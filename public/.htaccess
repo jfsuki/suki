@@ -1,0 +1,14 @@
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # 1. Si la petición es un archivo o carpeta que SÍ existe (CSS, JS, imágenes), no hagas nada
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # 2. Rutas de API: api/cliente/guardar -> api.php?route=cliente/guardar
+    RewriteRule ^api/(.*)$ api.php?route=$1 [QSA,L]
+
+    # 3. Rutas de Vistas: clientes -> index.php?url=clientes
+    RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
+</IfModule>

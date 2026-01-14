@@ -1,0 +1,78 @@
+{
+  "name": "example_form",
+  "version": "1.0.0",
+  "mode": "create",
+
+  "layout": {
+    "type": "sections",
+    "columns": 2,
+    "gap": "16px",
+    "sections": [
+      {
+        "id": "general",
+        "title": "Información General",
+        "description": "Datos principales",
+        "columns": 2,
+        "fields": ["country", "city"]
+      }
+    ]
+  },
+
+  "fields": [
+    {
+      "id": "country",
+      "name": "country",
+      "type": "select",
+      "label": "País",
+      "required": true,
+      "options": [
+        { "value": "CO", "label": "Colombia" },
+        { "value": "MX", "label": "México" }
+      ],
+      "ui": {
+        "colSpan": 1
+      }
+    },
+    {
+      "id": "city",
+      "name": "city",
+      "type": "select",
+      "label": "Ciudad",
+      "required": true,
+      "options": {
+        "dependsOn": "country",
+        "source": "api",
+        "endpoint": "/api/cities",
+        "map": {
+          "value": "id",
+          "label": "name"
+        }
+      },
+      "ui": {
+        "colSpan": 1
+      }
+    }
+  ],
+
+  "rules": [
+    {
+      "when": {
+        "field": "country",
+        "operator": "==",
+        "value": "CO"
+      },
+      "then": [
+        {
+          "type": "show",
+          "target": "city"
+        }
+      ]
+    }
+  ],
+
+  "ui": {
+    "density": "normal",
+    "labelPosition": "top",
+    "submitText": "Guardar"
+  }
+}
