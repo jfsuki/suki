@@ -1,0 +1,684 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Suki Form Builder - Editor Visual JSON (Mejorado)</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        .json-preview { font-family: 'Consolas', 'Monaco', monospace; font-size: 0.80rem; }
+        .tab-active { border-bottom: 2px solid #ea580c; color: #ea580c; font-weight: 600; background-color: #fff7ed; }
+        .tab-inactive { color: #6b7280; }
+        .tab-inactive:hover { color: #374151; background-color: #f9fafb; }
+        /* Scrollbar fina para el JSON */
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
+    </style>
+</head>
+<body class="bg-gray-100 h-screen overflow-hidden flex flex-col" x-data="formBuilder()">
+
+    <header class="bg-white border-b px-6 py-3 flex justify-between items-center shadow-sm z-10 h-16">
+        <div class="flex items-center gap-3">
+            <div class="bg-orange-600 text-white p-2 rounded-lg shadow-md"><i class="fa-solid fa-layer-group"></i></div>
+            <div>
+                <h1 class="font-bold text-gray-800 text-lg leading-tight">Suki Form Builder</h1>
+                <p class="text-[11px] text-gray-500 font-medium">Generador de JSON Avanzado v2.0</p>
+            </div>
+        </div>
+        <div class="flex gap-2">
+            <button @click="loadExample()" class="px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded border transition">
+                <i class="fa-solid fa-upload mr-1"></i> Cargar JSON
+            </button>
+            <button @click="downloadJson()" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold uppercase rounded shadow transition flex items-center">
+                <i class="fa-solid fa-download mr-2"></i> Descargar JSON
+            </button>
+        </div>
+    </header>
+
+    <div class="flex flex-1 overflow-hidden">
+        
+        <div class="flex-1 flex flex-col overflow-hidden border-r bg-gray-50/50">
+            
+            <div class="flex border-b px-2 bg-white shadow-sm overflow-x-auto">
+                <template x-for="tab in tabs">
+                    <button 
+                        @click="activeTab = tab.id"
+                        :class="activeTab === tab.id ? 'tab-active' : 'tab-inactive'"
+                        class="px-5 py-3 text-xs uppercase tracking-wide transition-all flex items-center gap-2 whitespace-nowrap">
+                        <i :class="tab.icon"></i> <span x-text="tab.label"></span>
+                    </button>
+                </template>
+            </div>
+
+            <div class="flex-1 overflow-y-auto p-6 scroll-smooth">
+                
+                <div x-show="activeTab === 'general'" class="space-y-6 max-w-3xl mx-auto" x-transition.opacity>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <h3 class="font-bold text-gray-800 mb-5 pb-2 border-b flex items-center gap-2">
+                            <i class="fa-solid fa-file-invoice text-orange-500"></i> Datos del Formulario
+                        </h3>
+                        <div class="grid grid-cols-2 gap-6">
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">ID del Archivo</label>
+                                <input x-model="data.name" type="text" class="w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none transition" placeholder="ej: orden_compra.form">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Título Legible</label>
+                                <input x-model="data.title" type="text" class="w-full border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-orange-500 outline-none transition" placeholder="ej: Orden de Compra">
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Modo por Defecto</label>
+                                <select x-model="data.mode" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                    <option value="create">Creación (Create)</option>
+                                    <option value="edit">Edición (Edit)</option>
+                                    <option value="view">Solo Lectura (View)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-xs font-bold text-gray-500 uppercase mb-1">Versión</label>
+                                <input x-model="data.version" type="text" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="1.0.0">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="activeTab === 'fields'" class="max-w-4xl mx-auto" x-transition.opacity>
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 class="font-bold text-gray-700 text-lg">Campos del Formulario</h3>
+                            <p class="text-xs text-gray-500">Campos principales fuera de las tablas.</p>
+                        </div>
+                        <button @click="addField()" class="text-xs font-bold uppercase bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 shadow transition flex items-center gap-2">
+                            <i class="fa-solid fa-plus"></i> Agregar Campo
+                        </button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <template x-for="(field, index) in data.fields" :key="index">
+                            <div class="bg-white p-5 rounded-lg border border-gray-200 shadow-sm relative group hover:border-blue-400 transition hover:shadow-md">
+                                <button @click="removeField(index)" class="absolute top-3 right-3 text-gray-300 hover:text-red-500 transition"><i class="fa-solid fa-trash-can fa-lg"></i></button>
+                                
+                                <div class="grid grid-cols-12 gap-4 items-start">
+                                    <div class="col-span-3">
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">ID Campo</label>
+                                        <input x-model="field.id" @input="field.name = field.id" type="text" class="w-full border rounded px-3 py-2 text-sm font-mono bg-gray-50 focus:bg-white transition" placeholder="id_campo">
+                                    </div>
+                                    <div class="col-span-4">
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Etiqueta (Label)</label>
+                                        <input x-model="field.label" type="text" class="w-full border rounded px-3 py-2 text-sm focus:ring-1 focus:ring-blue-400 outline-none" placeholder="Nombre visible">
+                                    </div>
+                                    <div class="col-span-3">
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo</label>
+                                        <select x-model="field.type" class="w-full border rounded px-3 py-2 text-sm bg-white focus:ring-1 focus:ring-blue-400 outline-none">
+                                            <option value="text">Texto</option>
+                                            <option value="number">Número</option>
+                                            <option value="email">Email</option>
+                                            <option value="date">Fecha</option>
+                                            <option value="time">Hora</option>
+                                            <option value="select">Select (Lista)</option>
+                                            <option value="checkbox">Checkbox (Switch)</option>
+                                            <option value="textarea">Área de Texto</option>
+                                        </select>
+                                    </div>
+                                    <div class="col-span-2 pt-6 flex justify-end">
+                                        <button @click="field.showSettings = !field.showSettings" class="text-xs font-semibold text-blue-600 hover:text-blue-800 transition flex items-center gap-1">
+                                            <i class="fa-solid fa-gear"></i> <span x-text="field.showSettings ? 'Ocultar' : 'Ajustes'"></span>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div x-show="field.showSettings" class="mt-4 pt-4 border-t border-gray-100 grid grid-cols-1 md:grid-cols-2 gap-6 bg-gray-50/50 -mx-5 -mb-5 p-5 rounded-b-lg">
+                                    
+                                    <div>
+                                        <h5 class="font-bold text-gray-600 mb-2 text-xs uppercase flex items-center gap-1"><i class="fa-solid fa-shield-halved"></i> Validación</h5>
+                                        <div class="space-y-2">
+                                            <label class="flex items-center gap-2 cursor-pointer p-2 hover:bg-white rounded border border-transparent hover:border-gray-200 transition">
+                                                <input type="checkbox" x-model="field.validation.required" class="rounded text-blue-600 focus:ring-0">
+                                                <span class="text-sm text-gray-700">Campo Obligatorio (Required)</span>
+                                            </label>
+                                            
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-xs text-gray-500 w-12">Regex:</span>
+                                                <input x-model="field.validation.pattern" type="text" class="flex-1 border rounded px-2 py-1 font-mono text-xs" placeholder="^[0-9]+$">
+                                            </div>
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-xs text-gray-500 w-12">Error:</span>
+                                                <input x-model="field.validation.message" type="text" class="flex-1 border rounded px-2 py-1 text-xs" placeholder="Mensaje de error personalizado...">
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div x-show="field.type === 'select'">
+                                        <h5 class="font-bold text-gray-600 mb-2 text-xs uppercase flex items-center gap-1"><i class="fa-solid fa-list-ul"></i> Configuración del Select</h5>
+                                        
+                                        <label class="flex items-center gap-2 cursor-pointer mb-2">
+                                            <input type="checkbox" x-model="field.searchable" class="rounded text-blue-600">
+                                            <span class="text-xs font-bold text-blue-700">Permitir Buscar/Filtrar (Searchable)</span>
+                                        </label>
+
+                                        <div class="flex gap-2 mb-2">
+                                            <button @click="field.options = [{value:'', label:''}]" :class="Array.isArray(field.options) ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-200 text-gray-600'" class="flex-1 py-1 text-xs rounded transition">Manual</button>
+                                            <button @click="field.options = {source:'api', endpoint:''}" :class="!Array.isArray(field.options) ? 'bg-blue-600 text-white shadow-md' : 'bg-gray-200 text-gray-600'" class="flex-1 py-1 text-xs rounded transition">Desde API</button>
+                                        </div>
+                                        
+                                        <template x-if="Array.isArray(field.options)">
+                                            <div class="bg-white border rounded p-2 max-h-32 overflow-y-auto">
+                                                <template x-for="(opt, oIndex) in field.options" :key="oIndex">
+                                                    <div class="flex gap-1 mb-1 items-center">
+                                                        <input x-model="opt.value" placeholder="Valor" class="border px-2 py-1 w-1/3 rounded text-xs">
+                                                        <input x-model="opt.label" placeholder="Etiqueta" class="border px-2 py-1 w-full rounded text-xs">
+                                                        <button @click="field.options.push({value:'', label:''})" class="text-green-600 hover:text-green-800"><i class="fa-solid fa-plus-circle"></i></button>
+                                                        <button @click="field.options.length > 1 ? field.options.splice(oIndex, 1) : null" class="text-red-500 hover:text-red-700"><i class="fa-solid fa-minus-circle"></i></button>
+                                                    </div>
+                                                </template>
+                                            </div>
+                                        </template>
+                                        
+                                        <template x-if="!Array.isArray(field.options)">
+                                            <div class="space-y-2">
+                                                <input x-model="field.options.endpoint" placeholder="/api/v1/options..." class="w-full border rounded px-2 py-1 text-xs font-mono bg-white">
+                                                <input x-model="field.options.valueKey" placeholder="Key Valor (ej: id)" class="w-full border rounded px-2 py-1 text-xs bg-white">
+                                                <input x-model="field.options.labelKey" placeholder="Key Etiqueta (ej: name)" class="w-full border rounded px-2 py-1 text-xs bg-white">
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+
+                        <div x-show="data.fields.length === 0" class="text-center py-10 text-gray-400 border-2 border-dashed border-gray-300 rounded-lg">
+                            <i class="fa-regular fa-folder-open text-3xl mb-2"></i>
+                            <p class="text-sm">No hay campos agregados aún.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="activeTab === 'layout'" class="max-w-4xl mx-auto" x-transition.opacity>
+                    <div class="flex justify-between items-center mb-6">
+                        <h3 class="font-bold text-gray-700 text-lg">Diseño de Secciones</h3>
+                        <button @click="addSection()" class="text-xs font-bold uppercase bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 shadow transition">
+                            + Nueva Sección
+                        </button>
+                    </div>
+
+                    <div class="space-y-4">
+                        <template x-for="(section, sIndex) in data.layout.sections" :key="sIndex">
+                            <div class="bg-white border border-gray-200 rounded-lg p-4 shadow-sm relative hover:shadow-md transition">
+                                <button @click="data.layout.sections.splice(sIndex, 1)" class="absolute top-2 right-2 text-gray-300 hover:text-red-500"><i class="fa-solid fa-times"></i></button>
+                                
+                                <div class="flex gap-4 mb-3 items-end">
+                                    <div class="flex-1">
+                                        <label class="text-[10px] font-bold text-gray-400 uppercase">Título Sección</label>
+                                        <input x-model="section.title" class="font-bold text-gray-800 border-b border-gray-300 focus:border-purple-500 outline-none w-full pb-1" placeholder="Ej: Información Personal">
+                                    </div>
+                                    <div class="w-24">
+                                        <label class="text-[10px] text-gray-400 uppercase">Columnas</label>
+                                        <input x-model="section.columns" type="number" min="1" max="4" class="w-full border rounded px-2 py-1 text-center font-bold text-purple-700">
+                                    </div>
+                                </div>
+                                <input x-model="section.id" class="text-[10px] text-gray-400 mb-3 w-full font-mono bg-transparent border-none p-0 focus:ring-0" placeholder="id_seccion_opcional">
+
+                                <div class="bg-gray-50 p-3 rounded-md border border-gray-100">
+                                    <p class="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider">Campos Asignados:</p>
+                                    <div class="flex flex-wrap gap-2 mb-3 min-h-[30px]">
+                                        <template x-for="fieldId in section.fields">
+                                            <span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded border border-purple-200 flex items-center gap-1 shadow-sm">
+                                                <i class="fa-solid fa-cube text-[10px]"></i> <span x-text="fieldId"></span>
+                                                <button @click="section.fields = section.fields.filter(f => f !== fieldId)" class="hover:text-red-600 ml-1 rounded-full w-4 h-4 flex items-center justify-center hover:bg-purple-200">×</button>
+                                            </span>
+                                        </template>
+                                        <span x-show="section.fields.length === 0" class="text-xs text-gray-400 italic py-1">Arrastra o selecciona campos abajo...</span>
+                                    </div>
+                                    
+                                    <div class="relative">
+                                        <select @change="if($event.target.value) { section.fields.push($event.target.value); $event.target.value=''; }" class="text-xs border border-gray-300 rounded p-2 w-full bg-white hover:border-purple-400 cursor-pointer outline-none">
+                                            <option value="">+ Añadir campo a esta sección...</option>
+                                            <template x-for="f in data.fields">
+                                                <option :value="f.id" x-text="f.label + ' (' + f.id + ')'" :disabled="section.fields.includes(f.id)"></option>
+                                            </template>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div x-show="activeTab === 'grids'" class="max-w-6xl mx-auto" x-transition.opacity>
+                      <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 class="font-bold text-gray-700 text-lg">Grids (Tablas Detalle)</h3>
+                            <p class="text-xs text-gray-500">Configura tablas repetibles, inventarios, o listas de items.</p>
+                        </div>
+                        <button @click="addGrid()" class="text-xs font-bold uppercase bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 shadow transition">
+                            + Agregar Grid
+                        </button>
+                    </div>
+
+                    <div class="space-y-8">
+                        <template x-for="(grid, gIndex) in data.grids" :key="gIndex">
+                            <div class="border border-orange-200 rounded-xl bg-white overflow-hidden shadow-sm">
+                                <div class="bg-orange-50 px-4 py-3 border-b border-orange-100 flex justify-between items-center">
+                                    <div class="flex gap-4 items-center flex-1">
+                                        <span class="font-black text-orange-600 text-sm tracking-wider">GRID</span>
+                                        <div class="flex flex-col">
+                                            <label class="text-[9px] uppercase font-bold text-orange-400">ID del Grid</label>
+                                            <input x-model="grid.name" placeholder="ID (ej: detalles_factura)" class="border-b border-orange-200 bg-transparent px-1 py-0 text-sm font-mono focus:border-orange-500 outline-none w-64">
+                                        </div>
+                                        <div class="flex flex-col flex-1">
+                                            <label class="text-[9px] uppercase font-bold text-orange-400">Título Visible</label>
+                                            <input x-model="grid.label" placeholder="Título (ej: Productos)" class="border-b border-orange-200 bg-transparent px-1 py-0 text-sm focus:border-orange-500 outline-none w-full">
+                                        </div>
+                                    </div>
+                                    <button @click="data.grids.splice(gIndex, 1)" class="text-gray-400 hover:text-red-500 transition px-2"><i class="fa-solid fa-trash"></i></button>
+                                </div>
+
+                                <div class="p-4 overflow-x-auto">
+                                    <table class="w-full text-sm text-left border-collapse">
+                                        <thead class="bg-gray-50 text-xs uppercase text-gray-600 font-bold">
+                                            <tr>
+                                                <th class="px-3 py-2 w-32">ID Columna</th>
+                                                <th class="px-3 py-2 w-48">Label</th>
+                                                <th class="px-3 py-2 w-40">Tipo Input</th>
+                                                <th class="px-3 py-2">Configuración / Fórmula</th>
+                                                <th class="px-3 py-2 w-10"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-100">
+                                            <template x-for="(col, cIndex) in grid.columns" :key="cIndex">
+                                                <tr class="hover:bg-gray-50/50 transition">
+                                                    <td class="p-2 align-top">
+                                                        <input x-model="col.name" class="w-full border rounded px-2 py-1 font-mono text-xs bg-gray-50 focus:bg-white" placeholder="id_col">
+                                                    </td>
+                                                    <td class="p-2 align-top">
+                                                        <input x-model="col.label" class="w-full border rounded px-2 py-1 text-xs" placeholder="Nombre Columna">
+                                                    </td>
+                                                    <td class="p-2 align-top">
+                                                        <select x-model="col.input.type" class="w-full border rounded px-2 py-1 text-xs bg-white focus:ring-1 focus:ring-orange-300">
+                                                            <option value="text">Texto</option>
+                                                            <option value="number">Número</option>
+                                                            <option value="currency">Moneda</option>
+                                                            <option value="select">Select (Lista)</option>
+                                                            <option value="checkbox">Checkbox (True/False)</option>
+                                                            <option value="date">Fecha</option>
+                                                            <option value="time">Hora</option>
+                                                            <option value="datetime">Fecha y Hora</option>
+                                                        </select>
+                                                        
+                                                        <template x-if="col.input.type === 'select'">
+                                                            <button @click="col.showOptions = !col.showOptions" class="mt-1 w-full text-[10px] bg-blue-50 text-blue-600 border border-blue-100 rounded py-1 hover:bg-blue-100">
+                                                                <i class="fa-solid fa-list"></i> Configurar Opciones
+                                                            </button>
+                                                        </template>
+                                                    </td>
+                                                    <td class="p-2 align-top">
+                                                        <div class="flex flex-col gap-2">
+                                                            
+                                                            <template x-if="col.input.type === 'select' && col.showOptions">
+                                                                <div class="bg-blue-50 border border-blue-200 p-2 rounded text-xs mb-2 shadow-sm">
+                                                                    <div class="flex justify-between items-center mb-1">
+                                                                        <span class="font-bold text-blue-800">Opciones del Select</span>
+                                                                        <label class="flex items-center gap-1 cursor-pointer">
+                                                                            <input type="checkbox" x-model="col.input.allowSearch" class="h-3 w-3 rounded text-blue-600">
+                                                                            <span class="text-[10px]">Buscable</span>
+                                                                        </label>
+                                                                    </div>
+                                                                    <div class="flex gap-1 mb-2">
+                                                                        <select x-model="col.input.optionsSource" @change="if($event.target.value === 'manual') { col.input.options = [{value:'', label:''}] } else { col.input.options = {endpoint:''} }" class="w-full border rounded px-1 py-0.5 text-[10px]">
+                                                                            <option value="manual">Manual</option>
+                                                                            <option value="api">API</option>
+                                                                        </select>
+                                                                    </div>
+                                                                    
+                                                                    <template x-if="col.input.optionsSource === 'manual' && Array.isArray(col.input.options)">
+                                                                        <div class="max-h-24 overflow-y-auto bg-white border rounded p-1">
+                                                                            <template x-for="(opt, oi) in col.input.options" :key="oi">
+                                                                                <div class="flex gap-1 mb-1">
+                                                                                    <input x-model="opt.value" placeholder="Val" class="w-1/3 border px-1 text-[10px] rounded">
+                                                                                    <input x-model="opt.label" placeholder="Texto" class="w-full border px-1 text-[10px] rounded">
+                                                                                    <button @click="col.input.options.push({value:'', label:''})" class="text-green-600 text-[10px]">+</button>
+                                                                                </div>
+                                                                            </template>
+                                                                        </div>
+                                                                    </template>
+                                                                     <template x-if="col.input.optionsSource === 'api'">
+                                                                         <input x-model="col.input.options.endpoint" placeholder="/api/items" class="w-full border rounded px-1 text-[10px] font-mono">
+                                                                    </template>
+                                                                </div>
+                                                            </template>
+
+                                                            <div class="flex items-center gap-2">
+                                                                <template x-if="!col.formula">
+                                                                    <button @click="col.formula = {expression:'', watch:[]}" class="text-[10px] text-gray-400 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100 hover:text-gray-600 transition">+ Fórmula Calc.</button>
+                                                                </template>
+                                                                <template x-if="col.formula">
+                                                                    <div class="w-full bg-purple-50 p-2 rounded border border-purple-200 relative group">
+                                                                        <button @click="delete col.formula" class="absolute top-1 right-1 text-purple-300 hover:text-red-500"><i class="fa-solid fa-times-circle"></i></button>
+                                                                        <label class="block text-[9px] font-bold text-purple-700">Expresión</label>
+                                                                        <input x-model="col.formula.expression" placeholder="cant * precio" class="w-full text-xs border border-purple-200 rounded px-1 py-0.5 mb-1 bg-white focus:ring-1 focus:ring-purple-400">
+                                                                        <label class="block text-[9px] font-bold text-purple-700">Observar (IDs)</label>
+                                                                        <input x-model="col.formula.watch" placeholder='["cant", "precio"]' class="w-full text-xs border border-purple-200 rounded px-1 py-0.5 font-mono bg-white text-gray-600">
+                                                                    </div>
+                                                                </template>
+                                                            </div>
+
+                                                            <label class="flex items-center gap-2 text-xs mt-1 text-gray-600 hover:bg-gray-100 p-1 rounded cursor-pointer w-fit">
+                                                                <input type="checkbox" :checked="!!col.total" @change="$event.target.checked ? col.total = true : delete col.total" class="rounded text-orange-500 focus:ring-0">
+                                                                <span class="text-[10px] uppercase font-bold text-gray-500">Sumar al Pie</span>
+                                                            </label>
+                                                        </div>
+                                                    </td>
+                                                    <td class="p-2 text-center align-top pt-3">
+                                                        <button @click="grid.columns.splice(cIndex, 1)" class="text-gray-300 hover:text-red-500 transition"><i class="fa-solid fa-circle-minus"></i></button>
+                                                    </td>
+                                                </tr>
+                                            </template>
+                                        </tbody>
+                                    </table>
+                                    <button @click="addGridColumn(gIndex)" class="mt-3 text-xs font-bold text-gray-600 bg-gray-100 hover:bg-gray-200 px-3 py-2 rounded border border-gray-200 transition flex items-center gap-1">
+                                        <i class="fa-solid fa-plus"></i> Añadir Columna
+                                    </button>
+                                </div>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <div x-show="activeTab === 'summary'" class="max-w-4xl mx-auto" x-transition.opacity>
+                    <div class="flex justify-between items-center mb-6">
+                        <div>
+                            <h3 class="font-bold text-gray-700 text-lg">Resumen y Totales (Footer)</h3>
+                            <p class="text-xs text-gray-500">Cálculos finales basados en grids o fórmulas complejas.</p>
+                        </div>
+                        <button @click="addSummary()" class="text-xs font-bold uppercase bg-teal-600 text-white px-4 py-2 rounded-lg hover:bg-teal-700 shadow transition">
+                            + Nuevo Total
+                        </button>
+                    </div>
+
+                    <div class="space-y-4">
+                         <template x-for="(sum, index) in data.summary" :key="index">
+                             <div class="bg-white border border-teal-100 p-4 rounded-lg flex gap-4 items-start shadow-sm hover:shadow-md transition">
+                                 <div class="bg-teal-50 text-teal-600 w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm shrink-0">
+                                     <span x-text="index + 1"></span>
+                                 </div>
+                                 <div class="flex-1 grid grid-cols-12 gap-4">
+                                     <div class="col-span-3">
+                                         <label class="text-[10px] font-bold text-gray-500 uppercase">ID Variable</label>
+                                         <input x-model="sum.name" class="w-full border rounded px-2 py-1 font-mono text-sm bg-gray-50 focus:bg-white" placeholder="total_neto">
+                                     </div>
+                                     <div class="col-span-5">
+                                         <label class="text-[10px] font-bold text-gray-500 uppercase">Etiqueta Visible</label>
+                                         <input x-model="sum.label" class="w-full border rounded px-2 py-1 text-sm font-bold text-gray-700" placeholder="Total a Pagar">
+                                     </div>
+                                     <div class="col-span-4">
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo de Cálculo</label>
+                                        <select x-model="sum.type" class="w-full border rounded px-2 py-1 text-sm bg-white font-medium text-teal-800">
+                                            <option value="sum">Suma de Columna (Grid)</option>
+                                            <option value="formula">Fórmula Matemática</option>
+                                        </select>
+                                     </div>
+
+                                     <div class="col-span-12 bg-gray-50 p-3 rounded border border-gray-100">
+                                        
+                                        <template x-if="sum.type === 'sum'">
+                                            <div class="flex gap-4 items-end">
+                                                <div class="flex-1">
+                                                    <label class="text-[10px] font-bold text-gray-400 uppercase">Grid Origen (ID)</label>
+                                                    <select x-model="sum.source.grid" class="w-full border rounded px-2 py-1 text-sm bg-white">
+                                                        <option value="">-- Seleccionar Grid --</option>
+                                                        <template x-for="g in data.grids">
+                                                            <option :value="g.name" x-text="g.name"></option>
+                                                        </template>
+                                                    </select>
+                                                </div>
+                                                <div class="flex-1">
+                                                    <label class="text-[10px] font-bold text-gray-400 uppercase">Columna a Sumar (ID)</label>
+                                                    <input x-model="sum.source.field" list="grid_fields_list" placeholder="id_columna" class="w-full border rounded px-2 py-1 text-sm">
+                                                    <datalist id="grid_fields_list">
+                                                        <template x-for="g in data.grids">
+                                                            <template x-for="c in g.columns">
+                                                                <option :value="c.name" x-text="g.name + ' -> ' + c.name"></option>
+                                                            </template>
+                                                        </template>
+                                                    </datalist>
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <template x-if="sum.type === 'formula'">
+                                            <div class="space-y-2">
+                                                <div>
+                                                    <label class="text-[10px] font-bold text-gray-400 uppercase">Expresión Matemática</label>
+                                                    <input x-model="sum.expression" placeholder="subtotal + impuestos" class="w-full border border-teal-300 rounded px-2 py-1 text-sm font-mono bg-white">
+                                                </div>
+                                                <div>
+                                                    <label class="text-[10px] font-bold text-gray-400 uppercase">Variables a observar</label>
+                                                    <input x-model="sum.watch" placeholder='["subtotal", "impuestos"]' class="w-full border rounded px-2 py-1 text-xs font-mono text-gray-500">
+                                                </div>
+                                            </div>
+                                        </template>
+
+                                        <div class="mt-3 pt-3 border-t border-gray-200 grid grid-cols-3 gap-3">
+                                            <div>
+                                                <label class="text-[9px] font-bold text-gray-400 uppercase">Formato</label>
+                                                <select x-model="sum.format" class="w-full border rounded px-2 py-1 text-xs">
+                                                    <option value="currency">Moneda ($)</option>
+                                                    <option value="number">Número Simple</option>
+                                                    <option value="percent">Porcentaje (%)</option>
+                                                </select>
+                                            </div>
+                                            <div>
+                                                <label class="text-[9px] font-bold text-gray-400 uppercase">Decimales</label>
+                                                <input type="number" x-model="sum.decimals" class="w-full border rounded px-2 py-1 text-xs" placeholder="2">
+                                            </div>
+                                        </div>
+
+                                     </div>
+                                 </div>
+                                 <button @click="data.summary.splice(index, 1)" class="text-gray-300 hover:text-red-500 pt-1"><i class="fa-solid fa-trash"></i></button>
+                             </div>
+                         </template>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <div class="w-[35%] bg-[#1e1e1e] text-gray-300 flex flex-col border-l border-gray-700 shadow-2xl relative">
+            <div class="px-4 py-3 bg-[#252526] text-xs font-mono border-b border-[#333] flex justify-between items-center shadow-md z-10">
+                <span class="font-bold text-gray-400"><i class="fa-brands fa-js mr-1"></i> JSON OUTPUT</span>
+                <span class="text-green-500 text-[10px] bg-green-900/30 px-2 py-0.5 rounded-full border border-green-800 animate-pulse">● Live</span>
+            </div>
+            
+            <div class="flex-1 overflow-auto p-0 relative group">
+                <textarea 
+                    readonly 
+                    class="w-full h-full bg-[#1e1e1e] font-mono text-xs text-[#9cdcfe] focus:outline-none resize-none p-4 leading-relaxed json-preview"
+                    x-text="JSON.stringify(data, null, 2)"
+                ></textarea>
+                <button @click="navigator.clipboard.writeText(JSON.stringify(data, null, 2))" class="absolute top-4 right-4 bg-gray-700 hover:bg-gray-600 text-white p-2 rounded opacity-0 group-hover:opacity-100 transition shadow-lg text-xs">
+                    <i class="fa-regular fa-copy"></i> Copiar
+                </button>
+            </div>
+
+            <div x-show="showLoadModal" class="absolute inset-0 bg-black/90 z-50 flex items-center justify-center p-8 backdrop-blur-sm" x-transition.opacity style="display: none;">
+                <div class="bg-white text-gray-800 w-full max-w-2xl rounded-xl shadow-2xl flex flex-col h-3/4 overflow-hidden">
+                    <div class="bg-gray-100 px-6 py-4 border-b flex justify-between items-center">
+                        <h3 class="font-bold text-lg text-gray-700">Pegar JSON Existente</h3>
+                        <button @click="showLoadModal = false" class="text-gray-400 hover:text-gray-700"><i class="fa-solid fa-times"></i></button>
+                    </div>
+                    <textarea x-model="jsonInput" class="flex-1 p-6 font-mono text-xs bg-white text-gray-700 resize-none focus:outline-none" placeholder="// Pega aquí el contenido de tu archivo .json..."></textarea>
+                    <div class="bg-gray-50 px-6 py-4 border-t flex justify-end gap-3">
+                        <button @click="showLoadModal = false" class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded transition">Cancelar</button>
+                        <button @click="processLoad()" class="px-6 py-2 bg-blue-600 text-white text-sm font-bold rounded shadow hover:bg-blue-700 transition">Cargar al Editor</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+    <script>
+        function formBuilder() {
+            return {
+                activeTab: 'general',
+                showLoadModal: false,
+                jsonInput: '',
+                tabs: [
+                    { id: 'general', label: 'General', icon: 'fa-solid fa-sliders' },
+                    { id: 'fields', label: 'Campos', icon: 'fa-regular fa-keyboard' },
+                    { id: 'layout', label: 'Diseño', icon: 'fa-solid fa-table-columns' },
+                    { id: 'grids', label: 'Grids/Tablas', icon: 'fa-solid fa-table-list' },
+                    { id: 'summary', label: 'Totales', icon: 'fa-solid fa-calculator' }
+                ],
+                data: {
+                    type: "form",
+                    name: "nuevo_formulario.json",
+                    title: "Nuevo Formulario",
+                    version: "1.0.0",
+                    mode: "create",
+                    layout: { type: "sections", gap: "4", sections: [] },
+                    fields: [],
+                    grids: [],
+                    summary: []
+                },
+
+                // --- Métodos de Campos ---
+                addField() {
+                    this.data.fields.push({
+                        id: 'campo_' + Math.floor(Math.random() * 1000),
+                        name: '', // se auto-llena con id
+                        type: 'text',
+                        label: 'Nuevo Campo',
+                        validation: { required: false, pattern: '', message: '' },
+                        showSettings: true,
+                        searchable: false, // Nuevo: para selects
+                        options: [] // Para selects
+                    });
+                    this.data.fields[this.data.fields.length-1].name = this.data.fields[this.data.fields.length-1].id;
+                    this.activeTab = 'fields';
+                },
+                removeField(index) {
+                    if(confirm('¿Eliminar este campo?')) this.data.fields.splice(index, 1);
+                },
+
+                // --- Métodos de Layout ---
+                addSection() {
+                    this.data.layout.sections.push({
+                        id: 'sec_' + Math.floor(Math.random() * 1000),
+                        title: 'Nueva Sección',
+                        columns: 2,
+                        fields: []
+                    });
+                },
+
+                // --- Métodos de Grids ---
+                addGrid() {
+                    this.data.grids.push({
+                        name: 'grid_' + Math.floor(Math.random() * 1000),
+                        label: 'Lista de Items',
+                        columns: [
+                            { 
+                                name: 'item', 
+                                label: 'Descripción', 
+                                input: { type: 'text' } 
+                            },
+                            { 
+                                name: 'cantidad', 
+                                label: 'Cant', 
+                                input: { type: 'number' },
+                                formula: { expression: '', watch: [] }
+                            },
+                            {
+                                name: 'precio',
+                                label: 'Precio Unit.',
+                                input: { type: 'currency' }
+                            },
+                            {
+                                name: 'total_linea',
+                                label: 'Total',
+                                input: { type: 'currency' },
+                                formula: { expression: 'cantidad * precio', watch: ['cantidad', 'precio'] },
+                                total: true // Sumar al pie
+                            }
+                        ]
+                    });
+                    this.activeTab = 'grids';
+                },
+                addGridColumn(gridIndex) {
+                    this.data.grids[gridIndex].columns.push({
+                        name: 'col_' + Math.floor(Math.random() * 100),
+                        label: 'Nueva Columna',
+                        input: { 
+                            type: 'text',
+                            optionsSource: 'manual', // default para selects
+                            options: [],
+                            allowSearch: false
+                        },
+                        showOptions: false // estado UI
+                    });
+                },
+
+                // --- Métodos de Summary (Totales) ---
+                addSummary() {
+                    this.data.summary.push({
+                        name: 'total_final',
+                        label: 'Total General',
+                        type: 'sum', // sum | formula
+                        source: { grid: '', field: '' },
+                        expression: '',
+                        watch: [],
+                        format: 'currency',
+                        decimals: 2
+                    });
+                    this.activeTab = 'summary';
+                },
+
+                // --- Utilidades ---
+                downloadJson() {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(this.data, null, 2));
+                    const node = document.createElement('a');
+                    node.setAttribute("href", dataStr);
+                    node.setAttribute("download", (this.data.name || "form") + ".json");
+                    document.body.appendChild(node);
+                    node.click();
+                    node.remove();
+                },
+                loadExample() {
+                    this.showLoadModal = true;
+                },
+                processLoad() {
+                    try {
+                        const parsed = JSON.parse(this.jsonInput);
+                        this.data = parsed;
+                        // Asegurar estructuras para evitar errores de renderizado
+                        if(!this.data.layout) this.data.layout = { sections: [] };
+                        if(!this.data.fields) this.data.fields = [];
+                        if(!this.data.grids) this.data.grids = [];
+                        if(!this.data.summary) this.data.summary = [];
+                        
+                        // Inicializar estados de UI que no se guardan en el JSON
+                        this.data.fields.forEach(f => f.showSettings = false);
+                        this.data.grids.forEach(g => {
+                            if(g.columns) g.columns.forEach(c => {
+                                c.showOptions = false;
+                                if(!c.input) c.input = { type: 'text' };
+                            });
+                        });
+
+                        this.showLoadModal = false;
+                        this.jsonInput = '';
+                        alert('JSON cargado correctamente');
+                    } catch (e) {
+                        alert('Error al leer el JSON: ' + e.message);
+                    }
+                }
+            }
+        }
+    </script>
+</body>
+</html>

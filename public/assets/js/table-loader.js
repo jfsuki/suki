@@ -1,3 +1,4 @@
+
 document.addEventListener('DOMContentLoaded', () => {
     document.querySelectorAll('tbody[data-endpoint]').forEach(tbody => {
         const endpoint = tbody.dataset.endpoint;

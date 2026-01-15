@@ -2,11 +2,9 @@
 header('Content-Type: application/javascript');
 $configName = basename($_GET['config'] ?? '');
 
-// Busca el JSON en la carpeta del script actual, subiendo niveles
+// Buscar JSON
 $jsonPath = realpath(__DIR__ . '/../../views/clientes/' . $configName);
-
 if (!$jsonPath || !file_exists($jsonPath)) {
-    // Si falla, intentamos una ruta relativa al DOCUMENT_ROOT de Laragon
     $jsonPath = $_SERVER['DOCUMENT_ROOT'] . '/../views/clientes/' . $configName;
 }
 
@@ -14,127 +12,205 @@ $formConfig = json_decode(file_get_contents($jsonPath), true);
 ?>
 
 class GridCalculator {
+
     constructor() {
-        this.init();
-        // Guardamos las reglas de validación del JSON en una variable JS
         this.rules = <?php echo json_encode($formConfig['grids'] ?? []); ?>;
+        this.init();
     }
 
     init() {
-        <?php foreach ($formConfig['grids'] as $grid): ?>
-            this.initGrid('<?php echo $grid['name']; ?>');
-        <?php endforeach; ?>
+        this.rules.forEach(grid => this.initGrid(grid.name));
     }
 
     initGrid(gridName) {
         const table = document.querySelector(`[data-grid="${gridName}"]`);
         if (!table) return;
 
-        // Botón agregar
         const btnAdd = document.querySelector(`[data-add-row="${gridName}"]`);
         if (btnAdd) btnAdd.onclick = () => this.addRow(gridName);
 
-        // Listener para Cálculos y VALIDACIÓN inmediata
-        table.addEventListener('input', (e) => {
+        table.addEventListener('input', e => {
             if (e.target.matches('input, select')) {
                 const row = e.target.closest('tr');
                 this.calculateRow(gridName, row);
-                this.validateField(e.target, gridName); // <--- VALIDACIÓN AQUÍ
                 this.updateFormSummary();
             }
         });
 
-        // Validar también al salir del campo (por si quedó vacío)
-        table.addEventListener('blur', (e) => {
-            if (e.target.matches('input, select')) {
-                this.validateField(e.target, gridName);
+        table.addEventListener('click', e => {
+            if (e.target.dataset.removeRow !== undefined) {
+                e.target.closest('tr').remove();
+                this.updateGridTotals(gridName);
+                this.updateFormSummary();
             }
-        }, true);
+        });
     }
 
-    validateField(input, gridName) {
-    const colName = input.dataset.column;
-    // Buscamos la configuración de esta columna en las reglas cargadas del JSON
-    const grid = this.rules.find(g => g.name === gridName);
-    const colConfig = grid?.columns.find(c => c.name === colName);
-    
-    if (!colConfig || !colConfig.validation) return;
+    addRow(gridName) {
+        const gridConfig = this.rules.find(g => g.name === gridName);
+        if (!gridConfig) return;
 
-    const val = input.value.trim();
-    const rules = colConfig.validation;
-    let isInvalid = false;
+        const tbody = document.querySelector(`[data-grid="${gridName}"] tbody`);
+        const rowIndex = tbody.children.length;
+        const tr = document.createElement('tr');
 
-    // VALIDACIÓN LÓGICA
-    if (rules.required && val === "") {
-        isInvalid = true;
-    } else if (rules.pattern && val !== "") {
-        const regex = new RegExp(rules.pattern);
-        if (!regex.test(val)) isInvalid = true;
+        gridConfig.columns.forEach(col => {
+
+            const td = document.createElement('td');
+            td.className = 'border p-2';
+
+            const inputCfg = col.input || {};
+            const type = (inputCfg.type || 'text').toLowerCase();
+            const hasFormula = !!col.formula;
+
+            let field;
+
+            /* ===============================
+               ✅ SELECT REAL
+            =============================== */
+            if (type === 'select') {
+
+                field = document.createElement('select');
+                field.className = 'w-full border rounded px-2 py-1 text-sm bg-white';
+
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = 'Seleccione...';
+                field.appendChild(placeholder);
+
+                if (Array.isArray(inputCfg.options)) {
+                    inputCfg.options.forEach(opt => {
+                        const option = document.createElement('option');
+                        option.value = opt.value;
+                        option.textContent = opt.label;
+                        field.appendChild(option);
+                    });
+                }
+
+            } 
+            /* ===============================
+               ✅ INPUT REAL
+            =============================== */
+            else {
+
+                field = document.createElement('input');
+                field.type = (type === 'currency') ? 'number' : type;
+                field.value = '0';
+                field.className = 'w-full border rounded px-2 py-1 text-sm';
+
+                if (type === 'number' || type === 'currency') {
+                    field.step = '0.01';
+                }
+            }
+
+            // Atributos comunes
+            field.name = `${gridName}[${rowIndex}][${col.name}]`;
+            field.dataset.column = col.name;
+            field.dataset.gridName = gridName;
+            field.dataset.rowIndex = rowIndex;
+
+            if (hasFormula) {
+                field.readOnly = true;
+                field.classList.add('bg-gray-100', 'font-semibold');
+            }
+
+            td.appendChild(field);
+            tr.appendChild(td);
+        });
+
+        // Botón eliminar
+        const tdRemove = document.createElement('td');
+        tdRemove.className = 'border p-2 text-center';
+        const btnRemove = document.createElement('button');
+        btnRemove.type = 'button';
+        btnRemove.dataset.removeRow = '';
+        btnRemove.textContent = '×';
+        btnRemove.className = 'text-red-600 font-bold text-lg';
+        tdRemove.appendChild(btnRemove);
+        tr.appendChild(tdRemove);
+
+        tbody.appendChild(tr);
+
+        this.updateGridTotals(gridName);
+        this.updateFormSummary();
     }
 
-    // APLICACIÓN DE ESTILOS (Tailwind)
-    if (isInvalid) {
-        input.classList.add('border-red-500', 'ring-2', 'ring-red-200', 'bg-red-50');
-        input.classList.remove('border-gray-300');
-    } else {
-        input.classList.remove('border-red-500', 'ring-2', 'ring-red-200', 'bg-red-50');
-        input.classList.add('border-gray-300');
-    }
-}
-
-    // ... (Mantén calculateRow, updateFormSummary y getGridTotal igual que antes) ...
     calculateRow(gridName, row) {
-        const getVal = (col) => parseFloat(row.querySelector(`[data-column="${col}"]`)?.value || 0);
+        const gridConfig = this.rules.find(g => g.name === gridName);
+        if (!gridConfig) return;
+
+        const getVal = col =>
+            parseFloat(row.querySelector(`[data-column="${col}"]`)?.value || 0);
+
         const setVal = (col, val) => {
-            const input = row.querySelector(`[data-column="${col}"]`);
-            if (input) input.value = val.toFixed(2);
+            const el = row.querySelector(`[data-column="${col}"]`);
+            if (el) el.value = val.toFixed(2);
         };
-        switch (gridName) {
-            <?php foreach ($formConfig['grids'] as $grid): ?>
-            case '<?php echo $grid['name']; ?>':
-                <?php foreach ($grid['columns'] as $col): 
-                    if (isset($col['formula'])): 
-                        $expr = $col['formula']['expression'];
-                        foreach ($col['formula']['watch'] as $v) $expr = str_replace($v, "getVal('$v')", $expr);
-                ?>
-                setVal('<?php echo $col['name']; ?>', <?php echo $expr; ?>);
-                <?php endif; endforeach; ?>
-                break;
-            <?php endforeach; ?>
-        }
+
+        gridConfig.columns.forEach(col => {
+            if (col.formula) {
+                let expr = col.formula.expression;
+                col.formula.watch.forEach(v => {
+                    expr = expr.replaceAll(v, `getVal("${v}")`);
+                });
+                try {
+                    setVal(col.name, eval(expr));
+                } catch {}
+            }
+        });
+
+        this.updateGridTotals(gridName);
+    }
+
+    updateGridTotals(gridName) {
+        const gridConfig = this.rules.find(g => g.name === gridName);
+        if (!gridConfig) return;
+
+        gridConfig.columns.forEach(col => {
+            if (col.total) {
+                let sum = 0;
+                document.querySelectorAll(
+                    `[data-grid="${gridName}"] [data-column="${col.name}"]`
+                ).forEach(i => sum += parseFloat(i.value || 0));
+
+                const el = document.querySelector(`[data-total="${gridName}.${col.name}"]`);
+                if (el) el.textContent = sum.toFixed(2);
+            }
+        });
     }
 
     updateFormSummary() {
-        <?php if(isset($formConfig['summary'])): ?>
-            <?php foreach ($formConfig['summary'] as $item): ?>
-                const el = document.querySelector('[data-summary="<?php echo $item['name']; ?>"]');
-                if (el) el.textContent = this.calculateSummaryValue('<?php echo $item['name']; ?>').toLocaleString('en-US', {minimumFractionDigits:2});
-            <?php endforeach; ?>
+        <?php if (!empty($formConfig['summary'])): ?>
+        <?php foreach ($formConfig['summary'] as $item): ?>
+            const el_<?php echo $item['name']; ?> =
+                document.querySelector('[data-summary="<?php echo $item['name']; ?>"]');
+            if (el_<?php echo $item['name']; ?>) {
+                el_<?php echo $item['name']; ?>.textContent =
+                    this.calculateSummaryValue('<?php echo $item['name']; ?>').toFixed(2);
+            }
+        <?php endforeach; ?>
         <?php endif; ?>
     }
 
     calculateSummaryValue(name) {
         switch (name) {
-            <?php if(isset($formConfig['summary'])): ?>
             <?php foreach ($formConfig['summary'] as $item): ?>
             case '<?php echo $item['name']; ?>':
                 <?php if ($item['type'] === 'sum'): ?>
-                    return this.getGridTotal('<?php echo $item['source']['grid']; ?>', '<?php echo $item['source']['field']; ?>');
-                <?php elseif ($item['type'] === 'formula'): 
-                    $jsExpr = $item['expression'];
-                    foreach ($item['watch'] as $v) $jsExpr = str_replace($v, "this.calculateSummaryValue('$v')", $jsExpr);
-                ?>
-                    return <?php echo $jsExpr; ?>;
+                    return this.getGridTotal('<?php echo $item['source']['grid']; ?>','<?php echo $item['source']['field']; ?>');
+                <?php elseif ($item['type'] === 'formula'): ?>
+                    return <?php echo $item['expression']; ?>;
                 <?php endif; ?>
             <?php endforeach; ?>
-            <?php endif; ?>
             default: return 0;
         }
     }
 
     getGridTotal(gridName, col) {
         let sum = 0;
-        document.querySelectorAll(`[data-grid="${gridName}"] [data-column="${col}"]`).forEach(i => sum += parseFloat(i.value || 0));
+        document.querySelectorAll(
+            `[data-grid="${gridName}"] [data-column="${col}"]`
+        ).forEach(i => sum += parseFloat(i.value || 0));
         return sum;
     }
 }

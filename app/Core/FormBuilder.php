@@ -1,20 +1,7 @@
 <?php
-// app/Core/FormBuilder.php
 
 namespace App\Core;
 
-/**
- * FormBuilder
- * ------------
- * Responsabilidad única:
- * Renderizar CAMPOS individuales.
- *
- * ❌ No conoce formularios
- * ❌ No conoce layouts
- * ❌ No conoce grids
- *
- * ✅ Solo UI de campos
- */
 class FormBuilder
 {
     public function renderField(array $field): string
@@ -26,87 +13,74 @@ class FormBuilder
 
         return match ($type) {
             'select'   => $this->select($label, $name, $field['options'] ?? []),
-            'checkbox' => $this->checkbox($label, $name, $field['value'] ?? '1'),
+            'checkbox' => $this->checkbox($label, $name, $field['value'] ?? '1', $field['defaultValue'] ?? false),
             'textarea' => $this->textarea($label, $name, $value),
             default    => $this->input($label, $name, $type, $value),
         };
     }
 
-    public function input(
-        ?string $label,
-        string $name,
-        string $type,
-        string $value = ''
-    ): string {
-        $labelHtml = $label
-            ? "<label class='text-xs font-bold text-gray-400 mb-1'>{$label}</label>"
+    public function input(?string $label, string $name, string $type, string $value = ''): string 
+    {
+        $labelHtml = $label 
+            ? "<label class='block text-xs font-bold text-gray-500 uppercase mb-1'>{$label}</label>" 
             : '';
 
         return "
-        <div class='flex flex-col gap-1'>
+        <div class='flex flex-col mb-2'>
             {$labelHtml}
-            <input
-                type='{$type}'
-                name='{$name}'
-                value='{$value}'
-                class='border rounded-lg p-2 text-sm'
+            <input 
+                type='{$type}' 
+                name='{$name}' 
+                value='{$value}' 
+                class='border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm'
             >
         </div>";
     }
 
-    public function textarea(
-        ?string $label,
-        string $name,
-        string $value = ''
-    ): string {
-        $labelHtml = $label
-            ? "<label class='text-xs font-bold text-gray-400 mb-1'>{$label}</label>"
+    public function textarea(?string $label, string $name, string $value = ''): string 
+    {
+        $labelHtml = $label 
+            ? "<label class='block text-xs font-bold text-gray-500 uppercase mb-1'>{$label}</label>" 
             : '';
 
         return "
-        <div class='flex flex-col gap-1'>
+        <div class='flex flex-col mb-2'>
             {$labelHtml}
-            <textarea
-                name='{$name}'
-                rows='3'
-                class='border rounded-lg p-2 text-sm'
+            <textarea 
+                name='{$name}' 
+                rows='3' 
+                class='border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm'
             >{$value}</textarea>
         </div>";
     }
 
-    public function checkbox(
-        string $label,
-        string $name,
-        string $value = '1'
-    ): string {
+    public function checkbox(string $label, string $name, string $value = '1', $default = false): string 
+    {
+        $checked = $default ? 'checked' : '';
         return "
-        <div class='flex items-center gap-2'>
-            <input
-                type='checkbox'
-                name='{$name}'
-                value='{$value}'
-                class='rounded border-gray-300'
+        <div class='flex items-center gap-3 mt-4 mb-2 p-2 border rounded-md bg-gray-50'>
+            <input 
+                type='checkbox' 
+                name='{$name}' 
+                value='{$value}' 
+                {$checked}
+                class='h-4 w-4 text-indigo-600 focus:ring-indigo-500 border-gray-300 rounded'
             >
-            <label class='text-sm text-gray-700'>{$label}</label>
+            <label class='text-sm font-medium text-gray-700'>{$label}</label>
         </div>";
     }
 
-    public function select(
-        string $label,
-        string $name,
-        array|string $options
-    ): string {
+    public function select(string $label, string $name, array|string $options): string 
+    {
         $html = "
-        <div class='flex flex-col'>
-            <label class='text-xs font-bold text-gray-400 mb-1'>{$label}</label>
-            <select
-                name='{$name}'
-                class='border rounded-lg p-2 text-sm'
+        <div class='flex flex-col mb-2'>
+            <label class='block text-xs font-bold text-gray-500 uppercase mb-1'>{$label}</label>
+            <select 
+                name='{$name}' 
+                class='border border-gray-300 rounded-md px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition shadow-sm bg-white'
         ";
 
-        // =====================================================
-        // OPCIONES DINÁMICAS (dependsOn / api)
-        // =====================================================
+        // Manejo de dependencias (API)
         if (is_array($options) && isset($options['dependsOn'])) {
             $html .= "
                 data-depends-on='{$options['dependsOn']}'
@@ -118,13 +92,10 @@ class FormBuilder
             $html .= ">
                 <option value=''>Seleccione...</option>
             </select></div>";
-
             return $html;
         }
 
-        // =====================================================
-        // OPCIONES ESTÁTICAS
-        // =====================================================
+        // Opciones Estáticas
         $html .= ">
             <option value=''>Seleccione...</option>";
 
@@ -142,9 +113,9 @@ class FormBuilder
     public function label(string $label, $value = ''): string
     {
         return "
-            <div>
-                <label class='text-xs font-semibold text-gray-500 uppercase'>{$label}</label>
-                <div class='mt-1 p-2 bg-gray-100 border rounded text-sm font-medium'>
+            <div class='mb-2'>
+                <label class='block text-xs font-bold text-gray-500 uppercase mb-1'>{$label}</label>
+                <div class='px-3 py-2 bg-gray-100 border border-gray-200 rounded-md text-sm text-gray-800 font-medium'>
                     {$value}
                 </div>
             </div>
