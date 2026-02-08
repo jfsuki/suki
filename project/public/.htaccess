@@ -1,0 +1,27 @@
+Options -Indexes
+
+<IfModule mod_headers.c>
+    Header set X-Content-Type-Options "nosniff"
+    Header set X-Frame-Options "SAMEORIGIN"
+    Header set Referrer-Policy "same-origin"
+</IfModule>
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # 1. Si la petición es un archivo o carpeta que SÍ existe, no enrutar.
+    RewriteCond %{REQUEST_FILENAME} -f [OR]
+    RewriteCond %{REQUEST_FILENAME} -d
+    RewriteRule ^ - [L]
+
+    # 1.1 Fallback de assets: si no existe en el proyecto, servir desde el framework.
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^assets/(.*)$ assets.php?path=$1 [QSA,L]
+
+    # 2. Rutas de API: api/cliente/guardar -> api.php?route=cliente/guardar
+    RewriteRule ^api/(.*)$ api.php?route=$1 [QSA,L]
+
+    # 3. Rutas de Vistas: clientes -> index.php?url=clientes
+    RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
+</IfModule>
