@@ -8,6 +8,11 @@
 - Validation runtime
 - Persistence adapters (save/load)
 - DB Kernel (query builder + security)
+- Integration Gateway (external providers, auth, webhooks)
+- Process Engine (command bus + workflows)
+- Conversation Layer (chat intents -> actions)
+- Job Queue (async, retries)
+- Audit + Observability (logs, traces)
 - Dev Assistant (formjson.html) to generate contracts, views, and DB artifacts
 
 ### App (Templates)
@@ -35,6 +40,11 @@ Core must be stable. Apps and Tenants configure behavior via contracts.
 - Runtime de validaciones
 - Adaptadores de persistencia
 - Kernel DB (builder + seguridad)
+- Integration Gateway (proveedores externos, auth, webhooks)
+- Process Engine (command bus + flujos)
+- Capa conversacional (intents de chat -> acciones)
+- Job Queue (async, reintentos)
+- Auditoria + Observabilidad (logs, trazas)
 - Asistente Dev (formjson.html) para generar contratos, vistas y artefactos de BD
 
 ### App (Plantillas)

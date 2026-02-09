@@ -11,12 +11,14 @@ Simple UI. Non-technical entrepreneurs can operate it. Accounting/DIAN complexit
 - Audit trail
 - DIAN-ready architecture
 - Backward-compatible contracts
+- Integrations + automation (external APIs and chat actions)
 
 ## Core outcomes
 - Faster delivery (templates + configs)
 - Fewer regressions (No-Break policy + versioning)
 - Scalable monetization (modules, vertical packs)
 - Dev assistant that generates contracts, views, and DB scaffolding
+- Integrations and processes executable by UI or chat
 
 ---
 
@@ -33,9 +35,11 @@ Interfaz simple. Emprendedor no técnico puede usarlo. La complejidad contable/D
 - Auditoría
 - Arquitectura lista para DIAN
 - Contratos retrocompatibles
+- Integraciones y automatizacion (APIs externas y acciones via chat)
 
 ## Resultados
 - Entrega rápida (plantillas + configs)
 - Menos regresiones (No-Break + versionado)
 - Monetización escalable (módulos y paquetes por sector)
 - Asistente dev que genera contratos, vistas y base de datos
+- Integraciones y procesos ejecutables por UI o chat

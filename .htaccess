@@ -4,6 +4,8 @@ Options -Indexes
     RewriteEngine On
 
     # Bloquear acceso directo a carpetas sensibles y dotfiles
+    # Permitir accesos cuando se usan vhosts dedicados
+    RewriteCond %{HTTP_HOST} !^(suki-fw\.test|suki\.test|localhost)(:\d+)?$ [NC]
     RewriteRule ^(framework|project)/ - [F,L]
     RewriteRule (^|/)\. - [F,L]
 </IfModule>

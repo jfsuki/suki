@@ -9,6 +9,13 @@ All tables include tenant_id. Enforce tenant isolation.
 - form_instance_data (json)
 - grid_instance_data (json)
 - audit_log
+- projects_registry, project_routes, project_configs
+- project_changes, project_db_profiles
+- integration_providers, integration_credentials
+- integration_runs, integration_webhooks
+- process_definitions, process_runs, process_steps
+- conversation_sessions, conversation_messages
+- job_queue
 
 ## DB Kernel (must exist)
 A “mother” DB layer:
@@ -39,6 +46,13 @@ Todas las tablas con tenant_id. Aislamiento obligatorio.
 - form_instance_data (json)
 - grid_instance_data (json)
 - audit_log
+- projects_registry, project_routes, project_configs
+- project_changes, project_db_profiles
+- integration_providers, integration_credentials
+- integration_runs, integration_webhooks
+- process_definitions, process_runs, process_steps
+- conversation_sessions, conversation_messages
+- job_queue
 
 ## Kernel DB (obligatorio)
 Capa “madre”:

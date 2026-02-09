@@ -33,6 +33,12 @@
 2) Document lifecycle + approvals
 3) Audit + traceability for accountant approval
 
+### Phase 5 � Integrations + Automation
+1) Integration Gateway MVP (providers + credentials + webhooks)
+2) Process Engine (command bus + process definitions)
+3) Conversational execution (chat intents -> actions)
+4) External provider POC (e-invoicing)
+
 ## Definition of Done (DoD)
 - Backward compatible
 - Minimal patch
@@ -53,7 +59,7 @@
 - Auditoría/seguridad pendiente ⚠️
 
 ## Roadmap
-(Fases iguales)
+Fases iguales + Fase 5 (Integraciones + Automatizacion)
 
 ## DoD
 - Retrocompatible
@@ -74,4 +80,7 @@
 - [ ] DB Kernel QueryBuilder MVP
 - [ ] Tenant scoping everywhere
 - [ ] Audit log MVP
+- [ ] Integration Gateway MVP
+- [ ] Process Engine + chat execution
+- [ ] E-invoicing provider POC
 - [x] Update formjson.html assistant when contracts/features change

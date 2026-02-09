@@ -17,6 +17,7 @@ This document defines what belongs to the framework (kernel/base) vs what belong
 - project/public/assets.php (proxy for framework assets if not present locally)
 - project/views/* (page views; no inline form/grid config)
 - project/contracts/forms/*, project/contracts/grids/*, project/contracts/views/* (app contracts)
+- project/contracts/app.manifest.json (app registry + integrations + db strategy)
 - project/config/menu.json (menu content maintained by the developer)
 - project/config/app.php, project/config/db.php, project/config/env_loader.php
 - project/app/controller/* (business controllers)
@@ -54,6 +55,7 @@ Este documento define qué pertenece al framework (kernel/base) y qué pertenece
 - project/public/assets.php (proxy de assets al framework si no existen localmente)
 - project/views/* (vistas; sin config inline de forms/grids)
 - project/contracts/forms/*, project/contracts/grids/*, project/contracts/views/* (contratos del app)
+- project/contracts/app.manifest.json (registro del app + integraciones + estrategia BD)
 - project/config/menu.json (menú mantenido por el programador)
 - project/config/app.php, project/config/db.php, project/config/env_loader.php
 - project/app/controller/* (controladores de negocio)

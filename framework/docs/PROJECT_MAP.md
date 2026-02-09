@@ -28,6 +28,7 @@
 - project/public/.htaccess: rutas /api y /<vista>, fallback de assets.
 - project/views/*: vistas del app.
 - project/contracts/*: contratos JSON del app.
+- project/contracts/app.manifest.json: contrato global del app (db/registry/integrations/processes).
 - project/config/*: config del app (menu.json, db, env_loader).
 - project/app/controller/*: controladores de negocio.
 - project/database/*: SQL/migraciones.
