@@ -77,10 +77,15 @@ Fases iguales + Fase 5 (Integraciones + Automatizacion)
 - [x] Routing/view standard + migration notes
 - [ ] Persist submit payload (FORM_STORE + GRID_STORE)
 - [ ] Load/hydrate
-- [ ] DB Kernel QueryBuilder MVP
-- [ ] Tenant scoping everywhere
+- [x] Entity contract schema + registry loader
+- [x] DB config loader (env -> PDO)
+- [x] DB Kernel QueryBuilder MVP
+- [x] CRUD base (Repository + allowlist)
+- [x] Tenant scoping everywhere
+- [x] Migration store (schema_migrations)
 - [ ] Audit log MVP
 - [ ] Integration Gateway MVP
 - [ ] Process Engine + chat execution
 - [ ] E-invoicing provider POC
 - [x] Update formjson.html assistant when contracts/features change
+

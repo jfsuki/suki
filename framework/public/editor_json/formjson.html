@@ -46,7 +46,18 @@
         
         <div class="flex-1 flex flex-col overflow-hidden border-r bg-gray-50/50">
             
-            <div class="flex border-b px-2 bg-white shadow-sm overflow-x-auto">
+            <div class="flex border-b px-3 bg-slate-900 text-white overflow-x-auto">
+                <template x-for="tab in mainTabs">
+                    <button
+                        @click="mainTab = tab.id"
+                        :class="mainTab === tab.id ? 'bg-white text-slate-900 shadow' : 'text-slate-200 hover:text-white'"
+                        class="px-4 py-2 text-xs font-bold uppercase tracking-wide rounded-t-md transition flex items-center gap-2 whitespace-nowrap">
+                        <i :class="tab.icon"></i> <span x-text="tab.label"></span>
+                    </button>
+                </template>
+            </div>
+
+            <div class="flex border-b px-2 bg-white shadow-sm overflow-x-auto" x-show="mainTab === 'forms'">
                 <template x-for="tab in tabs">
                     <button 
                         @click="activeTab = tab.id"
@@ -58,12 +69,312 @@
             </div>
 
             <div class="flex-1 overflow-y-auto p-6 scroll-smooth">
-                
+
+                <div x-show="mainTab === 'dashboard'" class="space-y-6 max-w-5xl mx-auto" x-transition.opacity>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                            <div>
+                                <h3 class="font-bold text-gray-800 text-lg">Dashboard del proyecto</h3>
+                                <p class="text-xs text-gray-500">Panorama rapido del avance: formularios, tablas y estado.</p>
+                            </div>
+                            <div class="flex gap-2">
+                                <button @click="selectProjectRoot()" class="px-3 py-2 text-xs font-bold bg-slate-800 text-white rounded shadow">
+                                    Seleccionar proyecto
+                                </button>
+                                <button @click="refreshProjectSnapshot()" class="px-3 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded shadow">
+                                    Refrescar
+                                </button>
+                            </div>
+                        </div>
+                        <div class="mt-2 text-[11px] text-gray-500">
+                            Carpeta: <span x-text="projectSnapshot.rootName || 'Sin seleccionar'"></span> |
+                            Actualizado: <span x-text="projectSnapshot.updatedAt || '-'"></span>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase mb-2">Resumen actual</h4>
+                            <ul class="text-xs text-gray-600 space-y-1">
+                                <li><span class="font-semibold">Formulario:</span> <span x-text="data.title"></span> (<span x-text="data.name"></span>)</li>
+                                <li><span class="font-semibold">Campos:</span> <span x-text="data.fields.length"></span></li>
+                                <li><span class="font-semibold">Grids:</span> <span x-text="data.grids.length"></span></li>
+                                <li><span class="font-semibold">Totales:</span> <span x-text="data.summary.length"></span></li>
+                            </ul>
+                        </div>
+                        <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase mb-2">Entidad/DB actual</h4>
+                            <ul class="text-xs text-gray-600 space-y-1">
+                                <li><span class="font-semibold">Entidad:</span> <span x-text="(getEntityObject() || {}).name || '-'"></span></li>
+                                <li><span class="font-semibold">Tabla:</span> <span x-text="(getEntityObject() && getEntityObject().table ? getEntityObject().table.name : '-')"></span></li>
+                                <li><span class="font-semibold">Tenant:</span> <span x-text="(getEntityObject() && getEntityObject().table && getEntityObject().table.tenantScoped) ? 'si' : 'no'"></span></li>
+                                <li><span class="font-semibold">Timestamps:</span> <span x-text="(getEntityObject() && getEntityObject().table && getEntityObject().table.timestamps) ? 'si' : 'no'"></span></li>
+                            </ul>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-3">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">Proyecto detectado</h4>
+                            <span class="text-[10px] text-gray-500">File System Access API</span>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-gray-600">
+                            <div><span class="font-semibold">Forms:</span> <span x-text="projectSnapshot.forms.length"></span></div>
+                            <div><span class="font-semibold">Entities:</span> <span x-text="projectSnapshot.entities.length"></span></div>
+                            <div><span class="font-semibold">Views:</span> <span x-text="projectSnapshot.views.length"></span></div>
+                            <div><span class="font-semibold">SQL:</span> <span x-text="projectSnapshot.database.length"></span></div>
+                        </div>
+                        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <p class="text-[10px] font-bold text-gray-500 uppercase">Formularios</p>
+                                <div class="text-xs text-gray-600 space-y-1">
+                                    <template x-for="name in projectSnapshot.forms.slice(0, 6)" :key="name">
+                                        <div x-text="name"></div>
+                                    </template>
+                                    <div x-show="projectSnapshot.forms.length === 0" class="text-[10px] text-gray-400">Sin datos</div>
+                                </div>
+                            </div>
+                            <div>
+                                <p class="text-[10px] font-bold text-gray-500 uppercase">Entidades/Tablas</p>
+                                <div class="text-xs text-gray-600 space-y-1">
+                                    <template x-for="item in projectSnapshot.entities.slice(0, 6)" :key="item.file">
+                                        <div>
+                                            <span x-text="item.file"></span>
+                                            <span class="text-[10px] text-gray-400" x-text="item.table ? ' -> ' + item.table : ''"></span>
+                                        </div>
+                                    </template>
+                                    <div x-show="projectSnapshot.entities.length === 0" class="text-[10px] text-gray-400">Sin datos</div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="mainTab === 'database'" class="space-y-6 max-w-5xl mx-auto" x-transition.opacity>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <h3 class="font-bold text-gray-800 text-lg">Editor de base de datos</h3>
+                        <p class="text-xs text-gray-500">Define perfil de BD (shared_schema o dedicated_db) y genera el app.manifest.json.</p>
+                        <div class="mt-3 text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded p-3">
+                            Enfoque <span class="font-bold">amigable</span>: puedes crear tablas, relaciones, CRUD y procesos sin ver SQL.
+                            Lo tecnico queda como informacion avanzada.
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                        <h4 class="text-xs font-bold text-gray-600 uppercase">Perfil de la app</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Manifest version</label>
+                                <input x-model="project.manifestVersion" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="1.0">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">App ID</label>
+                                <input x-model="project.appId" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="mi_app">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">App Name</label>
+                                <input x-model="project.appName" class="w-full border rounded px-3 py-2 text-sm" placeholder="Mi Aplicacion">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Estado</label>
+                                <select x-model="project.appStatus" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                    <option value="draft">draft</option>
+                                    <option value="active">active</option>
+                                    <option value="archived">archived</option>
+                                </select>
+                            </div>
+                            <div class="md:col-span-2">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Descripcion</label>
+                                <input x-model="project.appDescription" class="w-full border rounded px-3 py-2 text-sm" placeholder="Descripcion corta">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Tenant mode</label>
+                                <select x-model="project.appTenantMode" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                    <option value="shared">shared (multitenant)</option>
+                                    <option value="isolated">isolated (dedicada)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                        <h4 class="text-xs font-bold text-gray-600 uppercase">Perfil DB</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Strategy</label>
+                                <select x-model="project.dbStrategy" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                    <option value="shared_schema">shared_schema (multitenant)</option>
+                                    <option value="dedicated_db">dedicated_db (exclusiva)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Schema source</label>
+                                <select x-model="project.schemaSource" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                    <option value="master">master</option>
+                                    <option value="custom">custom</option>
+                                </select>
+                            </div>
+                            <div x-show="project.schemaSource === 'master'">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Master schema id</label>
+                                <input x-model="project.masterSchemaId" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="master_v1">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Connection alias</label>
+                                <input x-model="project.dbConnection" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="primary">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Database name</label>
+                                <input x-model="project.dbName" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="db_cliente_x">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Migrations</label>
+                                <select x-model="project.dbMigrationsMode" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                    <option value="auto">auto</option>
+                                    <option value="manual">manual</option>
+                                    <option value="off">off</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">DB name prefix</label>
+                                <input x-model="project.dbProvisionPrefix" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="cli_">
+                            </div>
+                            <div class="flex items-center gap-2 text-xs text-gray-600">
+                                <input type="checkbox" x-model="project.dbProvisionCreate" class="rounded text-emerald-600">
+                                crear_on_first_run
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                        <div>
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">Modelo de datos (amigable)</h4>
+                            <p class="text-[11px] text-gray-500">Define tabla, relaciones y CRUD sin tocar SQL. Esto alimenta el contrato entity.</p>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Tabla principal</label>
+                                <input x-model="project.tableName" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="clientes">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Entidad (name)</label>
+                                <input x-model="project.entityName" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="cliente">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Entidad (label)</label>
+                                <input x-model="project.entityLabel" class="w-full border rounded px-3 py-2 text-sm" placeholder="Cliente">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Primary key</label>
+                                <input x-model="project.entityPrimaryKey" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="id">
+                            </div>
+                            <div class="col-span-2">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Opciones sistema</label>
+                                <div class="flex flex-wrap gap-3 text-xs text-gray-600">
+                                    <label class="flex items-center gap-2">
+                                        <input type="checkbox" x-model="project.includeTenant" class="rounded text-emerald-600"> tenant_id
+                                    </label>
+                                    <label class="flex items-center gap-2">
+                                        <input type="checkbox" x-model="project.includeTimestamps" class="rounded text-emerald-600"> timestamps
+                                    </label>
+                                    <label class="flex items-center gap-2">
+                                        <input type="checkbox" x-model="project.entitySoftDelete" class="rounded text-emerald-600"> softDelete
+                                    </label>
+                                </div>
+                            </div>
+                            <div class="col-span-2">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Relaciones (JSON)</label>
+                                <textarea x-model="project.relationsJson" class="w-full border rounded px-3 py-2 text-xs font-mono h-20" placeholder="[{&quot;name&quot;:&quot;cliente&quot;,&quot;type&quot;:&quot;belongsTo&quot;,&quot;entity&quot;:&quot;cliente&quot;,&quot;fk&quot;:&quot;cliente_id&quot;}]"></textarea>
+                                <p class="text-[10px] text-gray-400 mt-1">Tip: puedes crear grids en la pestaña Formularios > Grids/Tablas.</p>
+                            </div>
+                            <div class="col-span-2">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">CRUD (roles separados por coma)</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <input x-model="project.permRead" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="read: admin,editor">
+                                    <input x-model="project.permCreate" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="create: admin,editor">
+                                    <input x-model="project.permUpdate" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="update: admin,editor">
+                                    <input x-model="project.permDelete" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="delete: admin">
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 border rounded-lg p-4">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="text-[10px] font-bold text-gray-500 uppercase">Entity preview</h4>
+                                <div class="flex gap-2 text-[10px]">
+                                    <button @click="navigator.clipboard.writeText(buildEntityContract())" class="text-indigo-600 hover:text-indigo-800">Copiar</button>
+                                    <button @click="downloadEntity()" class="text-indigo-600 hover:text-indigo-800">Descargar</button>
+                                </div>
+                            </div>
+                            <textarea readonly class="w-full h-48 border rounded p-2 text-xs font-mono bg-white" x-text="buildEntityContract()"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">Procesos en segundo plano</h4>
+                            <button @click="addProcess()" class="px-3 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Agregar proceso</button>
+                        </div>
+                        <p class="text-[11px] text-gray-500">Estos procesos no son visibles para el usuario final: sirven para guardar, validar, integrar o automatizar (ej: asiento contable).</p>
+                        <div class="space-y-3">
+                            <template x-for="(proc, pIndex) in project.processes" :key="pIndex">
+                                <div class="border rounded-lg p-4 bg-gray-50">
+                                    <div class="flex justify-between items-center mb-2">
+                                        <h5 class="text-[10px] font-bold text-gray-500 uppercase">Proceso</h5>
+                                        <button @click="removeProcess(pIndex)" class="text-xs text-red-600 hover:text-red-800">Eliminar</button>
+                                    </div>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        <input x-model="proc.id" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="id: crear_factura">
+                                        <input x-model="proc.label" class="w-full border rounded px-3 py-2 text-xs" placeholder="Label opcional">
+                                        <input x-model="proc.uiForm" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="ui_form: fact.form.json">
+                                        <input x-model="proc.actions" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="actions: validate,persist,emit_invoice">
+                                        <input x-model="proc.intents" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="intents: crear factura,facturar">
+                                        <input x-model="proc.requires" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="requires: cliente,items">
+                                        <input x-model="proc.permissions" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="permissions: facturas.create">
+                                        <input x-model="proc.integrationRef" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="integration_ref opcional">
+                                    </div>
+                                    <div class="flex gap-4 text-xs text-gray-600 mt-3">
+                                        <label class="flex items-center gap-2"><input type="checkbox" x-model="proc.async" class="rounded text-emerald-600"> async</label>
+                                        <label class="flex items-center gap-2"><input type="checkbox" x-model="proc.confirm" class="rounded text-emerald-600"> confirm</label>
+                                    </div>
+                                </div>
+                            </template>
+                            <div x-show="project.processes.length === 0" class="text-xs text-gray-400">Sin procesos creados.</div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                        <h4 class="text-xs font-bold text-gray-600 uppercase">Registry tracking</h4>
+                        <div class="grid grid-cols-2 md:grid-cols-3 gap-3 text-xs text-gray-600">
+                            <label class="flex items-center gap-2"><input type="checkbox" x-model="project.registryTrackChanges" class="rounded text-emerald-600"> track_changes</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" x-model="project.registryTrackRoutes" class="rounded text-emerald-600"> track_routes</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" x-model="project.registryTrackConfig" class="rounded text-emerald-600"> track_config</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" x-model="project.registryTrackDbProfile" class="rounded text-emerald-600"> track_db_profile</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" x-model="project.registryTrackIntegrations" class="rounded text-emerald-600"> track_integrations</label>
+                            <label class="flex items-center gap-2"><input type="checkbox" x-model="project.registryTrackProcesses" class="rounded text-emerald-600"> track_processes</label>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">app.manifest.json (preview)</h4>
+                            <div class="flex gap-2">
+                                <button @click="navigator.clipboard.writeText(buildManifest())" class="text-xs text-indigo-600 hover:text-indigo-800">Copiar</button>
+                                <button @click="downloadManifest()" class="text-xs text-indigo-600 hover:text-indigo-800">Descargar</button>
+                            </div>
+                        </div>
+                        <textarea readonly class="w-full h-56 border rounded p-2 text-xs font-mono bg-gray-50" x-text="buildManifest()"></textarea>
+                    </div>
+                </div>
+
+                <div x-show="mainTab === 'forms'" x-transition.opacity>
                 <div x-show="activeTab === 'general'" class="space-y-6 max-w-3xl mx-auto" x-transition.opacity>
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                         <h3 class="font-bold text-gray-800 mb-5 pb-2 border-b flex items-center gap-2">
                             <i class="fa-solid fa-file-invoice text-orange-500"></i> Datos del Formulario
                         </h3>
+                        <div class="mb-4 text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded p-3">
+                            Modo <span class="font-bold">amigable</span>: completa los campos y el sistema genera JSON, vistas y tablas sin que tengas que escribir codigo.
+                        </div>
                         <div class="grid grid-cols-2 gap-6">
                             <div>
                                 <label class="block text-xs font-bold text-gray-500 uppercase mb-1">ID del Archivo</label>
@@ -524,6 +835,22 @@
                                 <label class="text-[10px] font-bold text-gray-500 uppercase">Tabla Principal (DB)</label>
                                 <input x-model="project.tableName" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="clientes">
                             </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Entity Name</label>
+                                <input x-model="project.entityName" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="factura">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Entity Label</label>
+                                <input x-model="project.entityLabel" class="w-full border rounded px-3 py-2 text-sm" placeholder="Factura">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Entity File (opcional)</label>
+                                <input x-model="project.entityFile" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="factura.entity.json">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Primary Key</label>
+                                <input x-model="project.entityPrimaryKey" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="id">
+                            </div>
                             <div class="space-y-2">
                                 <label class="text-[10px] font-bold text-gray-500 uppercase">Opciones DB</label>
                                 <div class="flex items-center gap-3 text-xs text-gray-600">
@@ -539,6 +866,10 @@
                                         <input type="checkbox" x-model="project.includeGrids" class="rounded text-emerald-600">
                                         grids
                                     </label>
+                                    <label class="flex items-center gap-2">
+                                        <input type="checkbox" x-model="project.entitySoftDelete" class="rounded text-emerald-600">
+                                        softDelete
+                                    </label>
                                 </div>
                             </div>
                             <div class="space-y-2">
@@ -548,6 +879,60 @@
                                     Actualizar config/menu.json
                                 </label>
                             </div>
+                            <div class="col-span-2">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Permisos (roles separados por coma)</label>
+                                <div class="grid grid-cols-2 gap-2">
+                                    <input x-model="project.permRead" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="read: admin,editor">
+                                    <input x-model="project.permCreate" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="create: admin,editor">
+                                    <input x-model="project.permUpdate" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="update: admin,editor">
+                                    <input x-model="project.permDelete" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="delete: admin">
+                                </div>
+                            </div>
+                            <div class="col-span-2">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Relations JSON (opcional)</label>
+                                <textarea x-model="project.relationsJson" class="w-full border rounded px-3 py-2 text-xs font-mono h-20" placeholder="[]"></textarea>
+                            </div>
+                            <div class="col-span-2">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Rules JSON (opcional)</label>
+                                <textarea x-model="project.rulesJson" class="w-full border rounded px-3 py-2 text-xs font-mono h-20" placeholder="[]"></textarea>
+                            </div>
+                        </div>
+
+                        <div class="bg-gray-50 border rounded-lg p-4 text-xs text-gray-700">
+                            <div class="flex justify-between items-center mb-2">
+                                <h4 class="text-[10px] font-bold text-gray-500 uppercase">Resumen DB</h4>
+                                <button @click="navigator.clipboard.writeText(buildEntityContract())" class="text-[10px] text-indigo-600 hover:text-indigo-800">Copiar entity</button>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div><span class="font-semibold">Entidad:</span> <span x-text="(getEntityObject() || {}).name || '-'"></span></div>
+                                <div><span class="font-semibold">Tabla:</span> <span x-text="(getEntityObject() && getEntityObject().table ? getEntityObject().table.name : '-')"></span></div>
+                                <div><span class="font-semibold">PK:</span> <span x-text="(getEntityObject() && getEntityObject().table ? getEntityObject().table.primaryKey : 'id')"></span></div>
+                                <div><span class="font-semibold">Tenant:</span> <span x-text="(getEntityObject() && getEntityObject().table && getEntityObject().table.tenantScoped) ? 'si' : 'no'"></span></div>
+                            </div>
+                            <div class="mt-3">
+                                <p class="text-[10px] font-bold text-gray-500 uppercase">Campos</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <template x-for="field in ((getEntityObject() && getEntityObject().fields) ? getEntityObject().fields : [])" :key="field.name">
+                                        <span class="px-2 py-1 bg-white border rounded text-[10px]">
+                                            <span x-text="field.name"></span>
+                                            <span class="text-gray-400" x-text="' : ' + field.type"></span>
+                                        </span>
+                                    </template>
+                                    <span x-show="!(getEntityObject() && getEntityObject().fields && getEntityObject().fields.length)" class="text-[10px] text-gray-400">Sin campos</span>
+                                </div>
+                            </div>
+                            <div class="mt-3">
+                                <p class="text-[10px] font-bold text-gray-500 uppercase">Relaciones</p>
+                                <div class="flex flex-wrap gap-2">
+                                    <template x-for="rel in ((getEntityObject() && getEntityObject().relations) ? getEntityObject().relations : [])" :key="rel.name + rel.type">
+                                        <span class="px-2 py-1 bg-white border rounded text-[10px]">
+                                            <span x-text="rel.type"></span>
+                                            <span class="text-gray-400" x-text="' -> ' + rel.entity"></span>
+                                        </span>
+                                    </template>
+                                    <span x-show="!(getEntityObject() && getEntityObject().relations && getEntityObject().relations.length)" class="text-[10px] text-gray-400">Sin relaciones</span>
+                                </div>
+                            </div>
                         </div>
 
                         <div class="flex flex-wrap gap-2">
@@ -556,6 +941,9 @@
                             </button>
                             <button @click="downloadSql()" class="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white text-xs font-bold uppercase rounded shadow transition">
                                 Descargar SQL
+                            </button>
+                            <button @click="downloadEntity()" class="px-4 py-2 bg-slate-700 hover:bg-slate-800 text-white text-xs font-bold uppercase rounded shadow transition">
+                                Descargar Entity
                             </button>
                             <button @click="navigator.clipboard.writeText(buildMenuSnippet())" class="px-4 py-2 bg-gray-200 hover:bg-gray-300 text-gray-700 text-xs font-bold uppercase rounded shadow transition">
                                 Copiar menu.json
@@ -576,6 +964,13 @@
                                 <h4 class="text-xs font-bold text-gray-600 uppercase">Vista Generada</h4>
                                 <button @click="navigator.clipboard.writeText(buildViewTemplate())" class="text-xs text-indigo-600 hover:text-indigo-800">Copiar</button>
                             </div>
+                    <div class="bg-white border rounded-lg p-4 shadow-sm mt-4">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">Entity Contract</h4>
+                            <button @click="navigator.clipboard.writeText(buildEntityContract())" class="text-xs text-indigo-600 hover:text-indigo-800">Copiar</button>
+                        </div>
+                        <textarea readonly class="w-full h-48 border rounded p-2 text-xs font-mono bg-gray-50" x-text="buildEntityContract()"></textarea>
+                    </div>
                             <textarea readonly class="w-full h-64 border rounded p-2 text-xs font-mono bg-gray-50" x-text="buildViewTemplate()"></textarea>
                         </div>
                         <div class="bg-white border rounded-lg p-4 shadow-sm">
@@ -602,6 +997,7 @@
                         <textarea readonly class="w-full h-24 border rounded p-2 text-xs font-mono bg-gray-50" x-text="contractIssues().length ? contractIssues().join('\\n') : 'OK'"></textarea>
                     </div>
                 </div>
+            </div>
 
             </div>
         </div>
@@ -643,9 +1039,24 @@
     <script>
         function formBuilder() {
             return {
+                mainTab: 'dashboard',
+                mainTabs: [
+                    { id: 'dashboard', label: 'Dashboard', icon: 'fa-solid fa-gauge-high' },
+                    { id: 'forms', label: 'Formularios', icon: 'fa-solid fa-pen-to-square' },
+                    { id: 'database', label: 'Base de datos', icon: 'fa-solid fa-database' }
+                ],
                 activeTab: 'general',
                 showLoadModal: false,
                 jsonInput: '',
+                projectRootHandle: null,
+                projectSnapshot: {
+                    rootName: '',
+                    forms: [],
+                    entities: [],
+                    views: [],
+                    database: [],
+                    updatedAt: ''
+                },
                 tabs: [
                     { id: 'general', label: 'General', icon: 'fa-solid fa-sliders' },
                     { id: 'fields', label: 'Campos', icon: 'fa-regular fa-keyboard' },
@@ -671,10 +1082,49 @@
                     formFile: "",
                     menuLabel: "",
                     tableName: "",
+                    entityName: "",
+                    entityLabel: "",
+                    entityFile: "",
+                    entityPrimaryKey: "id",
+                    entitySoftDelete: false,
+                    permRead: "admin",
+                    permCreate: "admin",
+                    permUpdate: "admin",
+                    permDelete: "admin",
+                    relationsJson: "[]",
+                    rulesJson: "[]",
                     includeTenant: true,
                     includeTimestamps: true,
                     includeGrids: true,
-                    updateMenu: true
+                    updateMenu: true,
+
+                    // App/Manifest
+                    manifestVersion: "1.0",
+                    appId: "",
+                    appName: "",
+                    appDescription: "",
+                    appStatus: "draft",
+                    appTenantMode: "shared",
+
+                    // DB profile
+                    dbStrategy: "shared_schema",
+                    schemaSource: "master",
+                    masterSchemaId: "",
+                    dbConnection: "",
+                    dbName: "",
+                    dbProvisionCreate: true,
+                    dbProvisionPrefix: "",
+                    dbMigrationsMode: "auto",
+
+                    // Registry tracking
+                    registryTrackChanges: true,
+                    registryTrackRoutes: true,
+                    registryTrackConfig: true,
+                    registryTrackDbProfile: true,
+                    registryTrackIntegrations: false,
+                    registryTrackProcesses: false,
+
+                    processes: []
                 },
 
                 // --- Métodos de Campos ---
@@ -694,6 +1144,23 @@
                 },
                 removeField(index) {
                     if(confirm('¿Eliminar este campo?')) this.data.fields.splice(index, 1);
+                },
+                addProcess() {
+                    this.project.processes.push({
+                        id: '',
+                        label: '',
+                        uiForm: '',
+                        intents: '',
+                        requires: '',
+                        actions: 'persist',
+                        permissions: '',
+                        async: true,
+                        confirm: false,
+                        integrationRef: ''
+                    });
+                },
+                removeProcess(index) {
+                    if (confirm('¿Eliminar este proceso?')) this.project.processes.splice(index, 1);
                 },
 
                 // --- Métodos de Layout ---
@@ -787,12 +1254,65 @@
                     }
                     return name;
                 },
+                normalizeEntityName() {
+                    let name = (this.project.entityName || this.project.tableName || this.data.name || 'entity').trim();
+                    name = name.replace(/\.json$/i, '').replace(/\.form$/i, '');
+                    name = this.normalizeSqlName(name);
+                    return name || 'entity';
+                },
+                normalizeEntityFileName() {
+                    let name = (this.project.entityFile || this.normalizeEntityName() || 'entity').trim();
+                    name = name.replace(/\\/g, '/');
+                    name = name.split('/').pop();
+                    name = name.replace(/[^a-zA-Z0-9_.-]/g, '_');
+                    if (!name.endsWith('.json')) {
+                        if (!name.endsWith('.entity')) name += '.entity';
+                        name += '.json';
+                    }
+                    return name;
+                },
+                parseRoles(text) {
+                    return (text || '')
+                        .split(',')
+                        .map(r => r.trim())
+                        .filter(Boolean);
+                },
+                safeJsonArray(text) {
+                    if (!text) return [];
+                    try {
+                        const parsed = JSON.parse(text);
+                        return Array.isArray(parsed) ? parsed : [];
+                    } catch (e) {
+                        return [];
+                    }
+                },
                 normalizeSqlName(name) {
                     return (name || '')
                         .trim()
                         .toLowerCase()
                         .replace(/[^a-z0-9_]+/g, '_')
                         .replace(/^_+|_+$/g, '');
+                },
+                mapEntityType(type) {
+                    switch ((type || '').toLowerCase()) {
+                        case 'number':
+                            return 'number';
+                        case 'currency':
+                            return 'decimal';
+                        case 'checkbox':
+                            return 'bool';
+                        case 'date':
+                            return 'date';
+                        case 'time':
+                            return 'time';
+                        case 'textarea':
+                            return 'text';
+                        case 'email':
+                        case 'select':
+                        case 'text':
+                        default:
+                            return 'string';
+                    }
                 },
                 mapFieldType(type) {
                     switch ((type || '').toLowerCase()) {
@@ -882,6 +1402,156 @@ $formGenerator = new FormGenerator();
                     const label = (this.project.menuLabel || this.data.title || 'Formulario');
                     return JSON.stringify({ label: label, url: path }, null, 2);
                 },
+                getEntityObject() {
+                    try {
+                        return JSON.parse(this.buildEntityContract());
+                    } catch (e) {
+                        return null;
+                    }
+                },
+                normalizeAppId(value) {
+                    let id = (value || '').trim().toLowerCase();
+                    id = id.replace(/[^a-z0-9_-]+/g, '-').replace(/^-+|-+$/g, '');
+                    if (id.length < 2) id = 'app';
+                    return id;
+                },
+                buildManifest() {
+                    const schemaVersion = (this.project.manifestVersion || '1.0').trim() || '1.0';
+                    const appId = this.normalizeAppId(this.project.appId || this.normalizeEntityName());
+                    const appName = (this.project.appName || this.data.title || 'Nueva App').trim() || 'Nueva App';
+
+                    const app = { id: appId, name: appName };
+                    if (this.project.appDescription) app.description = this.project.appDescription.trim();
+                    if (this.project.appStatus) app.status = this.project.appStatus;
+                    if (this.project.appTenantMode) app.tenant_mode = this.project.appTenantMode;
+
+                    const db = {
+                        strategy: this.project.dbStrategy || 'shared_schema',
+                        schema_source: this.project.schemaSource || 'master'
+                    };
+                    if (db.schema_source === 'master') {
+                        const masterId = (this.project.masterSchemaId || '').trim();
+                        if (masterId) db.master_schema_id = masterId;
+                    }
+                    if (this.project.dbConnection) db.connection_alias = this.project.dbConnection.trim();
+                    if (this.project.dbName) db.database_name = this.project.dbName.trim();
+
+                    const provision = {};
+                    if (typeof this.project.dbProvisionCreate === 'boolean') {
+                        provision.create_on_first_run = this.project.dbProvisionCreate;
+                    }
+                    if (this.project.dbProvisionPrefix) {
+                        provision.db_name_prefix = this.project.dbProvisionPrefix.trim();
+                    }
+                    if (this.project.dbMigrationsMode) {
+                        provision.migrations = this.project.dbMigrationsMode;
+                    }
+                    if (Object.keys(provision).length) db.provision = provision;
+
+                    const registry = {
+                        track_changes: !!this.project.registryTrackChanges,
+                        track_routes: !!this.project.registryTrackRoutes,
+                        track_config: !!this.project.registryTrackConfig,
+                        track_db_profile: !!this.project.registryTrackDbProfile,
+                        track_integrations: !!this.project.registryTrackIntegrations,
+                        track_processes: !!this.project.registryTrackProcesses
+                    };
+
+                    const processes = (this.project.processes || [])
+                        .map((proc, index) => {
+                            const rawId = (proc.id || '').trim();
+                            const actions = this.parseRoles(proc.actions);
+                            const id = this.normalizeAppId(rawId || `process_${index + 1}`);
+                            if (actions.length === 0) return null;
+
+                            const item = { id: id, actions: actions };
+                            if (proc.label) item.label = proc.label.trim();
+                            if (proc.uiForm) item.ui_form = proc.uiForm.trim();
+                            const intents = this.parseRoles(proc.intents);
+                            if (intents.length) item.intents = intents;
+                            const requires = this.parseRoles(proc.requires);
+                            if (requires.length) item.requires = requires;
+                            const perms = this.parseRoles(proc.permissions);
+                            if (perms.length) item.permissions = perms;
+                            if (proc.async) item.async = true;
+                            if (proc.confirm) item.confirm = true;
+                            if (proc.integrationRef) item.integration_ref = proc.integrationRef.trim();
+                            return item;
+                        })
+                        .filter(Boolean);
+
+                    const manifest = { schema_version: schemaVersion, app, db, registry };
+                    if (processes.length) manifest.processes = processes;
+
+                    return JSON.stringify(manifest, null, 2);
+                },
+                downloadManifest() {
+                    this.downloadText('app.manifest.json', this.buildManifest());
+                },
+                async selectProjectRoot() {
+                    if (!window.showDirectoryPicker) {
+                        alert('Tu navegador no soporta File System Access API.');
+                        return;
+                    }
+                    const root = await window.showDirectoryPicker();
+                    this.projectRootHandle = await this.resolveProjectRoot(root);
+                    await this.refreshProjectSnapshot();
+                },
+                async refreshProjectSnapshot() {
+                    if (!this.projectRootHandle) {
+                        alert('Selecciona la carpeta project o raiz del workspace.');
+                        return;
+                    }
+
+                    const forms = await this.listFilesInPath(this.projectRootHandle, 'contracts/forms');
+                    const views = await this.listFilesInPath(this.projectRootHandle, 'views');
+                    const database = await this.listFilesInPath(this.projectRootHandle, 'database');
+                    const entities = await this.listEntitiesWithTables(this.projectRootHandle);
+
+                    this.projectSnapshot = {
+                        rootName: this.projectRootHandle.name || 'project',
+                        forms: forms,
+                        entities: entities,
+                        views: views,
+                        database: database,
+                        updatedAt: new Date().toISOString().replace('T', ' ').split('.')[0]
+                    };
+                },
+                async listFilesInPath(root, path) {
+                    try {
+                        const dir = await this.getDirHandle(root, path, false);
+                        const files = [];
+                        for await (const entry of dir.values()) {
+                            if (entry.kind === 'file') files.push(entry.name);
+                        }
+                        return files.sort();
+                    } catch (e) {
+                        return [];
+                    }
+                },
+                async listEntitiesWithTables(root) {
+                    try {
+                        const dir = await this.getDirHandle(root, 'contracts/entities', false);
+                        const items = [];
+                        for await (const entry of dir.values()) {
+                            if (entry.kind !== 'file') continue;
+                            let tableName = '';
+                            try {
+                                const file = await entry.getFile();
+                                const text = await file.text();
+                                const json = JSON.parse(text);
+                                tableName = (json.table && json.table.name) ? json.table.name : '';
+                            } catch (e) {
+                                tableName = '';
+                            }
+                            items.push({ file: entry.name, table: tableName });
+                        }
+                        items.sort((a, b) => a.file.localeCompare(b.file));
+                        return items;
+                    } catch (e) {
+                        return [];
+                    }
+                },
                 buildSqlSchema() {
                     const table = this.normalizeSqlName(this.project.tableName);
                     if (!table) return '-- Definir tableName para generar SQL.';
@@ -950,6 +1620,103 @@ $formGenerator = new FormGenerator();
 
                     return sql;
                 },
+                buildEntityContract() {
+                    const entityName = this.normalizeEntityName();
+                    const tableName = this.normalizeSqlName(this.project.tableName || entityName);
+                    const label = (this.project.entityLabel || this.data.title || entityName);
+                    const primaryKey = (this.project.entityPrimaryKey || 'id').trim() || 'id';
+
+                    const fields = [];
+                    const used = new Set();
+
+                    fields.push({ name: primaryKey, type: 'int', primary: true, source: 'system' });
+                    used.add(primaryKey);
+
+                    if (this.project.includeTenant) {
+                        fields.push({ name: 'tenant_id', type: 'int', source: 'system' });
+                        used.add('tenant_id');
+                    }
+
+                    (this.data.fields || []).forEach(field => {
+                        const raw = field.name || field.id;
+                        const name = this.normalizeSqlName(raw);
+                        if (!name || used.has(name)) return;
+                        used.add(name);
+                        fields.push({
+                            name: name,
+                            type: this.mapEntityType(field.type),
+                            label: field.label || name,
+                            required: !!field.validation?.required,
+                            source: 'form'
+                        });
+                    });
+
+                    const grids = [];
+                    if (this.project.includeGrids && Array.isArray(this.data.grids)) {
+                        this.data.grids.forEach(grid => {
+                            const gridName = this.normalizeSqlName(grid.name);
+                            if (!gridName) return;
+
+                            grids.push({
+                                name: grid.name,
+                                table: `${tableName}__${gridName}`,
+                                relation: { type: 'hasMany', fk: `${tableName}_id` }
+                            });
+
+                            (grid.columns || []).forEach(col => {
+                                const colName = this.normalizeSqlName(col.name);
+                                if (!colName || used.has(colName)) return;
+                                used.add(colName);
+                                fields.push({
+                                    name: colName,
+                                    type: this.mapEntityType(col.input?.type || col.type),
+                                    label: col.label || colName,
+                                    source: `grid:${grid.name}`,
+                                    grid: grid.name
+                                });
+                            });
+                        });
+                    }
+
+                    if (this.project.includeTimestamps) {
+                        if (!used.has('created_at')) {
+                            fields.push({ name: 'created_at', type: 'datetime', source: 'system' });
+                            used.add('created_at');
+                        }
+                        if (!used.has('updated_at')) {
+                            fields.push({ name: 'updated_at', type: 'datetime', source: 'system' });
+                            used.add('updated_at');
+                        }
+                    }
+
+                    const permissions = {
+                        read: this.parseRoles(this.project.permRead),
+                        create: this.parseRoles(this.project.permCreate),
+                        update: this.parseRoles(this.project.permUpdate),
+                        delete: this.parseRoles(this.project.permDelete)
+                    };
+
+                    const entity = {
+                        type: 'entity',
+                        name: entityName,
+                        label: label,
+                        version: '1.0',
+                        table: {
+                            name: tableName || entityName,
+                            primaryKey: primaryKey,
+                            timestamps: !!this.project.includeTimestamps,
+                            softDelete: !!this.project.entitySoftDelete,
+                            tenantScoped: !!this.project.includeTenant
+                        },
+                        fields: fields,
+                        grids: grids,
+                        relations: this.safeJsonArray(this.project.relationsJson),
+                        rules: this.safeJsonArray(this.project.rulesJson),
+                        permissions: permissions
+                    };
+
+                    return JSON.stringify(entity, null, 2);
+                },
                 contractIssues() {
                     const issues = [];
 
@@ -1010,6 +1777,10 @@ $formGenerator = new FormGenerator();
                     const table = this.normalizeSqlName(this.project.tableName) || 'schema';
                     this.downloadText(`${table}.sql`, this.buildSqlSchema());
                 },
+                downloadEntity() {
+                    const entityFile = this.normalizeEntityFileName();
+                    this.downloadText(entityFile, this.buildEntityContract());
+                },
                 async saveToProject() {
                     try {
                         if (!window.showDirectoryPicker) {
@@ -1038,6 +1809,10 @@ $formGenerator = new FormGenerator();
                             viewDir = await viewDir.getDirectoryHandle(seg, { create: true });
                         }
                         await this.writeFile(viewDir, viewFile, this.buildViewTemplate());
+
+                        const entitiesDir = await this.getDirHandle(projectRoot, 'contracts/entities', true);
+                        const entityFile = this.normalizeEntityFileName();
+                        await this.writeFile(entitiesDir, entityFile, this.buildEntityContract());
 
                         const sql = this.buildSqlSchema();
                         if (this.project.tableName && sql && !sql.startsWith('--')) {
@@ -1171,3 +1946,6 @@ $formGenerator = new FormGenerator();
     </script>
 </body>
 </html>
+
+
+

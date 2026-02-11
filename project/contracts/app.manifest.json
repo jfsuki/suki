@@ -1,0 +1,49 @@
+{
+  "schema_version": "1.0",
+  "app": {
+    "id": "suki_erp",
+    "name": "Suki ERP",
+    "description": "Proyecto ERP base",
+    "status": "draft",
+    "tenant_mode": "shared",
+    "default_locale": "es-CO",
+    "timezone": "America/Bogota",
+    "version": "0.1.0"
+  },
+  "db": {
+    "strategy": "shared_schema",
+    "schema_source": "master",
+    "master_schema_id": "suki_base_v1",
+    "connection_alias": "default",
+    "provision": {
+      "create_on_first_run": true,
+      "db_name_prefix": "tenant_",
+      "migrations": "auto"
+    }
+  },
+  "registry": {
+    "track_changes": true,
+    "track_routes": true,
+    "track_config": true,
+    "track_db_profile": true,
+    "track_integrations": true,
+    "track_processes": true
+  },
+  "auth": {
+    "login_field": "username",
+    "email_optional": true,
+    "mfa": "optional",
+    "roles": ["admin", "editor", "viewer"],
+    "default_role": "admin",
+    "password_policy": {
+      "min_length": 8,
+      "require_numbers": true,
+      "require_symbols": false
+    }
+  },
+  "integrations": [],
+  "processes": [],
+  "extensions": {}
+}
+
+

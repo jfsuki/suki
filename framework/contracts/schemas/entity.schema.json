@@ -1,0 +1,124 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EntityContract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "name", "table", "fields", "permissions"],
+  "properties": {
+    "type": { "const": "entity" },
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z0-9_]+$"
+    },
+    "label": { "type": "string" },
+    "version": { "type": "string" },
+    "table": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string" },
+        "primaryKey": { "type": "string" },
+        "timestamps": { "type": "boolean" },
+        "softDelete": { "type": "boolean" },
+        "tenantScoped": { "type": "boolean" }
+      }
+    },
+    "fields": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "type"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string" },
+          "label": { "type": "string" },
+          "required": { "type": "boolean" },
+          "nullable": { "type": "boolean" },
+          "default": {},
+          "length": { "type": "integer", "minimum": 1 },
+          "precision": { "type": "integer", "minimum": 1 },
+          "scale": { "type": "integer", "minimum": 0 },
+          "primary": { "type": "boolean" },
+          "unique": { "type": "boolean" },
+          "source": { "type": "string" },
+          "grid": { "type": "string" },
+          "ref": { "type": "string" }
+        }
+      }
+    },
+    "grids": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "table", "relation"],
+        "properties": {
+          "name": { "type": "string" },
+          "table": { "type": "string" },
+          "relation": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["type"],
+            "properties": {
+              "type": { "type": "string", "enum": ["hasMany", "hasOne", "belongsTo"] },
+              "fk": { "type": "string" },
+              "entity": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "relations": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["name", "type", "entity"],
+        "properties": {
+          "name": { "type": "string" },
+          "type": { "type": "string", "enum": ["hasMany", "hasOne", "belongsTo", "manyToMany"] },
+          "entity": { "type": "string" },
+          "fk": { "type": "string" },
+          "localKey": { "type": "string" },
+          "through": { "type": "string" }
+        }
+      }
+    },
+    "rules": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "assert", "message"],
+        "properties": {
+          "id": { "type": "string" },
+          "when": { "type": "string" },
+          "assert": { "type": "string" },
+          "message": { "type": "string" },
+          "fields": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        }
+      }
+    },
+    "permissions": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["read", "create", "update", "delete"],
+      "properties": {
+        "read": { "type": "array", "items": { "type": "string" } },
+        "create": { "type": "array", "items": { "type": "string" } },
+        "update": { "type": "array", "items": { "type": "string" } },
+        "delete": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "extensions": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

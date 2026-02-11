@@ -14,11 +14,22 @@ require_once APP_ROOT . '/vendor/autoload.php';
 require_once APP_ROOT . '/app/autoload.php';
 
 use App\Core\Response;
+$manifestError = null;
+try {
+    \App\Core\ManifestValidator::validateOrFail();
+} catch (\Throwable $e) {
+    $manifestError = $e;
+}
 
 // --------------------------------
 // Inicializar respuesta
 // --------------------------------
 $response = new Response();
+if ($manifestError) {
+    http_response_code(500);
+    echo $response->json('error', 'App manifest invalido: ' . $manifestError->getMessage());
+    return;
+}
 
 // --------------------------------
 // 1. Obtener la ruta
@@ -74,3 +85,10 @@ $result = $controller->$method($_POST);
 if (is_string($result)) {
     echo $result;
 }
+
+
+
+
+
+
+

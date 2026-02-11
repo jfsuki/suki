@@ -30,7 +30,8 @@ All core rules, architecture, contracts, and plans live in `/framework/docs`.
 - `/framework/docs/09_MONETIZATION_PRODUCT_VISION.md` â€” product vision & monetization.
 - `/framework/docs/10_AI_OPERATING_PROCEDURE.md` â€” how AI must operate (safe workflow).
 - `/framework/docs/11_FRAMEWORK_BOUNDARY.md` — framework vs project boundary.
-- `/framework/docs/12_INTEGRATIONS_AUTOMATION.md` — integrations, automation, chat processes.
+- `/framework/docs/12_INTEGRATIONS_AUTOMATION.md` — integrations, automation, chat processes.
+- /framework/docs/13_APP_MANIFEST_CONTRACT.md -- app manifest contract (db strategy, registry, integrations, processes).
 
 ---
 
@@ -52,4 +53,8 @@ Copy/paste before any AI work:
 - Audit everything (DIAN-ready).
 - Security by design.
 
+
+
+
+- /framework/docs/14_ENTITY_CONTRACT.md -- entity contract (tables, fields, relations, permissions).
 
