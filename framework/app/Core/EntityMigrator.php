@@ -25,18 +25,18 @@ class EntityMigrator
         $this->mapper = $mapper ?? new DbTypeMapper();
     }
 
-    public function migrateAll(): array
+    public function migrateAll(bool $apply = true): array
     {
         $this->store->ensureTable();
 
         $results = [];
         foreach ($this->registry->all() as $entity) {
-            $results[] = $this->migrateEntity($entity);
+            $results[] = $this->migrateEntity($entity, $apply);
         }
         return $results;
     }
 
-    public function migrateEntity(array $entity): array
+    public function migrateEntity(array $entity, bool $apply = true): array
     {
         $name = (string) ($entity['name'] ?? '');
         if ($name === '') {
@@ -47,15 +47,16 @@ class EntityMigrator
         $current = $this->store->getChecksum($name);
 
         $sqls = $this->buildCreateSql($entity);
-        foreach ($sqls as $sql) {
-            $this->db->exec($sql);
+        if ($apply) {
+            foreach ($sqls as $sql) {
+                $this->db->exec($sql);
+            }
+            $this->store->upsert($name, $checksum);
         }
-
-        $this->store->upsert($name, $checksum);
 
         return [
             'entity' => $name,
-            'applied' => $current !== $checksum,
+            'applied' => $apply ? ($current !== $checksum) : false,
             'checksum' => $checksum,
             'sql' => $sqls,
         ];

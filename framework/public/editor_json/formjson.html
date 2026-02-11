@@ -33,6 +33,11 @@
             <button @click="loadExample()" class="px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded border transition">
                 <i class="fa-solid fa-upload mr-1"></i> Cargar JSON
             </button>
+            <button @click="showAdvanced = !showAdvanced; if(!showAdvanced && activeTab === 'output') activeTab = 'general'" class="px-3 py-2 text-xs font-bold rounded border transition"
+                :class="showAdvanced ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'">
+                <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>
+                <span x-text="showAdvanced ? 'Modo avanzado' : 'Modo amigable'"></span>
+            </button>
             <button @click="downloadJson()" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold uppercase rounded shadow transition flex items-center">
                 <i class="fa-solid fa-download mr-2"></i> Descargar JSON
             </button>
@@ -60,6 +65,7 @@
             <div class="flex border-b px-2 bg-white shadow-sm overflow-x-auto" x-show="mainTab === 'forms'">
                 <template x-for="tab in tabs">
                     <button 
+                        x-show="!tab.advanced || showAdvanced"
                         @click="activeTab = tab.id"
                         :class="activeTab === tab.id ? 'tab-active' : 'tab-inactive'"
                         class="px-5 py-3 text-xs uppercase tracking-wide transition-all flex items-center gap-2 whitespace-nowrap">
@@ -92,61 +98,93 @@
                         </div>
                     </div>
 
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                            <h4 class="text-xs font-bold text-gray-600 uppercase mb-2">Resumen actual</h4>
-                            <ul class="text-xs text-gray-600 space-y-1">
-                                <li><span class="font-semibold">Formulario:</span> <span x-text="data.title"></span> (<span x-text="data.name"></span>)</li>
-                                <li><span class="font-semibold">Campos:</span> <span x-text="data.fields.length"></span></li>
-                                <li><span class="font-semibold">Grids:</span> <span x-text="data.grids.length"></span></li>
-                                <li><span class="font-semibold">Totales:</span> <span x-text="data.summary.length"></span></li>
-                            </ul>
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">Progreso</h4>
+                            <span class="text-xs font-bold text-emerald-700" x-text="progressPercent() + '%'"></span>
                         </div>
-                        <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                            <h4 class="text-xs font-bold text-gray-600 uppercase mb-2">Entidad/DB actual</h4>
-                            <ul class="text-xs text-gray-600 space-y-1">
-                                <li><span class="font-semibold">Entidad:</span> <span x-text="(getEntityObject() || {}).name || '-'"></span></li>
-                                <li><span class="font-semibold">Tabla:</span> <span x-text="(getEntityObject() && getEntityObject().table ? getEntityObject().table.name : '-')"></span></li>
-                                <li><span class="font-semibold">Tenant:</span> <span x-text="(getEntityObject() && getEntityObject().table && getEntityObject().table.tenantScoped) ? 'si' : 'no'"></span></li>
-                                <li><span class="font-semibold">Timestamps:</span> <span x-text="(getEntityObject() && getEntityObject().table && getEntityObject().table.timestamps) ? 'si' : 'no'"></span></li>
-                            </ul>
+                        <div class="w-full h-2 bg-gray-100 rounded mt-2">
+                            <div class="h-2 bg-emerald-500 rounded" :style="`width:${progressPercent()}%`"></div>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 mt-3 text-xs text-gray-600">
+                            <template x-for="step in progressSteps()" :key="step.label">
+                                <div class="flex items-center gap-2">
+                                    <span class="inline-block w-2 h-2 rounded-full" :class="step.done ? 'bg-emerald-500' : 'bg-gray-300'"></span>
+                                    <span x-text="step.label"></span>
+                                </div>
+                            </template>
                         </div>
                     </div>
 
                     <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
-                        <div class="flex items-center justify-between mb-3">
-                            <h4 class="text-xs font-bold text-gray-600 uppercase">Proyecto detectado</h4>
-                            <span class="text-[10px] text-gray-500">File System Access API</span>
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">Arbol del proyecto</h4>
+                            <span class="text-[10px] text-gray-500">clic para desplegar</span>
                         </div>
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs text-gray-600">
-                            <div><span class="font-semibold">Forms:</span> <span x-text="projectSnapshot.forms.length"></span></div>
-                            <div><span class="font-semibold">Entities:</span> <span x-text="projectSnapshot.entities.length"></span></div>
-                            <div><span class="font-semibold">Views:</span> <span x-text="projectSnapshot.views.length"></span></div>
-                            <div><span class="font-semibold">SQL:</span> <span x-text="projectSnapshot.database.length"></span></div>
-                        </div>
-                        <div class="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <p class="text-[10px] font-bold text-gray-500 uppercase">Formularios</p>
-                                <div class="text-xs text-gray-600 space-y-1">
-                                    <template x-for="name in projectSnapshot.forms.slice(0, 6)" :key="name">
-                                        <div x-text="name"></div>
-                                    </template>
-                                    <div x-show="projectSnapshot.forms.length === 0" class="text-[10px] text-gray-400">Sin datos</div>
-                                </div>
-                            </div>
-                            <div>
-                                <p class="text-[10px] font-bold text-gray-500 uppercase">Entidades/Tablas</p>
-                                <div class="text-xs text-gray-600 space-y-1">
-                                    <template x-for="item in projectSnapshot.entities.slice(0, 6)" :key="item.file">
-                                        <div>
-                                            <span x-text="item.file"></span>
-                                            <span class="text-[10px] text-gray-400" x-text="item.table ? ' -> ' + item.table : ''"></span>
+
+                        <details open class="border rounded p-3 bg-gray-50">
+                            <summary class="text-xs font-bold text-gray-700 cursor-pointer">
+                                Proyecto: <span x-text="projectSnapshot.rootName || 'Sin seleccionar'"></span>
+                            </summary>
+                            <div class="mt-2 space-y-2 text-xs text-gray-600">
+                                <details>
+                                    <summary class="cursor-pointer">Formularios (<span x-text="projectSnapshot.forms.length"></span>)</summary>
+                                    <div class="pl-4 mt-1 space-y-1">
+                                        <template x-for="name in projectSnapshot.forms" :key="name">
+                                            <div x-text="name"></div>
+                                        </template>
+                                        <div x-show="projectSnapshot.forms.length === 0" class="text-[10px] text-gray-400">Sin formularios</div>
+                                    </div>
+                                </details>
+
+                                <details>
+                                    <summary class="cursor-pointer">Vistas (<span x-text="projectSnapshot.views.length"></span>)</summary>
+                                    <div class="pl-4 mt-1 space-y-1">
+                                        <template x-for="name in projectSnapshot.views" :key="name">
+                                            <div x-text="name"></div>
+                                        </template>
+                                        <div x-show="projectSnapshot.views.length === 0" class="text-[10px] text-gray-400">Sin vistas</div>
+                                    </div>
+                                </details>
+
+                                <details>
+                                    <summary class="cursor-pointer">Base de datos</summary>
+                                    <div class="pl-4 mt-2 space-y-2">
+                                        <div class="text-[11px] text-gray-500">
+                                            Strategy: <span x-text="project.dbStrategy"></span> |
+                                            Schema: <span x-text="project.schemaSource"></span>
                                         </div>
-                                    </template>
-                                    <div x-show="projectSnapshot.entities.length === 0" class="text-[10px] text-gray-400">Sin datos</div>
-                                </div>
+                                        <div class="text-[11px] text-gray-500" x-show="projectSnapshot.manifest">
+                                            Manifest: <span x-text="projectSnapshot.manifest?.app?.name || 'app'"></span>
+                                        </div>
+
+                                        <details>
+                                            <summary class="cursor-pointer">Tablas / Entidades (<span x-text="projectSnapshot.entities.length"></span>)</summary>
+                                            <div class="pl-4 mt-2 space-y-2">
+                                                <template x-for="entity in projectSnapshot.entities" :key="entity.file">
+                                                    <details class="border rounded p-2 bg-white">
+                                                        <summary class="cursor-pointer text-xs font-semibold">
+                                                            <span x-text="entity.table || entity.file"></span>
+                                                            <span class="text-[10px] text-gray-400" x-text="entity.file ? ' (' + entity.file + ')' : ''"></span>
+                                                        </summary>
+                                                        <div class="pl-3 mt-1 space-y-1">
+                                                            <template x-for="field in (entity.fields || [])" :key="field.name + field.type">
+                                                                <div class="text-[10px] text-gray-600">
+                                                                    <span x-text="field.name"></span>
+                                                                    <span class="text-gray-400" x-text="' : ' + field.type"></span>
+                                                                </div>
+                                                            </template>
+                                                            <div x-show="!entity.fields || entity.fields.length === 0" class="text-[10px] text-gray-400">Sin campos</div>
+                                                        </div>
+                                                    </details>
+                                                </template>
+                                                <div x-show="projectSnapshot.entities.length === 0" class="text-[10px] text-gray-400">Sin entidades</div>
+                                            </div>
+                                        </details>
+                                    </div>
+                                </details>
                             </div>
-                        </div>
+                        </details>
                     </div>
                 </div>
 
@@ -306,6 +344,74 @@
                                 </div>
                             </div>
                             <textarea readonly class="w-full h-48 border rounded p-2 text-xs font-mono bg-white" x-text="buildEntityContract()"></textarea>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">Importar CSV (crear tabla)</h4>
+                            <span class="text-[10px] text-gray-500">beta</span>
+                        </div>
+                        <p class="text-[11px] text-gray-500">Sube un CSV y genera campos automaticamente. No toca la BD, solo crea contratos.</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Archivo CSV</label>
+                                <input type="file" accept=".csv,text/csv" @change="handleCsvFile($event)" class="w-full border rounded px-3 py-2 text-xs bg-white">
+                                <p class="text-[10px] text-gray-400 mt-1" x-text="csvImport.fileName || 'Sin archivo'"></p>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2">
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Delimitador</label>
+                                    <input x-model="csvImport.delimiter" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="," maxlength="2">
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-gray-600 mt-4">
+                                    <input type="checkbox" x-model="csvImport.firstRowHeader" class="rounded text-emerald-600">
+                                    Primera fila = encabezado
+                                </div>
+                                <div class="flex items-center gap-2 text-xs text-gray-600 mt-2">
+                                    <input type="checkbox" x-model="csvImport.replaceFields" class="rounded text-emerald-600">
+                                    Reemplazar campos existentes
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="border rounded p-3 bg-gray-50">
+                            <h5 class="text-[10px] font-bold text-gray-500 uppercase mb-2">Columnas detectadas</h5>
+                            <div class="space-y-2">
+                                <template x-for="(col, idx) in csvImport.columns" :key="idx">
+                                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2 items-center text-xs">
+                                        <input x-model="col.name" class="border rounded px-2 py-1 text-xs font-mono" placeholder="nombre_columna">
+                                        <select x-model="col.type" class="border rounded px-2 py-1 text-xs bg-white">
+                                            <option value="string">string</option>
+                                            <option value="int">int</option>
+                                            <option value="decimal">decimal</option>
+                                            <option value="bool">bool</option>
+                                            <option value="date">date</option>
+                                        </select>
+                                        <span class="text-[10px] text-gray-400" x-text="mapCsvTypeToFormType(col.type) + ' (form)'"></span>
+                                    </div>
+                                </template>
+                                <div x-show="csvImport.columns.length === 0" class="text-[10px] text-gray-400">Sin columnas detectadas</div>
+                            </div>
+                            <button @click="applyCsvToFields()" class="mt-3 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded">Crear campos</button>
+                        </div>
+
+                        <div class="border rounded p-3 bg-white">
+                            <h5 class="text-[10px] font-bold text-gray-500 uppercase mb-2">Preview filas</h5>
+                            <div class="overflow-auto max-h-40">
+                                <table class="w-full text-xs">
+                                    <tbody>
+                                        <template x-for="(row, rIndex) in csvImport.preview" :key="rIndex">
+                                            <tr class="border-b">
+                                                <template x-for="(cell, cIndex) in row" :key="cIndex">
+                                                    <td class="px-2 py-1 border-r" x-text="cell"></td>
+                                                </template>
+                                            </tr>
+                                        </template>
+                                    </tbody>
+                                </table>
+                                <div x-show="csvImport.preview.length === 0" class="text-[10px] text-gray-400">Sin preview</div>
+                            </div>
                         </div>
                     </div>
 
@@ -1002,7 +1108,7 @@
             </div>
         </div>
 
-        <div class="w-[35%] bg-[#1e1e1e] text-gray-300 flex flex-col border-l border-gray-700 shadow-2xl relative">
+        <div class="w-[35%] bg-[#1e1e1e] text-gray-300 flex flex-col border-l border-gray-700 shadow-2xl relative" x-show="showAdvanced">
             <div class="px-4 py-3 bg-[#252526] text-xs font-mono border-b border-[#333] flex justify-between items-center shadow-md z-10">
                 <span class="font-bold text-gray-400"><i class="fa-brands fa-js mr-1"></i> JSON OUTPUT</span>
                 <span class="text-green-500 text-[10px] bg-green-900/30 px-2 py-0.5 rounded-full border border-green-800 animate-pulse">● Live</span>
@@ -1047,6 +1153,7 @@
                 ],
                 activeTab: 'general',
                 showLoadModal: false,
+                showAdvanced: false,
                 jsonInput: '',
                 projectRootHandle: null,
                 projectSnapshot: {
@@ -1055,7 +1162,16 @@
                     entities: [],
                     views: [],
                     database: [],
+                    manifest: null,
                     updatedAt: ''
+                },
+                csvImport: {
+                    fileName: '',
+                    delimiter: ',',
+                    firstRowHeader: true,
+                    replaceFields: true,
+                    columns: [],
+                    preview: []
                 },
                 tabs: [
                     { id: 'general', label: 'General', icon: 'fa-solid fa-sliders' },
@@ -1063,7 +1179,7 @@
                     { id: 'layout', label: 'Diseño', icon: 'fa-solid fa-table-columns' },
                     { id: 'grids', label: 'Grids/Tablas', icon: 'fa-solid fa-table-list' },
                     { id: 'summary', label: 'Totales', icon: 'fa-solid fa-calculator' },
-                    { id: 'output', label: 'Proyecto', icon: 'fa-solid fa-sitemap' }
+                    { id: 'output', label: 'Proyecto', icon: 'fa-solid fa-sitemap', advanced: true }
                 ],
                 data: {
                     type: "form",
@@ -1161,6 +1277,168 @@
                 },
                 removeProcess(index) {
                     if (confirm('¿Eliminar este proceso?')) this.project.processes.splice(index, 1);
+                },
+                handleCsvFile(event) {
+                    const file = event.target.files && event.target.files[0];
+                    if (!file) return;
+                    this.csvImport.fileName = file.name;
+
+                    const reader = new FileReader();
+                    reader.onload = () => {
+                        const text = reader.result || '';
+                        this.parseCsvText(String(text));
+                    };
+                    reader.readAsText(file);
+                },
+                parseCsvText(text) {
+                    const delimiter = this.csvImport.delimiter || ',';
+                    const rows = this.parseCsvRows(text, delimiter);
+                    if (!rows.length) {
+                        this.csvImport.columns = [];
+                        this.csvImport.preview = [];
+                        return;
+                    }
+
+                    let headers = [];
+                    let dataStartIndex = 0;
+                    if (this.csvImport.firstRowHeader) {
+                        headers = rows[0].map(h => String(h || '').trim());
+                        dataStartIndex = 1;
+                    } else {
+                        headers = rows[0].map((_, i) => `col_${i + 1}`);
+                    }
+
+                    const dataRows = rows.slice(dataStartIndex, dataStartIndex + 10);
+                    this.csvImport.preview = dataRows;
+
+                    this.csvImport.columns = headers.map((name, index) => {
+                        const sample = dataRows.map(r => r[index]).filter(v => v !== undefined && v !== '');
+                        return {
+                            name: name || `col_${index + 1}`,
+                            type: this.inferCsvType(sample)
+                        };
+                    });
+                },
+                parseCsvRows(text, delimiter) {
+                    const rows = [];
+                    let row = [];
+                    let current = '';
+                    let inQuotes = false;
+
+                    for (let i = 0; i < text.length; i++) {
+                        const char = text[i];
+                        const next = text[i + 1];
+
+                        if (char === '"' && inQuotes && next === '"') {
+                            current += '"';
+                            i++;
+                            continue;
+                        }
+
+                        if (char === '"') {
+                            inQuotes = !inQuotes;
+                            continue;
+                        }
+
+                        if (char === delimiter && !inQuotes) {
+                            row.push(current);
+                            current = '';
+                            continue;
+                        }
+
+                        if ((char === '\n' || char === '\r') && !inQuotes) {
+                            if (current.length || row.length) {
+                                row.push(current);
+                                rows.push(row);
+                            }
+                            row = [];
+                            current = '';
+                            continue;
+                        }
+
+                        current += char;
+                    }
+
+                    if (current.length || row.length) {
+                        row.push(current);
+                        rows.push(row);
+                    }
+
+                    return rows;
+                },
+                inferCsvType(values) {
+                    if (!values.length) return 'string';
+                    let isInt = true;
+                    let isNumber = true;
+                    let isBool = true;
+                    let isDate = true;
+
+                    values.forEach(value => {
+                        const v = String(value).trim();
+                        if (v === '') return;
+
+                        if (!/^-?\d+$/.test(v)) isInt = false;
+                        if (!/^-?\d+(\.\d+)?$/.test(v)) isNumber = false;
+                        if (!/^(true|false|0|1|si|no)$/i.test(v)) isBool = false;
+                        if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) isDate = false;
+                    });
+
+                    if (isInt) return 'int';
+                    if (isNumber) return 'decimal';
+                    if (isBool) return 'bool';
+                    if (isDate) return 'date';
+                    return 'string';
+                },
+                mapCsvTypeToFormType(type) {
+                    switch ((type || '').toLowerCase()) {
+                        case 'int':
+                        case 'decimal':
+                        case 'number':
+                            return 'number';
+                        case 'bool':
+                            return 'checkbox';
+                        case 'date':
+                            return 'date';
+                        default:
+                            return 'text';
+                    }
+                },
+                applyCsvToFields() {
+                    if (!this.csvImport.columns.length) {
+                        alert('No hay columnas para aplicar.');
+                        return;
+                    }
+
+                    const fields = this.csvImport.columns.map(col => {
+                        const name = this.normalizeSqlName(col.name);
+                        return {
+                            id: name,
+                            name: name,
+                            label: col.name || name,
+                            type: this.mapCsvTypeToFormType(col.type),
+                            validation: { required: false, pattern: '', message: '' },
+                            showSettings: false,
+                            searchable: false,
+                            options: []
+                        };
+                    });
+
+                    if (this.csvImport.replaceFields) {
+                        this.data.fields = fields;
+                    } else {
+                        this.data.fields = (this.data.fields || []).concat(fields);
+                    }
+
+                    if (!this.project.tableName) {
+                        const base = (this.csvImport.fileName || 'tabla').replace(/\.[^/.]+$/, '');
+                        this.project.tableName = this.normalizeSqlName(base);
+                    }
+
+                    if (!this.project.entityName) {
+                        this.project.entityName = this.normalizeSqlName(this.project.tableName);
+                    }
+
+                    alert('Campos cargados desde CSV.');
                 },
 
                 // --- Métodos de Layout ---
@@ -1485,6 +1763,20 @@ $formGenerator = new FormGenerator();
 
                     return JSON.stringify(manifest, null, 2);
                 },
+                progressSteps() {
+                    return [
+                        { label: 'Formulario', done: (this.data.fields || []).length > 0 },
+                        { label: 'Entidad', done: !!(this.project.entityName || this.project.tableName) },
+                        { label: 'Vista', done: !!this.project.viewPath },
+                        { label: 'DB profile', done: !!this.project.dbStrategy }
+                    ];
+                },
+                progressPercent() {
+                    const steps = this.progressSteps();
+                    if (!steps.length) return 0;
+                    const done = steps.filter(s => s.done).length;
+                    return Math.round((done / steps.length) * 100);
+                },
                 downloadManifest() {
                     this.downloadText('app.manifest.json', this.buildManifest());
                 },
@@ -1506,7 +1798,8 @@ $formGenerator = new FormGenerator();
                     const forms = await this.listFilesInPath(this.projectRootHandle, 'contracts/forms');
                     const views = await this.listFilesInPath(this.projectRootHandle, 'views');
                     const database = await this.listFilesInPath(this.projectRootHandle, 'database');
-                    const entities = await this.listEntitiesWithTables(this.projectRootHandle);
+                    const entities = await this.listEntitiesWithFields(this.projectRootHandle);
+                    const manifest = await this.readManifest(this.projectRootHandle);
 
                     this.projectSnapshot = {
                         rootName: this.projectRootHandle.name || 'project',
@@ -1514,6 +1807,7 @@ $formGenerator = new FormGenerator();
                         entities: entities,
                         views: views,
                         database: database,
+                        manifest: manifest,
                         updatedAt: new Date().toISOString().replace('T', ' ').split('.')[0]
                     };
                 },
@@ -1529,27 +1823,45 @@ $formGenerator = new FormGenerator();
                         return [];
                     }
                 },
-                async listEntitiesWithTables(root) {
+                async listEntitiesWithFields(root) {
                     try {
                         const dir = await this.getDirHandle(root, 'contracts/entities', false);
                         const items = [];
                         for await (const entry of dir.values()) {
                             if (entry.kind !== 'file') continue;
                             let tableName = '';
+                            let fields = [];
                             try {
                                 const file = await entry.getFile();
                                 const text = await file.text();
                                 const json = JSON.parse(text);
                                 tableName = (json.table && json.table.name) ? json.table.name : '';
+                                if (Array.isArray(json.fields)) {
+                                    fields = json.fields
+                                        .map(f => ({ name: f.name || '', type: f.type || '' }))
+                                        .filter(f => f.name);
+                                }
                             } catch (e) {
                                 tableName = '';
+                                fields = [];
                             }
-                            items.push({ file: entry.name, table: tableName });
+                            items.push({ file: entry.name, table: tableName, fields: fields });
                         }
                         items.sort((a, b) => a.file.localeCompare(b.file));
                         return items;
                     } catch (e) {
                         return [];
+                    }
+                },
+                async readManifest(root) {
+                    try {
+                        const dir = await this.getDirHandle(root, 'contracts', false);
+                        const fileHandle = await dir.getFileHandle('app.manifest.json', { create: false });
+                        const file = await fileHandle.getFile();
+                        const text = await file.text();
+                        return JSON.parse(text);
+                    } catch (e) {
+                        return null;
                     }
                 },
                 buildSqlSchema() {
