@@ -25,13 +25,16 @@
         <div class="flex items-center gap-3">
             <div class="bg-orange-600 text-white p-2 rounded-lg shadow-md"><i class="fa-solid fa-layer-group"></i></div>
             <div>
-                <h1 class="font-bold text-gray-800 text-lg leading-tight">Suki Form Builder</h1>
-                <p class="text-[11px] text-gray-500 font-medium">Generador de JSON Avanzado v2.0</p>
+                <h1 class="font-bold text-gray-800 text-lg leading-tight">Suki Studio</h1>
+                <p class="text-[11px] text-gray-500 font-medium">Creador visual de apps (modo amigable)</p>
             </div>
         </div>
         <div class="flex gap-2">
             <button @click="loadExample()" class="px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded border transition">
                 <i class="fa-solid fa-upload mr-1"></i> Cargar JSON
+            </button>
+            <button @click="startGuided()" class="px-3 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded shadow transition">
+                <i class="fa-solid fa-person-walking-luggage mr-1"></i> Modo guiado
             </button>
             <button @click="showAdvanced = !showAdvanced; if(!showAdvanced && activeTab === 'output') activeTab = 'general'" class="px-3 py-2 text-xs font-bold rounded border transition"
                 :class="showAdvanced ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'">
@@ -62,7 +65,7 @@
                 </template>
             </div>
 
-            <div class="flex border-b px-2 bg-white shadow-sm overflow-x-auto" x-show="mainTab === 'forms'">
+            <div class="flex border-b px-2 bg-white shadow-sm overflow-x-auto" x-show="mainTab === 'forms' && showAdvanced">
                 <template x-for="tab in tabs">
                     <button 
                         x-show="!tab.advanced || showAdvanced"
@@ -542,7 +545,811 @@
                     </div>
                 </div>
 
-                <div x-show="mainTab === 'forms'" x-transition.opacity>
+                <div x-show="mainTab === 'forms' && !showAdvanced" class="space-y-4" x-transition.opacity>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                            <div>
+                                <h3 class="font-bold text-gray-800 text-lg">Constructor visual de apps</h3>
+                                <p class="text-xs text-gray-500">Objeto → Propiedades. Selecciona a la izquierda y edita a la derecha.</p>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button @click="builderTopTab='insert'; openWizard()" :class="builderTopTab==='insert' ? 'bg-orange-600 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
+                                    <i class="fa-solid fa-plus mr-1"></i> Insertar
+                                </button>
+                                <button @click="builderTopTab='data'; showDataImport=true" :class="builderTopTab==='data' ? 'bg-slate-800 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
+                                    <i class="fa-solid fa-database mr-1"></i> Datos
+                                </button>
+                                <button @click="builderTopTab='reports'" :class="builderTopTab==='reports' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
+                                    <i class="fa-solid fa-file-lines mr-1"></i> Informes
+                                </button>
+                                <button @click="builderTopTab='dashboards'" :class="builderTopTab==='dashboards' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
+                                    <i class="fa-solid fa-chart-line mr-1"></i> Dashboard
+                                </button>
+                                <button @click="mainTab = 'chat'" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded shadow">
+                                    <i class="fa-solid fa-comments mr-1"></i> Probar
+                                </button>
+                                <button @click="saveToProject()" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold uppercase rounded shadow">
+                                    <i class="fa-solid fa-floppy-disk mr-1"></i> Guardar
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-1 xl:grid-cols-[260px_1fr_320px] gap-4">
+                        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
+                            <div class="flex items-center justify-between">
+                                <h4 class="text-xs font-bold text-gray-600 uppercase">Objetos</h4>
+                                <button @click="selectObject('form')" class="text-[10px] text-indigo-600">Pantalla</button>
+                            </div>
+
+                            <div class="space-y-2 text-xs">
+                                <button @click="selectObject('form')" class="w-full text-left px-2 py-2 rounded border"
+                                    :class="isSelected('form') ? 'border-orange-400 bg-orange-50 text-orange-700' : 'border-gray-200 hover:bg-gray-50'">
+                                    <i class="fa-solid fa-window-maximize mr-2 text-gray-500"></i>
+                                    <span x-text="data.title || data.name || 'Pantalla'"></span>
+                                </button>
+
+                                <details open class="border border-gray-100 rounded">
+                                    <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
+                                        <i class="fa-solid fa-layer-group mr-2"></i> Secciones
+                                    </summary>
+                                    <div class="space-y-1 px-2 pb-2">
+                                        <template x-for="(section, sIndex) in (data.layout?.sections || [])" :key="'sec-'+sIndex">
+                                            <button @click="selectObject('section', sIndex)" class="w-full text-left px-2 py-1 rounded"
+                                                :class="isSelected('section', sIndex) ? 'bg-orange-50 text-orange-700' : 'hover:bg-gray-50'">
+                                                <i class="fa-solid fa-folder-open mr-2 text-gray-400"></i>
+                                                <span x-text="section.title || section.id || ('Seccion ' + (sIndex+1))"></span>
+                                            </button>
+                                        </template>
+                                        <div x-show="!data.layout || !data.layout.sections || data.layout.sections.length === 0" class="text-[10px] text-gray-400 px-2 py-1">
+                                            Sin secciones
+                                        </div>
+                                    </div>
+                                </details>
+
+                                <details open class="border border-gray-100 rounded">
+                                    <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
+                                        <i class="fa-solid fa-list-check mr-2"></i> Campos
+                                    </summary>
+                                    <div class="space-y-1 px-2 pb-2">
+                                        <template x-for="(field, fIndex) in data.fields" :key="'field-'+fIndex">
+                                            <button @click="selectObject('field', fIndex)" class="w-full text-left px-2 py-1 rounded"
+                                                :class="isSelected('field', fIndex) ? 'bg-orange-50 text-orange-700' : 'hover:bg-gray-50'">
+                                                <i class="fa-regular fa-square mr-2 text-gray-400"></i>
+                                                <span x-text="field.label || field.name || field.id || ('Campo ' + (fIndex+1))"></span>
+                                            </button>
+                                        </template>
+                                        <div x-show="data.fields.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin campos</div>
+                                    </div>
+                                </details>
+
+                                <details open class="border border-gray-100 rounded">
+                                    <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
+                                        <i class="fa-solid fa-table mr-2"></i> Tablas
+                                    </summary>
+                                    <div class="space-y-2 px-2 pb-2">
+                                        <template x-for="(grid, gIndex) in data.grids" :key="'grid-'+gIndex">
+                                            <details class="border border-gray-100 rounded">
+                                                <summary class="cursor-pointer px-2 py-1"
+                                                    :class="isSelected('grid', gIndex) ? 'bg-orange-50 text-orange-700' : ''"
+                                                    @click.stop="selectObject('grid', gIndex)">
+                                                    <i class="fa-solid fa-table-columns mr-2 text-gray-400"></i>
+                                                    <span x-text="grid.label || grid.name || ('Tabla ' + (gIndex+1))"></span>
+                                                </summary>
+                                                <div class="pl-4 py-2 space-y-1">
+                                                    <template x-for="(col, cIndex) in (grid.columns || [])" :key="'col-'+gIndex+'-'+cIndex">
+                                                        <button @click="selectObject('column', cIndex, gIndex)" class="w-full text-left px-2 py-1 rounded"
+                                                            :class="isSelected('column', cIndex, gIndex) ? 'bg-orange-50 text-orange-700' : 'hover:bg-gray-50'">
+                                                            <i class="fa-solid fa-grip-lines-vertical mr-2 text-gray-400"></i>
+                                                            <span x-text="col.label || col.name || ('Columna ' + (cIndex+1))"></span>
+                                                        </button>
+                                                    </template>
+                                                </div>
+                                            </details>
+                                        </template>
+                                        <div x-show="data.grids.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin tablas</div>
+                                    </div>
+                                </details>
+
+                                <details open class="border border-gray-100 rounded">
+                                    <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
+                                        <i class="fa-solid fa-calculator mr-2"></i> Totales
+                                    </summary>
+                                    <div class="space-y-1 px-2 pb-2">
+                                        <template x-for="(sum, sIndex) in data.summary" :key="'sum-'+sIndex">
+                                            <button @click="selectObject('summary', sIndex)" class="w-full text-left px-2 py-1 rounded"
+                                                :class="isSelected('summary', sIndex) ? 'bg-orange-50 text-orange-700' : 'hover:bg-gray-50'">
+                                                <i class="fa-solid fa-equals mr-2 text-gray-400"></i>
+                                                <span x-text="sum.label || sum.name || ('Total ' + (sIndex+1))"></span>
+                                            </button>
+                                        </template>
+                                        <div x-show="data.summary.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin totales</div>
+                                    </div>
+                                </details>
+
+                                <details open class="border border-gray-100 rounded">
+                                    <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
+                                        <i class="fa-solid fa-chart-line mr-2"></i> Dashboard
+                                    </summary>
+                                    <div class="space-y-1 px-2 pb-2">
+                                        <template x-for="(dash, dIndex) in (data.dashboards || [])" :key="'dash-'+dIndex">
+                                            <button @click="selectObject('dashboard', dIndex)" class="w-full text-left px-2 py-1 rounded"
+                                                :class="isSelected('dashboard', dIndex) ? 'bg-orange-50 text-orange-700' : 'hover:bg-gray-50'">
+                                                <i class="fa-solid fa-chart-pie mr-2 text-gray-400"></i>
+                                                <span x-text="dash.name || dash.id || ('Dashboard ' + (dIndex+1))"></span>
+                                            </button>
+                                        </template>
+                                        <div x-show="!data.dashboards || data.dashboards.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin dashboards</div>
+                                    </div>
+                                </details>
+
+                                <details open class="border border-gray-100 rounded">
+                                    <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
+                                        <i class="fa-solid fa-file-lines mr-2"></i> Informes
+                                    </summary>
+                                    <div class="space-y-1 px-2 pb-2">
+                                        <template x-for="(rep, rIndex) in data.reports" :key="'rep-'+rIndex">
+                                            <button @click="selectObject('report', rIndex)" class="w-full text-left px-2 py-1 rounded"
+                                                :class="isSelected('report', rIndex) ? 'bg-orange-50 text-orange-700' : 'hover:bg-gray-50'">
+                                                <i class="fa-regular fa-file-pdf mr-2 text-gray-400"></i>
+                                                <span x-text="rep.name || rep.id || ('Informe ' + (rIndex+1))"></span>
+                                            </button>
+                                        </template>
+                                        <div x-show="!data.reports || data.reports.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin informes</div>
+                                    </div>
+                                </details>
+
+                                <details open class="border border-gray-100 rounded">
+                                    <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
+                                        <i class="fa-solid fa-gear mr-2"></i> Procesos
+                                    </summary>
+                                    <div class="space-y-1 px-2 pb-2">
+                                        <template x-for="(proc, pIndex) in project.processes" :key="'proc-'+pIndex">
+                                            <button @click="selectObject('process', pIndex)" class="w-full text-left px-2 py-1 rounded"
+                                                :class="isSelected('process', pIndex) ? 'bg-orange-50 text-orange-700' : 'hover:bg-gray-50'">
+                                                <i class="fa-solid fa-bolt mr-2 text-gray-400"></i>
+                                                <span x-text="proc.label || proc.id || ('Proceso ' + (pIndex+1))"></span>
+                                            </button>
+                                        </template>
+                                        <div x-show="!project.processes || project.processes.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin procesos</div>
+                                    </div>
+                                </details>
+                            </div>
+                        </div>
+                        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h4 class="text-xs font-bold text-gray-600 uppercase">Vista previa</h4>
+                                <span class="text-[10px] text-gray-400">WYS-ish</span>
+                            </div>
+                            <div x-show="builderTopTab === 'dashboards'" class="border rounded-lg p-3 bg-gray-50">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h5 class="text-[11px] font-bold text-gray-700 uppercase">Gestor de dashboards</h5>
+                                    <button @click="addDashboard()" class="px-2 py-1 text-[10px] font-bold bg-sky-600 text-white rounded">Crear dashboard</button>
+                                </div>
+                                <div class="space-y-2">
+                                    <template x-for="(dash, dIndex) in (data.dashboards || [])" :key="'dash-card-'+dIndex">
+                                        <div class="border rounded p-2 bg-white text-xs flex items-center justify-between">
+                                            <div>
+                                                <div class="font-semibold" x-text="dash.name || dash.id"></div>
+                                                <div class="text-[10px] text-gray-400" x-text="(dash.widgets || []).length + ' widgets'"></div>
+                                            </div>
+                                            <div class="flex gap-2">
+                                                <button @click="selectObject('dashboard', dIndex)" class="text-[10px] text-indigo-600">Editar</button>
+                                                <button @click="removeDashboard(dIndex)" class="text-[10px] text-rose-600">Eliminar</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div x-show="!data.dashboards || data.dashboards.length === 0" class="text-[10px] text-gray-400">Sin dashboards creados.</div>
+                                </div>
+                            </div>
+                            <div x-show="builderTopTab === 'reports'" class="border rounded-lg p-3 bg-gray-50">
+                                <div class="flex items-center justify-between mb-2">
+                                    <h5 class="text-[11px] font-bold text-gray-700 uppercase">Gestor de informes</h5>
+                                    <button @click="addReport()" class="px-2 py-1 text-[10px] font-bold bg-orange-600 text-white rounded">Crear informe</button>
+                                </div>
+                                <div class="space-y-2">
+                                    <template x-for="(rep, rIndex) in data.reports" :key="'rep-card-'+rIndex">
+                                        <div class="border rounded p-2 bg-white text-xs flex items-center justify-between">
+                                            <div>
+                                                <div class="font-semibold" x-text="rep.name || rep.id"></div>
+                                                <div class="text-[10px] text-gray-400" x-text="rep.type || 'report'"></div>
+                                            </div>
+                                            <div class="flex gap-2">
+                                                <button @click="previewReport(rIndex)" class="text-[10px] text-indigo-600">Previsualizar</button>
+                                                <button @click="printReport(rIndex)" class="text-[10px] text-gray-600">Imprimir</button>
+                                                <button @click="exportReportPdf(rIndex)" class="text-[10px] text-gray-600">PDF</button>
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div x-show="!data.reports || data.reports.length === 0" class="text-[10px] text-gray-400">Sin informes creados.</div>
+                                </div>
+                            </div>
+                            <div x-show="selectedObject.type === 'report'" class="border rounded-lg p-3 bg-white">
+                                <div class="text-[11px] font-bold text-gray-600 uppercase mb-2">Canvas de documento</div>
+                                <div class="border border-dashed rounded-lg p-3 bg-gray-50 space-y-2">
+                                    <div class="bg-white border rounded p-2 text-[10px] text-gray-500">Encabezado (logo, nombre empresa)</div>
+                                    <div class="bg-white border rounded p-2 text-[10px] text-gray-500">Detalle (campos del formulario)</div>
+                                    <div class="bg-white border rounded p-2 text-[10px] text-gray-500">Totales y pie</div>
+                                </div>
+                                <div class="text-[10px] text-gray-400 mt-2">Selecciona un informe para editar su diseño.</div>
+                            </div>
+                            <div x-show="selectedObject.type === 'dashboard' && data.dashboards?.[selectedObject.index]" class="border rounded-lg p-3 bg-white">
+                                <div class="text-[11px] font-bold text-gray-600 uppercase mb-2">Vista del dashboard</div>
+                                <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                    <template x-for="(widget, wIndex) in (data.dashboards[selectedObject.index].widgets || [])" :key="'dash-widget-'+wIndex">
+                                        <div class="border rounded p-2 bg-gray-50">
+                                            <div class="text-[10px] font-bold text-gray-500 uppercase" x-text="widget.label || widget.type"></div>
+                                            <div class="mt-2 text-xs text-gray-600" x-show="widget.type === 'kpi'">
+                                                KPI: <span class="font-semibold" x-text="widget.source?.summary || 'sin resumen'"></span>
+                                            </div>
+                                            <div class="mt-2 text-xs text-gray-600" x-show="widget.type === 'chart'">
+                                                Grafica: <span class="font-semibold" x-text="widget.source?.grid || 'sin tabla'"></span>
+                                            </div>
+                                            <div class="mt-2 h-16 bg-white border border-dashed rounded flex items-center justify-center text-[10px] text-gray-400">
+                                                Preview
+                                            </div>
+                                        </div>
+                                    </template>
+                                    <div x-show="(data.dashboards[selectedObject.index].widgets || []).length === 0" class="text-[10px] text-gray-400">Sin widgets.</div>
+                                </div>
+                            </div>
+                            <div x-show="(!data.layout?.sections || data.layout.sections.length === 0) && data.fields.length > 0" class="border rounded-lg p-3 bg-emerald-50">
+                                <div class="text-xs font-semibold text-emerald-900">Sugerencia rapida</div>
+                                <div class="text-[11px] text-emerald-800 mt-1">Detectamos campos sin pantalla. Puedes crear la pantalla automaticamente.</div>
+                                <button @click="ensureLayoutFromFields()" class="mt-2 px-3 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Crear pantalla automatica</button>
+                            </div>
+                            <div x-show="data.grids.length > 0" class="text-[10px] text-gray-400">
+                                Tip: Si tienes una tabla detalle, puedes crear un formulario maestro-detalle e informe de factura.
+                            </div>
+                            <div class="space-y-4">
+                                <template x-for="(section, sIndex) in (data.layout?.sections || [])" :key="'prev-sec-'+sIndex">
+                                    <div class="border rounded-lg p-3 bg-gray-50">
+                                        <div class="text-xs font-semibold text-gray-700" x-text="section.title || ('Seccion ' + (sIndex+1))"></div>
+                                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
+                                            <template x-for="fieldId in (section.fields || [])" :key="'prev-field-'+fieldId">
+                                                <div class="border bg-white rounded px-2 py-2 text-xs text-gray-600">
+                                                    <div class="font-semibold" x-text="fieldById(fieldId)?.label || fieldId"></div>
+                                                    <div class="text-[10px] text-gray-400" x-text="fieldById(fieldId)?.type || ''"></div>
+                                                </div>
+                                            </template>
+                                        </div>
+                                    </div>
+                                </template>
+                                <template x-if="!data.layout || !data.layout.sections || data.layout.sections.length === 0">
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                        <template x-for="(field, fIndex) in data.fields" :key="'prev-field-'+fIndex">
+                                            <div class="border bg-white rounded px-2 py-2 text-xs text-gray-600">
+                                                <div class="font-semibold" x-text="field.label || field.name || ('Campo ' + (fIndex+1))"></div>
+                                                <div class="text-[10px] text-gray-400" x-text="field.type || ''"></div>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </template>
+                                <template x-for="(grid, gIndex) in data.grids" :key="'prev-grid-'+gIndex">
+                                    <div class="border rounded-lg p-3">
+                                        <div class="text-xs font-semibold text-gray-700" x-text="grid.label || grid.name || ('Tabla ' + (gIndex+1))"></div>
+                                        <div class="mt-2 overflow-x-auto">
+                                            <table class="w-full text-[10px] border">
+                                                <thead class="bg-gray-50">
+                                                    <tr>
+                                                        <template x-for="(col, cIndex) in (grid.columns || [])" :key="'prev-col-'+cIndex">
+                                                            <th class="border px-2 py-1 text-left" x-text="col.label || col.name"></th>
+                                                        </template>
+                                                    </tr>
+                                                </thead>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </template>
+                                <div class="border rounded-lg p-3 bg-indigo-50" x-show="data.summary.length > 0">
+                                    <div class="text-xs font-semibold text-indigo-900">Totales</div>
+                                    <div class="space-y-1 mt-2">
+                                        <template x-for="(sum, sIndex) in data.summary" :key="'prev-sum-'+sIndex">
+                                            <div class="flex justify-between text-[11px] text-indigo-900">
+                                                <span x-text="sum.label || sum.name"></span>
+                                                <span>0.00</span>
+                                            </div>
+                                        </template>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h4 class="text-xs font-bold text-gray-600 uppercase">Propiedades</h4>
+                                <span class="text-[10px] text-gray-400" x-text="selectedObjectLabel()"></span>
+                            </div>
+
+                            <div x-show="selectedObject.type === 'form'">
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
+                                        <input x-model="data.title" class="w-full border rounded px-3 py-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Modo</label>
+                                        <select x-model="data.mode" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                            <option value="create">Creacion</option>
+                                            <option value="edit">Edicion</option>
+                                            <option value="view">Solo lectura</option>
+                                        </select>
+                                    </div>
+                                    <details class="border rounded p-2">
+                                        <summary class="cursor-pointer text-[10px] font-bold text-gray-500 uppercase">Opciones avanzadas</summary>
+                                        <div class="mt-2 space-y-2">
+                                            <div>
+                                                <label class="text-[10px] font-bold text-gray-500 uppercase">ID (no se ve)</label>
+                                                <input x-model="data.name" class="w-full border rounded px-3 py-2 text-sm font-mono">
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] font-bold text-gray-500 uppercase">Version</label>
+                                                <input x-model="data.version" class="w-full border rounded px-3 py-2 text-sm font-mono">
+                                            </div>
+                                        </div>
+                                    </details>
+                                </div>
+                            </div>
+
+                            <div x-show="selectedObject.type === 'section' && data.layout?.sections?.[selectedObject.index]">
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
+                                        <input x-model="data.layout.sections[selectedObject.index].title" class="w-full border rounded px-3 py-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Descripcion</label>
+                                        <input x-model="data.layout.sections[selectedObject.index].description" class="w-full border rounded px-3 py-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Columnas</label>
+                                        <input type="number" min="1" x-model="data.layout.sections[selectedObject.index].columns" class="w-full border rounded px-3 py-2 text-sm">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div x-show="selectedObject.type === 'field' && data.fields[selectedObject.index]" x-init="ensureFieldValidation(selectedObject.index)">
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
+                                        <input x-model="data.fields[selectedObject.index].label" class="w-full border rounded px-3 py-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo</label>
+                                        <select x-model="data.fields[selectedObject.index].type" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                            <option value="text">Texto</option>
+                                            <option value="number">Numero</option>
+                                            <option value="email">Email</option>
+                                            <option value="date">Fecha</option>
+                                            <option value="textarea">Texto largo</option>
+                                            <option value="select">Seleccion</option>
+                                            <option value="checkbox">Checkbox</option>
+                                        </select>
+                                    </div>
+                                    <div class="flex items-center gap-2 text-xs text-gray-600">
+                                        <input type="checkbox" x-model="data.fields[selectedObject.index].validation.required" class="rounded text-emerald-600">
+                                        Obligatorio
+                                    </div>
+                                    <details class="border rounded p-2">
+                                        <summary class="cursor-pointer text-[10px] font-bold text-gray-500 uppercase">Opciones avanzadas</summary>
+                                        <div class="mt-2">
+                                            <label class="text-[10px] font-bold text-gray-500 uppercase">ID (no se ve)</label>
+                                            <input x-model="data.fields[selectedObject.index].name" class="w-full border rounded px-3 py-2 text-sm font-mono">
+                                        </div>
+                                    </details>
+                                </div>
+                            </div>
+
+                            <div x-show="selectedObject.type === 'grid' && data.grids[selectedObject.index]">
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
+                                        <input x-model="data.grids[selectedObject.index].label" class="w-full border rounded px-3 py-2 text-sm">
+                                    </div>
+                                    <details class="border rounded p-2">
+                                        <summary class="cursor-pointer text-[10px] font-bold text-gray-500 uppercase">Opciones avanzadas</summary>
+                                        <div class="mt-2">
+                                            <label class="text-[10px] font-bold text-gray-500 uppercase">ID (no se ve)</label>
+                                            <input x-model="data.grids[selectedObject.index].name" class="w-full border rounded px-3 py-2 text-sm font-mono">
+                                        </div>
+                                    </details>
+                                </div>
+                            </div>
+
+                            <div x-show="selectedObject.type === 'column' && data.grids[selectedObject.parentIndex]?.columns?.[selectedObject.index]" x-init="ensureColumnDefaults(selectedObject.parentIndex, selectedObject.index)">
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
+                                        <input x-model="data.grids[selectedObject.parentIndex].columns[selectedObject.index].label" class="w-full border rounded px-3 py-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo</label>
+                                        <select x-model="data.grids[selectedObject.parentIndex].columns[selectedObject.index].input.type" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                            <option value="text">Texto</option>
+                                            <option value="number">Numero</option>
+                                            <option value="currency">Moneda</option>
+                                            <option value="date">Fecha</option>
+                                            <option value="select">Seleccion</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Formula</label>
+                                        <input x-model="data.grids[selectedObject.parentIndex].columns[selectedObject.index].formula.expression" class="w-full border rounded px-3 py-2 text-sm font-mono">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div x-show="selectedObject.type === 'summary' && data.summary[selectedObject.index]" x-init="ensureSummaryDefaults(selectedObject.index)">
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
+                                        <input x-model="data.summary[selectedObject.index].label" class="w-full border rounded px-3 py-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo</label>
+                                        <select x-model="data.summary[selectedObject.index].type" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                            <option value="sum">Suma</option>
+                                            <option value="formula">Formula</option>
+                                        </select>
+                                    </div>
+                                    <div x-show="data.summary[selectedObject.index].type === 'sum'" class="space-y-2">
+                                        <div>
+                                            <label class="text-[10px] font-bold text-gray-500 uppercase">Tabla</label>
+                                            <select x-model="data.summary[selectedObject.index].source.grid" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                                <option value="">Selecciona</option>
+                                                <template x-for="(grid, gIndex) in data.grids" :key="'sum-grid-'+gIndex">
+                                                    <option :value="grid.name" x-text="grid.label || grid.name"></option>
+                                                </template>
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="text-[10px] font-bold text-gray-500 uppercase">Campo</label>
+                                            <select x-model="data.summary[selectedObject.index].source.field" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                                <option value="">Selecciona</option>
+                                                <template x-for="col in (gridColumns(data.summary[selectedObject.index].source.grid) || [])" :key="'sum-col-'+col.name">
+                                                    <option :value="col.name" x-text="col.label || col.name"></option>
+                                                </template>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div x-show="data.summary[selectedObject.index].type === 'formula'">
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Formula</label>
+                                        <input x-model="data.summary[selectedObject.index].expression" class="w-full border rounded px-3 py-2 text-sm font-mono">
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div x-show="selectedObject.type === 'report' && data.reports[selectedObject.index]" x-init="ensureReportDefaults(selectedObject.index)">
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
+                                        <input x-model="data.reports[selectedObject.index].name" class="w-full border rounded px-3 py-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo</label>
+                                        <select x-model="data.reports[selectedObject.index].type" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                            <option value="invoice">Factura</option>
+                                            <option value="quote">Cotizacion</option>
+                                            <option value="report">Reporte</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Plantilla</label>
+                                        <input x-model="data.reports[selectedObject.index].template" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="basic">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Descripcion</label>
+                                        <input x-model="data.reports[selectedObject.index].description" class="w-full border rounded px-3 py-2 text-sm">
+                                    </div>
+                                    <details class="border rounded p-2">
+                                        <summary class="cursor-pointer text-[10px] font-bold text-gray-500 uppercase">Contenido del documento</summary>
+                                        <div class="mt-2 space-y-3 text-xs">
+                                            <div>
+                                                <label class="text-[10px] font-bold text-gray-500 uppercase">Titulo encabezado</label>
+                                                <input x-model="data.reports[selectedObject.index].layout.header.title" class="w-full border rounded px-2 py-1 text-xs" placeholder="Factura de venta">
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] font-bold text-gray-500 uppercase">Campos</label>
+                                                <div class="grid grid-cols-2 gap-2">
+                                                    <template x-for="(field, fIndex) in data.fields" :key="'rep-field-'+fIndex">
+                                                        <label class="flex items-center gap-2 text-[10px]">
+                                                            <input type="checkbox" :value="field.name || field.id" x-model="data.reports[selectedObject.index].layout.fields" class="rounded text-emerald-600">
+                                                            <span x-text="field.label || field.name || ('Campo ' + (fIndex+1))"></span>
+                                                        </label>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] font-bold text-gray-500 uppercase">Tabla detalle</label>
+                                                <select x-model="data.reports[selectedObject.index].layout.grid.name" class="w-full border rounded px-2 py-1 text-xs bg-white">
+                                                    <option value="">Sin tabla</option>
+                                                    <template x-for="(grid, gIndex) in data.grids" :key="'rep-grid-'+gIndex">
+                                                        <option :value="grid.name" x-text="grid.label || grid.name"></option>
+                                                    </template>
+                                                </select>
+                                                <div class="grid grid-cols-2 gap-2 mt-2" x-show="data.reports[selectedObject.index].layout.grid.name">
+                                                    <template x-for="col in (gridColumns(data.reports[selectedObject.index].layout.grid.name) || [])" :key="'rep-col-'+col.name">
+                                                        <label class="flex items-center gap-2 text-[10px]">
+                                                            <input type="checkbox" :value="col.name" x-model="data.reports[selectedObject.index].layout.grid.columns" class="rounded text-emerald-600">
+                                                            <span x-text="col.label || col.name"></span>
+                                                        </label>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] font-bold text-gray-500 uppercase">Totales</label>
+                                                <div class="grid grid-cols-2 gap-2">
+                                                    <template x-for="(sum, sIndex) in data.summary" :key="'rep-sum-'+sIndex">
+                                                        <label class="flex items-center gap-2 text-[10px]">
+                                                            <input type="checkbox" :value="sum.name" x-model="data.reports[selectedObject.index].layout.totals" class="rounded text-emerald-600">
+                                                            <span x-text="sum.label || sum.name"></span>
+                                                        </label>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </details>
+                                </div>
+                            </div>
+
+                            <div x-show="selectedObject.type === 'dashboard' && data.dashboards?.[selectedObject.index]" x-init="ensureDashboardDefaults(selectedObject.index)">
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
+                                        <input x-model="data.dashboards[selectedObject.index].name" class="w-full border rounded px-3 py-2 text-sm">
+                                    </div>
+                                    <div class="flex flex-wrap gap-2">
+                                        <button @click="addDashboardWidget('kpi', selectedObject.index)" class="px-3 py-2 text-[10px] font-bold bg-sky-600 text-white rounded">Agregar KPI</button>
+                                        <button @click="addDashboardWidget('chart', selectedObject.index)" class="px-3 py-2 text-[10px] font-bold bg-indigo-600 text-white rounded">Agregar Grafica</button>
+                                    </div>
+                                    <div class="space-y-2">
+                                        <template x-for="(widget, wIndex) in (data.dashboards[selectedObject.index].widgets || [])" :key="'dash-widget-prop-'+wIndex">
+                                            <div class="border rounded p-2 bg-gray-50 space-y-2">
+                                                <div class="flex items-center justify-between">
+                                                    <input x-model="widget.label" class="flex-1 border rounded px-2 py-1 text-xs mr-2" placeholder="Nombre del widget">
+                                                    <button @click="removeDashboardWidget(selectedObject.index, wIndex)" class="text-[10px] text-rose-600">Eliminar</button>
+                                                </div>
+                                                <div x-show="widget.type === 'kpi'" class="space-y-2">
+                                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Resumen</label>
+                                                    <select x-model="widget.source.summary" class="w-full border rounded px-2 py-1 text-xs bg-white">
+                                                        <option value="">Selecciona</option>
+                                                        <template x-for="(sum, sIndex) in data.summary" :key="'dash-sum-'+sIndex">
+                                                            <option :value="sum.name" x-text="sum.label || sum.name"></option>
+                                                        </template>
+                                                    </select>
+                                                </div>
+                                                <div x-show="widget.type === 'chart'" class="space-y-2">
+                                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Tabla</label>
+                                                    <select x-model="widget.source.grid" class="w-full border rounded px-2 py-1 text-xs bg-white">
+                                                        <option value="">Selecciona</option>
+                                                        <template x-for="(grid, gIndex) in data.grids" :key="'dash-grid-'+gIndex">
+                                                            <option :value="grid.name" x-text="grid.label || grid.name"></option>
+                                                        </template>
+                                                    </select>
+                                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Campo</label>
+                                                    <select x-model="widget.source.field" class="w-full border rounded px-2 py-1 text-xs bg-white">
+                                                        <option value="">Selecciona</option>
+                                                        <template x-for="col in (gridColumns(widget.source.grid) || [])" :key="'dash-col-'+col.name">
+                                                            <option :value="col.name" x-text="col.label || col.name"></option>
+                                                        </template>
+                                                    </select>
+                                                </div>
+                                            </div>
+                                        </template>
+                                        <div x-show="(data.dashboards[selectedObject.index].widgets || []).length === 0" class="text-[10px] text-gray-400">Sin widgets configurados.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div x-show="selectedObject.type === 'process' && project.processes[selectedObject.index]">
+                                <div class="space-y-3">
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
+                                        <input x-model="project.processes[selectedObject.index].label" class="w-full border rounded px-3 py-2 text-sm">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">ID (no se ve)</label>
+                                        <input x-model="project.processes[selectedObject.index].id" class="w-full border rounded px-3 py-2 text-sm font-mono">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Acciones</label>
+                                        <input x-model="project.processes[selectedObject.index].actions" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="validate,persist">
+                                    </div>
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Intents (chat)</label>
+                                        <input x-model="project.processes[selectedObject.index].intents" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="crear factura">
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div x-show="showWizardAdd" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+                        <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-bold text-gray-800">Agregar rapido</h4>
+                                <button @click="showWizardAdd = false" class="text-gray-400 hover:text-gray-700">&times;</button>
+                            </div>
+                            <div class="space-y-3">
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo</label>
+                                    <select x-model="wizardType" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                        <option value="field">Campo</option>
+                                        <option value="grid">Tabla</option>
+                                        <option value="summary">Total</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
+                                    <input x-model="wizardLabel" class="w-full border rounded px-3 py-2 text-sm">
+                                </div>
+                                <div x-show="wizardType === 'field'">
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo de campo</label>
+                                    <select x-model="wizardFieldType" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                        <option value="text">Texto</option>
+                                        <option value="number">Numero</option>
+                                        <option value="email">Email</option>
+                                        <option value="date">Fecha</option>
+                                        <option value="select">Seleccion</option>
+                                    </select>
+                                </div>
+                                <div x-show="wizardType === 'summary'">
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo de total</label>
+                                    <select x-model="wizardSummaryType" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                        <option value="sum">Suma</option>
+                                        <option value="formula">Formula</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="flex justify-end gap-2">
+                                <button @click="showWizardAdd = false" class="px-3 py-2 text-xs font-bold uppercase bg-slate-100 text-slate-600 rounded">Cancelar</button>
+                                <button @click="applyWizard()" class="px-3 py-2 text-xs font-bold uppercase bg-orange-600 text-white rounded">Crear</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div x-show="showGuided" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+                        <div class="bg-white rounded-xl shadow-lg w-full max-w-3xl p-6 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h4 class="font-bold text-gray-800">Modo guiado</h4>
+                                    <div class="text-[11px] text-gray-500" x-text="'Paso ' + guidedStep + ' de ' + guidedSteps.length"></div>
+                                </div>
+                                <button @click="closeGuided()" class="text-gray-400 hover:text-gray-700">&times;</button>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <template x-for="step in guidedSteps" :key="'guided-step-'+step.id">
+                                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase"
+                                        :class="guidedStep === step.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'">
+                                        <span x-text="step.label"></span>
+                                    </span>
+                                </template>
+                            </div>
+
+                            <div x-show="guidedStep === 1" class="space-y-3">
+                                <div class="text-xs text-gray-600">Elige una plantilla. Puedes ajustar todo despues.</div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    <button @click="guidedTemplate='blank'" class="px-3 py-2 text-xs font-bold border rounded">En blanco</button>
+                                    <button @click="guidedTemplate='invoice'" class="px-3 py-2 text-xs font-bold border rounded">Factura</button>
+                                    <button @click="guidedTemplate='inventory'" class="px-3 py-2 text-xs font-bold border rounded">Inventario</button>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
+                                    <input x-model="data.title" class="w-full border rounded px-3 py-2 text-sm" placeholder="Mi app">
+                                </div>
+                                <button @click="applyGuidedTemplate()" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Aplicar plantilla</button>
+                            </div>
+
+                            <div x-show="guidedStep === 2" class="space-y-3">
+                                <div class="text-xs text-gray-600">Agrega campos rapidos o importa desde CSV.</div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    <input x-model="quickFieldLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del campo">
+                                    <select x-model="quickFieldType" class="border rounded px-2 py-1 text-xs bg-white">
+                                        <option value="text">Texto</option>
+                                        <option value="number">Numero</option>
+                                        <option value="date">Fecha</option>
+                                        <option value="select">Seleccion</option>
+                                    </select>
+                                    <button @click="addQuickField()" class="px-3 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Agregar campo</button>
+                                </div>
+                                <button @click="showDataImport = true" class="px-3 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded">Importar CSV</button>
+                            </div>
+
+                            <div x-show="guidedStep === 3" class="space-y-3">
+                                <div class="text-xs text-gray-600">Si tu app tiene detalle (items), agrega una tabla.</div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    <input x-model="quickGridLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre de la tabla">
+                                    <div class="hidden md:block"></div>
+                                    <button @click="addQuickGrid()" class="px-3 py-2 text-xs font-bold bg-orange-600 text-white rounded">Agregar tabla</button>
+                                </div>
+                                <div class="text-[10px] text-gray-400" x-show="data.grids.length > 0">Detectamos tablas detalle: puedes crear un formulario maestro-detalle.</div>
+                            </div>
+
+                            <div x-show="guidedStep === 4" class="space-y-3">
+                                <div class="text-xs text-gray-600">Agrega totales para resumenes automaticos.</div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    <input x-model="quickSummaryLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del total">
+                                    <div class="hidden md:block"></div>
+                                    <button @click="addQuickSummary()" class="px-3 py-2 text-xs font-bold bg-teal-600 text-white rounded">Agregar total</button>
+                                </div>
+                            </div>
+
+                            <div x-show="guidedStep === 5" class="space-y-3">
+                                <div class="text-xs text-gray-600">Crea informes (factura, cotizacion, PDF).</div>
+                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                                    <input x-model="quickReportLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del informe">
+                                    <div class="hidden md:block"></div>
+                                    <button @click="addQuickReport()" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Agregar informe</button>
+                                </div>
+                            </div>
+
+                            <div x-show="guidedStep === 6" class="space-y-3">
+                                <div class="text-xs text-gray-600">Guarda y prueba tu app.</div>
+                                <div class="flex flex-wrap gap-2">
+                                    <button @click="saveToProject()" class="px-3 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Guardar proyecto</button>
+                                    <button @click="downloadJson()" class="px-3 py-2 text-xs font-bold bg-orange-600 text-white rounded">Descargar JSON</button>
+                                    <button @click="mainTab = 'chat'; closeGuided()" class="px-3 py-2 text-xs font-bold bg-slate-800 text-white rounded">Probar por chat</button>
+                                </div>
+                            </div>
+
+                            <div class="flex items-center justify-between pt-2 border-t">
+                                <button @click="prevGuided()" :disabled="guidedStep === 1" class="px-3 py-2 text-xs font-bold bg-slate-100 text-slate-600 rounded disabled:opacity-50">Anterior</button>
+                                <button @click="nextGuided()" :disabled="guidedStep === guidedSteps.length" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded disabled:opacity-50">Siguiente</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div x-show="showDataImport" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+                        <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <h4 class="font-bold text-gray-800">Importador de tablas (CSV/Excel)</h4>
+                                <button @click="showDataImport = false" class="text-gray-400 hover:text-gray-700">&times;</button>
+                            </div>
+                            <div class="text-xs text-gray-500">Sube un CSV (si tienes Excel, exporta a CSV) y creamos campos automaticamente.</div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Archivo CSV</label>
+                                    <input type="file" accept=".csv,text/csv" @change="handleCsvFile($event)" class="w-full border rounded px-3 py-2 text-xs bg-white">
+                                    <p class="text-[10px] text-gray-400 mt-1" x-text="csvImport.fileName || 'Sin archivo'"></p>
+                                </div>
+                                <div class="space-y-2">
+                                    <div>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Delimitador</label>
+                                        <input x-model="csvImport.delimiter" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="," maxlength="2">
+                                    </div>
+                                    <label class="flex items-center gap-2 text-xs text-gray-600">
+                                        <input type="checkbox" x-model="csvImport.firstRowHeader" class="rounded text-emerald-600">
+                                        Primera fila = encabezado
+                                    </label>
+                                    <label class="flex items-center gap-2 text-xs text-gray-600">
+                                        <input type="checkbox" x-model="csvImport.replaceFields" class="rounded text-emerald-600">
+                                        Reemplazar campos existentes
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="border rounded p-3 bg-gray-50">
+                                <h5 class="text-[10px] font-bold text-gray-500 uppercase mb-2">Columnas detectadas</h5>
+                                <div class="space-y-2">
+                                    <template x-for="(col, idx) in csvImport.columns" :key="idx">
+                                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2 items-center text-xs">
+                                            <input x-model="col.name" class="border rounded px-2 py-1 text-xs font-mono" placeholder="nombre_columna">
+                                            <select x-model="col.type" class="border rounded px-2 py-1 text-xs bg-white">
+                                                <option value="string">string</option>
+                                                <option value="int">int</option>
+                                                <option value="decimal">decimal</option>
+                                                <option value="bool">bool</option>
+                                                <option value="date">date</option>
+                                            </select>
+                                            <span class="text-[10px] text-gray-400" x-text="mapCsvTypeToFormType(col.type) + ' (form)'"></span>
+                                        </div>
+                                    </template>
+                                    <div x-show="csvImport.columns.length === 0" class="text-[10px] text-gray-400">Sin columnas detectadas</div>
+                                </div>
+                                <button @click="applyCsvToFields(); showDataImport=false" class="mt-3 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded">Crear campos</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div x-show="mainTab === 'forms' && showAdvanced" x-transition.opacity>
                 <div x-show="activeTab === 'general'" class="space-y-6 max-w-3xl mx-auto" x-transition.opacity>
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                         <h3 class="font-bold text-gray-800 mb-5 pb-2 border-b flex items-center gap-2">
@@ -1215,12 +2022,12 @@
     <script>
         function formBuilder() {
             return {
-                mainTab: 'dashboard',
+                mainTab: 'forms',
                 mainTabs: [
-                    { id: 'dashboard', label: 'Dashboard', icon: 'fa-solid fa-gauge-high' },
-                    { id: 'forms', label: 'Formularios', icon: 'fa-solid fa-pen-to-square' },
-                    { id: 'database', label: 'Base de datos', icon: 'fa-solid fa-database' },
-                    { id: 'chat', label: 'Chat/Pruebas', icon: 'fa-solid fa-comments' }
+                    { id: 'dashboard', label: 'Panel', icon: 'fa-solid fa-gauge-high' },
+                    { id: 'forms', label: 'Pantallas', icon: 'fa-solid fa-pen-to-square' },
+                    { id: 'database', label: 'Datos', icon: 'fa-solid fa-database' },
+                    { id: 'chat', label: 'Probar', icon: 'fa-solid fa-comments' }
                 ],
                 activeTab: 'general',
                 showLoadModal: false,
@@ -1261,7 +2068,9 @@
                     layout: { type: "sections", gap: "4", sections: [] },
                     fields: [],
                     grids: [],
-                    summary: []
+                    summary: [],
+                    reports: [],
+                    dashboards: []
                 },
                 project: {
                     viewPath: "",
@@ -1324,8 +2133,34 @@
                     lastRun: ''
                 },
 
+                selectedObject: { type: 'form', index: null, parentIndex: null },
+                showWizardAdd: false,
+                showDataImport: false,
+                builderTopTab: 'canvas',
+                wizardType: 'field',
+                wizardLabel: '',
+                wizardFieldType: 'text',
+                wizardSummaryType: 'sum',
+                showGuided: false,
+                guidedStep: 1,
+                guidedTemplate: 'blank',
+                guidedSteps: [
+                    { id: 1, label: 'Inicio' },
+                    { id: 2, label: 'Datos' },
+                    { id: 3, label: 'Pantalla' },
+                    { id: 4, label: 'Totales' },
+                    { id: 5, label: 'Informes' },
+                    { id: 6, label: 'Guardar' }
+                ],
+                quickFieldLabel: '',
+                quickFieldType: 'text',
+                quickGridLabel: '',
+                quickSummaryLabel: '',
+                quickReportLabel: '',
+
                 init() {
                     this.loadChatSettings();
+                    this.selectedObject = { type: 'form', index: null, parentIndex: null };
                 },
 
                 loadChatSettings() {
@@ -1349,6 +2184,254 @@
                     } catch (e) {
                         // ignore
                     }
+                },
+
+                // --- Builder UI helpers ---
+                selectObject(type, index = null, parentIndex = null) {
+                    this.selectedObject = { type, index, parentIndex };
+                    if (type === 'form') this.activeTab = 'general';
+                    if (type === 'field') this.activeTab = 'fields';
+                    if (type === 'grid' || type === 'column') this.activeTab = 'grids';
+                    if (type === 'summary') this.activeTab = 'summary';
+                    if (type === 'report') this.builderTopTab = 'reports';
+                    if (type === 'dashboard') this.builderTopTab = 'dashboards';
+                },
+                isSelected(type, index = null, parentIndex = null) {
+                    return this.selectedObject.type === type
+                        && this.selectedObject.index === index
+                        && this.selectedObject.parentIndex === parentIndex;
+                },
+                selectedObjectLabel() {
+                    const type = this.selectedObject.type;
+                    if (type === 'form') return 'Pantalla';
+                    if (type === 'section') {
+                        const sec = this.data.layout?.sections?.[this.selectedObject.index];
+                        return sec?.title || 'Seccion';
+                    }
+                    if (type === 'field') {
+                        const f = this.data.fields?.[this.selectedObject.index];
+                        return f?.label || f?.name || 'Campo';
+                    }
+                    if (type === 'grid') {
+                        const g = this.data.grids?.[this.selectedObject.index];
+                        return g?.label || g?.name || 'Tabla';
+                    }
+                    if (type === 'column') {
+                        const g = this.data.grids?.[this.selectedObject.parentIndex];
+                        const c = g?.columns?.[this.selectedObject.index];
+                        return c?.label || c?.name || 'Columna';
+                    }
+                    if (type === 'summary') {
+                        const s = this.data.summary?.[this.selectedObject.index];
+                        return s?.label || s?.name || 'Total';
+                    }
+                    if (type === 'report') {
+                        const r = this.data.reports?.[this.selectedObject.index];
+                        return r?.name || r?.id || 'Informe';
+                    }
+                    if (type === 'dashboard') {
+                        const d = this.data.dashboards?.[this.selectedObject.index];
+                        return d?.name || d?.id || 'Dashboard';
+                    }
+                    if (type === 'process') {
+                        const p = this.project.processes?.[this.selectedObject.index];
+                        return p?.label || p?.id || 'Proceso';
+                    }
+                    return '';
+                },
+                fieldById(fieldId) {
+                    const id = String(fieldId || '');
+                    return (this.data.fields || []).find(f => f.id === id || f.name === id) || null;
+                },
+                gridColumns(gridName) {
+                    const name = String(gridName || '');
+                    const grid = (this.data.grids || []).find(g => g.name === name);
+                    return grid ? (grid.columns || []) : [];
+                },
+                ensureFieldValidation(index) {
+                    const field = this.data.fields?.[index];
+                    if (!field) return;
+                    if (!field.validation || typeof field.validation !== 'object') {
+                        field.validation = { required: false, pattern: '', message: '' };
+                    }
+                    if (field.validation.required === undefined) {
+                        field.validation.required = false;
+                    }
+                },
+                ensureColumnDefaults(gridIndex, columnIndex) {
+                    const grid = this.data.grids?.[gridIndex];
+                    if (!grid) return;
+                    const col = grid.columns?.[columnIndex];
+                    if (!col) return;
+                    if (!col.input) col.input = { type: 'text' };
+                    if (!col.formula) col.formula = { expression: '', watch: [] };
+                },
+                ensureSummaryDefaults(index) {
+                    const sum = this.data.summary?.[index];
+                    if (!sum) return;
+                    if (!sum.source) sum.source = { grid: '', field: '' };
+                    if (!sum.expression) sum.expression = '';
+                },
+                ensureReportDefaults(index) {
+                    const rep = this.data.reports?.[index];
+                    if (!rep) return;
+                    if (!rep.layout) {
+                        rep.layout = { header: { title: '', showLogo: true }, fields: [], grid: { name: '', columns: [] }, totals: [] };
+                    }
+                    if (!rep.layout.header) rep.layout.header = { title: '', showLogo: true };
+                    if (!Array.isArray(rep.layout.fields)) rep.layout.fields = [];
+                    if (!rep.layout.grid) rep.layout.grid = { name: '', columns: [] };
+                    if (!Array.isArray(rep.layout.grid.columns)) rep.layout.grid.columns = [];
+                    if (!Array.isArray(rep.layout.totals)) rep.layout.totals = [];
+                },
+                normalizeLabelToName(label, prefix) {
+                    const raw = String(label || '').trim().toLowerCase();
+                    const clean = raw.replace(/[^a-z0-9_]+/g, '_').replace(/^_+|_+$/g, '');
+                    if (clean) return clean;
+                    return prefix + '_' + Math.floor(Math.random() * 1000);
+                },
+                openWizard(type = '') {
+                    if (type) this.wizardType = type;
+                    this.wizardLabel = '';
+                    this.wizardFieldType = 'text';
+                    this.wizardSummaryType = 'sum';
+                    this.showWizardAdd = true;
+                },
+                applyWizard() {
+                    const label = (this.wizardLabel || '').trim();
+                    if (this.wizardType === 'field') {
+                        this.addField();
+                        const idx = this.data.fields.length - 1;
+                        if (label) this.data.fields[idx].label = label;
+                        this.data.fields[idx].type = this.wizardFieldType || 'text';
+                        this.selectObject('field', idx);
+                    } else if (this.wizardType === 'grid') {
+                        this.addGrid();
+                        const idx = this.data.grids.length - 1;
+                        if (label) {
+                            this.data.grids[idx].label = label;
+                            this.data.grids[idx].name = this.normalizeLabelToName(label, 'grid');
+                        }
+                        this.selectObject('grid', idx);
+                    } else if (this.wizardType === 'summary') {
+                        this.addSummary();
+                        const idx = this.data.summary.length - 1;
+                        if (label) this.data.summary[idx].label = label;
+                        this.data.summary[idx].type = this.wizardSummaryType || 'sum';
+                        this.selectObject('summary', idx);
+                    }
+                    this.builderTopTab = 'canvas';
+                    this.showWizardAdd = false;
+                },
+                startGuided() {
+                    this.showGuided = true;
+                    this.guidedStep = 1;
+                },
+                closeGuided() {
+                    this.showGuided = false;
+                },
+                nextGuided() {
+                    if (this.guidedStep < this.guidedSteps.length) {
+                        this.guidedStep += 1;
+                    }
+                },
+                prevGuided() {
+                    if (this.guidedStep > 1) {
+                        this.guidedStep -= 1;
+                    }
+                },
+                createFieldFromLabel(label, type = 'text') {
+                    this.addField();
+                    const idx = this.data.fields.length - 1;
+                    if (label) {
+                        const name = this.normalizeLabelToName(label, 'campo');
+                        this.data.fields[idx].label = label;
+                        this.data.fields[idx].name = name;
+                        this.data.fields[idx].id = name;
+                    }
+                    this.data.fields[idx].type = type || 'text';
+                },
+                ensureLayoutFromFields() {
+                    if (!this.data.layout) this.data.layout = { type: 'sections', gap: '4', sections: [] };
+                    if (!Array.isArray(this.data.layout.sections)) this.data.layout.sections = [];
+                    if (this.data.layout.sections.length === 0 && this.data.fields.length > 0) {
+                        this.data.layout.sections.push({
+                            id: 'section_1',
+                            title: 'Informacion',
+                            columns: 2,
+                            fields: this.data.fields.map(f => f.name || f.id)
+                        });
+                    }
+                },
+                applyGuidedTemplate() {
+                    const tpl = this.guidedTemplate || 'blank';
+                    if (tpl === 'blank') return;
+
+                    if (tpl === 'invoice') {
+                        if (this.data.fields.length === 0) {
+                            this.createFieldFromLabel('Cliente', 'text');
+                            this.createFieldFromLabel('Fecha', 'date');
+                        }
+                        if (this.data.grids.length === 0) {
+                            this.addGrid();
+                            const gIndex = this.data.grids.length - 1;
+                            this.data.grids[gIndex].label = 'Detalle de items';
+                            this.data.grids[gIndex].name = this.normalizeLabelToName('detalle_items', 'grid');
+                        }
+                        if (this.data.summary.length === 0) {
+                            this.addSummary();
+                            const sIndex = this.data.summary.length - 1;
+                            this.data.summary[sIndex].label = 'Total a pagar';
+                        }
+                        if (!this.data.reports || this.data.reports.length === 0) {
+                            this.addReport();
+                            const rIndex = this.data.reports.length - 1;
+                            this.data.reports[rIndex].type = 'invoice';
+                            this.data.reports[rIndex].name = 'Factura';
+                        }
+                    }
+
+                    if (tpl === 'inventory') {
+                        if (this.data.fields.length === 0) {
+                            this.createFieldFromLabel('Producto', 'text');
+                            this.createFieldFromLabel('Stock', 'number');
+                            this.createFieldFromLabel('Precio', 'number');
+                        }
+                    }
+
+                    this.ensureLayoutFromFields();
+                    this.selectObject('form');
+                },
+                addQuickField() {
+                    const label = (this.quickFieldLabel || '').trim();
+                    if (!label) return;
+                    this.createFieldFromLabel(label, this.quickFieldType || 'text');
+                    this.quickFieldLabel = '';
+                },
+                addQuickGrid() {
+                    this.addGrid();
+                    const idx = this.data.grids.length - 1;
+                    if (this.quickGridLabel) {
+                        this.data.grids[idx].label = this.quickGridLabel;
+                        this.data.grids[idx].name = this.normalizeLabelToName(this.quickGridLabel, 'grid');
+                    }
+                    this.quickGridLabel = '';
+                },
+                addQuickSummary() {
+                    this.addSummary();
+                    const idx = this.data.summary.length - 1;
+                    if (this.quickSummaryLabel) {
+                        this.data.summary[idx].label = this.quickSummaryLabel;
+                    }
+                    this.quickSummaryLabel = '';
+                },
+                addQuickReport() {
+                    this.addReport();
+                    const idx = this.data.reports.length - 1;
+                    if (this.quickReportLabel) {
+                        this.data.reports[idx].name = this.quickReportLabel;
+                    }
+                    this.quickReportLabel = '';
                 },
 
                 resolveChatApiBase() {
@@ -1744,6 +2827,102 @@
                     this.activeTab = 'summary';
                 },
 
+                // --- Reportes ---
+                addReport() {
+                    this.data.reports = Array.isArray(this.data.reports) ? this.data.reports : [];
+                    this.data.reports.push({
+                        id: 'rep_' + Math.floor(Math.random() * 1000),
+                        name: 'Nuevo Informe',
+                        type: 'report', // invoice | quote | report
+                        template: 'basic',
+                        description: '',
+                        layout: {
+                            header: { title: '', showLogo: true },
+                            fields: [],
+                            grid: { name: '', columns: [] },
+                            totals: []
+                        }
+                    });
+                    this.selectObject('report', this.data.reports.length - 1);
+                },
+                removeReport(index) {
+                    if (confirm('¿Eliminar este informe?')) {
+                        this.data.reports.splice(index, 1);
+                    }
+                },
+                previewReport(index) {
+                    const rep = this.data.reports?.[index];
+                    if (!rep) return;
+                    alert('Previsualizar: ' + (rep.name || rep.id));
+                },
+                printReport(index) {
+                    const rep = this.data.reports?.[index];
+                    if (!rep) return;
+                    alert('Imprimir: ' + (rep.name || rep.id));
+                },
+                exportReportPdf(index) {
+                    const rep = this.data.reports?.[index];
+                    if (!rep) return;
+                    alert('PDF: ' + (rep.name || rep.id));
+                },
+                // --- Dashboards ---
+                addDashboard() {
+                    this.data.dashboards = Array.isArray(this.data.dashboards) ? this.data.dashboards : [];
+                    this.data.dashboards.push({
+                        id: 'dash_' + Math.floor(Math.random() * 1000),
+                        name: 'Nuevo dashboard',
+                        widgets: []
+                    });
+                    const idx = this.data.dashboards.length - 1;
+                    this.selectObject('dashboard', idx);
+                    if ((this.data.summary || []).length) {
+                        this.addDashboardWidget('kpi', idx);
+                    }
+                    if ((this.data.grids || []).length) {
+                        this.addDashboardWidget('chart', idx);
+                    }
+                },
+                removeDashboard(index) {
+                    if (confirm('Eliminar este dashboard?')) {
+                        this.data.dashboards.splice(index, 1);
+                        this.selectObject('form');
+                    }
+                },
+                ensureDashboardDefaults(index) {
+                    const dash = this.data.dashboards?.[index];
+                    if (!dash) return;
+                    if (!Array.isArray(dash.widgets)) dash.widgets = [];
+                },
+                addDashboardWidget(type = 'kpi', dashIndex = null) {
+                    const idx = dashIndex !== null ? dashIndex : this.selectedObject.index;
+                    const dash = this.data.dashboards?.[idx];
+                    if (!dash) return;
+                    if (!Array.isArray(dash.widgets)) dash.widgets = [];
+
+                    const widget = {
+                        id: 'widget_' + Math.floor(Math.random() * 1000),
+                        type: type,
+                        label: type === 'chart' ? 'Grafica' : 'Indicador',
+                        source: { summary: '', grid: '', field: '' }
+                    };
+
+                    if (type === 'kpi') {
+                        widget.source.summary = this.data.summary?.[0]?.name || '';
+                    }
+                    if (type === 'chart') {
+                        const grid = this.data.grids?.[0];
+                        widget.source.grid = grid?.name || '';
+                        widget.source.field = grid?.columns?.[0]?.name || '';
+                    }
+
+                    dash.widgets.push(widget);
+                },
+                removeDashboardWidget(dashIndex, widgetIndex) {
+                    const dash = this.data.dashboards?.[dashIndex];
+                    if (!dash || !Array.isArray(dash.widgets)) return;
+                    dash.widgets.splice(widgetIndex, 1);
+                },
+
                 // --- Utilidades ---
                 normalizeViewPath(path) {
                     let p = (path || '').trim().replace(/\\/g, '/');
@@ -1997,6 +3176,9 @@ $formGenerator = new FormGenerator();
                 progressSteps() {
                     return [
                         { label: 'Formulario', done: (this.data.fields || []).length > 0 },
+                        { label: 'Tablas', done: (this.data.grids || []).length > 0 },
+                        { label: 'Informes', done: (this.data.reports || []).length > 0 },
+                        { label: 'Dashboard', done: (this.data.dashboards || []).length > 0 },
                         { label: 'Entidad', done: !!(this.project.entityName || this.project.tableName) },
                         { label: 'Vista', done: !!this.project.viewPath },
                         { label: 'DB profile', done: !!this.project.dbStrategy }
@@ -2296,6 +3478,18 @@ $formGenerator = new FormGenerator();
                         });
                     }
 
+                    if (Array.isArray(this.data.reports)) {
+                        this.data.reports.forEach((r, i) => {
+                            if (!r.name) issues.push(`reports[${i}] sin name`);
+                            if (!r.type) issues.push(`reports[${i}] sin type`);
+                        });
+                    }
+                    if (Array.isArray(this.data.dashboards)) {
+                        this.data.dashboards.forEach((d, i) => {
+                            if (!d.name && !d.id) issues.push(`dashboards[${i}] sin name`);
+                        });
+                    }
+
                     return issues;
                 },
                 downloadText(fileName, content) {
@@ -2445,6 +3639,8 @@ $formGenerator = new FormGenerator();
                         if(!this.data.fields) this.data.fields = [];
                         if(!this.data.grids) this.data.grids = [];
                         if(!this.data.summary) this.data.summary = [];
+                        if(!this.data.reports) this.data.reports = [];
+                        if(!this.data.dashboards) this.data.dashboards = [];
                         
                         // Inicializar estados de UI que no se guardan en el JSON
                         this.data.fields.forEach(f => {
@@ -2478,8 +3674,10 @@ $formGenerator = new FormGenerator();
                             });
                         });
 
+                        this.builderTopTab = 'canvas';
                         this.showLoadModal = false;
                         this.jsonInput = '';
+                        this.selectObject('form');
                         alert('JSON cargado correctamente');
                     } catch (e) {
                         alert('Error al leer el JSON: ' + e.message);

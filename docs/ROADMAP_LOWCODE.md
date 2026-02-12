@@ -57,6 +57,22 @@ Done criteria
 - FormContract renders with current FormGenerator.
 - Layout stored as stable JSON (no pixel positions).
 
+## Stage v3 (ETAPA 4) - Smart Wizards + Reports
+**Goal:** acelerar creacion de apps: sugerencias automaticas y reportes.
+
+Deliverables
+- Sugerencia de formulario CRUD desde tabla (campos + layout).
+- Deteccion maestro-detalle por relaciones (hasMany/belongsTo).
+- Sugerir grids y formularios relacionados.
+- Report Manager (lista de informes por formulario).
+- Report Designer minimo (Factura/Cotizacion/Reporte) con preview.
+- Dashboard basico (KPI + grafico simple por entidad).
+
+Done criteria
+- Crear formulario y grids sugeridos en 1 clic.
+- Informes basicos con preview/print/PDF (MVP).
+- Dashboard genera al menos 1 grafico por entidad.
+
 ## Proposed DataContract v1 (example)
 ```json
 {

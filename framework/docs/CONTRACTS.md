@@ -13,6 +13,8 @@ Keys (observed in repo):
 - fields[]: { id, name, type, label, required?, validation?, options?, showSettings? }
 - grids[]: { type, name, mode?, label?, columns[] }
 - summary[]: { name, label, type, source?, expression?, watch? }
+- reports[] (optional): { id, name, type, template?, description?, layout? }
+- dashboards[] (optional): { id, name, widgets[] }
 
 ## GridContract (current)
 Location: embedded in FormContract (grids[])

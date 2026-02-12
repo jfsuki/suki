@@ -4,7 +4,7 @@
 |---|---|---|---|
 | FormContract spec | Partial | framework/docs/03_FORM_CONTRACT.md | Spec vs runtime keys not fully aligned. |
 | Form rendering (sections/fields) | Done | framework/app/Core/FormGenerator.php, FormBuilder.php | Stable; keep backward compatible. |
-| Grid runtime (rows/totals/formulas) | Partial | framework/public/assets/js/form-grid.js | Uses eval; needs sandbox + tests. |
+| Grid runtime (rows/totals/formulas) | Done (MVP) | framework/public/assets/js/form-grid.js | Safe expression engine (no eval). |
 | Summary dependency graph | Done | framework/public/assets/js/form-grid.js | Works; watch for cycles. |
 | Select options (manual/API) | Done | form-grid.js, FormBuilder.php | API error handling minimal. |
 | FORM_STORE/GRID_STORE | Partial | form-grid.js + docs | Only localStorage; no DB persistence. |
@@ -17,9 +17,14 @@
 | Auto migrations (create-if-missing) | Done (MVP) | framework/app/Core/EntityMigrator.php | No ALTER/diff. |
 | CLI migration runner | Done | project/bin/migrate.php | CLI only; no web endpoint. |
 | Manifest contract + validation | Done | framework/contracts/schemas/app.manifest.schema.json, ManifestValidator.php | Not wired to editor save. |
-| Editor JSON (formjson.html) | Partial | framework/public/editor_json/formjson.html | Still technical; needs simplification. |
-| Import wizard (CSV/Excel/JSON) | Pending | (new) | Required for low-code flow. |
+| Editor JSON (formjson.html) | Partial | framework/public/editor_json/formjson.html | Nuevo layout builder; falta refinamiento. |
+| Import wizard (CSV/Excel/JSON) | Partial | framework/public/editor_json/formjson.html | CSV a campos (no Excel nativo). |
 | Visual form builder (drag/drop) | Pending | (new) | Must persist to layout JSON (no pixels). |
+| Form wizard (table -> form) | Pending | (new) | Sugerir formulario desde tabla/relaciones. |
+| Master-detail detection | Pending | (new) | Detectar relaciones y sugerir grids. |
+| Report manager/designer | Partial | framework/public/editor_json/formjson.html | UI base; falta engine PDF/print. |
+| Dashboards + charts | Pending | (new) | KPI, gráficas, análisis. |
+| Cubo/pivot tables | Pending | (new) | Consolidación avanzada. |
 | Process engine + async jobs | Pending | (new) | Needed for background tasks. |
 | Audit log | Pending | (new) | Required for enterprise readiness. |
 | Security hardening (CSRF, sanitization) | Pending | (new) | Needs centralized middleware. |

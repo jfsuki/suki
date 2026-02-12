@@ -16,6 +16,7 @@ Build a low-code "mother app" platform that generates business apps from JSON co
 - Grid runtime (form-grid.js): rows, totals, formulas, summary graph.
 - Entity contracts + registry + migrator (DB kernel MVP).
 - Editor JSON: dashboard + forms + DB/process editor.
+- Editor JSON (modo amigable): arbol/inspector/canvas, modo guiado, reportes y dashboards basicos (UI).
 
 ## What works today
 - Forms + grids render from JSON.
@@ -37,6 +38,9 @@ Build a low-code "mother app" platform that generates business apps from JSON co
 - Migration diff/alter (only CREATE IF NOT EXISTS).
 - Import wizard (CSV/Excel/JSON -> DataContract + seeds).
 - Visual form builder (drag/drop, layout grid).
+- Form wizard (table -> CRUD form) + maestro-detalle.
+- Report manager/designer (facturas, cotizaciones, PDF).
+- Dashboards + charts (KPI, analitica).
 - Process engine + async jobs + audit log.
 - Security hardening (CSRF, RBAC/IDOR, rate limiting).
 
