@@ -20,6 +20,8 @@
 - framework/app/Core/DbTypeMapper.php: entity type -> SQL mapping.
 - framework/app/Core/TenantContext.php: tenant_id resolver.
 - framework/app/Core/MigrationStore.php: schema_migrations tracker.
+- framework/app/Core/CommandLayer.php: CRUD + Command layer (Create/Query/Update/Delete).
+- framework/app/Core/Contracts/ContractCache.php: contract cache (APCu/file).
 - framework/config/menu.php: loader para project/config/menu.json.
 - framework/contracts/schemas/*: JSON schemas.
 - framework/contracts/forms/form.contract.json: sample contract (kernel).

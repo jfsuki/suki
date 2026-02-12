@@ -37,6 +37,24 @@ $mimeTypes = [
 
 $mime = $mimeTypes[$ext] ?? (function_exists('mime_content_type') ? mime_content_type($assetPath) : 'application/octet-stream');
 header('Content-Type: ' . $mime);
+
+$mtime = filemtime($assetPath) ?: time();
+$etag = '"' . sha1($assetPath . '|' . $mtime . '|' . filesize($assetPath)) . '"';
+header('ETag: ' . $etag);
+header('Last-Modified: ' . gmdate('D, d M Y H:i:s', $mtime) . ' GMT');
+$hasVersion = isset($_GET['v']) && $_GET['v'] !== '';
+if ($hasVersion) {
+    header('Cache-Control: public, max-age=31536000, immutable');
+} else {
+    header('Cache-Control: public, max-age=3600');
+}
+
+$ifNoneMatch = $_SERVER['HTTP_IF_NONE_MATCH'] ?? '';
+if ($ifNoneMatch === $etag) {
+    http_response_code(304);
+    exit;
+}
+
 header('Content-Length: ' . filesize($assetPath));
 
 readfile($assetPath);

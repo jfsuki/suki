@@ -19,7 +19,7 @@
         ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
     </style>
 </head>
-<body class="bg-gray-100 h-screen overflow-hidden flex flex-col" x-data="formBuilder()">
+<body class="bg-gray-100 h-screen overflow-hidden flex flex-col" x-data="formBuilder()" x-init="init()">
 
     <header class="bg-white border-b px-6 py-3 flex justify-between items-center shadow-sm z-10 h-16">
         <div class="flex items-center gap-3">
@@ -469,6 +469,76 @@
                             </div>
                         </div>
                         <textarea readonly class="w-full h-56 border rounded p-2 text-xs font-mono bg-gray-50" x-text="buildManifest()"></textarea>
+                    </div>
+                </div>
+
+                <div x-show="mainTab === 'chat'" class="space-y-6 max-w-5xl mx-auto" x-transition.opacity>
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                        <h3 class="font-bold text-gray-800 text-lg">Pruebas por chat</h3>
+                        <p class="text-xs text-gray-500">Usa mensajes para probar formularios y funciones igual que un usuario final.</p>
+                        <div class="mt-3 text-xs bg-emerald-50 border border-emerald-200 text-emerald-900 rounded p-3">
+                            Todo se ejecuta por el mismo endpoint <span class="font-bold">/api/command</span>. Si funciona por chat, funciona en UI.
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                        <h4 class="text-xs font-bold text-gray-600 uppercase">Configuracion</h4>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">API base (proyecto)</label>
+                                <input x-model="chatTest.apiBase" @change="saveChatSettings()" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="https://suki.test o http://localhost">
+                                <div class="text-[10px] text-gray-400 mt-1">Usa la URL del proyecto (no la del framework).</div>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Entidad objetivo</label>
+                                <div class="flex gap-2">
+                                    <input x-model="chatTest.entity" @change="saveChatSettings()" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="clientes, facturas, cuentasxcobrar">
+                                    <button @click="chatTest.entity = resolveChatEntity(true)" class="px-3 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded">Usar formulario</button>
+                                </div>
+                                <div class="text-[10px] text-gray-400 mt-1">Se usa para generar pruebas rapidas.</div>
+                            </div>
+                            <div class="md:col-span-2 flex items-center gap-2 text-xs text-gray-600">
+                                <input type="checkbox" x-model="chatTest.autoRun" @change="saveChatSettings()" class="rounded text-emerald-600">
+                                Ejecutar pruebas rapidas al guardar proyecto
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
+                        <h4 class="text-xs font-bold text-gray-600 uppercase">Mensaje de prueba</h4>
+                        <textarea x-model="chatTest.message" rows="3" class="w-full border rounded p-3 text-sm font-mono" placeholder="crear clientes nombre=&quot;Ana&quot; nit=123"></textarea>
+                        <div class="flex flex-wrap gap-2">
+                            <button @click="sendChatMessage()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase rounded shadow">
+                                Enviar mensaje
+                            </button>
+                            <button @click="runChatSmoke()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded shadow">
+                                Pruebas rapidas
+                            </button>
+                            <button @click="chatTest.logs = []" class="px-4 py-2 bg-slate-200 text-slate-700 text-xs font-bold uppercase rounded shadow">
+                                Limpiar log
+                            </button>
+                        </div>
+                        <div class="text-[10px] text-gray-500">
+                            Formato sugerido: <span class="font-mono">crear {entidad} campo=valor</span> | <span class="font-mono">listar {entidad}</span> | <span class="font-mono">actualizar {entidad} id=1 campo=valor</span>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">Log de pruebas</h4>
+                            <span class="text-[10px] text-gray-400" x-text="chatTest.lastRun ? ('Ultima: ' + chatTest.lastRun) : ''"></span>
+                        </div>
+                        <div class="bg-slate-900 text-emerald-200 rounded p-3 text-[11px] font-mono h-48 overflow-auto">
+                            <template x-for="(log, idx) in chatTest.logs" :key="idx">
+                                <div class="mb-1">
+                                    <span class="text-slate-400" x-text="log.ts"></span>
+                                    <span x-text="log.dir"></span>
+                                    <span class="text-slate-300">-</span>
+                                    <span x-text="log.text"></span>
+                                </div>
+                            </template>
+                            <div x-show="chatTest.logs.length === 0" class="text-slate-500">Sin pruebas ejecutadas.</div>
+                        </div>
                     </div>
                 </div>
 
@@ -1149,7 +1219,8 @@
                 mainTabs: [
                     { id: 'dashboard', label: 'Dashboard', icon: 'fa-solid fa-gauge-high' },
                     { id: 'forms', label: 'Formularios', icon: 'fa-solid fa-pen-to-square' },
-                    { id: 'database', label: 'Base de datos', icon: 'fa-solid fa-database' }
+                    { id: 'database', label: 'Base de datos', icon: 'fa-solid fa-database' },
+                    { id: 'chat', label: 'Chat/Pruebas', icon: 'fa-solid fa-comments' }
                 ],
                 activeTab: 'general',
                 showLoadModal: false,
@@ -1241,6 +1312,166 @@
                     registryTrackProcesses: false,
 
                     processes: []
+                },
+
+                chatTest: {
+                    apiBase: '',
+                    entity: '',
+                    message: '',
+                    autoRun: false,
+                    busy: false,
+                    logs: [],
+                    lastRun: ''
+                },
+
+                init() {
+                    this.loadChatSettings();
+                },
+
+                loadChatSettings() {
+                    try {
+                        const apiBase = localStorage.getItem('suki_chat_api') || '';
+                        const autoRun = localStorage.getItem('suki_chat_autorun') || '';
+                        const entity = localStorage.getItem('suki_chat_entity') || '';
+                        this.chatTest.apiBase = apiBase;
+                        this.chatTest.autoRun = autoRun === '1';
+                        this.chatTest.entity = entity;
+                    } catch (e) {
+                        // ignore
+                    }
+                },
+
+                saveChatSettings() {
+                    try {
+                        localStorage.setItem('suki_chat_api', (this.chatTest.apiBase || '').trim());
+                        localStorage.setItem('suki_chat_autorun', this.chatTest.autoRun ? '1' : '0');
+                        localStorage.setItem('suki_chat_entity', (this.chatTest.entity || '').trim());
+                    } catch (e) {
+                        // ignore
+                    }
+                },
+
+                resolveChatApiBase() {
+                    const raw = (this.chatTest.apiBase || '').trim();
+                    if (raw !== '') {
+                        return raw.replace(/\/+$/, '');
+                    }
+                    return window.location.origin;
+                },
+
+                resolveChatEntity(fromForm = false) {
+                    if (fromForm) {
+                        const candidate = (this.project.entityName || this.data.entity || '').trim();
+                        if (candidate) {
+                            return candidate;
+                        }
+                        return (this.data.name || '').replace(/\.form$/i, '').replace(/[^a-zA-Z0-9_]/g, '');
+                    }
+                    return (this.chatTest.entity || this.project.entityName || this.data.entity || '').trim();
+                },
+
+                appendChatLog(dir, text) {
+                    const ts = new Date().toLocaleTimeString();
+                    this.chatTest.logs.push({
+                        ts,
+                        dir: dir === 'in' ? 'IN ' : 'OUT',
+                        text: String(text)
+                    });
+                },
+
+                buildSampleData() {
+                    const sample = {};
+                    const fields = Array.isArray(this.data.fields) ? this.data.fields : [];
+                    fields.slice(0, 4).forEach(f => {
+                        const key = (f.name || f.id || '').trim();
+                        if (!key) return;
+                        if (f.options && Array.isArray(f.options) && f.options.length > 0) {
+                            sample[key] = f.options[0].value ?? f.options[0].label ?? '';
+                            return;
+                        }
+                        const type = (f.type || '').toLowerCase();
+                        if (type === 'email') sample[key] = 'demo@local.test';
+                        else if (type === 'number' || type === 'currency') sample[key] = '10';
+                        else if (type === 'date') sample[key] = '2026-01-01';
+                        else if (type === 'checkbox') sample[key] = '1';
+                        else sample[key] = key + '_demo';
+                    });
+                    return sample;
+                },
+
+                buildCreateMessage(entity) {
+                    const data = this.buildSampleData();
+                    const parts = [];
+                    Object.keys(data).forEach(key => {
+                        const val = data[key];
+                        if (val === '' || val === null || val === undefined) return;
+                        if (String(val).match(/^[0-9.]+$/)) {
+                            parts.push(`${key}=${val}`);
+                        } else {
+                            parts.push(`${key}="${String(val).replace(/"/g, '')}"`);
+                        }
+                    });
+                    return `crear ${entity} ${parts.join(' ')}`.trim();
+                },
+
+                async sendChatMessage(messageOverride = '') {
+                    const message = (messageOverride || this.chatTest.message || '').trim();
+                    if (!message) {
+                        alert('Escribe un mensaje de prueba.');
+                        return;
+                    }
+
+                    const base = this.resolveChatApiBase();
+                    if (!base) {
+                        alert('Define la URL del proyecto (API base).');
+                        return;
+                    }
+
+                    this.chatTest.busy = true;
+                    this.appendChatLog('out', message);
+
+                    try {
+                        const res = await fetch(`${base}/api/command`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                message: message,
+                                entity: this.resolveChatEntity()
+                            })
+                        });
+                        const json = await res.json();
+                        this.appendChatLog('in', JSON.stringify(json));
+                        this.chatTest.lastRun = new Date().toLocaleString();
+                    } catch (e) {
+                        this.appendChatLog('in', 'Error: ' + (e.message || e));
+                    } finally {
+                        this.chatTest.busy = false;
+                    }
+                },
+
+                async runChatSmoke() {
+                    const entity = this.resolveChatEntity(true);
+                    if (!entity) {
+                        alert('Define una entidad para las pruebas.');
+                        return;
+                    }
+
+                    const tests = [
+                        `listar ${entity}`,
+                        this.buildCreateMessage(entity),
+                        `listar ${entity}`
+                    ];
+
+                    for (const msg of tests) {
+                        if (!msg) continue;
+                        await this.sendChatMessage(msg);
+                    }
+                },
+
+                async maybeRunChatTests() {
+                    if (this.chatTest.autoRun) {
+                        await this.runChatSmoke();
+                    }
                 },
 
                 // --- Métodos de Campos ---
@@ -2138,6 +2369,7 @@ $formGenerator = new FormGenerator();
                         }
 
                         alert('Archivos guardados.');
+                        await this.maybeRunChatTests();
                     } catch (e) {
                         console.error(e);
                         alert('No se pudo guardar: ' + (e.message || e));

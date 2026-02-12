@@ -1,6 +1,7 @@
 {
   "type": "form",
   "name": "cliente.form",
+  "entity": "cliente",
   "version": "1.0.0",
   "mode": "create",
 

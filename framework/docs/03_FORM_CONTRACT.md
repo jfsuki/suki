@@ -7,6 +7,10 @@
 - namespace (string)
 - createdAt, updatedAt
 
+## Optional integration (MVP)
+- entity (string) -> nombre de EntityContract para CRUD
+- action (string) -> endpoint API override (si no se define, usa /api/records/{entity})
+
 ## Fields
 Each field:
 - name (stable key, no rename)
@@ -33,6 +37,10 @@ Each field:
 - formName
 - namespace
 - createdAt, updatedAt
+
+## Integración opcional (MVP)
+- entity (string) -> nombre de EntityContract para CRUD
+- action (string) -> endpoint API override (si no se define, usa /api/records/{entity})
 
 ## Campos
 Cada campo:

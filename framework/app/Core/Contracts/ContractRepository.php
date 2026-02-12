@@ -10,6 +10,7 @@ class ContractRepository
 {
     private string $frameworkRoot;
     private string $projectRoot;
+    private ContractCache $cache;
 
     public function __construct(?string $frameworkRoot = null, ?string $projectRoot = null)
     {
@@ -19,6 +20,8 @@ class ContractRepository
         $workspaceRoot = dirname($this->frameworkRoot);
         $this->projectRoot = $projectRoot
             ?? (defined('PROJECT_ROOT') ? PROJECT_ROOT : $workspaceRoot . '/project');
+
+        $this->cache = new ContractCache($this->projectRoot);
     }
 
     public function getForm(string $key, ?string $module = null): array
@@ -31,6 +34,24 @@ class ContractRepository
         }
 
         return $this->readJson($path);
+    }
+
+    public function getFormMeta(string $key, ?string $module = null): array
+    {
+        $path = $this->resolveFormPath($key, $module);
+
+        if ($path === null) {
+            $moduleMsg = $module ? " in module {$module}" : '';
+            throw new RuntimeException("ContractRepository: form not found for {$key}{$moduleMsg}.");
+        }
+
+        $data = $this->readJson($path);
+        return [
+            'data' => $data,
+            'path' => $path,
+            'mtime' => filemtime($path) ?: 0,
+            'size' => filesize($path) ?: 0,
+        ];
     }
 
     public function existsForm(string $key, ?string $module = null): bool
@@ -87,6 +108,11 @@ class ContractRepository
 
     private function readJson(string $path): array
     {
+        $cached = $this->cache->get($path);
+        if (is_array($cached)) {
+            return $cached;
+        }
+
         $contents = file_get_contents($path);
         if ($contents === false) {
             throw new RuntimeException("ContractRepository: unable to read {$path}.");
@@ -102,12 +128,13 @@ class ContractRepository
             throw new RuntimeException("ContractRepository: JSON root must be an object or array in {$path}.");
         }
 
+        $this->cache->put($path, $decoded);
         return $decoded;
     }
 
     private function assertValid(string $value, string $label): void
     {
-        if ($value === '' || strpos($value, '..') !== false || !preg_match('/^[a-zA-Z0-9\/_-]+$/', $value)) {
+        if ($value === '' || strpos($value, '..') !== false || !preg_match('/^[a-zA-Z0-9\/_.-]+$/', $value)) {
             throw new InvalidArgumentException("ContractRepository: {$label} invalido.");
         }
     }

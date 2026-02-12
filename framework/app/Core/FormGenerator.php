@@ -33,10 +33,18 @@ class FormGenerator
             throw new InvalidArgumentException('Form: faltan fields');
         }
 
-        $action = $cfg['action'] ?? '#';
+        $action = $cfg['action'] ?? '';
+        $entity = isset($cfg['entity']) ? (string) $cfg['entity'] : '';
+        $apiEndpoint = $entity !== '' ? "records/{$entity}" : '';
+        if ($apiEndpoint !== '' && ($action === '' || $action === '#')) {
+            $action = "/api/{$apiEndpoint}";
+        }
+        $actionAttr = Html::e($action !== '' ? $action : '#');
+        $entityAttr = $entity !== '' ? " data-entity='" . Html::e($entity) . "'" : '';
+        $apiAttr = $apiEndpoint !== '' ? " data-api-endpoint='" . Html::e($apiEndpoint) . "'" : '';
         $layout = $cfg['layout'] ?? ['type' => 'grid', 'columns' => 1];
 
-        $html = "<form method='post' action='{$action}' class='space-y-6'>";
+        $html = "<form method='post' action='{$actionAttr}'{$entityAttr}{$apiAttr} class='space-y-6'>";
 
         // Sections Layout
         if (($layout['type'] ?? 'grid') === 'sections' && !empty($layout['sections'])) {
@@ -45,7 +53,8 @@ class FormGenerator
             }
         } else {
             // Grid Layout simple
-            $cols = $layout['columns'] ?? 1;
+            $cols = (int) ($layout['columns'] ?? 1);
+            $cols = $cols > 0 ? $cols : 1;
             $html .= "<div class='grid grid-cols-{$cols} gap-4'>";
             foreach ($cfg['fields'] as $field) {
                 $html .= $this->renderField($field);
@@ -79,16 +88,17 @@ class FormGenerator
 
     private function renderSection(array $section, array $allFields): string
     {
-        $cols   = $section['columns'] ?? 2;
+        $cols   = (int) ($section['columns'] ?? 2);
+        $cols = $cols > 0 ? $cols : 1;
         $fields = $section['fields'] ?? [];
 
         $html = "<div class='border rounded-lg p-4 space-y-4 bg-white shadow-sm'>";
 
         if (!empty($section['title'])) {
-            $html .= "<h3 class='text-md font-semibold text-gray-800'>{$section['title']}</h3>";
+            $html .= "<h3 class='text-md font-semibold text-gray-800'>" . Html::e($section['title']) . "</h3>";
         }
         if (!empty($section['description'])) {
-            $html .= "<p class='text-xs text-gray-500 -mt-3'>{$section['description']}</p>";
+            $html .= "<p class='text-xs text-gray-500 -mt-3'>" . Html::e($section['description']) . "</p>";
         }
 
         $html .= "<div class='grid grid-cols-{$cols} gap-4'>";
@@ -145,23 +155,24 @@ class FormGenerator
     // --- RENDERIZADO DE LA GRILLA ---
     private function renderGrid(array $cfg): string
     {
-        $name = $cfg['name'];
+        $name = (string) ($cfg['name'] ?? '');
+        $safeName = Html::e($name);
         $html = "<div class='mt-6 mb-6'>";
         
         if (!empty($cfg['label'])) {
-            $html .= "<h4 class='font-bold text-gray-700 mb-2'>{$cfg['label']}</h4>";
+            $html .= "<h4 class='font-bold text-gray-700 mb-2'>" . Html::e($cfg['label']) . "</h4>";
         }
 
-        $html .= "<table class='w-full border' data-grid='{$name}'>
+        $html .= "<table class='w-full border' data-grid='{$safeName}'>
                     <thead class='bg-gray-50'><tr>";
         
         foreach ($cfg['columns'] as $c) {
-            $html .= "<th class='border p-2 text-xs uppercase'>{$c['label']}</th>";
+            $html .= "<th class='border p-2 text-xs uppercase'>" . Html::e($c['label'] ?? '') . "</th>";
         }
         
         $html .= "<th class='border p-2 w-10'>#</th></tr></thead><tbody></tbody></table>";
 
-        $html .= "<button type='button' data-add-row='{$name}' class='mt-2 bg-green-600 text-white px-3 py-1 rounded text-sm'>+ Agregar ítem</button>";
+        $html .= "<button type='button' data-add-row='{$safeName}' class='mt-2 bg-green-600 text-white px-3 py-1 rounded text-sm'>+ Agregar ítem</button>";
 
         // ✅ CORRECCIÓN: Manejo correcto de totales
         $totalColumns = array_filter($cfg['columns'], function($col) {
@@ -186,8 +197,8 @@ class FormGenerator
                 }
 
                 $html .= "<div>
-                            <label class='text-xs font-bold text-gray-500 uppercase'>{$totalLabel}</label>
-                            <div class='text-lg font-bold' data-total='{$name}.{$col['name']}'>0.00</div>
+                            <label class='text-xs font-bold text-gray-500 uppercase'>" . Html::e($totalLabel) . "</label>
+                            <div class='text-lg font-bold' data-total='{$safeName}." . Html::e($col['name'] ?? '') . "'>0.00</div>
                           </div>";
             }
 
@@ -202,8 +213,8 @@ class FormGenerator
                     }
                     $totalLabel = $totalDef['label'] ?? strtoupper($totalName);
                     $html .= "<div>
-                                <label class='text-xs font-bold text-gray-500 uppercase'>{$totalLabel}</label>
-                                <div class='text-lg font-bold' data-grid-total='{$name}.{$totalName}'>0.00</div>
+                                <label class='text-xs font-bold text-gray-500 uppercase'>" . Html::e($totalLabel) . "</label>
+                                <div class='text-lg font-bold' data-grid-total='{$safeName}." . Html::e($totalName) . "'>0.00</div>
                               </div>";
                 }
             }
@@ -212,7 +223,11 @@ class FormGenerator
         }
 
         // Configuración oculta para el JS
-        $html .= "<script type='application/json' data-grid-config='{$name}'>" . json_encode($cfg) . "</script></div>";
+        $gridJson = json_encode(
+            $cfg,
+            JSON_HEX_TAG | JSON_HEX_AMP | JSON_HEX_APOS | JSON_HEX_QUOT
+        );
+        $html .= "<script type='application/json' data-grid-config='{$safeName}'>{$gridJson}</script></div>";
         
         return $html;
     }
@@ -221,7 +236,7 @@ class FormGenerator
 
     private function renderGridCell(array $col, string $gridName, int $rowIndex): string
 {
-    $name = "{$gridName}[{$rowIndex}][{$col['name']}]";
+    $name = "{$gridName}[{$rowIndex}][" . ($col['name'] ?? '') . "]";
     $base = "w-full border rounded px-2 py-1 text-sm";
 
     $input = $col['input'] ?? ['type' => 'text'];
@@ -229,14 +244,14 @@ class FormGenerator
 
     // ✅ SELECT
     if ($type === 'select') {
-        $html = "<select name='{$name}' class='{$base}' 
-                    data-column='{$col['name']}'
-                    data-grid-name='{$gridName}'
-                    data-row-index='{$rowIndex}'>";
+        $html = "<select name='" . Html::e($name) . "' class='{$base}' 
+                    data-column='" . Html::e($col['name'] ?? '') . "'
+                    data-grid-name='" . Html::e($gridName) . "'
+                    data-row-index='" . Html::e((string) $rowIndex) . "'>";
 
         foreach (($input['options'] ?? []) as $opt) {
-            $value = htmlspecialchars($opt['value']);
-            $label = htmlspecialchars($opt['label']);
+            $value = Html::e($opt['value'] ?? '');
+            $label = Html::e($opt['label'] ?? '');
             $html .= "<option value='{$value}'>{$label}</option>";
         }
 
@@ -245,12 +260,12 @@ class FormGenerator
 
     // ✅ DEFAULT INPUT
     return "<input 
-        type='{$type}' 
-        name='{$name}'
+        type='" . Html::e($type) . "' 
+        name='" . Html::e($name) . "'
         class='{$base}'
-        data-column='{$col['name']}'
-        data-grid-name='{$gridName}'
-        data-row-index='{$rowIndex}'
+        data-column='" . Html::e($col['name'] ?? '') . "'
+        data-grid-name='" . Html::e($gridName) . "'
+        data-row-index='" . Html::e((string) $rowIndex) . "'
     />";
 }
 
@@ -264,7 +279,7 @@ class FormGenerator
                 <div class='space-y-3 max-w-md ml-auto'>";
 
         foreach ($summary as $item) {
-            $name   = $item['name'];
+            $name   = (string) ($item['name'] ?? '');
             $label  = $item['label'] ?? strtoupper($name);
             $isTotal = $name === 'total_general';
             
@@ -274,8 +289,8 @@ class FormGenerator
 
             $html .= "
                 <div class='flex justify-between items-center {$wrapper}'>
-                    <span class='{$textClass} text-sm'>{$label}</span>
-                    <span class='{$fontClass} {$textClass}' data-summary='{$name}'>0.00</span>
+                    <span class='{$textClass} text-sm'>" . Html::e($label) . "</span>
+                    <span class='{$fontClass} {$textClass}' data-summary='" . Html::e($name) . "'>0.00</span>
                 </div>
             ";
         }

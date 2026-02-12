@@ -1,38 +1,13 @@
 <?php
 use App\Core\FormGenerator;
+use App\Core\Contracts\ContractRepository;
 
 $frameworkRoot = defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__, 2) . '/framework';
 require_once $frameworkRoot . '/app/autoload.php';
 
 $formGenerator = new FormGenerator();
-
-$formPathCandidates = [
-    __DIR__ . '/../contracts/forms/fact.form.json',
-    __DIR__ . '/clientes/fact.form.json',
-];
-
-$formPath = null;
-foreach ($formPathCandidates as $candidate) {
-    if (file_exists($candidate)) {
-        $formPath = $candidate;
-        break;
-    }
-}
-
-if ($formPath === null) {
-    throw new RuntimeException("Archivo no encontrado: fact.form.json");
-}
-
-try {
-    $formConfig = json_decode(
-        file_get_contents($formPath),
-        true,
-        512,
-        JSON_THROW_ON_ERROR
-    );
-} catch (JsonException $e) {
-    throw new RuntimeException("JSON inválido: " . $e->getMessage());
-}
+$contractRepo = new ContractRepository($frameworkRoot, PROJECT_ROOT);
+$formConfig = $contractRepo->getForm('fact.form', 'clientes');
 ?>
 
 <h1 class="text-2xl font-bold mb-4">Nueva Factura</h1>

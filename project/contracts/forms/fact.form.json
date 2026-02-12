@@ -1,6 +1,7 @@
 {
   "type": "form",
   "name": "fact.form",
+  "entity": "factura",
   "version": "1.0.0",
   "mode": "create",
   "layout": {
@@ -268,12 +269,12 @@
     },
     {
       "name": "iva",
-      "label": "IVA (19%)",
-      "type": "formula",
-      "expression": "subtotal_general * 0.19",
-      "watch": [
-        "subtotal_general"
-      ]
+      "label": "IVA",
+      "type": "sum",
+      "source": {
+        "grid": "detalle_factura",
+        "field": "iva_prod"
+      }
     },
     {
       "name": "total_general",

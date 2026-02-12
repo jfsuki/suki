@@ -1,0 +1,298 @@
+{
+    "key": "suki_contract_84f9fda6120d3b7cb2fe57743d8d6d5c432053d8",
+    "mtime": 1770836367,
+    "size": 6354,
+    "data": {
+        "type": "form",
+        "name": "fact.form",
+        "entity": "factura",
+        "version": "1.0.0",
+        "mode": "create",
+        "layout": {
+            "type": "sections",
+            "columns": 2,
+            "gap": "4",
+            "sections": [
+                {
+                    "id": "datos_basicos",
+                    "title": "Datos del cliente",
+                    "description": "Informaci\u00f3n principal del cliente",
+                    "columns": 2,
+                    "fields": [
+                        "nombre",
+                        "email",
+                        "telefono",
+                        "nit"
+                    ]
+                },
+                {
+                    "id": "ubicacion",
+                    "title": "Ubicaci\u00f3n",
+                    "description": "Datos geogr\u00e1ficos",
+                    "columns": 3,
+                    "fields": [
+                        "pais",
+                        "ciudad",
+                        "direccion"
+                    ]
+                },
+                {
+                    "id": "estado",
+                    "title": "Configuraci\u00f3n",
+                    "columns": 2,
+                    "fields": [
+                        "activo",
+                        "tipo_cliente"
+                    ]
+                }
+            ]
+        },
+        "fields": [
+            {
+                "id": "nombre",
+                "name": "nombre",
+                "type": "text",
+                "label": "Nombre completo",
+                "required": true,
+                "showSettings": false,
+                "validation": []
+            },
+            {
+                "id": "email",
+                "name": "email",
+                "type": "email",
+                "label": "Correo electr\u00f3nico",
+                "showSettings": false,
+                "validation": []
+            },
+            {
+                "id": "telefono",
+                "name": "telefono",
+                "type": "text",
+                "label": "Tel\u00e9fono",
+                "showSettings": false,
+                "validation": []
+            },
+            {
+                "id": "pais",
+                "name": "pais",
+                "type": "select",
+                "label": "Pa\u00eds",
+                "options": [
+                    {
+                        "value": "CO",
+                        "label": "Colombia"
+                    },
+                    {
+                        "value": "MX",
+                        "label": "M\u00e9xico"
+                    }
+                ],
+                "showSettings": true,
+                "validation": []
+            },
+            {
+                "id": "ciudad",
+                "name": "ciudad",
+                "type": "select",
+                "label": "Ciudad",
+                "options": {
+                    "dependsOn": "pais",
+                    "source": "api",
+                    "endpoint": "/api/ciudades",
+                    "map": {
+                        "value": "id",
+                        "label": "nombre"
+                    }
+                },
+                "showSettings": false,
+                "validation": []
+            },
+            {
+                "id": "direccion",
+                "name": "direccion",
+                "type": "textarea",
+                "label": "Direcci\u00f3n",
+                "showSettings": false,
+                "validation": []
+            },
+            {
+                "id": "activo",
+                "name": "activo",
+                "type": "checkbox",
+                "label": "Cliente activo",
+                "defaultValue": true,
+                "showSettings": false,
+                "validation": []
+            },
+            {
+                "id": "tipo_cliente",
+                "name": "tipo_cliente",
+                "type": "select",
+                "label": "Tipo de cliente",
+                "options": [
+                    {
+                        "value": "normal",
+                        "label": "Normal"
+                    },
+                    {
+                        "value": "vip",
+                        "label": "VIP"
+                    }
+                ],
+                "showSettings": false,
+                "validation": []
+            },
+            {
+                "id": "nit",
+                "name": "nit",
+                "type": "number",
+                "label": "NIT/CC",
+                "validation": {
+                    "required": false
+                },
+                "showSettings": false,
+                "options": []
+            }
+        ],
+        "grids": [
+            {
+                "type": "grid",
+                "name": "detalle_factura",
+                "mode": "create",
+                "columns": [
+                    {
+                        "name": "concepto",
+                        "label": "Concepto",
+                        "input": {
+                            "type": "text"
+                        },
+                        "showOptions": false
+                    },
+                    {
+                        "name": "cantidad",
+                        "label": "Cantidad",
+                        "input": {
+                            "type": "number"
+                        },
+                        "total": {
+                            "type": "sum",
+                            "label": "Total"
+                        },
+                        "showOptions": false
+                    },
+                    {
+                        "name": "valor_unitario",
+                        "label": "Valor Unitario",
+                        "input": {
+                            "type": "number"
+                        },
+                        "showOptions": false
+                    },
+                    {
+                        "name": "subtotal",
+                        "label": "Subtotal",
+                        "formula": {
+                            "expression": "cantidad * valor_unitario",
+                            "watch": [
+                                "cantidad",
+                                "valor_unitario"
+                            ]
+                        },
+                        "total": {
+                            "type": "sum",
+                            "label": "Total Facturaci\u00f3n"
+                        },
+                        "showOptions": false,
+                        "input": {
+                            "type": "text"
+                        }
+                    },
+                    {
+                        "name": "porc_iva",
+                        "label": "IVA",
+                        "input": {
+                            "type": "select",
+                            "allowSearch": true,
+                            "optionsSource": "manual",
+                            "options": [
+                                {
+                                    "value": "19",
+                                    "label": "19%"
+                                },
+                                {
+                                    "value": "5",
+                                    "label": "5%"
+                                },
+                                {
+                                    "value": "0",
+                                    "label": "0%"
+                                }
+                            ]
+                        },
+                        "showOptions": true
+                    },
+                    {
+                        "name": "iva_prod",
+                        "label": "Valor IVA",
+                        "input": {
+                            "type": "number"
+                        },
+                        "formula": {
+                            "expression": "subtotal*(porc_iva/100)",
+                            "watch": [
+                                "subtotal",
+                                "porc_iva"
+                            ]
+                        },
+                        "total": {
+                            "type": "sum",
+                            "label": "Total"
+                        },
+                        "showOptions": false
+                    }
+                ],
+                "label": "Productos"
+            }
+        ],
+        "summary": [
+            {
+                "name": "total_cantidad",
+                "label": "Total Cantidad",
+                "type": "sum",
+                "source": {
+                    "grid": "detalle_factura",
+                    "field": "cantidad"
+                }
+            },
+            {
+                "name": "subtotal_general",
+                "label": "Subtotal",
+                "type": "sum",
+                "source": {
+                    "grid": "detalle_factura",
+                    "field": "subtotal"
+                }
+            },
+            {
+                "name": "iva",
+                "label": "IVA (19%)",
+                "type": "formula",
+                "expression": "subtotal_general * 0.19",
+                "watch": [
+                    "subtotal_general"
+                ]
+            },
+            {
+                "name": "total_general",
+                "label": "Total a Pagar",
+                "type": "formula",
+                "expression": "subtotal_general + iva",
+                "watch": [
+                    "subtotal_general",
+                    "iva"
+                ]
+            }
+        ]
+    }
+}

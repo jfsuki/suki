@@ -1,0 +1,60 @@
+{
+  "type": "entity",
+  "name": "cliente",
+  "label": "Cliente",
+  "version": "1.0",
+  "table": {
+    "name": "clientes",
+    "primaryKey": "id",
+    "timestamps": true,
+    "softDelete": false,
+    "tenantScoped": true
+  },
+  "fields": [
+    { "name": "id", "type": "int", "primary": true, "source": "system" },
+    { "name": "nombre", "type": "string", "label": "Nombre", "required": true, "source": "form" },
+    { "name": "email", "type": "string", "label": "Email", "required": false, "source": "form" },
+    { "name": "telefono", "type": "string", "label": "Telefono", "required": false, "source": "form" },
+    { "name": "pais", "type": "string", "label": "Pais", "required": false, "source": "form" },
+    { "name": "ciudad", "type": "string", "label": "Ciudad", "required": false, "source": "form" },
+    { "name": "direccion", "type": "string", "label": "Direccion", "required": false, "source": "form" },
+    { "name": "activo", "type": "bool", "label": "Activo", "required": false, "source": "form" },
+    { "name": "tipo_cliente", "type": "string", "label": "Tipo cliente", "required": false, "source": "form" },
+
+    { "name": "nombre", "type": "string", "label": "Nombre contacto", "source": "grid:cliente_contactos", "grid": "cliente_contactos" },
+    { "name": "cargo", "type": "string", "label": "Cargo", "source": "grid:cliente_contactos", "grid": "cliente_contactos" },
+    { "name": "telefono", "type": "string", "label": "Telefono contacto", "source": "grid:cliente_contactos", "grid": "cliente_contactos" },
+    { "name": "email", "type": "string", "label": "Email contacto", "source": "grid:cliente_contactos", "grid": "cliente_contactos" },
+
+    { "name": "concepto", "type": "string", "label": "Concepto", "source": "grid:cliente_facturacion", "grid": "cliente_facturacion" },
+    { "name": "cantidad", "type": "number", "label": "Cantidad", "source": "grid:cliente_facturacion", "grid": "cliente_facturacion" },
+    { "name": "valor_unitario", "type": "decimal", "label": "Valor unitario", "source": "grid:cliente_facturacion", "grid": "cliente_facturacion" },
+    { "name": "subtotal", "type": "decimal", "label": "Subtotal", "source": "grid:cliente_facturacion", "grid": "cliente_facturacion" }
+  ],
+  "grids": [
+    {
+      "name": "cliente_contactos",
+      "table": "clientes__cliente_contactos",
+      "relation": {
+        "type": "hasMany",
+        "fk": "cliente_id"
+      }
+    },
+    {
+      "name": "cliente_facturacion",
+      "table": "clientes__cliente_facturacion",
+      "relation": {
+        "type": "hasMany",
+        "fk": "cliente_id"
+      }
+    }
+  ],
+  "relations": [],
+  "rules": [],
+  "permissions": {
+    "read": ["admin"],
+    "create": ["admin"],
+    "update": ["admin"],
+    "delete": ["admin"]
+  }
+}

@@ -31,7 +31,7 @@ final class TableGenerator
 
         foreach ($columns as $col) {
             $label = $col['label'] ?? '';
-            $html .= "<th class='border p-2 text-left text-xs font-bold uppercase text-gray-600'>{$label}</th>";
+            $html .= "<th class='border p-2 text-left text-xs font-bold uppercase text-gray-600'>" . Html::e($label) . "</th>";
         }
 
         $html .= "</tr></thead>";
@@ -45,6 +45,6 @@ final class TableGenerator
      */
     private static function renderBody(string $endpoint): string
     {
-        return "<tbody data-endpoint='{$endpoint}' class='divide-y'></tbody>";
+        return "<tbody data-endpoint='" . Html::e($endpoint) . "' class='divide-y'></tbody>";
     }
 }

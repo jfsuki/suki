@@ -16,6 +16,325 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (e) { console.error("Error cargando config", e); }
     });
 
+    // ---- Safe Expression Engine (no eval/new Function) ----
+    function tokenizeExpression(expression) {
+        const tokens = [];
+        const expr = String(expression || '');
+        let i = 0;
+        const len = expr.length;
+
+        while (i < len) {
+            const ch = expr[i];
+            if (/\s/.test(ch)) { i++; continue; }
+
+            if (ch === '"' || ch === "'") {
+                const quote = ch;
+                i++;
+                let value = '';
+                while (i < len && expr[i] !== quote) {
+                    if (expr[i] === '\\' && i + 1 < len) {
+                        value += expr[i + 1];
+                        i += 2;
+                        continue;
+                    }
+                    value += expr[i];
+                    i++;
+                }
+                if (expr[i] !== quote) throw new Error('String sin cierre');
+                i++;
+                tokens.push({ type: 'string', value });
+                continue;
+            }
+
+            if (/[0-9.]/.test(ch)) {
+                let num = '';
+                while (i < len && /[0-9.]/.test(expr[i])) {
+                    num += expr[i];
+                    i++;
+                }
+                if (num === '.' || (num.split('.').length > 2)) {
+                    throw new Error('Numero invalido');
+                }
+                tokens.push({ type: 'number', value: parseFloat(num) });
+                continue;
+            }
+
+            if (/[a-zA-Z_]/.test(ch)) {
+                let ident = '';
+                while (i < len && /[a-zA-Z0-9_]/.test(expr[i])) {
+                    ident += expr[i];
+                    i++;
+                }
+                const upper = ident.toUpperCase();
+                if (upper === 'AND') {
+                    tokens.push({ type: 'operator', value: '&&' });
+                } else if (upper === 'OR') {
+                    tokens.push({ type: 'operator', value: '||' });
+                } else if (upper === 'NOT') {
+                    tokens.push({ type: 'operator', value: '!' });
+                } else {
+                    tokens.push({ type: 'identifier', value: ident });
+                }
+                continue;
+            }
+
+            const two = expr.slice(i, i + 2);
+            if (['>=', '<=', '==', '!=', '&&', '||'].includes(two)) {
+                tokens.push({ type: 'operator', value: two });
+                i += 2;
+                continue;
+            }
+
+            if (['+', '-', '*', '/', '>', '<', '(', ')', ','].includes(ch)) {
+                if (ch === '(' || ch === ')') {
+                    tokens.push({ type: 'paren', value: ch });
+                } else if (ch === ',') {
+                    tokens.push({ type: 'comma', value: ch });
+                } else {
+                    tokens.push({ type: 'operator', value: ch });
+                }
+                i++;
+                continue;
+            }
+
+            throw new Error('Token invalido');
+        }
+
+        return tokens;
+    }
+
+    class ExpressionParser {
+        constructor(tokens) {
+            this.tokens = tokens;
+            this.pos = 0;
+        }
+
+        peek() { return this.tokens[this.pos]; }
+        next() { return this.tokens[this.pos++]; }
+        isAtEnd() { return this.pos >= this.tokens.length; }
+
+        match(type, value) {
+            const token = this.peek();
+            if (!token || token.type !== type) return false;
+            if (value !== undefined && token.value !== value) return false;
+            this.next();
+            return true;
+        }
+
+        parseExpression() { return this.parseOr(); }
+
+        parseOr() {
+            let node = this.parseAnd();
+            while (this.match('operator', '||')) {
+                node = { type: 'binary', op: '||', left: node, right: this.parseAnd() };
+            }
+            return node;
+        }
+
+        parseAnd() {
+            let node = this.parseEquality();
+            while (this.match('operator', '&&')) {
+                node = { type: 'binary', op: '&&', left: node, right: this.parseEquality() };
+            }
+            return node;
+        }
+
+        parseEquality() {
+            let node = this.parseComparison();
+            while (true) {
+                if (this.match('operator', '==')) {
+                    node = { type: 'binary', op: '==', left: node, right: this.parseComparison() };
+                } else if (this.match('operator', '!=')) {
+                    node = { type: 'binary', op: '!=', left: node, right: this.parseComparison() };
+                } else {
+                    break;
+                }
+            }
+            return node;
+        }
+
+        parseComparison() {
+            let node = this.parseTerm();
+            while (true) {
+                if (this.match('operator', '>=')) {
+                    node = { type: 'binary', op: '>=', left: node, right: this.parseTerm() };
+                } else if (this.match('operator', '<=')) {
+                    node = { type: 'binary', op: '<=', left: node, right: this.parseTerm() };
+                } else if (this.match('operator', '>')) {
+                    node = { type: 'binary', op: '>', left: node, right: this.parseTerm() };
+                } else if (this.match('operator', '<')) {
+                    node = { type: 'binary', op: '<', left: node, right: this.parseTerm() };
+                } else {
+                    break;
+                }
+            }
+            return node;
+        }
+
+        parseTerm() {
+            let node = this.parseFactor();
+            while (true) {
+                if (this.match('operator', '+')) {
+                    node = { type: 'binary', op: '+', left: node, right: this.parseFactor() };
+                } else if (this.match('operator', '-')) {
+                    node = { type: 'binary', op: '-', left: node, right: this.parseFactor() };
+                } else {
+                    break;
+                }
+            }
+            return node;
+        }
+
+        parseFactor() {
+            let node = this.parseUnary();
+            while (true) {
+                if (this.match('operator', '*')) {
+                    node = { type: 'binary', op: '*', left: node, right: this.parseUnary() };
+                } else if (this.match('operator', '/')) {
+                    node = { type: 'binary', op: '/', left: node, right: this.parseUnary() };
+                } else {
+                    break;
+                }
+            }
+            return node;
+        }
+
+        parseUnary() {
+            if (this.match('operator', '!')) {
+                return { type: 'unary', op: '!', value: this.parseUnary() };
+            }
+            if (this.match('operator', '-')) {
+                return { type: 'unary', op: '-', value: this.parseUnary() };
+            }
+            if (this.match('operator', '+')) {
+                return { type: 'unary', op: '+', value: this.parseUnary() };
+            }
+            return this.parsePrimary();
+        }
+
+        parsePrimary() {
+            const token = this.peek();
+            if (!token) throw new Error('Expresion incompleta');
+
+            if (this.match('number')) {
+                return { type: 'number', value: token.value };
+            }
+            if (this.match('string')) {
+                return { type: 'string', value: token.value };
+            }
+            if (this.match('identifier')) {
+                const name = token.value;
+                if (this.match('paren', '(')) {
+                    const args = [];
+                    if (!this.match('paren', ')')) {
+                        do {
+                            args.push(this.parseExpression());
+                        } while (this.match('comma'));
+                        if (!this.match('paren', ')')) {
+                            throw new Error('Falta )');
+                        }
+                    }
+                    return { type: 'call', name, args };
+                }
+                if (name.toLowerCase() === 'true') return { type: 'bool', value: true };
+                if (name.toLowerCase() === 'false') return { type: 'bool', value: false };
+                return { type: 'var', name };
+            }
+            if (this.match('paren', '(')) {
+                const expr = this.parseExpression();
+                if (!this.match('paren', ')')) throw new Error('Falta )');
+                return expr;
+            }
+            throw new Error('Token inesperado');
+        }
+    }
+
+    function toNumber(value) {
+        const num = Number(value);
+        return Number.isFinite(num) ? num : 0;
+    }
+
+    function getBuiltins() {
+        return {
+            SUM: (...args) => args.reduce((acc, val) => acc + toNumber(val), 0),
+            MIN: (...args) => {
+                const nums = args.map(toNumber);
+                return nums.length ? Math.min(...nums) : 0;
+            },
+            MAX: (...args) => {
+                const nums = args.map(toNumber);
+                return nums.length ? Math.max(...nums) : 0;
+            },
+            ROUND: (val, digits = 0) => {
+                const factor = Math.pow(10, toNumber(digits));
+                return Math.round(toNumber(val) * factor) / factor;
+            },
+            IF: (cond, truthy, falsy = 0) => (cond ? truthy : falsy),
+        };
+    }
+
+    function evaluateAst(node, vars, functionsMap) {
+        const builtins = getBuiltins();
+        const fns = Object.assign({}, builtins, functionsMap || {});
+
+        switch (node.type) {
+            case 'number':
+            case 'string':
+            case 'bool':
+                return node.value;
+            case 'var':
+                return vars && Object.prototype.hasOwnProperty.call(vars, node.name)
+                    ? vars[node.name]
+                    : 0;
+            case 'unary': {
+                const val = evaluateAst(node.value, vars, fns);
+                if (node.op === '!') return !val;
+                if (node.op === '-') return -toNumber(val);
+                return toNumber(val);
+            }
+            case 'binary': {
+                const left = evaluateAst(node.left, vars, fns);
+                const right = evaluateAst(node.right, vars, fns);
+                switch (node.op) {
+                    case '+': return toNumber(left) + toNumber(right);
+                    case '-': return toNumber(left) - toNumber(right);
+                    case '*': return toNumber(left) * toNumber(right);
+                    case '/': return toNumber(right) === 0 ? 0 : toNumber(left) / toNumber(right);
+                    case '==': return left == right;
+                    case '!=': return left != right;
+                    case '>': return toNumber(left) > toNumber(right);
+                    case '<': return toNumber(left) < toNumber(right);
+                    case '>=': return toNumber(left) >= toNumber(right);
+                    case '<=': return toNumber(left) <= toNumber(right);
+                    case '&&': return !!left && !!right;
+                    case '||': return !!left || !!right;
+                    default: return 0;
+                }
+            }
+            case 'call': {
+                const fn = fns[node.name.toUpperCase()];
+                if (typeof fn !== 'function') return 0;
+                const args = node.args.map(arg => evaluateAst(arg, vars, fns));
+                return fn(...args);
+            }
+            default:
+                return 0;
+        }
+    }
+
+    function compileExpression(expression) {
+        if (!expression || typeof expression !== 'string') return null;
+        try {
+            const tokens = tokenizeExpression(expression);
+            const parser = new ExpressionParser(tokens);
+            const ast = parser.parseExpression();
+            if (!parser.isAtEnd()) return null;
+            return ast;
+        } catch (e) {
+            return null;
+        }
+    }
+
     function normalizeGridConfig(cfg) {
         if (!cfg || !Array.isArray(cfg.columns)) return cfg;
 
@@ -52,6 +371,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!Array.isArray(col.formula.watch)) {
                     col.formula.watch = inferWatch(col.formula.expression, columnNames);
                 }
+            }
+
+            if (col.formula && typeof col.formula.expression === 'string') {
+                col.formula.compiled = compileExpression(col.formula.expression);
             }
         });
 
@@ -191,6 +514,7 @@ document.addEventListener('DOMContentLoaded', () => {
             if (normalized.type === 'formula') {
                 normalized.expression = typeof item.expression === 'string' ? item.expression : '';
                 normalized.watch = Array.isArray(item.watch) ? item.watch.map(String) : [];
+                normalized.compiled = compileExpression(normalized.expression);
                 if (!normalized.expression) {
                     console.warn(`[summary] Fórmula vacía: ${name}`);
                 }
@@ -300,6 +624,33 @@ document.addEventListener('DOMContentLoaded', () => {
         return sum;
     }
 
+    function getGridTotalsIndex() {
+        const totalsByColumn = {};
+        const duplicates = new Set();
+
+        Object.keys(grids).forEach(gridName => {
+            const cfg = grids[gridName]?.config;
+            if (!cfg || !Array.isArray(cfg.columns)) return;
+
+            cfg.columns.forEach(col => {
+                const colName = col?.name;
+                if (!colName) return;
+                const total = getGridTotal(gridName, colName);
+                if (Object.prototype.hasOwnProperty.call(totalsByColumn, colName)) {
+                    duplicates.add(colName);
+                } else {
+                    totalsByColumn[colName] = total;
+                }
+            });
+        });
+
+        duplicates.forEach(name => {
+            delete totalsByColumn[name];
+        });
+
+        return totalsByColumn;
+    }
+
     function normalizeTotalsFormula(formula) {
         if (typeof formula !== 'string') return '';
         return formula.replace(/sum\s*\(\s*([a-zA-Z0-9_]+)\s*\)/g, (match, col) => {
@@ -310,6 +661,7 @@ document.addEventListener('DOMContentLoaded', () => {
     function updateSummary() {
         if (!summaryState || summaryState.config.length === 0) return;
 
+        const gridTotals = getGridTotalsIndex();
         const values = {};
         summaryState.config.forEach(item => values[item.name] = 0);
 
@@ -321,10 +673,11 @@ document.addEventListener('DOMContentLoaded', () => {
             if (item.type === 'sum') {
                 res = getGridTotal(item.source?.grid, item.source?.field);
             } else if (item.type === 'formula') {
-                try {
-                    const fn = new Function('s', `with(s){ return ${item.expression}; }`);
-                    res = fn(values) || 0;
-                } catch (e) {
+                const compiled = item.compiled || compileExpression(item.expression);
+                if (compiled) {
+                    const contextVars = Object.assign({}, gridTotals, values);
+                    res = toNumber(evaluateAst(compiled, contextVars, {}));
+                } else {
                     res = 0;
                 }
             }
@@ -388,8 +741,22 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // 4. Escuchar cambios
+    function resolveGridName(target) {
+        if (!target) return '';
+        if (target.dataset && target.dataset.gridName) return target.dataset.gridName;
+        const table = target.closest ? target.closest('[data-grid]') : null;
+        return table ? table.dataset.grid : '';
+    }
+
     document.addEventListener('input', (e) => {
-        const gridName = e.target.dataset.gridName;
+        const gridName = resolveGridName(e.target);
+        if (gridName) {
+            window.recalcAll(gridName);
+        }
+    });
+
+    document.addEventListener('change', (e) => {
+        const gridName = resolveGridName(e.target);
         if (gridName) {
             window.recalcAll(gridName);
         }
@@ -400,6 +767,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const grid = grids[gridName];
         const rows = document.querySelectorAll(`[data-grid="${gridName}"] tbody tr`);
         const totals = {};
+        const rowsPayload = [];
 
         // Inicializar sumadores para el pie del grid
         grid.config.columns.forEach(c => totals[c.name] = 0);
@@ -418,17 +786,19 @@ document.addEventListener('DOMContentLoaded', () => {
                     : col.formula?.expression;
 
                 if (formulaExpr) {
-                    try {
-                        const fn = new Function('r', `with(r){ return ${formulaExpr}; }`);
-                        const res = fn(rowData) || 0;
+                    const compiled = col.formula?.compiled || compileExpression(formulaExpr);
+                    if (compiled) {
+                        const res = toNumber(evaluateAst(compiled, rowData, {}));
                         rowData[col.name] = res;
                         const input = tr.querySelector(`[data-column="${col.name}"]`);
                         if (input) input.value = res.toFixed(2);
-                    } catch (e) {}
+                    }
                 }
                 // Sumar para el total inferior
                 totals[col.name] += rowData[col.name];
             });
+
+            rowsPayload.push({ ...rowData });
         });
 
         // A. Actualizar Pie de Grid (Labels de 10.00, 1000.00, etc.)
@@ -445,11 +815,12 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (!def || !def.name || !def.formula) return;
                 const expr = normalizeTotalsFormula(def.formula);
                 let value = 0;
-                try {
-                    const fn = new Function('sum', `return ${expr};`);
-                    value = fn(col => totals[col] || 0) || 0;
-                } catch (e) {
-                    value = 0;
+                const compiled = def._compiled || compileExpression(expr);
+                if (compiled) {
+                    def._compiled = compiled;
+                    value = toNumber(evaluateAst(compiled, {}, {
+                        SUM: (col) => totals[col] || 0
+                    }));
                 }
                 const label = document.querySelector(`[data-grid-total="${gridName}.${def.name}"]`);
                 if (label) label.textContent = value.toFixed(2);
@@ -457,7 +828,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // B. Actualizar GRID_STORE
-        window.GRID_STORE[gridName] = { totals: totals };
+        window.GRID_STORE[gridName] = { totals: totals, rows: rowsPayload };
         localStorage.setItem('GRID_STORE', JSON.stringify(window.GRID_STORE));
 
         // C. Sincronizar FORM_STORE y Resumen de Facturación
