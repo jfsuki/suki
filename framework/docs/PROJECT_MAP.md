@@ -21,6 +21,12 @@
 - framework/app/Core/TenantContext.php: tenant_id resolver.
 - framework/app/Core/MigrationStore.php: schema_migrations tracker.
 - framework/app/Core/CommandLayer.php: CRUD + Command layer (Create/Query/Update/Delete).
+- framework/app/Core/IntegrationRegistry.php: loader + validator for integration contracts.
+- framework/app/Core/InvoiceRegistry.php: loader + validator for invoice contracts.
+- framework/app/Core/IntegrationMigrator.php: tablas base de integracion + outbox.
+- framework/app/Core/IntegrationStore.php: persistencia de integraciones/documentos/webhooks.
+- framework/app/Core/AlanubeClient.php: cliente API Alanube (emitir/consultar/anular).
+- framework/app/Core/InvoiceMapper.php: mapea invoice contract -> payload proveedor.
 - framework/app/Core/Contracts/ContractCache.php: contract cache (APCu/file).
 - framework/config/menu.php: loader para project/config/menu.json.
 - framework/contracts/schemas/*: JSON schemas.
@@ -41,6 +47,8 @@
 - project/contracts/*: contratos JSON del app.
 - project/contracts/app.manifest.json: contrato global del app (db/registry/integrations/processes).
 - project/contracts/entities/*: contratos de entidades (tablas, fields, relations, permisos).
+- project/contracts/integrations/*: contratos de integraciones externas (Alanube).
+- project/contracts/invoices/*: contratos de factura electronica.
 - project/config/*: config del app (menu.json, db, env_loader).
 - project/app/controller/*: controladores de negocio.
 - project/database/*: SQL/migraciones.

@@ -11,15 +11,21 @@ class CommandLayer
     private EntityRegistry $registry;
     private EntityMigrator $migrator;
     private ?int $tenantId;
+    private ValidationEngine $validator;
+    private AuditLogger $audit;
 
     public function __construct(
         ?EntityRegistry $registry = null,
         ?EntityMigrator $migrator = null,
-        ?int $tenantId = null
+        ?int $tenantId = null,
+        ?ValidationEngine $validator = null,
+        ?AuditLogger $audit = null
     ) {
         $this->registry = $registry ?? new EntityRegistry();
         $this->migrator = $migrator ?? new EntityMigrator($this->registry);
         $this->tenantId = $tenantId ?? TenantContext::getTenantId();
+        $this->validator = $validator ?? new ValidationEngine();
+        $this->audit = $audit ?? new AuditLogger();
     }
 
     public function createRecord(string $entityName, array $payload): array
@@ -38,6 +44,10 @@ class CommandLayer
         $id = $repo->create($clean);
 
         $gridResult = $this->persistGrids($entity, $id, $grids);
+        $this->audit->log('create', $entityName, $id, [
+            'data' => $clean,
+            'grids' => $grids,
+        ]);
 
         return [
             'id' => $id,
@@ -90,6 +100,10 @@ class CommandLayer
         if (!empty($grids)) {
             $this->replaceGrids($entity, (int) $id, $grids);
         }
+        $this->audit->log('update', $entityName, $id, [
+            'data' => $clean,
+            'grids' => $grids,
+        ]);
 
         return [
             'updated' => $affected,
@@ -103,6 +117,7 @@ class CommandLayer
 
         $repo = new BaseRepository($entity, null, $this->tenantId);
         $affected = $repo->delete($id);
+        $this->audit->log('delete', $entityName, $id, []);
 
         return [
             'deleted' => $affected,
@@ -169,6 +184,11 @@ class CommandLayer
                 [$value, $err] = $this->normalizeValue($field, $data[$name]);
                 if ($err) {
                     $errors[] = "Campo {$name}: {$err}";
+                    continue;
+                }
+                $ruleErrors = $this->validator->validate($field, $value, $isCreate);
+                if (!empty($ruleErrors)) {
+                    $errors[] = "Campo {$name}: " . implode(', ', $ruleErrors);
                     continue;
                 }
                 $clean[$name] = $value;

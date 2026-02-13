@@ -51,8 +51,9 @@ This contract defines global app metadata, database strategy, registry tracking,
 
 ### integrations (optional)
 - integrations[].id, type, provider
+- integrations[].country, integrations[].environment
 - integrations[].base_url
-- integrations[].auth (api_key/oauth2/basic/jwt/custom)
+- integrations[].auth (bearer/api_key/oauth2/basic/jwt/custom) + token_env
 - integrations[].webhooks[]
 
 ### processes (optional)
@@ -192,8 +193,9 @@ Este contrato define metadatos globales del app, estrategia de base de datos, re
 
 ### integrations (opcional)
 - integrations[].id, type, provider
+- integrations[].country, integrations[].environment
 - integrations[].base_url
-- integrations[].auth (api_key/oauth2/basic/jwt/custom)
+- integrations[].auth (bearer/api_key/oauth2/basic/jwt/custom) + token_env
 - integrations[].webhooks[]
 
 ### processes (opcional)

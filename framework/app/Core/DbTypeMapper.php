@@ -37,6 +37,10 @@ class DbTypeMapper
                 return 'TIME';
             case 'datetime':
                 return 'DATETIME';
+            case 'ulid':
+                return 'VARCHAR(26)';
+            case 'uuid':
+                return 'VARCHAR(36)';
             case 'text':
             case 'textarea':
                 return 'TEXT';

@@ -20,6 +20,12 @@
   - route param split by '/': <controller>/<method>
   - class: App\Controller\<Controller>Controller
   - method: lowercased second segment (default index)
+  - endpoints custom:
+    - contracts/forms, reports, dashboards
+    - wizard/form-from-entity
+    - entity/save, import/csv
+    - records/*, command
+    - integrations/alanube/* (test/save/emit/status/cancel/webhook)
 
 ## Menu driven routes
 - framework/config/menu.php loads project/config/menu.json:

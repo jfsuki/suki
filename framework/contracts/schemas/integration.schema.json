@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "IntegrationContract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["id", "type", "provider", "country", "environment", "base_url", "auth"],
+  "properties": {
+    "id": {
+      "type": "string",
+      "pattern": "^[a-z0-9][a-z0-9_-]{1,62}$"
+    },
+    "type": {
+      "type": "string",
+      "enum": ["e-invoicing", "payments", "erp", "crm", "custom"]
+    },
+    "provider": { "type": "string", "minLength": 2, "maxLength": 64 },
+    "country": { "type": "string", "minLength": 2, "maxLength": 8 },
+    "environment": { "type": "string", "enum": ["sandbox", "production"] },
+    "base_url": { "type": "string", "minLength": 8 },
+    "enabled": { "type": "boolean" },
+    "auth": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["bearer", "api_key", "basic", "oauth2", "jwt", "custom"]
+        },
+        "token_env": { "type": "string", "minLength": 2 },
+        "ref": { "type": "string" },
+        "header": { "type": "string" }
+      }
+    },
+    "webhooks": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

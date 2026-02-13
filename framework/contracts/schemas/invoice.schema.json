@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "InvoiceContract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["type", "version", "provider", "country", "entity", "mapping"],
+  "properties": {
+    "type": { "const": "invoice" },
+    "version": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+(\\.\\d+)?$"
+    },
+    "provider": { "type": "string", "minLength": 2, "maxLength": 64 },
+    "country": { "type": "string", "minLength": 2, "maxLength": 8 },
+    "entity": { "type": "string", "minLength": 1 },
+    "integration_id": { "type": "string" },
+    "emit_endpoint": { "type": "string" },
+    "status_endpoint": { "type": "string" },
+    "cancel_endpoint": { "type": "string" },
+    "mapping": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "document": { "type": "object" },
+        "sender": { "type": "object" },
+        "buyer": { "type": "object" },
+        "totals": { "type": "object" },
+        "items": { "type": "object" }
+      }
+    }
+  }
+}

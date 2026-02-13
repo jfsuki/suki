@@ -30,17 +30,25 @@ Build a low-code "mother app" platform that generates business apps from JSON co
 - CRUD API endpoints /api/records/* + command endpoint /api/command.
 - Contract cache + ETag (contracts) and assets cache headers.
 - DB persistence for main entity + grid rows via CommandLayer.
+- Report runtime (preview + PDF MVP) via /api/reports.
+- Dashboard runtime (KPI + chart series) via /api/dashboards.
+- Wizard tabla->form (FormWizard) con soporte maestro-detalle + reportes fiscales.
+- CSV->EntityContract + migracion.
+- ValidationEngine backend (min/max/pattern/enum) + AuditLogger.
+- IntegrationContract + InvoiceContract schemas.
+- Integracion Alanube (wizard + endpoints + webhook) con base_url parametrico por pais.
+- Report designer fiscal basico (emisor/cliente/documento/totales) en editor.
+- Tablas base de integracion (connections/documents/outbox/webhooks).
 - Smoke tests checklist in framework/docs/SMOKE_TESTS.md (run before deploy).
 
 ## What is missing
-- Validation engine (UI + backend).
+- Validation engine (UI) con mensajes claros.
 - Snapshot persistence of FORM_STORE/GRID_STORE for audit/history.
 - Migration diff/alter (only CREATE IF NOT EXISTS).
 - Import wizard (CSV/Excel/JSON -> DataContract + seeds).
 - Visual form builder (drag/drop, layout grid).
-- Form wizard (table -> CRUD form) + maestro-detalle.
-- Report manager/designer (facturas, cotizaciones, PDF).
-- Dashboards + charts (KPI, analitica).
+- Report manager/designer avanzado (facturas, cotizaciones, PDF).
+- Dashboards + charts avanzados (KPI, analitica).
 - Process engine + async jobs + audit log.
 - Security hardening (CSRF, RBAC/IDOR, rate limiting).
 

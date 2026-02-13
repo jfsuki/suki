@@ -14,6 +14,14 @@ Keys (observed in repo):
 - grids[]: { type, name, mode?, label?, columns[] }
 - summary[]: { name, label, type, source?, expression?, watch? }
 - reports[] (optional): { id, name, type, template?, description?, layout? }
+  - layout.header: { title, subtitle?, showLogo? }
+  - layout.meta: { label, fields[] } (datos del documento)
+  - layout.issuer: { label, fields[] } (emisor)
+  - layout.buyer: { label, fields[] } (cliente)
+  - layout.fields: [] (otros datos)
+  - layout.grid: { name, columns[] }
+  - layout.totals: []
+  - layout.footer: { text }
 - dashboards[] (optional): { id, name, widgets[] }
 
 ## GridContract (current)
@@ -36,6 +44,22 @@ Keys:
 Location: /project/contracts/app.manifest.json
 Schema: /framework/contracts/schemas/app.manifest.schema.json
 Keys: app, db, registry, auth?, integrations?, processes?
+
+## IntegrationContract (new)
+Location: /project/contracts/integrations/*.integration.json
+Schema: /framework/contracts/schemas/integration.schema.json
+Keys:
+- id, type, provider, country, environment, base_url, enabled
+- auth: { type, token_env }
+- webhooks[], metadata?
+
+## InvoiceContract (new)
+Location: /project/contracts/invoices/*.invoice.json
+Schema: /framework/contracts/schemas/invoice.schema.json
+Keys:
+- type=invoice, version, provider, country, entity, integration_id
+- emit_endpoint/status_endpoint/cancel_endpoint
+- mapping: document, sender, buyer, totals, items
 
 ## Planned optional contracts (versioned)
 - DataContract v1: tables, fields, relations, indices, seeds, import metadata.

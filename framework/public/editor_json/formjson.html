@@ -26,7 +26,7 @@
             <div class="bg-orange-600 text-white p-2 rounded-lg shadow-md"><i class="fa-solid fa-layer-group"></i></div>
             <div>
                 <h1 class="font-bold text-gray-800 text-lg leading-tight">Suki Studio</h1>
-                <p class="text-[11px] text-gray-500 font-medium">Creador visual de apps (modo amigable)</p>
+                <p class="text-[11px] text-gray-500 font-medium">Creador visual de apps (sin tecnicismos)</p>
             </div>
         </div>
         <div class="flex gap-2">
@@ -36,7 +36,7 @@
             <button @click="startGuided()" class="px-3 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded shadow transition">
                 <i class="fa-solid fa-person-walking-luggage mr-1"></i> Modo guiado
             </button>
-            <button @click="showAdvanced = !showAdvanced; if(!showAdvanced && activeTab === 'output') activeTab = 'general'" class="px-3 py-2 text-xs font-bold rounded border transition"
+            <button @click="showAdvanced = !showAdvanced; if(!showAdvanced && activeTab === 'output') activeTab = 'general'; if(!showAdvanced && mainTab === 'database') mainTab = 'forms'" class="px-3 py-2 text-xs font-bold rounded border transition"
                 :class="showAdvanced ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'">
                 <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>
                 <span x-text="showAdvanced ? 'Modo avanzado' : 'Modo amigable'"></span>
@@ -50,6 +50,15 @@
         </div>
     </header>
 
+    <div class="fixed top-20 right-4 z-50 space-y-2">
+        <template x-for="toast in toasts" :key="toast.id">
+            <div class="px-4 py-2 rounded shadow text-xs font-semibold border"
+                :class="toast.type === 'error' ? 'bg-rose-50 border-rose-200 text-rose-800' : (toast.type === 'warning' ? 'bg-amber-50 border-amber-200 text-amber-800' : 'bg-emerald-50 border-emerald-200 text-emerald-800')">
+                <span x-text="toast.message"></span>
+            </div>
+        </template>
+    </div>
+
     <div class="flex flex-1 overflow-hidden">
         
         <div class="flex-1 flex flex-col overflow-hidden border-r bg-gray-50/50">
@@ -57,6 +66,7 @@
             <div class="flex border-b px-3 bg-slate-900 text-white overflow-x-auto">
                 <template x-for="tab in mainTabs">
                     <button
+                        x-show="showAdvanced || tab.id !== 'database'"
                         @click="mainTab = tab.id"
                         :class="mainTab === tab.id ? 'bg-white text-slate-900 shadow' : 'text-slate-200 hover:text-white'"
                         class="px-4 py-2 text-xs font-bold uppercase tracking-wide rounded-t-md transition flex items-center gap-2 whitespace-nowrap">
@@ -79,12 +89,12 @@
 
             <div class="flex-1 overflow-y-auto p-6 scroll-smooth">
 
-                <div x-show="mainTab === 'dashboard'" class="space-y-6 max-w-5xl mx-auto" x-transition.opacity>
+                <div x-show="mainTab === 'Indicadores'" class="space-y-6 max-w-5xl mx-auto" x-transition.opacity>
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                             <div>
-                                <h3 class="font-bold text-gray-800 text-lg">Dashboard del proyecto</h3>
-                                <p class="text-xs text-gray-500">Panorama rapido del avance: formularios, tablas y estado.</p>
+                                <h3 class="font-bold text-gray-800 text-lg">Indicadores del proyecto</h3>
+                                <p class="text-xs text-gray-500">Panorama rapido del avance: formularios, Listas y estado.</p>
                             </div>
                             <div class="flex gap-2">
                                 <button @click="selectProjectRoot()" class="px-3 py-2 text-xs font-bold bg-slate-800 text-white rounded shadow">
@@ -162,7 +172,7 @@
                                         </div>
 
                                         <details>
-                                            <summary class="cursor-pointer">Tablas / Entidades (<span x-text="projectSnapshot.entities.length"></span>)</summary>
+                                            <summary class="cursor-pointer">Listas / Entidades (<span x-text="projectSnapshot.entities.length"></span>)</summary>
                                             <div class="pl-4 mt-2 space-y-2">
                                                 <template x-for="entity in projectSnapshot.entities" :key="entity.file">
                                                     <details class="border rounded p-2 bg-white">
@@ -177,7 +187,7 @@
                                                                     <span class="text-gray-400" x-text="' : ' + field.type"></span>
                                                                 </div>
                                                             </template>
-                                                            <div x-show="!entity.fields || entity.fields.length === 0" class="text-[10px] text-gray-400">Sin campos</div>
+                                                            <div x-show="!entity.fields || entity.fields.length === 0" class="text-[10px] text-gray-400">Sin Datos</div>
                                                         </div>
                                                     </details>
                                                 </template>
@@ -196,7 +206,7 @@
                         <h3 class="font-bold text-gray-800 text-lg">Editor de base de datos</h3>
                         <p class="text-xs text-gray-500">Define perfil de BD (shared_schema o dedicated_db) y genera el app.manifest.json.</p>
                         <div class="mt-3 text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded p-3">
-                            Enfoque <span class="font-bold">amigable</span>: puedes crear tablas, relaciones, CRUD y procesos sin ver SQL.
+                            Enfoque <span class="font-bold">amigable</span>: puedes crear Listas, relaciones, CRUD y procesos sin ver SQL.
                             Lo tecnico queda como informacion avanzada.
                         </div>
                     </div>
@@ -325,7 +335,7 @@
                             <div class="col-span-2">
                                 <label class="text-[10px] font-bold text-gray-500 uppercase">Relaciones (JSON)</label>
                                 <textarea x-model="project.relationsJson" class="w-full border rounded px-3 py-2 text-xs font-mono h-20" placeholder="[{&quot;name&quot;:&quot;cliente&quot;,&quot;type&quot;:&quot;belongsTo&quot;,&quot;entity&quot;:&quot;cliente&quot;,&quot;fk&quot;:&quot;cliente_id&quot;}]"></textarea>
-                                <p class="text-[10px] text-gray-400 mt-1">Tip: puedes crear grids en la pestaña Formularios > Grids/Tablas.</p>
+                                <p class="text-[10px] text-gray-400 mt-1">Tip: puedes crear grids en la pestaña Formularios > Grids/Listas.</p>
                             </div>
                             <div class="col-span-2">
                                 <label class="text-[10px] font-bold text-gray-500 uppercase">CRUD (roles separados por coma)</label>
@@ -339,11 +349,40 @@
                         </div>
 
                         <div class="bg-gray-50 border rounded-lg p-4">
-                            <div class="flex justify-between items-center mb-2">
+                            <div class="flex flex-wrap justify-between items-center mb-2 gap-2">
                                 <h4 class="text-[10px] font-bold text-gray-500 uppercase">Entity preview</h4>
-                                <div class="flex gap-2 text-[10px]">
+                                <div class="flex flex-wrap gap-2 text-[10px]">
                                     <button @click="navigator.clipboard.writeText(buildEntityContract())" class="text-indigo-600 hover:text-indigo-800">Copiar</button>
                                     <button @click="downloadEntity()" class="text-indigo-600 hover:text-indigo-800">Descargar</button>
+                                    <button @click="saveEntityToServer()" class="text-emerald-700 hover:text-emerald-900 font-semibold">Guardar + migrar</button>
+                                    <button @click="generateFormFromEntity()" class="text-orange-700 hover:text-orange-900 font-semibold">Crear formulario</button>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap gap-3 text-[10px] text-gray-600 mb-2">
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" x-model="wizardMasterDetail" class="rounded text-emerald-600">
+                                    Maestro-detalle automatico
+                                </label>
+                                <label class="flex items-center gap-2">
+                                    <input type="checkbox" x-model="wizardAutoReport" class="rounded text-emerald-600">
+                                    Documento fiscal (factura/cotizacion)
+                                </label>
+                                <div class="flex items-center gap-2">
+                                    <span>Tipo</span>
+                                    <select x-model="wizardReportType" class="border rounded px-2 py-1 text-[10px] bg-white">
+                                        <option value="auto">auto</option>
+                                        <option value="invoice">Factura</option>
+                                        <option value="quote">Cotizacion</option>
+                                        <option value="report">Reporte</option>
+                                    </select>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <span>Plantilla</span>
+                                    <select x-model="wizardReportTemplate" class="border rounded px-2 py-1 text-[10px] bg-white">
+                                        <option value="auto">auto</option>
+                                        <option value="fiscal">Fiscal</option>
+                                        <option value="basic">Basica</option>
+                                    </select>
                                 </div>
                             </div>
                             <textarea readonly class="w-full h-48 border rounded p-2 text-xs font-mono bg-white" x-text="buildEntityContract()"></textarea>
@@ -352,10 +391,10 @@
 
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200 space-y-4">
                         <div class="flex items-center justify-between">
-                            <h4 class="text-xs font-bold text-gray-600 uppercase">Importar CSV (crear tabla)</h4>
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">Importar datos (CSV/Excel)</h4>
                             <span class="text-[10px] text-gray-500">beta</span>
                         </div>
-                        <p class="text-[11px] text-gray-500">Sube un CSV y genera campos automaticamente. No toca la BD, solo crea contratos.</p>
+                        <p class="text-[11px] text-gray-500">Sube un CSV y crea campos y tablas automaticamente. No toca la base de datos real, solo prepara la configuracion.</p>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
                                 <label class="text-[10px] font-bold text-gray-500 uppercase">Archivo CSV</label>
@@ -373,7 +412,7 @@
                                 </div>
                                 <div class="flex items-center gap-2 text-xs text-gray-600 mt-2">
                                     <input type="checkbox" x-model="csvImport.replaceFields" class="rounded text-emerald-600">
-                                    Reemplazar campos existentes
+                                    Reemplazar Datos existentes
                                 </div>
                             </div>
                         </div>
@@ -396,7 +435,10 @@
                                 </template>
                                 <div x-show="csvImport.columns.length === 0" class="text-[10px] text-gray-400">Sin columnas detectadas</div>
                             </div>
-                            <button @click="applyCsvToFields()" class="mt-3 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded">Crear campos</button>
+                            <div class="flex flex-wrap gap-2 mt-3">
+                                <button @click="applyCsvToFields()" class="px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded">Crear Datos</button>
+                                <button @click="importCsvToEntity()" class="px-4 py-2 bg-slate-800 text-white text-xs font-bold rounded">Crear entidad + migrar</button>
+                            </div>
                         </div>
 
                         <div class="border rounded p-3 bg-white">
@@ -488,12 +530,12 @@
                         <h4 class="text-xs font-bold text-gray-600 uppercase">Configuracion</h4>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div>
-                                <label class="text-[10px] font-bold text-gray-500 uppercase">API base (proyecto)</label>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">URL del proyecto</label>
                                 <input x-model="chatTest.apiBase" @change="saveChatSettings()" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="https://suki.test o http://localhost">
-                                <div class="text-[10px] text-gray-400 mt-1">Usa la URL del proyecto (no la del framework).</div>
+                                <div class="text-[10px] text-gray-400 mt-1">Es la URL donde corre tu app (no la del framework).</div>
                             </div>
                             <div>
-                                <label class="text-[10px] font-bold text-gray-500 uppercase">Entidad objetivo</label>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Lista principal (opcional)</label>
                                 <div class="flex gap-2">
                                     <input x-model="chatTest.entity" @change="saveChatSettings()" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="clientes, facturas, cuentasxcobrar">
                                     <button @click="chatTest.entity = resolveChatEntity(true)" class="px-3 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded">Usar formulario</button>
@@ -502,7 +544,7 @@
                             </div>
                             <div class="md:col-span-2 flex items-center gap-2 text-xs text-gray-600">
                                 <input type="checkbox" x-model="chatTest.autoRun" @change="saveChatSettings()" class="rounded text-emerald-600">
-                                Ejecutar pruebas rapidas al guardar proyecto
+                                Probar automaticamente al guardar
                             </div>
                         </div>
                     </div>
@@ -549,8 +591,8 @@
                     <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                             <div>
-                                <h3 class="font-bold text-gray-800 text-lg">Constructor visual de apps</h3>
-                                <p class="text-xs text-gray-500">Objeto → Propiedades. Selecciona a la izquierda y edita a la derecha.</p>
+                                <h3 class="font-bold text-gray-800 text-lg">Constructor visual (sin tecnicismos)</h3>
+                                <p class="text-xs text-gray-500">Elige un elemento en el arbol y ajusta sus propiedades a la derecha.</p>
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 <button @click="builderTopTab='insert'; openWizard()" :class="builderTopTab==='insert' ? 'bg-orange-600 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
@@ -560,10 +602,13 @@
                                     <i class="fa-solid fa-database mr-1"></i> Datos
                                 </button>
                                 <button @click="builderTopTab='reports'" :class="builderTopTab==='reports' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
-                                    <i class="fa-solid fa-file-lines mr-1"></i> Informes
+                                    <i class="fa-solid fa-file-lines mr-1"></i> Documentos
                                 </button>
-                                <button @click="builderTopTab='dashboards'" :class="builderTopTab==='dashboards' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
-                                    <i class="fa-solid fa-chart-line mr-1"></i> Dashboard
+                                <button @click="builderTopTab='Indicadoress'" :class="builderTopTab==='Indicadoress' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
+                                    <i class="fa-solid fa-chart-line mr-1"></i> Indicadores
+                                </button>
+                                <button @click="showAlanubeWizard = true" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase rounded shadow">
+                                    <i class="fa-solid fa-receipt mr-1"></i> Facturacion
                                 </button>
                                 <button @click="mainTab = 'chat'" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded shadow">
                                     <i class="fa-solid fa-comments mr-1"></i> Probar
@@ -574,10 +619,29 @@
                             </div>
                         </div>
                     </div>
+                    <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">Revision rapida</h4>
+                            <span class="text-[10px] font-bold"
+                                :class="uiIssues().length === 0 ? 'text-emerald-600' : 'text-amber-600'">
+                                <span x-text="uiIssues().length === 0 ? 'Todo listo' : (uiIssues().length + ' pendientes')"></span>
+                            </span>
+                        </div>
+                        <div class="mt-2 space-y-1 text-[11px]">
+                            <template x-for="issue in uiIssues()" :key="issue.id">
+                                <div class="flex items-start gap-2 px-2 py-1 rounded"
+                                    :class="issue.level === 'error' ? 'bg-rose-50 text-rose-800' : 'bg-amber-50 text-amber-800'">
+                                    <i class="fa-solid fa-circle-exclamation mt-0.5"></i>
+                                    <span x-text="issue.message"></span>
+                                </div>
+                            </template>
+                            <div x-show="uiIssues().length === 0" class="text-[10px] text-gray-500">Sin bloqueos. Puedes guardar y probar.</div>
+                        </div>
+                    </div>
                     <div class="grid grid-cols-1 xl:grid-cols-[260px_1fr_320px] gap-4">
                         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
                             <div class="flex items-center justify-between">
-                                <h4 class="text-xs font-bold text-gray-600 uppercase">Objetos</h4>
+                                <h4 class="text-xs font-bold text-gray-600 uppercase">Arbol</h4>
                                 <button @click="selectObject('form')" class="text-[10px] text-indigo-600">Pantalla</button>
                             </div>
 
@@ -608,7 +672,7 @@
 
                                 <details open class="border border-gray-100 rounded">
                                     <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
-                                        <i class="fa-solid fa-list-check mr-2"></i> Campos
+                                        <i class="fa-solid fa-list-check mr-2"></i> Datos
                                     </summary>
                                     <div class="space-y-1 px-2 pb-2">
                                         <template x-for="(field, fIndex) in data.fields" :key="'field-'+fIndex">
@@ -618,13 +682,13 @@
                                                 <span x-text="field.label || field.name || field.id || ('Campo ' + (fIndex+1))"></span>
                                             </button>
                                         </template>
-                                        <div x-show="data.fields.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin campos</div>
+                                        <div x-show="data.fields.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin Datos</div>
                                     </div>
                                 </details>
 
                                 <details open class="border border-gray-100 rounded">
                                     <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
-                                        <i class="fa-solid fa-table mr-2"></i> Tablas
+                                        <i class="fa-solid fa-table mr-2"></i> Listas
                                     </summary>
                                     <div class="space-y-2 px-2 pb-2">
                                         <template x-for="(grid, gIndex) in data.grids" :key="'grid-'+gIndex">
@@ -633,7 +697,7 @@
                                                     :class="isSelected('grid', gIndex) ? 'bg-orange-50 text-orange-700' : ''"
                                                     @click.stop="selectObject('grid', gIndex)">
                                                     <i class="fa-solid fa-table-columns mr-2 text-gray-400"></i>
-                                                    <span x-text="grid.label || grid.name || ('Tabla ' + (gIndex+1))"></span>
+                                                    <span x-text="grid.label || grid.name || ('Lista ' + (gIndex+1))"></span>
                                                 </summary>
                                                 <div class="pl-4 py-2 space-y-1">
                                                     <template x-for="(col, cIndex) in (grid.columns || [])" :key="'col-'+gIndex+'-'+cIndex">
@@ -646,7 +710,7 @@
                                                 </div>
                                             </details>
                                         </template>
-                                        <div x-show="data.grids.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin tablas</div>
+                                        <div x-show="data.grids.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin Listas</div>
                                     </div>
                                 </details>
 
@@ -662,45 +726,45 @@
                                                 <span x-text="sum.label || sum.name || ('Total ' + (sIndex+1))"></span>
                                             </button>
                                         </template>
-                                        <div x-show="data.summary.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin totales</div>
+                                        <div x-show="data.summary.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin Totales</div>
                                     </div>
                                 </details>
 
                                 <details open class="border border-gray-100 rounded">
                                     <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
-                                        <i class="fa-solid fa-chart-line mr-2"></i> Dashboard
+                                        <i class="fa-solid fa-chart-line mr-2"></i> Indicadores
                                     </summary>
                                     <div class="space-y-1 px-2 pb-2">
-                                        <template x-for="(dash, dIndex) in (data.dashboards || [])" :key="'dash-'+dIndex">
-                                            <button @click="selectObject('dashboard', dIndex)" class="w-full text-left px-2 py-1 rounded"
-                                                :class="isSelected('dashboard', dIndex) ? 'bg-orange-50 text-orange-700' : 'hover:bg-gray-50'">
+                                        <template x-for="(dash, dIndex) in (data.Indicadoress || [])" :key="'dash-'+dIndex">
+                                            <button @click="selectObject('Indicadores', dIndex)" class="w-full text-left px-2 py-1 rounded"
+                                                :class="isSelected('Indicadores', dIndex) ? 'bg-orange-50 text-orange-700' : 'hover:bg-gray-50'">
                                                 <i class="fa-solid fa-chart-pie mr-2 text-gray-400"></i>
-                                                <span x-text="dash.name || dash.id || ('Dashboard ' + (dIndex+1))"></span>
+                                                <span x-text="dash.name || dash.id || ('Indicador ' + (dIndex+1))"></span>
                                             </button>
                                         </template>
-                                        <div x-show="!data.dashboards || data.dashboards.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin dashboards</div>
+                                        <div x-show="!data.Indicadoress || data.Indicadoress.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin indicadores</div>
                                     </div>
                                 </details>
 
                                 <details open class="border border-gray-100 rounded">
                                     <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
-                                        <i class="fa-solid fa-file-lines mr-2"></i> Informes
+                                        <i class="fa-solid fa-file-lines mr-2"></i> Documentos
                                     </summary>
                                     <div class="space-y-1 px-2 pb-2">
                                         <template x-for="(rep, rIndex) in data.reports" :key="'rep-'+rIndex">
                                             <button @click="selectObject('report', rIndex)" class="w-full text-left px-2 py-1 rounded"
                                                 :class="isSelected('report', rIndex) ? 'bg-orange-50 text-orange-700' : 'hover:bg-gray-50'">
                                                 <i class="fa-regular fa-file-pdf mr-2 text-gray-400"></i>
-                                                <span x-text="rep.name || rep.id || ('Informe ' + (rIndex+1))"></span>
+                                                <span x-text="rep.name || rep.id || ('Documento ' + (rIndex+1))"></span>
                                             </button>
                                         </template>
-                                        <div x-show="!data.reports || data.reports.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin informes</div>
+                                        <div x-show="!data.reports || data.reports.length === 0" class="text-[10px] text-gray-400 px-2 py-1">Sin Documentos</div>
                                     </div>
                                 </details>
 
-                                <details open class="border border-gray-100 rounded">
+                                <details open class="border border-gray-100 rounded" x-show="showAdvanced">
                                     <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
-                                        <i class="fa-solid fa-gear mr-2"></i> Procesos
+                                        <i class="fa-solid fa-gear mr-2"></i> Automatizaciones
                                     </summary>
                                     <div class="space-y-1 px-2 pb-2">
                                         <template x-for="(proc, pIndex) in project.processes" :key="'proc-'+pIndex">
@@ -717,34 +781,38 @@
                         </div>
                         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-4">
                             <div class="flex items-center justify-between">
-                                <h4 class="text-xs font-bold text-gray-600 uppercase">Vista previa</h4>
-                                <span class="text-[10px] text-gray-400">WYS-ish</span>
+                                <h4 class="text-xs font-bold text-gray-600 uppercase">Lienzo</h4>
+                                <span class="text-[10px] text-gray-400">Asi se vera</span>
                             </div>
-                            <div x-show="builderTopTab === 'dashboards'" class="border rounded-lg p-3 bg-gray-50">
+                            <div x-show="builderTopTab === 'Indicadoress'" class="border rounded-lg p-3 bg-gray-50">
                                 <div class="flex items-center justify-between mb-2">
-                                    <h5 class="text-[11px] font-bold text-gray-700 uppercase">Gestor de dashboards</h5>
-                                    <button @click="addDashboard()" class="px-2 py-1 text-[10px] font-bold bg-sky-600 text-white rounded">Crear dashboard</button>
+                                    <h5 class="text-[11px] font-bold text-gray-700 uppercase">Gestor de indicadores</h5>
+                                    <button @click="addIndicadores()" class="px-2 py-1 text-[10px] font-bold bg-sky-600 text-white rounded">Crear indicador</button>
                                 </div>
                                 <div class="space-y-2">
-                                    <template x-for="(dash, dIndex) in (data.dashboards || [])" :key="'dash-card-'+dIndex">
+                                    <template x-for="(dash, dIndex) in (data.Indicadoress || [])" :key="'dash-card-'+dIndex">
                                         <div class="border rounded p-2 bg-white text-xs flex items-center justify-between">
                                             <div>
                                                 <div class="font-semibold" x-text="dash.name || dash.id"></div>
                                                 <div class="text-[10px] text-gray-400" x-text="(dash.widgets || []).length + ' widgets'"></div>
                                             </div>
                                             <div class="flex gap-2">
-                                                <button @click="selectObject('dashboard', dIndex)" class="text-[10px] text-indigo-600">Editar</button>
-                                                <button @click="removeDashboard(dIndex)" class="text-[10px] text-rose-600">Eliminar</button>
+                                                <button @click="selectObject('Indicadores', dIndex)" class="text-[10px] text-indigo-600">Editar</button>
+                                                <button @click="removeIndicadores(dIndex)" class="text-[10px] text-rose-600">Eliminar</button>
                                             </div>
                                         </div>
                                     </template>
-                                    <div x-show="!data.dashboards || data.dashboards.length === 0" class="text-[10px] text-gray-400">Sin dashboards creados.</div>
+                                    <div x-show="!data.Indicadoress || data.Indicadoress.length === 0" class="text-[10px] text-gray-400">Sin indicadores creados.</div>
                                 </div>
                             </div>
                             <div x-show="builderTopTab === 'reports'" class="border rounded-lg p-3 bg-gray-50">
                                 <div class="flex items-center justify-between mb-2">
-                                    <h5 class="text-[11px] font-bold text-gray-700 uppercase">Gestor de informes</h5>
-                                    <button @click="addReport()" class="px-2 py-1 text-[10px] font-bold bg-orange-600 text-white rounded">Crear informe</button>
+                                    <h5 class="text-[11px] font-bold text-gray-700 uppercase">Gestor de Documentos</h5>
+                                    <button @click="addReport()" class="px-2 py-1 text-[10px] font-bold bg-orange-600 text-white rounded">Crear documento</button>
+                                </div>
+                                <div class="flex items-center gap-2 mb-2 text-[10px] text-gray-500">
+                                    <span>Registro a imprimir (ID):</span>
+                                    <input x-model="reportRecordId" class="border rounded px-2 py-1 text-[10px]" placeholder="ej: 1">
                                 </div>
                                 <div class="space-y-2">
                                     <template x-for="(rep, rIndex) in data.reports" :key="'rep-card-'+rIndex">
@@ -760,45 +828,45 @@
                                             </div>
                                         </div>
                                     </template>
-                                    <div x-show="!data.reports || data.reports.length === 0" class="text-[10px] text-gray-400">Sin informes creados.</div>
+                                    <div x-show="!data.reports || data.reports.length === 0" class="text-[10px] text-gray-400">Sin Documentos creados.</div>
                                 </div>
                             </div>
                             <div x-show="selectedObject.type === 'report'" class="border rounded-lg p-3 bg-white">
                                 <div class="text-[11px] font-bold text-gray-600 uppercase mb-2">Canvas de documento</div>
                                 <div class="border border-dashed rounded-lg p-3 bg-gray-50 space-y-2">
                                     <div class="bg-white border rounded p-2 text-[10px] text-gray-500">Encabezado (logo, nombre empresa)</div>
-                                    <div class="bg-white border rounded p-2 text-[10px] text-gray-500">Detalle (campos del formulario)</div>
+                                    <div class="bg-white border rounded p-2 text-[10px] text-gray-500">Detalle (Datos del formulario)</div>
                                     <div class="bg-white border rounded p-2 text-[10px] text-gray-500">Totales y pie</div>
                                 </div>
-                                <div class="text-[10px] text-gray-400 mt-2">Selecciona un informe para editar su diseño.</div>
+                                <div class="text-[10px] text-gray-400 mt-2">Selecciona un documento para editar su diseño.</div>
                             </div>
-                            <div x-show="selectedObject.type === 'dashboard' && data.dashboards?.[selectedObject.index]" class="border rounded-lg p-3 bg-white">
-                                <div class="text-[11px] font-bold text-gray-600 uppercase mb-2">Vista del dashboard</div>
+                            <div x-show="selectedObject.type === 'Indicadores' && data.Indicadoress?.[selectedObject.index]" class="border rounded-lg p-3 bg-white">
+                                <div class="text-[11px] font-bold text-gray-600 uppercase mb-2">Vista de indicadores</div>
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
-                                    <template x-for="(widget, wIndex) in (data.dashboards[selectedObject.index].widgets || [])" :key="'dash-widget-'+wIndex">
+                                    <template x-for="(widget, wIndex) in (data.Indicadoress[selectedObject.index].widgets || [])" :key="'dash-widget-'+wIndex">
                                         <div class="border rounded p-2 bg-gray-50">
                                             <div class="text-[10px] font-bold text-gray-500 uppercase" x-text="widget.label || widget.type"></div>
                                             <div class="mt-2 text-xs text-gray-600" x-show="widget.type === 'kpi'">
                                                 KPI: <span class="font-semibold" x-text="widget.source?.summary || 'sin resumen'"></span>
                                             </div>
                                             <div class="mt-2 text-xs text-gray-600" x-show="widget.type === 'chart'">
-                                                Grafica: <span class="font-semibold" x-text="widget.source?.grid || 'sin tabla'"></span>
+                                                Grafica: <span class="font-semibold" x-text="widget.source?.grid || 'sin lista'"></span>
                                             </div>
                                             <div class="mt-2 h-16 bg-white border border-dashed rounded flex items-center justify-center text-[10px] text-gray-400">
                                                 Preview
                                             </div>
                                         </div>
                                     </template>
-                                    <div x-show="(data.dashboards[selectedObject.index].widgets || []).length === 0" class="text-[10px] text-gray-400">Sin widgets.</div>
+                                    <div x-show="(data.Indicadoress[selectedObject.index].widgets || []).length === 0" class="text-[10px] text-gray-400">Sin widgets.</div>
                                 </div>
                             </div>
                             <div x-show="(!data.layout?.sections || data.layout.sections.length === 0) && data.fields.length > 0" class="border rounded-lg p-3 bg-emerald-50">
                                 <div class="text-xs font-semibold text-emerald-900">Sugerencia rapida</div>
-                                <div class="text-[11px] text-emerald-800 mt-1">Detectamos campos sin pantalla. Puedes crear la pantalla automaticamente.</div>
+                                <div class="text-[11px] text-emerald-800 mt-1">Detectamos Datos sin pantalla. Puedes crear la pantalla automaticamente.</div>
                                 <button @click="ensureLayoutFromFields()" class="mt-2 px-3 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Crear pantalla automatica</button>
                             </div>
                             <div x-show="data.grids.length > 0" class="text-[10px] text-gray-400">
-                                Tip: Si tienes una tabla detalle, puedes crear un formulario maestro-detalle e informe de factura.
+                                Tip: Si tienes una lista detalle, puedes crear un formulario maestro-detalle y documento de factura.
                             </div>
                             <div class="space-y-4">
                                 <template x-for="(section, sIndex) in (data.layout?.sections || [])" :key="'prev-sec-'+sIndex">
@@ -826,7 +894,7 @@
                                 </template>
                                 <template x-for="(grid, gIndex) in data.grids" :key="'prev-grid-'+gIndex">
                                     <div class="border rounded-lg p-3">
-                                        <div class="text-xs font-semibold text-gray-700" x-text="grid.label || grid.name || ('Tabla ' + (gIndex+1))"></div>
+                                        <div class="text-xs font-semibold text-gray-700" x-text="grid.label || grid.name || ('Lista ' + (gIndex+1))"></div>
                                         <div class="mt-2 overflow-x-auto">
                                             <table class="w-full text-[10px] border">
                                                 <thead class="bg-gray-50">
@@ -854,8 +922,11 @@
                             </div>
                         </div>
                         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-4">
-                            <div class="flex items-center justify-between">
-                                <h4 class="text-xs font-bold text-gray-600 uppercase">Propiedades</h4>
+                            <div class="flex items-start justify-between gap-2">
+                                <div>
+                                    <h4 class="text-xs font-bold text-gray-600 uppercase">Propiedades</h4>
+                                    <div class="text-[10px] text-gray-400">Solo lo necesario. Lo técnico está en “Opciones avanzadas”.</div>
+                                </div>
                                 <span class="text-[10px] text-gray-400" x-text="selectedObjectLabel()"></span>
                             </div>
 
@@ -970,10 +1041,13 @@
                                             <option value="select">Seleccion</option>
                                         </select>
                                     </div>
-                                    <div>
-                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Formula</label>
-                                        <input x-model="data.grids[selectedObject.parentIndex].columns[selectedObject.index].formula.expression" class="w-full border rounded px-3 py-2 text-sm font-mono">
-                                    </div>
+                                    <details class="border rounded p-2">
+                                        <summary class="cursor-pointer text-[10px] font-bold text-gray-500 uppercase">Opciones avanzadas</summary>
+                                        <div class="mt-2">
+                                            <label class="text-[10px] font-bold text-gray-500 uppercase">Cálculo (fórmula)</label>
+                                            <input x-model="data.grids[selectedObject.parentIndex].columns[selectedObject.index].formula.expression" class="w-full border rounded px-3 py-2 text-sm font-mono">
+                                        </div>
+                                    </details>
                                 </div>
                             </div>
 
@@ -987,12 +1061,12 @@
                                         <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo</label>
                                         <select x-model="data.summary[selectedObject.index].type" class="w-full border rounded px-3 py-2 text-sm bg-white">
                                             <option value="sum">Suma</option>
-                                            <option value="formula">Formula</option>
+                                            <option value="formula">Calculo</option>
                                         </select>
                                     </div>
                                     <div x-show="data.summary[selectedObject.index].type === 'sum'" class="space-y-2">
                                         <div>
-                                            <label class="text-[10px] font-bold text-gray-500 uppercase">Tabla</label>
+                                            <label class="text-[10px] font-bold text-gray-500 uppercase">Lista</label>
                                             <select x-model="data.summary[selectedObject.index].source.grid" class="w-full border rounded px-3 py-2 text-sm bg-white">
                                                 <option value="">Selecciona</option>
                                                 <template x-for="(grid, gIndex) in data.grids" :key="'sum-grid-'+gIndex">
@@ -1011,7 +1085,7 @@
                                         </div>
                                     </div>
                                     <div x-show="data.summary[selectedObject.index].type === 'formula'">
-                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Formula</label>
+                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Calculo</label>
                                         <input x-model="data.summary[selectedObject.index].expression" class="w-full border rounded px-3 py-2 text-sm font-mono">
                                     </div>
                                 </div>
@@ -1033,7 +1107,12 @@
                                     </div>
                                     <div>
                                         <label class="text-[10px] font-bold text-gray-500 uppercase">Plantilla</label>
-                                        <input x-model="data.reports[selectedObject.index].template" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="basic">
+                                        <select x-model="data.reports[selectedObject.index].template" @change="applyReportTemplate(selectedObject.index)" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                            <option value="basic">Basica</option>
+                                            <option value="fiscal">Fiscal (Factura/Cotizacion)</option>
+                                            <option value="invoice">Factura simple</option>
+                                            <option value="quote">Cotizacion simple</option>
+                                        </select>
                                     </div>
                                     <div>
                                         <label class="text-[10px] font-bold text-gray-500 uppercase">Descripcion</label>
@@ -1047,7 +1126,46 @@
                                                 <input x-model="data.reports[selectedObject.index].layout.header.title" class="w-full border rounded px-2 py-1 text-xs" placeholder="Factura de venta">
                                             </div>
                                             <div>
-                                                <label class="text-[10px] font-bold text-gray-500 uppercase">Campos</label>
+                                                <label class="text-[10px] font-bold text-gray-500 uppercase">Subtitulo</label>
+                                                <input x-model="data.reports[selectedObject.index].layout.header.subtitle" class="w-full border rounded px-2 py-1 text-xs" placeholder="Documento fiscal">
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] font-bold text-gray-500 uppercase">Documento (meta)</label>
+                                                <div class="grid grid-cols-2 gap-2">
+                                                    <template x-for="(field, fIndex) in data.fields" :key="'rep-meta-'+fIndex">
+                                                        <label class="flex items-center gap-2 text-[10px]">
+                                                            <input type="checkbox" :value="field.name || field.id" x-model="data.reports[selectedObject.index].layout.meta.fields" class="rounded text-emerald-600">
+                                                            <span x-text="field.label || field.name || ('Campo ' + (fIndex+1))"></span>
+                                                        </label>
+                                                    </template>
+                                                </div>
+                                            </div>
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
+                                                <div>
+                                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Emisor</label>
+                                                    <div class="grid grid-cols-2 gap-2">
+                                                        <template x-for="(field, fIndex) in data.fields" :key="'rep-issuer-'+fIndex">
+                                                            <label class="flex items-center gap-2 text-[10px]">
+                                                                <input type="checkbox" :value="field.name || field.id" x-model="data.reports[selectedObject.index].layout.issuer.fields" class="rounded text-emerald-600">
+                                                                <span x-text="field.label || field.name || ('Campo ' + (fIndex+1))"></span>
+                                                            </label>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                                <div>
+                                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Cliente</label>
+                                                    <div class="grid grid-cols-2 gap-2">
+                                                        <template x-for="(field, fIndex) in data.fields" :key="'rep-buyer-'+fIndex">
+                                                            <label class="flex items-center gap-2 text-[10px]">
+                                                                <input type="checkbox" :value="field.name || field.id" x-model="data.reports[selectedObject.index].layout.buyer.fields" class="rounded text-emerald-600">
+                                                                <span x-text="field.label || field.name || ('Campo ' + (fIndex+1))"></span>
+                                                            </label>
+                                                        </template>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] font-bold text-gray-500 uppercase">Datos</label>
                                                 <div class="grid grid-cols-2 gap-2">
                                                     <template x-for="(field, fIndex) in data.fields" :key="'rep-field-'+fIndex">
                                                         <label class="flex items-center gap-2 text-[10px]">
@@ -1058,9 +1176,9 @@
                                                 </div>
                                             </div>
                                             <div>
-                                                <label class="text-[10px] font-bold text-gray-500 uppercase">Tabla detalle</label>
+                                                <label class="text-[10px] font-bold text-gray-500 uppercase">Lista detalle</label>
                                                 <select x-model="data.reports[selectedObject.index].layout.grid.name" class="w-full border rounded px-2 py-1 text-xs bg-white">
-                                                    <option value="">Sin tabla</option>
+                                                    <option value="">Sin lista</option>
                                                     <template x-for="(grid, gIndex) in data.grids" :key="'rep-grid-'+gIndex">
                                                         <option :value="grid.name" x-text="grid.label || grid.name"></option>
                                                     </template>
@@ -1085,27 +1203,31 @@
                                                     </template>
                                                 </div>
                                             </div>
+                                            <div>
+                                                <label class="text-[10px] font-bold text-gray-500 uppercase">Pie de pagina</label>
+                                                <input x-model="data.reports[selectedObject.index].layout.footer.text" class="w-full border rounded px-2 py-1 text-xs" placeholder="Gracias por su compra">
+                                            </div>
                                         </div>
                                     </details>
                                 </div>
                             </div>
 
-                            <div x-show="selectedObject.type === 'dashboard' && data.dashboards?.[selectedObject.index]" x-init="ensureDashboardDefaults(selectedObject.index)">
+                            <div x-show="selectedObject.type === 'Indicadores' && data.Indicadoress?.[selectedObject.index]" x-init="ensureIndicadoresDefaults(selectedObject.index)">
                                 <div class="space-y-3">
                                     <div>
                                         <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
-                                        <input x-model="data.dashboards[selectedObject.index].name" class="w-full border rounded px-3 py-2 text-sm">
+                                        <input x-model="data.Indicadoress[selectedObject.index].name" class="w-full border rounded px-3 py-2 text-sm">
                                     </div>
                                     <div class="flex flex-wrap gap-2">
-                                        <button @click="addDashboardWidget('kpi', selectedObject.index)" class="px-3 py-2 text-[10px] font-bold bg-sky-600 text-white rounded">Agregar KPI</button>
-                                        <button @click="addDashboardWidget('chart', selectedObject.index)" class="px-3 py-2 text-[10px] font-bold bg-indigo-600 text-white rounded">Agregar Grafica</button>
+                                        <button @click="addIndicadoresWidget('kpi', selectedObject.index)" class="px-3 py-2 text-[10px] font-bold bg-sky-600 text-white rounded">Agregar KPI</button>
+                                        <button @click="addIndicadoresWidget('chart', selectedObject.index)" class="px-3 py-2 text-[10px] font-bold bg-indigo-600 text-white rounded">Agregar Grafica</button>
                                     </div>
                                     <div class="space-y-2">
-                                        <template x-for="(widget, wIndex) in (data.dashboards[selectedObject.index].widgets || [])" :key="'dash-widget-prop-'+wIndex">
+                                        <template x-for="(widget, wIndex) in (data.Indicadoress[selectedObject.index].widgets || [])" :key="'dash-widget-prop-'+wIndex">
                                             <div class="border rounded p-2 bg-gray-50 space-y-2">
                                                 <div class="flex items-center justify-between">
                                                     <input x-model="widget.label" class="flex-1 border rounded px-2 py-1 text-xs mr-2" placeholder="Nombre del widget">
-                                                    <button @click="removeDashboardWidget(selectedObject.index, wIndex)" class="text-[10px] text-rose-600">Eliminar</button>
+                                                    <button @click="removeIndicadoresWidget(selectedObject.index, wIndex)" class="text-[10px] text-rose-600">Eliminar</button>
                                                 </div>
                                                 <div x-show="widget.type === 'kpi'" class="space-y-2">
                                                     <label class="text-[10px] font-bold text-gray-500 uppercase">Resumen</label>
@@ -1117,7 +1239,7 @@
                                                     </select>
                                                 </div>
                                                 <div x-show="widget.type === 'chart'" class="space-y-2">
-                                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Tabla</label>
+                                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Lista</label>
                                                     <select x-model="widget.source.grid" class="w-full border rounded px-2 py-1 text-xs bg-white">
                                                         <option value="">Selecciona</option>
                                                         <template x-for="(grid, gIndex) in data.grids" :key="'dash-grid-'+gIndex">
@@ -1134,7 +1256,7 @@
                                                 </div>
                                             </div>
                                         </template>
-                                        <div x-show="(data.dashboards[selectedObject.index].widgets || []).length === 0" class="text-[10px] text-gray-400">Sin widgets configurados.</div>
+                                        <div x-show="(data.Indicadoress[selectedObject.index].widgets || []).length === 0" class="text-[10px] text-gray-400">Sin widgets configurados.</div>
                                     </div>
                                 </div>
                             </div>
@@ -1172,7 +1294,7 @@
                                     <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo</label>
                                     <select x-model="wizardType" class="w-full border rounded px-3 py-2 text-sm bg-white">
                                         <option value="field">Campo</option>
-                                        <option value="grid">Tabla</option>
+                                        <option value="grid">Lista</option>
                                         <option value="summary">Total</option>
                                     </select>
                                 </div>
@@ -1194,7 +1316,7 @@
                                     <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo de total</label>
                                     <select x-model="wizardSummaryType" class="w-full border rounded px-3 py-2 text-sm bg-white">
                                         <option value="sum">Suma</option>
-                                        <option value="formula">Formula</option>
+                                        <option value="formula">Calculo</option>
                                     </select>
                                 </div>
                             </div>
@@ -1229,6 +1351,9 @@
                                     <button @click="guidedTemplate='blank'" class="px-3 py-2 text-xs font-bold border rounded">En blanco</button>
                                     <button @click="guidedTemplate='invoice'" class="px-3 py-2 text-xs font-bold border rounded">Factura</button>
                                     <button @click="guidedTemplate='inventory'" class="px-3 py-2 text-xs font-bold border rounded">Inventario</button>
+                                    <button @click="guidedTemplate='login'" class="px-3 py-2 text-xs font-bold border rounded">Acceso</button>
+                                    <button @click="guidedTemplate='users'" class="px-3 py-2 text-xs font-bold border rounded">Usuarios</button>
+                                    <button @click="guidedTemplate='company'" class="px-3 py-2 text-xs font-bold border rounded">Empresa</button>
                                 </div>
                                 <div>
                                     <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
@@ -1238,7 +1363,7 @@
                             </div>
 
                             <div x-show="guidedStep === 2" class="space-y-3">
-                                <div class="text-xs text-gray-600">Agrega campos rapidos o importa desde CSV.</div>
+                                <div class="text-xs text-gray-600">Agrega campos rapido o importa desde CSV.</div>
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
                                     <input x-model="quickFieldLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del campo">
                                     <select x-model="quickFieldType" class="border rounded px-2 py-1 text-xs bg-white">
@@ -1249,21 +1374,21 @@
                                     </select>
                                     <button @click="addQuickField()" class="px-3 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Agregar campo</button>
                                 </div>
-                                <button @click="showDataImport = true" class="px-3 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded">Importar CSV</button>
+                                <button @click="showDataImport = true" class="px-3 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded">Importar datos</button>
                             </div>
 
                             <div x-show="guidedStep === 3" class="space-y-3">
-                                <div class="text-xs text-gray-600">Si tu app tiene detalle (items), agrega una tabla.</div>
+                                <div class="text-xs text-gray-600">Si tu app tiene detalle (items), agrega una lista.</div>
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                    <input x-model="quickGridLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre de la tabla">
+                                    <input x-model="quickGridLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre de la lista">
                                     <div class="hidden md:block"></div>
-                                    <button @click="addQuickGrid()" class="px-3 py-2 text-xs font-bold bg-orange-600 text-white rounded">Agregar tabla</button>
+                                    <button @click="addQuickGrid()" class="px-3 py-2 text-xs font-bold bg-orange-600 text-white rounded">Agregar lista</button>
                                 </div>
-                                <div class="text-[10px] text-gray-400" x-show="data.grids.length > 0">Detectamos tablas detalle: puedes crear un formulario maestro-detalle.</div>
+                                <div class="text-[10px] text-gray-400" x-show="data.grids.length > 0">Detectamos Listas detalle: puedes crear un formulario maestro-detalle.</div>
                             </div>
 
                             <div x-show="guidedStep === 4" class="space-y-3">
-                                <div class="text-xs text-gray-600">Agrega totales para resumenes automaticos.</div>
+                                <div class="text-xs text-gray-600">Agrega Totales para resumenes automaticos.</div>
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
                                     <input x-model="quickSummaryLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del total">
                                     <div class="hidden md:block"></div>
@@ -1272,11 +1397,11 @@
                             </div>
 
                             <div x-show="guidedStep === 5" class="space-y-3">
-                                <div class="text-xs text-gray-600">Crea informes (factura, cotizacion, PDF).</div>
+                                <div class="text-xs text-gray-600">Crea Documentos (factura, cotizacion, PDF).</div>
                                 <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                    <input x-model="quickReportLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del informe">
+                                    <input x-model="quickReportLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del documento">
                                     <div class="hidden md:block"></div>
-                                    <button @click="addQuickReport()" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Agregar informe</button>
+                                    <button @click="addQuickReport()" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Agregar documento</button>
                                 </div>
                             </div>
 
@@ -1299,10 +1424,10 @@
                     <div x-show="showDataImport" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
                         <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 space-y-4">
                             <div class="flex items-center justify-between">
-                                <h4 class="font-bold text-gray-800">Importador de tablas (CSV/Excel)</h4>
+                                <h4 class="font-bold text-gray-800">Importar datos (CSV/Excel)</h4>
                                 <button @click="showDataImport = false" class="text-gray-400 hover:text-gray-700">&times;</button>
                             </div>
-                            <div class="text-xs text-gray-500">Sube un CSV (si tienes Excel, exporta a CSV) y creamos campos automaticamente.</div>
+                            <div class="text-xs text-gray-500">Sube un CSV (si tienes Excel, exporta a CSV) y creamos campos y tablas automaticamente.</div>
                             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
                                     <label class="text-[10px] font-bold text-gray-500 uppercase">Archivo CSV</label>
@@ -1320,7 +1445,7 @@
                                     </label>
                                     <label class="flex items-center gap-2 text-xs text-gray-600">
                                         <input type="checkbox" x-model="csvImport.replaceFields" class="rounded text-emerald-600">
-                                        Reemplazar campos existentes
+                                        Reemplazar Datos existentes
                                     </label>
                                 </div>
                             </div>
@@ -1343,7 +1468,82 @@
                                     </template>
                                     <div x-show="csvImport.columns.length === 0" class="text-[10px] text-gray-400">Sin columnas detectadas</div>
                                 </div>
-                                <button @click="applyCsvToFields(); showDataImport=false" class="mt-3 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded">Crear campos</button>
+                                <button @click="applyCsvToFields(); showDataImport=false" class="mt-3 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded">Crear Datos</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div x-show="showAlanubeWizard" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+                        <div class="bg-white rounded-xl shadow-lg w-full max-w-3xl p-6 space-y-4">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <h4 class="font-bold text-gray-800">Facturacion electronica (Alanube)</h4>
+                                    <div class="text-[11px] text-gray-500">Configura pais + sandbox y genera la integracion sin tocar codigo.</div>
+                                </div>
+                                <button @click="showAlanubeWizard = false" class="text-gray-400 hover:text-gray-700">&times;</button>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">ID de integracion</label>
+                                    <input x-model="project.alanube.integrationId" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="alanube_main">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Pais (codigo)</label>
+                                    <input x-model="project.alanube.country" @change="syncAlanubeBaseUrl()" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="CO">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Entorno</label>
+                                    <select x-model="project.alanube.environment" @change="syncAlanubeBaseUrl()" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                        <option value="sandbox">sandbox (pruebas)</option>
+                                        <option value="production">produccion</option>
+                                    </select>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Base URL</label>
+                                    <input x-model="project.alanube.baseUrl" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="https://sandbox.alanube.co/co/v1">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Token en .env</label>
+                                    <input x-model="project.alanube.tokenEnv" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="ALANUBE_TOKEN">
+                                    <div class="text-[10px] text-gray-400 mt-1">No guardamos el token en JSON.</div>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Contrato factura (nombre)</label>
+                                    <input x-model="project.alanube.invoiceContract" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="factura">
+                                    <div class="text-[10px] text-gray-400 mt-1">Se crea en /contracts/invoices</div>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo documento (CO)</label>
+                                    <input x-model="project.alanube.documentType" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="INVOICE">
+                                    <div class="text-[10px] text-gray-400 mt-1">Opcional: ajusta segun tu pais.</div>
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Moneda</label>
+                                    <input x-model="project.alanube.currency" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="COP">
+                                </div>
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Resolucion / prefijo</label>
+                                    <input x-model="project.alanube.resolutionId" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="RESOLUTION_ID">
+                                    <div class="text-[10px] text-gray-400 mt-1">Si tu proveedor lo requiere, se envia en mapping.</div>
+                                </div>
+                            </div>
+                            <div class="flex flex-wrap gap-2">
+                                <button @click="testAlanubeConnection()" class="px-4 py-2 text-xs font-bold bg-slate-800 text-white rounded">Probar conexion</button>
+                                <button @click="saveAlanubeIntegration()" class="px-4 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Guardar integracion</button>
+                                <button @click="saveInvoiceContract()" class="px-4 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Crear contrato factura</button>
+                                <button @click="sendAlanubeSandbox()" class="px-4 py-2 text-xs font-bold bg-amber-600 text-white rounded">Enviar sandbox</button>
+                                <button @click="showAlanubeWizard = false" class="px-4 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded">Cerrar</button>
+                            </div>
+                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div>
+                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Record ID (para prueba)</label>
+                                    <input x-model="project.alanube.testRecordId" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="1">
+                                    <div class="text-[10px] text-gray-400 mt-1">Usa un registro real del formulario.</div>
+                                </div>
+                            </div>
+                            <div x-show="alanubeStatus.message" class="text-xs rounded border px-3 py-2"
+                                :class="alanubeStatus.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'">
+                                <span x-text="alanubeStatus.message"></span>
                             </div>
                         </div>
                     </div>
@@ -1356,7 +1556,7 @@
                             <i class="fa-solid fa-file-invoice text-orange-500"></i> Datos del Formulario
                         </h3>
                         <div class="mb-4 text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded p-3">
-                            Modo <span class="font-bold">amigable</span>: completa los campos y el sistema genera JSON, vistas y tablas sin que tengas que escribir codigo.
+                            Modo <span class="font-bold">amigable</span>: completa los Datos y el sistema genera JSON, vistas y Listas sin que tengas que escribir codigo.
                         </div>
                         <div class="grid grid-cols-2 gap-6">
                             <div>
@@ -1386,8 +1586,8 @@
                 <div x-show="activeTab === 'fields'" class="max-w-4xl mx-auto" x-transition.opacity>
                     <div class="flex justify-between items-center mb-6">
                         <div>
-                            <h3 class="font-bold text-gray-700 text-lg">Campos del Formulario</h3>
-                            <p class="text-xs text-gray-500">Campos principales fuera de las tablas.</p>
+                            <h3 class="font-bold text-gray-700 text-lg">Datos del Formulario</h3>
+                            <p class="text-xs text-gray-500">Datos principales fuera de las Listas.</p>
                         </div>
                         <button @click="addField()" class="text-xs font-bold uppercase bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700 shadow transition flex items-center gap-2">
                             <i class="fa-solid fa-plus"></i> Agregar Campo
@@ -1491,7 +1691,7 @@
 
                         <div x-show="data.fields.length === 0" class="text-center py-10 text-gray-400 border-2 border-dashed border-gray-300 rounded-lg">
                             <i class="fa-regular fa-folder-open text-3xl mb-2"></i>
-                            <p class="text-sm">No hay campos agregados aún.</p>
+                            <p class="text-sm">No hay Datos agregados aún.</p>
                         </div>
                     </div>
                 </div>
@@ -1522,7 +1722,7 @@
                                 <input x-model="section.id" class="text-[10px] text-gray-400 mb-3 w-full font-mono bg-transparent border-none p-0 focus:ring-0" placeholder="id_seccion_opcional">
 
                                 <div class="bg-gray-50 p-3 rounded-md border border-gray-100">
-                                    <p class="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider">Campos Asignados:</p>
+                                    <p class="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider">Datos Asignados:</p>
                                     <div class="flex flex-wrap gap-2 mb-3 min-h-[30px]">
                                         <template x-for="fieldId in section.fields">
                                             <span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded border border-purple-200 flex items-center gap-1 shadow-sm">
@@ -1530,7 +1730,7 @@
                                                 <button @click="section.fields = section.fields.filter(f => f !== fieldId)" class="hover:text-red-600 ml-1 rounded-full w-4 h-4 flex items-center justify-center hover:bg-purple-200">×</button>
                                             </span>
                                         </template>
-                                        <span x-show="section.fields.length === 0" class="text-xs text-gray-400 italic py-1">Arrastra o selecciona campos abajo...</span>
+                                        <span x-show="section.fields.length === 0" class="text-xs text-gray-400 italic py-1">Arrastra o selecciona Datos abajo...</span>
                                     </div>
                                     
                                     <div class="relative">
@@ -1550,8 +1750,8 @@
                 <div x-show="activeTab === 'grids'" class="max-w-6xl mx-auto" x-transition.opacity>
                       <div class="flex justify-between items-center mb-6">
                         <div>
-                            <h3 class="font-bold text-gray-700 text-lg">Grids (Tablas Detalle)</h3>
-                            <p class="text-xs text-gray-500">Configura tablas repetibles, inventarios, o listas de items.</p>
+                            <h3 class="font-bold text-gray-700 text-lg">Grids (Listas Detalle)</h3>
+                            <p class="text-xs text-gray-500">Configura Listas repetibles, inventarios, o listas de items.</p>
                         </div>
                         <button @click="addGrid()" class="text-xs font-bold uppercase bg-orange-600 text-white px-4 py-2 rounded-lg hover:bg-orange-700 shadow transition">
                             + Agregar Grid
@@ -1893,7 +2093,7 @@
                                 <div><span class="font-semibold">Tenant:</span> <span x-text="(getEntityObject() && getEntityObject().table && getEntityObject().table.tenantScoped) ? 'si' : 'no'"></span></div>
                             </div>
                             <div class="mt-3">
-                                <p class="text-[10px] font-bold text-gray-500 uppercase">Campos</p>
+                                <p class="text-[10px] font-bold text-gray-500 uppercase">Datos</p>
                                 <div class="flex flex-wrap gap-2">
                                     <template x-for="field in ((getEntityObject() && getEntityObject().fields) ? getEntityObject().fields : [])" :key="field.name">
                                         <span class="px-2 py-1 bg-white border rounded text-[10px]">
@@ -1901,7 +2101,7 @@
                                             <span class="text-gray-400" x-text="' : ' + field.type"></span>
                                         </span>
                                     </template>
-                                    <span x-show="!(getEntityObject() && getEntityObject().fields && getEntityObject().fields.length)" class="text-[10px] text-gray-400">Sin campos</span>
+                                    <span x-show="!(getEntityObject() && getEntityObject().fields && getEntityObject().fields.length)" class="text-[10px] text-gray-400">Sin Datos</span>
                                 </div>
                             </div>
                             <div class="mt-3">
@@ -2024,9 +2224,9 @@
             return {
                 mainTab: 'forms',
                 mainTabs: [
-                    { id: 'dashboard', label: 'Panel', icon: 'fa-solid fa-gauge-high' },
-                    { id: 'forms', label: 'Pantallas', icon: 'fa-solid fa-pen-to-square' },
-                    { id: 'database', label: 'Datos', icon: 'fa-solid fa-database' },
+                    { id: 'Indicadores', label: 'Inicio', icon: 'fa-solid fa-gauge-high' },
+                    { id: 'forms', label: 'Dise?ar', icon: 'fa-solid fa-pen-to-square' },
+                    { id: 'database', label: 'Datos (avanzado)', icon: 'fa-solid fa-database' },
                     { id: 'chat', label: 'Probar', icon: 'fa-solid fa-comments' }
                 ],
                 activeTab: 'general',
@@ -2053,9 +2253,9 @@
                 },
                 tabs: [
                     { id: 'general', label: 'General', icon: 'fa-solid fa-sliders' },
-                    { id: 'fields', label: 'Campos', icon: 'fa-regular fa-keyboard' },
+                    { id: 'fields', label: 'Datos', icon: 'fa-regular fa-keyboard' },
                     { id: 'layout', label: 'Diseño', icon: 'fa-solid fa-table-columns' },
-                    { id: 'grids', label: 'Grids/Tablas', icon: 'fa-solid fa-table-list' },
+                    { id: 'grids', label: 'Grids/Listas', icon: 'fa-solid fa-table-list' },
                     { id: 'summary', label: 'Totales', icon: 'fa-solid fa-calculator' },
                     { id: 'output', label: 'Proyecto', icon: 'fa-solid fa-sitemap', advanced: true }
                 ],
@@ -2070,7 +2270,7 @@
                     grids: [],
                     summary: [],
                     reports: [],
-                    dashboards: []
+                    Indicadoress: []
                 },
                 project: {
                     viewPath: "",
@@ -2117,10 +2317,23 @@
                     registryTrackRoutes: true,
                     registryTrackConfig: true,
                     registryTrackDbProfile: true,
-                    registryTrackIntegrations: false,
+                    registryTrackIntegrations: true,
                     registryTrackProcesses: false,
 
-                    processes: []
+                    processes: [],
+                    alanube: {
+                        enabled: true,
+                        integrationId: 'alanube_main',
+                        country: 'CO',
+                        environment: 'sandbox',
+                        baseUrl: '',
+                        tokenEnv: 'ALANUBE_TOKEN',
+                        invoiceContract: '',
+                        documentType: 'INVOICE',
+                        currency: 'COP',
+                        resolutionId: '',
+                        testRecordId: ''
+                    }
                 },
 
                 chatTest: {
@@ -2136,6 +2349,7 @@
                 selectedObject: { type: 'form', index: null, parentIndex: null },
                 showWizardAdd: false,
                 showDataImport: false,
+                showAlanubeWizard: false,
                 builderTopTab: 'canvas',
                 wizardType: 'field',
                 wizardLabel: '',
@@ -2149,18 +2363,29 @@
                     { id: 2, label: 'Datos' },
                     { id: 3, label: 'Pantalla' },
                     { id: 4, label: 'Totales' },
-                    { id: 5, label: 'Informes' },
+                    { id: 5, label: 'Documentos' },
                     { id: 6, label: 'Guardar' }
                 ],
+                reportRecordId: '',
                 quickFieldLabel: '',
                 quickFieldType: 'text',
                 quickGridLabel: '',
                 quickSummaryLabel: '',
                 quickReportLabel: '',
+                alanubeStatus: { ok: true, message: '' },
+                wizardMasterDetail: false,
+                wizardAutoReport: true,
+                wizardReportType: 'auto',
+                wizardReportTemplate: 'auto',
+                toasts: [],
 
                 init() {
                     this.loadChatSettings();
                     this.selectedObject = { type: 'form', index: null, parentIndex: null };
+                    this.syncAlanubeBaseUrl();
+                    if (this.project.alanube && !this.project.alanube.invoiceContract) {
+                        this.project.alanube.invoiceContract = this.normalizeEntityName() || 'factura';
+                    }
                 },
 
                 loadChatSettings() {
@@ -2186,6 +2411,79 @@
                     }
                 },
 
+                notify(type, message) {
+                    const id = Date.now().toString() + Math.random().toString(36).slice(2);
+                    this.toasts.push({ id, type, message });
+                    setTimeout(() => {
+                        this.toasts = this.toasts.filter(t => t.id !== id);
+                    }, 4000);
+                },
+
+                uiIssues() {
+                    const issues = [];
+                    const push = (id, level, message) => issues.push({ id, level, message });
+
+                    if (!this.data.title) push('title', 'error', 'Pon un nombre visible para la pantalla.');
+                    if (!this.data.name) push('name', 'error', 'Falta el ID interno del formulario.');
+                    if (!Array.isArray(this.data.fields) || this.data.fields.length === 0) {
+                        push('fields', 'error', 'Agrega al menos un campo.');
+                    }
+                    if (Array.isArray(this.data.fields)) {
+                        this.data.fields.forEach((f, i) => {
+                            if (!f.name) push('field_name_' + i, 'error', 'Campo sin ID interno (name).');
+                            if (!f.label) push('field_label_' + i, 'warning', 'Campo sin nombre visible.');
+                        });
+                    }
+                    if (Array.isArray(this.data.grids)) {
+                        this.data.grids.forEach((g, i) => {
+                            if (!g.name) push('grid_name_' + i, 'error', 'Lista sin ID interno.');
+                            if (!Array.isArray(g.columns) || g.columns.length === 0) {
+                                push('grid_cols_' + i, 'warning', 'Lista sin columnas definidas.');
+                            }
+                        });
+                    }
+                    if (Array.isArray(this.data.summary)) {
+                        this.data.summary.forEach((s, i) => {
+                            if (!s.name) push('sum_name_' + i, 'warning', 'Total sin ID interno.');
+                            if (s.type === 'sum' && (!s.source?.grid || !s.source?.field)) {
+                                push('sum_source_' + i, 'warning', 'Total sin origen definido.');
+                            }
+                        });
+                    }
+                    if (!this.project.viewPath) push('view_path', 'warning', 'Define la ruta de la vista para poder abrirla.');
+                    if (!this.project.entityName && !this.project.tableName) push('entity', 'warning', 'Define la entidad (base de datos) para guardar en DB.');
+
+                    if (this.wizardMasterDetail && (!this.data.grids || this.data.grids.length === 0)) {
+                        push('md_grid', 'warning', 'Maestro-detalle activo pero no hay listas.');
+                    }
+                    if (Array.isArray(this.data.reports)) {
+                        this.data.reports.forEach((r, i) => {
+                            if ((r.template || '') === 'fiscal') {
+                                const meta = r.layout?.meta?.fields || [];
+                                const issuer = r.layout?.issuer?.fields || [];
+                                const buyer = r.layout?.buyer?.fields || [];
+                                if (!meta.length) push('report_meta_' + i, 'warning', 'Documento fiscal sin datos de encabezado.');
+                                if (!issuer.length) push('report_issuer_' + i, 'warning', 'Documento fiscal sin datos del emisor.');
+                                if (!buyer.length) push('report_buyer_' + i, 'warning', 'Documento fiscal sin datos del cliente.');
+                            }
+                        });
+                    }
+                    return issues;
+                },
+
+                validateBeforeSave() {
+                    const issues = this.uiIssues();
+                    const errors = issues.filter(i => i.level === 'error');
+                    if (errors.length) {
+                        this.notify('error', 'Antes de guardar: ' + errors[0].message);
+                        return false;
+                    }
+                    if (issues.length) {
+                        this.notify('warning', 'Hay detalles por revisar. Puedes guardar igual.');
+                    }
+                    return true;
+                },
+
                 // --- Builder UI helpers ---
                 selectObject(type, index = null, parentIndex = null) {
                     this.selectedObject = { type, index, parentIndex };
@@ -2194,7 +2492,7 @@
                     if (type === 'grid' || type === 'column') this.activeTab = 'grids';
                     if (type === 'summary') this.activeTab = 'summary';
                     if (type === 'report') this.builderTopTab = 'reports';
-                    if (type === 'dashboard') this.builderTopTab = 'dashboards';
+                    if (type === 'Indicadores') this.builderTopTab = 'Indicadoress';
                 },
                 isSelected(type, index = null, parentIndex = null) {
                     return this.selectedObject.type === type
@@ -2214,7 +2512,7 @@
                     }
                     if (type === 'grid') {
                         const g = this.data.grids?.[this.selectedObject.index];
-                        return g?.label || g?.name || 'Tabla';
+                        return g?.label || g?.name || 'Lista';
                     }
                     if (type === 'column') {
                         const g = this.data.grids?.[this.selectedObject.parentIndex];
@@ -2227,11 +2525,11 @@
                     }
                     if (type === 'report') {
                         const r = this.data.reports?.[this.selectedObject.index];
-                        return r?.name || r?.id || 'Informe';
+                        return r?.name || r?.id || 'Documento';
                     }
-                    if (type === 'dashboard') {
-                        const d = this.data.dashboards?.[this.selectedObject.index];
-                        return d?.name || d?.id || 'Dashboard';
+                    if (type === 'Indicadores') {
+                        const d = this.data.Indicadoress?.[this.selectedObject.index];
+                        return d?.name || d?.id || 'Indicador';
                     }
                     if (type === 'process') {
                         const p = this.project.processes?.[this.selectedObject.index];
@@ -2276,13 +2574,48 @@
                     const rep = this.data.reports?.[index];
                     if (!rep) return;
                     if (!rep.layout) {
-                        rep.layout = { header: { title: '', showLogo: true }, fields: [], grid: { name: '', columns: [] }, totals: [] };
+                        rep.layout = {
+                            header: { title: '', subtitle: '', showLogo: true },
+                            meta: { label: 'Documento', fields: [] },
+                            issuer: { label: 'Emisor', fields: [] },
+                            buyer: { label: 'Cliente', fields: [] },
+                            fields: [],
+                            grid: { name: '', columns: [] },
+                            totals: [],
+                            footer: { text: '' }
+                        };
                     }
-                    if (!rep.layout.header) rep.layout.header = { title: '', showLogo: true };
+                    if (!rep.layout.header) rep.layout.header = { title: '', subtitle: '', showLogo: true };
+                    if (!rep.layout.meta) rep.layout.meta = { label: 'Documento', fields: [] };
+                    if (!rep.layout.issuer) rep.layout.issuer = { label: 'Emisor', fields: [] };
+                    if (!rep.layout.buyer) rep.layout.buyer = { label: 'Cliente', fields: [] };
                     if (!Array.isArray(rep.layout.fields)) rep.layout.fields = [];
                     if (!rep.layout.grid) rep.layout.grid = { name: '', columns: [] };
                     if (!Array.isArray(rep.layout.grid.columns)) rep.layout.grid.columns = [];
                     if (!Array.isArray(rep.layout.totals)) rep.layout.totals = [];
+                    if (!rep.layout.footer) rep.layout.footer = { text: '' };
+                },
+                applyReportTemplate(index) {
+                    const rep = this.data.reports?.[index];
+                    if (!rep) return;
+                    this.ensureReportDefaults(index);
+                    if (rep.template === 'fiscal') {
+                        const metaFields = this.findFieldsByHints(['fecha', 'numero', 'serie', 'prefijo']);
+                        const issuerFields = this.findFieldsByHints(['empresa', 'emisor', 'razon', 'nit', 'direccion', 'telefono', 'correo']);
+                        const buyerFields = this.findFieldsByHints(['cliente', 'comprador', 'razon', 'nit', 'documento', 'email', 'direccion', 'telefono']);
+                        if (metaFields.length) rep.layout.meta.fields = metaFields;
+                        if (issuerFields.length) rep.layout.issuer.fields = issuerFields;
+                        if (buyerFields.length) rep.layout.buyer.fields = buyerFields;
+                        if (!rep.layout.grid.name && this.data.grids.length) {
+                            rep.layout.grid.name = this.data.grids[0].name;
+                        }
+                        if (!rep.layout.grid.columns.length && rep.layout.grid.name) {
+                            rep.layout.grid.columns = (this.gridColumns(rep.layout.grid.name) || []).map(col => col.name);
+                        }
+                        if (!rep.layout.totals.length && this.data.summary.length) {
+                            rep.layout.totals = this.data.summary.map(s => s.name).filter(Boolean);
+                        }
+                    }
                 },
                 normalizeLabelToName(label, prefix) {
                     const raw = String(label || '').trim().toLowerCase();
@@ -2322,6 +2655,97 @@
                     }
                     this.builderTopTab = 'canvas';
                     this.showWizardAdd = false;
+                },
+                async saveEntityToServer() {
+                    try {
+                        const entity = JSON.parse(this.buildEntityContract());
+                        const res = await fetch('/api/entity/save', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ entity })
+                        });
+                        const json = await res.json();
+                        if (json.status !== 'success') {
+                            alert('Error: ' + json.message);
+                            return;
+                        }
+                        alert('Entidad guardada y migrada.');
+                    } catch (e) {
+                        alert('Error: ' + (e.message || e));
+                    }
+                },
+                async generateFormFromEntity() {
+                    const entityName = (this.project.entityName || '').trim();
+                    if (!entityName) {
+                        this.notify('error', 'Define el nombre de entidad primero.');
+                        return;
+                    }
+                    try {
+                        const payload = {
+                            entity: entityName,
+                            master_detail: !!this.wizardMasterDetail,
+                            report_type: this.wizardReportType || 'auto',
+                            template: this.wizardReportTemplate || 'auto'
+                        };
+                        if (!this.wizardAutoReport) {
+                            payload.report_type = 'report';
+                            payload.template = 'basic';
+                        }
+                        const res = await fetch('/api/wizard/form-from-entity', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const json = await res.json();
+                        if (json.status !== 'success') {
+                            this.notify('error', json.message || 'No se pudo generar el formulario.');
+                            return;
+                        }
+                        if (json.data && json.data.form) {
+                            this.data = json.data.form;
+                            this.selectObject('form');
+                            this.notify('success', 'Formulario generado desde la entidad.');
+                        }
+                    } catch (e) {
+                        this.notify('error', 'Error: ' + (e.message || e));
+                    }
+                },
+                async importCsvToEntity() {
+                    try {
+                        const columns = (this.csvImport.columns || []).map(col => ({
+                            name: col.name,
+                            type: col.type,
+                            required: false,
+                        }));
+                        const payload = {
+                            entityName: (this.project.entityName || this.project.tableName || 'entidad').trim(),
+                            entityLabel: this.project.entityLabel || this.project.entityName || 'Entidad',
+                            tableName: (this.project.tableName || this.project.entityName || 'tabla').trim(),
+                            primaryKey: this.project.entityPrimaryKey || 'id',
+                            tenantScoped: !!this.project.includeTenant,
+                            timestamps: !!this.project.includeTimestamps,
+                            softDelete: !!this.project.entitySoftDelete,
+                            columns,
+                            createForm: true
+                        };
+                        const res = await fetch('/api/import/csv', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const json = await res.json();
+                        if (json.status !== 'success') {
+                            alert('Error: ' + json.message);
+                            return;
+                        }
+                        if (json.data && json.data.form) {
+                            this.data = json.data.form;
+                            this.selectObject('form');
+                        }
+                        alert('Entidad creada, migrada y formulario generado.');
+                    } catch (e) {
+                        alert('Error: ' + (e.message || e));
+                    }
                 },
                 startGuided() {
                     this.showGuided = true;
@@ -2388,6 +2812,8 @@
                             const rIndex = this.data.reports.length - 1;
                             this.data.reports[rIndex].type = 'invoice';
                             this.data.reports[rIndex].name = 'Factura';
+                            this.data.reports[rIndex].template = 'fiscal';
+                            this.applyReportTemplate(rIndex);
                         }
                     }
 
@@ -2397,6 +2823,36 @@
                             this.createFieldFromLabel('Stock', 'number');
                             this.createFieldFromLabel('Precio', 'number');
                         }
+                    }
+
+                    if (tpl === 'login') {
+                        this.data.fields = [];
+                        this.createFieldFromLabel('Usuario', 'text');
+                        this.createFieldFromLabel('Clave', 'text');
+                        this.data.title = 'Ingreso';
+                    }
+
+                    if (tpl === 'users') {
+                        this.data.fields = [];
+                        this.createFieldFromLabel('Nombre', 'text');
+                        this.createFieldFromLabel('Usuario', 'text');
+                        this.createFieldFromLabel('Rol', 'select');
+                        const idx = this.data.fields.length - 1;
+                        if (idx >= 0) {
+                            this.data.fields[idx].options = ['admin', 'editor', 'viewer'];
+                        }
+                        this.createFieldFromLabel('Activo', 'checkbox');
+                        this.data.title = 'Usuarios';
+                    }
+
+                    if (tpl === 'company') {
+                        this.data.fields = [];
+                        this.createFieldFromLabel('Empresa', 'text');
+                        this.createFieldFromLabel('NIT', 'text');
+                        this.createFieldFromLabel('Direccion', 'text');
+                        this.createFieldFromLabel('Telefono', 'text');
+                        this.createFieldFromLabel('Correo', 'email');
+                        this.data.title = 'Empresa';
                     }
 
                     this.ensureLayoutFromFields();
@@ -2557,7 +3013,7 @@
                     }
                 },
 
-                // --- Métodos de Campos ---
+                // --- Métodos de Datos ---
                 addField() {
                     this.data.fields.push({
                         id: 'campo_' + Math.floor(Math.random() * 1000),
@@ -2752,7 +3208,7 @@
                         this.project.entityName = this.normalizeSqlName(this.project.tableName);
                     }
 
-                    alert('Campos cargados desde CSV.');
+                    alert('Datos cargados desde CSV.');
                 },
 
                 // --- Métodos de Layout ---
@@ -2827,12 +3283,12 @@
                     this.activeTab = 'summary';
                 },
 
-                // --- Reportes ---
+                // --- Documentos ---
                 addReport() {
                     this.data.reports = Array.isArray(this.data.reports) ? this.data.reports : [];
                     this.data.reports.push({
                         id: 'rep_' + Math.floor(Math.random() * 1000),
-                        name: 'Nuevo Informe',
+                        name: 'Nuevo Documento',
                         type: 'report', // invoice | quote | report
                         template: 'basic',
                         description: '',
@@ -2846,56 +3302,95 @@
                     this.selectObject('report', this.data.reports.length - 1);
                 },
                 removeReport(index) {
-                    if (confirm('¿Eliminar este informe?')) {
+                    if (confirm('¿Eliminar este documento?')) {
                         this.data.reports.splice(index, 1);
                     }
                 },
                 previewReport(index) {
                     const rep = this.data.reports?.[index];
                     if (!rep) return;
-                    alert('Previsualizar: ' + (rep.name || rep.id));
+                    const formKey = this.data.name || '';
+                    if (!formKey) {
+                        alert('Define el nombre del formulario.');
+                        return;
+                    }
+                    const reportKey = rep.id || rep.name || '';
+                    let recordId = (this.reportRecordId || '').trim();
+                    if (!recordId) {
+                        recordId = prompt('ID del registro para previsualizar', '');
+                        if (!recordId) return;
+                        this.reportRecordId = recordId;
+                    }
+                    const url = `/api/reports/preview?form=${encodeURIComponent(formKey)}&report=${encodeURIComponent(reportKey)}&id=${encodeURIComponent(recordId)}`;
+                    window.open(url, '_blank');
                 },
                 printReport(index) {
                     const rep = this.data.reports?.[index];
                     if (!rep) return;
-                    alert('Imprimir: ' + (rep.name || rep.id));
+                    const formKey = this.data.name || '';
+                    if (!formKey) {
+                        alert('Define el nombre del formulario.');
+                        return;
+                    }
+                    const reportKey = rep.id || rep.name || '';
+                    let recordId = (this.reportRecordId || '').trim();
+                    if (!recordId) {
+                        recordId = prompt('ID del registro para imprimir', '');
+                        if (!recordId) return;
+                        this.reportRecordId = recordId;
+                    }
+                    const url = `/api/reports/preview?form=${encodeURIComponent(formKey)}&report=${encodeURIComponent(reportKey)}&id=${encodeURIComponent(recordId)}`;
+                    window.open(url, '_blank');
                 },
                 exportReportPdf(index) {
                     const rep = this.data.reports?.[index];
                     if (!rep) return;
-                    alert('PDF: ' + (rep.name || rep.id));
+                    const formKey = this.data.name || '';
+                    if (!formKey) {
+                        alert('Define el nombre del formulario.');
+                        return;
+                    }
+                    const reportKey = rep.id || rep.name || '';
+                    let recordId = (this.reportRecordId || '').trim();
+                    if (!recordId) {
+                        recordId = prompt('ID del registro para PDF', '');
+                        if (!recordId) return;
+                        this.reportRecordId = recordId;
+                    }
+                    const url = `/api/reports/pdf?form=${encodeURIComponent(formKey)}&report=${encodeURIComponent(reportKey)}&id=${encodeURIComponent(recordId)}`;
+                    window.open(url, '_blank');
                 },
-                // --- Dashboards ---
-                addDashboard() {
-                    this.data.dashboards = Array.isArray(this.data.dashboards) ? this.data.dashboards : [];
-                    this.data.dashboards.push({
+                // --- Indicadores ---
+                addIndicadores() {
+                    this.data.Indicadoress = Array.isArray(this.data.Indicadoress) ? this.data.Indicadoress : [];
+                    this.data.Indicadoress.push({
                         id: 'dash_' + Math.floor(Math.random() * 1000),
-                        name: 'Nuevo dashboard',
+                        name: 'Nuevo Indicador',
                         widgets: []
                     });
-                    const idx = this.data.dashboards.length - 1;
-                    this.selectObject('dashboard', idx);
+                    const idx = this.data.Indicadoress.length - 1;
+                    this.selectObject('Indicadores', idx);
                     if ((this.data.summary || []).length) {
-                        this.addDashboardWidget('kpi', idx);
+                        this.addIndicadoresWidget('kpi', idx);
                     }
                     if ((this.data.grids || []).length) {
-                        this.addDashboardWidget('chart', idx);
+                        this.addIndicadoresWidget('chart', idx);
                     }
                 },
-                removeDashboard(index) {
-                    if (confirm('Eliminar este dashboard?')) {
-                        this.data.dashboards.splice(index, 1);
+                removeIndicadores(index) {
+                    if (confirm('¿Eliminar este indicador?')) {
+                        this.data.Indicadoress.splice(index, 1);
                         this.selectObject('form');
                     }
                 },
-                ensureDashboardDefaults(index) {
-                    const dash = this.data.dashboards?.[index];
+                ensureIndicadoresDefaults(index) {
+                    const dash = this.data.Indicadoress?.[index];
                     if (!dash) return;
                     if (!Array.isArray(dash.widgets)) dash.widgets = [];
                 },
-                addDashboardWidget(type = 'kpi', dashIndex = null) {
+                addIndicadoresWidget(type = 'kpi', dashIndex = null) {
                     const idx = dashIndex !== null ? dashIndex : this.selectedObject.index;
-                    const dash = this.data.dashboards?.[idx];
+                    const dash = this.data.Indicadoress?.[idx];
                     if (!dash) return;
                     if (!Array.isArray(dash.widgets)) dash.widgets = [];
 
@@ -2917,8 +3412,8 @@
 
                     dash.widgets.push(widget);
                 },
-                removeDashboardWidget(dashIndex, widgetIndex) {
-                    const dash = this.data.dashboards?.[dashIndex];
+                removeIndicadoresWidget(dashIndex, widgetIndex) {
+                    const dash = this.data.Indicadoress?.[dashIndex];
                     if (!dash || !Array.isArray(dash.widgets)) return;
                     dash.widgets.splice(widgetIndex, 1);
                 },
@@ -3168,17 +3663,338 @@ $formGenerator = new FormGenerator();
                         })
                         .filter(Boolean);
 
+                    const integrations = this.buildIntegrations();
+
                     const manifest = { schema_version: schemaVersion, app, db, registry };
                     if (processes.length) manifest.processes = processes;
+                    if (integrations.length) manifest.integrations = integrations;
 
                     return JSON.stringify(manifest, null, 2);
+                },
+                buildIntegrations() {
+                    const items = [];
+                    if (this.project.alanube && this.project.alanube.enabled) {
+                        const integration = this.buildAlanubeIntegration();
+                        if (integration) items.push(integration);
+                    }
+                    return items;
+                },
+                normalizeCountryCode(value) {
+                    const raw = (value || '').trim();
+                    return raw ? raw.toUpperCase() : 'CO';
+                },
+                computeAlanubeBaseUrl() {
+                    const country = this.normalizeCountryCode(this.project.alanube.country).toLowerCase();
+                    const env = (this.project.alanube.environment || 'sandbox').toLowerCase();
+                    if (env === 'production') {
+                        return `https://api.alanube.co/${country}/v1`;
+                    }
+                    return `https://sandbox.alanube.co/${country}/v1`;
+                },
+                syncAlanubeBaseUrl() {
+                    if (!this.project.alanube) return;
+                    const current = (this.project.alanube.baseUrl || '').trim();
+                    const computed = this.computeAlanubeBaseUrl();
+                    if (!current || current.includes('alanube.co')) {
+                        this.project.alanube.baseUrl = computed;
+                    }
+                },
+                buildAlanubeIntegration() {
+                    if (!this.project.alanube) return null;
+                    const id = (this.project.alanube.integrationId || 'alanube_main').trim();
+                    if (!id) return null;
+                    const country = this.normalizeCountryCode(this.project.alanube.country);
+                    const environment = (this.project.alanube.environment || 'sandbox').trim();
+                    const baseUrl = (this.project.alanube.baseUrl || this.computeAlanubeBaseUrl()).trim();
+                    const tokenEnv = (this.project.alanube.tokenEnv || 'ALANUBE_TOKEN').trim();
+
+                    return {
+                        id: this.normalizeAppId(id),
+                        type: 'e-invoicing',
+                        provider: 'alanube',
+                        country: country,
+                        environment: environment,
+                        base_url: baseUrl,
+                        enabled: true,
+                        auth: {
+                            type: 'bearer',
+                            token_env: tokenEnv
+                        },
+                        webhooks: ['documents.emissionFinished']
+                    };
+                },
+                async testAlanubeConnection() {
+                    try {
+                        this.alanubeStatus = { ok: true, message: 'Probando conexion...' };
+                        const integration = this.buildAlanubeIntegration();
+                        if (!integration) {
+                            this.alanubeStatus = { ok: false, message: 'Completa los datos de integracion.' };
+                            return;
+                        }
+                        const res = await fetch('/api/integrations/alanube/test', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                base_url: integration.base_url,
+                                token_env: integration.auth.token_env
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.status === 'success') {
+                            this.alanubeStatus = { ok: true, message: data.message || 'Conexion OK' };
+                        } else {
+                            this.alanubeStatus = { ok: false, message: data.message || 'No se pudo conectar' };
+                        }
+                    } catch (e) {
+                        this.alanubeStatus = { ok: false, message: 'Error: ' + (e.message || e) };
+                    }
+                },
+                async saveAlanubeIntegration() {
+                    try {
+                        if (!window.showDirectoryPicker) {
+                            alert('Tu navegador no soporta File System Access API. Usa Descargar.');
+                            return;
+                        }
+                        const integration = this.buildAlanubeIntegration();
+                        if (!integration) {
+                            alert('Completa los datos de integracion.');
+                            return;
+                        }
+                        const root = await window.showDirectoryPicker();
+                        const projectRoot = await this.resolveProjectRoot(root);
+
+                        const dir = await this.getDirHandle(projectRoot, 'contracts/integrations', true);
+                        const fileName = `${integration.id}.integration.json`;
+                        await this.writeFile(dir, fileName, JSON.stringify(integration, null, 2));
+
+                        await this.mergeManifestIntegration(projectRoot, integration);
+                        try {
+                            const res = await fetch('/api/integrations/alanube/save', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ integration })
+                            });
+                            const data = await res.json();
+                            if (data.status === 'success') {
+                                this.alanubeStatus = { ok: true, message: 'Integracion guardada y DB lista.' };
+                            } else {
+                                this.alanubeStatus = { ok: false, message: data.message || 'Integracion guardada, pero API fallo.' };
+                            }
+                        } catch (e) {
+                            this.alanubeStatus = { ok: false, message: 'Integracion guardada, pero no se pudo validar API.' };
+                        }
+                    } catch (e) {
+                        this.alanubeStatus = { ok: false, message: 'No se pudo guardar: ' + (e.message || e) };
+                    }
+                },
+                async mergeManifestIntegration(projectRoot, integration) {
+                    try {
+                        const dir = await this.getDirHandle(projectRoot, 'contracts', true);
+                        const fileHandle = await dir.getFileHandle('app.manifest.json', { create: true });
+                        let manifest = null;
+                        try {
+                            const file = await fileHandle.getFile();
+                            const text = await file.text();
+                            if (text.trim()) manifest = JSON.parse(text);
+                        } catch (e) {
+                            manifest = null;
+                        }
+
+                        if (!manifest || typeof manifest !== 'object') {
+                            manifest = JSON.parse(this.buildManifest());
+                        }
+
+                        manifest.integrations = Array.isArray(manifest.integrations) ? manifest.integrations : [];
+                        const idx = manifest.integrations.findIndex(item => item.id === integration.id);
+                        if (idx >= 0) {
+                            manifest.integrations[idx] = integration;
+                        } else {
+                            manifest.integrations.push(integration);
+                        }
+
+                        const writable = await fileHandle.createWritable();
+                        await writable.write(JSON.stringify(manifest, null, 2));
+                        await writable.close();
+                    } catch (e) {
+                        console.warn('No se pudo actualizar manifest:', e);
+                    }
+                },
+                buildInvoiceContract() {
+                    const integration = this.buildAlanubeIntegration();
+                    const entityName = (this.project.entityName || this.normalizeEntityName()).trim() || 'facturas';
+                    const contractName = (this.project.alanube.invoiceContract || entityName).trim() || 'factura';
+                    const gridName = this.data.grids?.[0]?.name || '';
+                    const currency = (this.project.alanube.currency || 'COP').trim();
+                    const documentType = (this.project.alanube.documentType || 'INVOICE').trim();
+                    const resolutionId = (this.project.alanube.resolutionId || '').trim();
+
+                    const buyerName = this.findFieldByHint(['cliente', 'razon', 'nombre']) || '';
+                    const buyerId = this.findFieldByHint(['nit', 'documento', 'identificacion']) || '';
+                    const buyerEmail = this.findFieldByHint(['correo', 'email']) || '';
+                    const buyerAddress = this.findFieldByHint(['direccion', 'address']) || '';
+                    const buyerPhone = this.findFieldByHint(['telefono', 'tel']) || '';
+                    const dateField = this.findFieldByHint(['fecha']) || '';
+                    const numberField = this.findFieldByHint(['numero', 'nro', 'consecutivo']) || '';
+                    const senderName = this.findFieldByHint(['empresa', 'emisor', 'razon social']) || '';
+                    const senderId = this.findFieldByHint(['nit_emisor', 'nit empresa']) || '';
+
+                    const document = {
+                        issue_date: dateField ? `field:${dateField}` : 'fixed:',
+                    };
+                    if (currency) document.currency = `fixed:${currency}`;
+                    if (documentType) document.document_type = `fixed:${documentType}`;
+                    if (resolutionId) document.resolution_id = `fixed:${resolutionId}`;
+                    if (numberField) document.number = `field:${numberField}`;
+
+                    const buyer = {
+                        name: buyerName ? `field:${buyerName}` : 'fixed:',
+                        id: buyerId ? `field:${buyerId}` : 'fixed:'
+                    };
+                    if (buyerEmail) buyer.email = `field:${buyerEmail}`;
+                    if (buyerAddress) buyer.address = `field:${buyerAddress}`;
+                    if (buyerPhone) buyer.phone = `field:${buyerPhone}`;
+
+                    const sender = {};
+                    if (senderName) sender.name = `field:${senderName}`;
+                    if (senderId) sender.id = `field:${senderId}`;
+
+                    const items = this.mapGridColumnsForInvoice(gridName);
+
+                    return {
+                        type: 'invoice',
+                        version: '1.0',
+                        provider: 'alanube',
+                        country: integration ? integration.country : 'CO',
+                        entity: entityName,
+                        integration_id: integration ? integration.id : 'alanube_main',
+                        emit_endpoint: '/invoices',
+                        status_endpoint: '/invoices',
+                        cancel_endpoint: '/invoices',
+                        name: contractName,
+                        mapping: {
+                            document: document,
+                            buyer: buyer,
+                            ...(Object.keys(sender).length ? { sender } : {}),
+                            items: items
+                        }
+                    };
+                },
+                mapGridColumnsForInvoice(gridName) {
+                    const columns = this.gridColumns(gridName) || [];
+                    const pick = (hints) => {
+                        const needle = hints.map(h => h.toLowerCase());
+                        for (const col of columns) {
+                            const label = (col.label || col.name || '').toLowerCase();
+                            if (needle.some(h => label.includes(h))) return col.name;
+                        }
+                        return '';
+                    };
+                    const map = {};
+                    const desc = pick(['concepto', 'descripcion', 'detalle', 'producto', 'item']);
+                    const qty = pick(['cantidad', 'qty', 'cant']);
+                    const price = pick(['valor_unitario', 'precio', 'valor', 'unitario']);
+                    const subtotal = pick(['subtotal', 'importe', 'total']);
+                    const taxRate = pick(['iva', 'impuesto', 'tax', 'porc']);
+                    const taxAmount = pick(['valor_iva', 'iva_prod', 'impuesto']);
+
+                    if (desc) map.description = `item:${desc}`;
+                    if (qty) map.quantity = `item:${qty}`;
+                    if (price) map.unit_price = `item:${price}`;
+                    if (subtotal) map.subtotal = `item:${subtotal}`;
+                    if (taxRate) map.tax_rate = `item:${taxRate}`;
+                    if (taxAmount) map.tax_amount = `item:${taxAmount}`;
+
+                    if (Object.keys(map).length === 0) {
+                        columns.forEach(col => {
+                            if (!col.name) return;
+                            map[col.name] = `item:${col.name}`;
+                        });
+                    }
+
+                    return {
+                        source_grid: gridName,
+                        map
+                    };
+                },
+                async saveInvoiceContract() {
+                    try {
+                        if (!window.showDirectoryPicker) {
+                            alert('Tu navegador no soporta File System Access API. Usa Descargar.');
+                            return;
+                        }
+                        const contract = this.buildInvoiceContract();
+                        const root = await window.showDirectoryPicker();
+                        const projectRoot = await this.resolveProjectRoot(root);
+                        const dir = await this.getDirHandle(projectRoot, 'contracts/invoices', true);
+                        const fileName = `${contract.name || contract.entity}.invoice.json`;
+                        await this.writeFile(dir, fileName, JSON.stringify(contract, null, 2));
+                        this.alanubeStatus = { ok: true, message: 'Contrato de factura creado.' };
+                    } catch (e) {
+                        this.alanubeStatus = { ok: false, message: 'No se pudo crear contrato: ' + (e.message || e) };
+                    }
+                },
+                async sendAlanubeSandbox() {
+                    try {
+                        const recordId = (this.project.alanube.testRecordId || '').trim();
+                        if (!recordId) {
+                            this.alanubeStatus = { ok: false, message: 'Define un record_id para enviar.' };
+                            return;
+                        }
+                        const invoice = (this.project.alanube.invoiceContract || '').trim();
+                        if (!invoice) {
+                            this.alanubeStatus = { ok: false, message: 'Define el contrato de factura primero.' };
+                            return;
+                        }
+                        this.alanubeStatus = { ok: true, message: 'Enviando a sandbox...' };
+                        const res = await fetch('/api/integrations/alanube/emit', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                integration_id: (this.project.alanube.integrationId || 'alanube_main').trim(),
+                                invoice: invoice,
+                                record_id: recordId
+                            })
+                        });
+                        const data = await res.json();
+                        if (data.status === 'success') {
+                            this.alanubeStatus = { ok: true, message: 'Enviado OK. ID externo: ' + (data.data?.id || data.external_id || '') };
+                        } else {
+                            this.alanubeStatus = { ok: false, message: data.message || 'Error al emitir.' };
+                        }
+                    } catch (e) {
+                        this.alanubeStatus = { ok: false, message: 'Error: ' + (e.message || e) };
+                    }
+                },
+                findFieldByHint(hints = []) {
+                    const fields = this.data.fields || [];
+                    const needle = hints.map(h => h.toLowerCase());
+                    for (const field of fields) {
+                        const label = (field.label || field.name || '').toLowerCase();
+                        if (!label) continue;
+                        if (needle.some(h => label.includes(h))) return field.name || field.id || '';
+                    }
+                    return '';
+                },
+                findFieldsByHints(hints = []) {
+                    const fields = this.data.fields || [];
+                    const needle = hints.map(h => h.toLowerCase());
+                    const result = [];
+                    for (const field of fields) {
+                        const label = (field.label || field.name || '').toLowerCase();
+                        if (!label) continue;
+                        if (needle.some(h => label.includes(h))) {
+                            const name = field.name || field.id;
+                            if (name && !result.includes(name)) result.push(name);
+                        }
+                    }
+                    return result;
                 },
                 progressSteps() {
                     return [
                         { label: 'Formulario', done: (this.data.fields || []).length > 0 },
-                        { label: 'Tablas', done: (this.data.grids || []).length > 0 },
-                        { label: 'Informes', done: (this.data.reports || []).length > 0 },
-                        { label: 'Dashboard', done: (this.data.dashboards || []).length > 0 },
+                        { label: 'Listas', done: (this.data.grids || []).length > 0 },
+                        { label: 'Documentos', done: (this.data.reports || []).length > 0 },
+                        { label: 'Indicadores', done: (this.data.Indicadoress || []).length > 0 },
                         { label: 'Entidad', done: !!(this.project.entityName || this.project.tableName) },
                         { label: 'Vista', done: !!this.project.viewPath },
                         { label: 'DB profile', done: !!this.project.dbStrategy }
@@ -3484,9 +4300,9 @@ $formGenerator = new FormGenerator();
                             if (!r.type) issues.push(`reports[${i}] sin type`);
                         });
                     }
-                    if (Array.isArray(this.data.dashboards)) {
-                        this.data.dashboards.forEach((d, i) => {
-                            if (!d.name && !d.id) issues.push(`dashboards[${i}] sin name`);
+                    if (Array.isArray(this.data.Indicadoress)) {
+                        this.data.Indicadoress.forEach((d, i) => {
+                            if (!d.name && !d.id) issues.push(`Indicadoress[${i}] sin name`);
                         });
                     }
 
@@ -3502,6 +4318,9 @@ $formGenerator = new FormGenerator();
                     node.remove();
                 },
                 downloadJson() {
+                    if (!this.validateBeforeSave()) {
+                        return;
+                    }
                     const fileName = this.normalizeFormFileName();
                     this.downloadText(fileName, JSON.stringify(this.data, null, 2));
                 },
@@ -3524,10 +4343,13 @@ $formGenerator = new FormGenerator();
                             alert('Tu navegador no soporta File System Access API. Usa Descargar.');
                             return;
                         }
+                        if (!this.validateBeforeSave()) {
+                            return;
+                        }
 
                         const viewPath = this.normalizeViewPath(this.project.viewPath);
                         if (!viewPath) {
-                            alert('Define la ruta de la vista (ej: clientes/fact).');
+                            this.notify('error', 'Define la ruta de la vista (ej: clientes/fact).');
                             return;
                         }
 
@@ -3562,11 +4384,11 @@ $formGenerator = new FormGenerator();
                             await this.updateMenuJson(projectRoot, viewPath);
                         }
 
-                        alert('Archivos guardados.');
+                        this.notify('success', 'Archivos guardados.');
                         await this.maybeRunChatTests();
                     } catch (e) {
                         console.error(e);
-                        alert('No se pudo guardar: ' + (e.message || e));
+                        this.notify('error', 'No se pudo guardar: ' + (e.message || e));
                     }
                 },
                 async getDirHandle(root, path, create) {
@@ -3640,7 +4462,7 @@ $formGenerator = new FormGenerator();
                         if(!this.data.grids) this.data.grids = [];
                         if(!this.data.summary) this.data.summary = [];
                         if(!this.data.reports) this.data.reports = [];
-                        if(!this.data.dashboards) this.data.dashboards = [];
+                        if(!this.data.Indicadoress) this.data.Indicadoress = [];
                         
                         // Inicializar estados de UI que no se guardan en el JSON
                         this.data.fields.forEach(f => {
@@ -3688,6 +4510,8 @@ $formGenerator = new FormGenerator();
     </script>
 </body>
 </html>
+
+
 
 
 

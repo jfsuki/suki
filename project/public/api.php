@@ -16,6 +16,24 @@ require_once APP_ROOT . '/app/autoload.php';
 use App\Core\Response;
 use App\Core\CommandLayer;
 use App\Core\Contracts\ContractRepository;
+use App\Core\ReportEngine;
+use App\Core\DashboardEngine;
+use App\Core\FormWizard;
+use App\Core\CsvImportService;
+use App\Core\EntityRegistry;
+use App\Core\EntityMigrator;
+use App\Core\IntegrationRegistry;
+use App\Core\IntegrationValidator;
+use App\Core\IntegrationStore;
+use App\Core\IntegrationMigrator;
+use App\Core\AlanubeClient;
+use App\Core\InvoiceRegistry;
+use App\Core\InvoiceValidator;
+use App\Core\InvoiceMapper;
+use App\Core\Database;
+use App\Core\QueryBuilder;
+
+$route = trim($_GET['route'] ?? '');
 $manifestError = null;
 try {
     \App\Core\ManifestValidator::validateOrFail();
@@ -48,9 +66,18 @@ if ($origin && $allowedOrigins !== '') {
 // --------------------------------
 $response = new Response();
 if ($manifestError) {
-    http_response_code(500);
-    echo $response->json('error', 'App manifest invalido: ' . $manifestError->getMessage());
-    return;
+    $allowedWithoutManifest = [
+        'integrations/alanube/test',
+        'integrations/alanube/save',
+        'integrations/alanube/webhook',
+    ];
+    if (in_array($route, $allowedWithoutManifest, true)) {
+        // allow integration setup even if manifest missing
+    } else {
+        http_response_code(500);
+        echo $response->json('error', 'App manifest invalido: ' . $manifestError->getMessage());
+        return;
+    }
 }
 
 function requestData(): array
@@ -81,6 +108,23 @@ function respondJson(Response $response, string $status, string $message, array 
 {
     http_response_code($code);
     echo $response->json($status, $message, $data);
+}
+
+function writeJsonFile(string $path, array $data): void
+{
+    $dir = dirname($path);
+    if (!is_dir($dir)) {
+        if (!mkdir($dir, 0775, true) && !is_dir($dir)) {
+            throw new RuntimeException('No se pudo crear directorio: ' . $dir);
+        }
+    }
+    $json = json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        throw new RuntimeException('No se pudo serializar JSON.');
+    }
+    if (file_put_contents($path, $json) === false) {
+        throw new RuntimeException('No se pudo escribir archivo: ' . $path);
+    }
 }
 
 function tokenizeChatMessage(string $message): array
@@ -213,11 +257,39 @@ function parseChatMessage(array $payload): array
     ];
 }
 
+function fetchGridItems(array $entity, string $gridName, $recordId): array
+{
+    if ($gridName === '' || $recordId === null || $recordId === '') {
+        return [];
+    }
+    $gridTable = '';
+    $fk = '';
+    foreach (($entity['grids'] ?? []) as $grid) {
+        if (!is_array($grid)) {
+            continue;
+        }
+        if (($grid['name'] ?? '') === $gridName) {
+            $gridTable = (string) ($grid['table'] ?? '');
+            $fk = (string) ($grid['relation']['fk'] ?? '');
+            break;
+        }
+    }
+    if ($gridTable === '') {
+        $gridTable = ($entity['table']['name'] ?? '') . '__' . $gridName;
+    }
+    if ($fk === '') {
+        $fk = ($entity['table']['name'] ?? 'parent') . '_id';
+    }
+
+    $db = Database::connection();
+    $qb = new QueryBuilder($db, $gridTable);
+    $qb->setAllowedColumns([]);
+    return $qb->where($fk, '=', $recordId)->get();
+}
+
 // --------------------------------
 // 1. Obtener la ruta
 // --------------------------------
-$route = trim($_GET['route'] ?? '');
-
 if ($route === '') {
     echo $response->json('error', 'Ruta no definida');
     return;
@@ -260,6 +332,378 @@ if (str_starts_with($route, 'contracts/')) {
         respondJson($response, 'error', $e->getMessage(), [], 500);
     }
     return;
+}
+
+if (str_starts_with($route, 'reports/')) {
+    $parts = explode('/', $route);
+    $action = $parts[1] ?? 'preview';
+    $formKey = (string) ($_GET['form'] ?? '');
+    $reportKey = (string) ($_GET['report'] ?? '');
+    $entity = (string) ($_GET['entity'] ?? '');
+    $recordId = $_GET['id'] ?? null;
+
+    if ($formKey === '') {
+        respondJson($response, 'error', 'form requerido', [], 400);
+        return;
+    }
+
+    try {
+        $engine = new ReportEngine();
+        if ($action === 'pdf') {
+            $pdf = $engine->renderPdf($formKey, $reportKey, $recordId, $entity ?: null);
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: inline; filename=\"reporte.pdf\"');
+            echo $pdf;
+            return;
+        }
+
+        $html = $engine->renderPreview($formKey, $reportKey, $recordId, $entity ?: null);
+        header('Content-Type: text/html; charset=utf-8');
+        echo $html;
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if (str_starts_with($route, 'dashboards')) {
+    $formKey = (string) ($_GET['form'] ?? '');
+    $dashKey = (string) ($_GET['dashboard'] ?? '');
+    $entity = (string) ($_GET['entity'] ?? '');
+    if ($formKey === '') {
+        respondJson($response, 'error', 'form requerido', [], 400);
+        return;
+    }
+
+    try {
+        $engine = new DashboardEngine();
+        $data = $engine->build($formKey, $dashKey, $entity ?: null);
+        respondJson($response, 'success', 'Dashboard listo', $data);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'wizard/form-from-entity') {
+    $payload = requestData();
+    $entityName = (string) ($payload['entity'] ?? $_GET['entity'] ?? '');
+    if ($entityName === '') {
+        respondJson($response, 'error', 'entity requerido', [], 400);
+        return;
+    }
+
+    try {
+        $registry = new EntityRegistry();
+        $entity = $registry->get($entityName);
+        $wizard = new FormWizard();
+        $options = [
+            'master_detail' => !empty($payload['master_detail']) || !empty($payload['masterDetail']),
+            'report_type' => (string) ($payload['report_type'] ?? $payload['reportType'] ?? ''),
+            'template' => (string) ($payload['template'] ?? ''),
+        ];
+        $form = $wizard->buildFromEntity($entity, $options);
+
+        $saved = false;
+        if (!empty($payload['save'])) {
+            $fileName = $form['name'] . '.json';
+            $path = PROJECT_ROOT . '/contracts/forms/' . $fileName;
+            writeJsonFile($path, $form);
+            $saved = true;
+        }
+
+        respondJson($response, 'success', 'Formulario generado', [
+            'form' => $form,
+            'saved' => $saved,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'entity/save') {
+    $payload = requestData();
+    $entity = $payload['entity'] ?? null;
+    if (!is_array($entity)) {
+        respondJson($response, 'error', 'entity requerido', [], 400);
+        return;
+    }
+    try {
+        $name = $entity['name'] ?? '';
+        if ($name === '') {
+            respondJson($response, 'error', 'entity.name requerido', [], 400);
+            return;
+        }
+        $fileName = $name . '.entity.json';
+        $path = PROJECT_ROOT . '/contracts/entities/' . $fileName;
+        writeJsonFile($path, $entity);
+        $migrator = new EntityMigrator(new EntityRegistry());
+        $migration = $migrator->migrateEntity($entity, true);
+        respondJson($response, 'success', 'Entidad guardada', [
+            'file' => $fileName,
+            'migration' => $migration,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'import/csv') {
+    $payload = requestData();
+    try {
+        $service = new CsvImportService();
+        $result = $service->import($payload);
+        $entity = $result['entity'];
+        $fileName = ($entity['name'] ?? 'entity') . '.entity.json';
+        $path = PROJECT_ROOT . '/contracts/entities/' . $fileName;
+        writeJsonFile($path, $entity);
+
+        $form = null;
+        if (!empty($payload['createForm'])) {
+            $wizard = new FormWizard();
+            $form = $wizard->buildFromEntity($entity);
+            $formFile = $form['name'] . '.json';
+            writeJsonFile(PROJECT_ROOT . '/contracts/forms/' . $formFile, $form);
+        }
+
+        respondJson($response, 'success', 'CSV importado', [
+            'entity' => $entity,
+            'migration' => $result['migration'] ?? [],
+            'form' => $form,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'integrations/alanube/test') {
+    $payload = requestData();
+    $baseUrl = (string) ($payload['base_url'] ?? '');
+    $tokenEnv = (string) ($payload['token_env'] ?? 'ALANUBE_TOKEN');
+    $token = (string) ($payload['token'] ?? getenv($tokenEnv) ?: '');
+    if ($baseUrl === '') {
+        respondJson($response, 'error', 'base_url requerido', [], 400);
+        return;
+    }
+    if ($token === '') {
+        respondJson($response, 'error', 'Token no encontrado en .env', [], 400);
+        return;
+    }
+
+    try {
+        $client = new AlanubeClient($baseUrl, $token);
+        $result = $client->testConnection();
+        $status = (int) ($result['status'] ?? 0);
+        $ok = ($status >= 200 && $status < 300) || in_array($status, [401, 403, 404], true);
+        $message = $ok ? 'Conexion OK (sandbox o prod)' : 'No se pudo conectar';
+        respondJson($response, $ok ? 'success' : 'error', $message, [
+            'status' => $status,
+            'data' => $result['data'] ?? []
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'integrations/alanube/save') {
+    $payload = requestData();
+    $integration = $payload['integration'] ?? null;
+    if (!is_array($integration)) {
+        respondJson($response, 'error', 'integration requerida', [], 400);
+        return;
+    }
+    try {
+        IntegrationValidator::validateOrFail($integration);
+        $id = (string) ($integration['id'] ?? '');
+        if ($id === '') {
+            respondJson($response, 'error', 'integration.id requerido', [], 400);
+            return;
+        }
+        $path = PROJECT_ROOT . '/contracts/integrations/' . $id . '.integration.json';
+        writeJsonFile($path, $integration);
+
+        $store = new IntegrationStore();
+        $store->saveConnection($integration);
+
+        respondJson($response, 'success', 'Integracion guardada', [
+            'file' => basename($path)
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'integrations/alanube/emit') {
+    $payload = requestData();
+    $invoiceKey = (string) ($payload['invoice'] ?? '');
+    $recordId = $payload['record_id'] ?? null;
+    $integrationId = (string) ($payload['integration_id'] ?? 'alanube_main');
+    $manualPayload = $payload['payload'] ?? null;
+
+    try {
+        $integrations = new IntegrationRegistry();
+        $integration = $integrations->get($integrationId);
+        $tokenEnv = $integration['auth']['token_env'] ?? 'ALANUBE_TOKEN';
+        $token = getenv($tokenEnv) ?: '';
+        if ($token === '') {
+            respondJson($response, 'error', 'Token no encontrado en .env', [], 400);
+            return;
+        }
+
+        $client = new AlanubeClient($integration['base_url'], $token);
+        $endpoint = (string) ($payload['endpoint'] ?? '/documents');
+        $payloadData = [];
+        $entityName = null;
+
+        if (is_array($manualPayload)) {
+            $payloadData = $manualPayload;
+        } elseif ($invoiceKey !== '') {
+            $registry = new InvoiceRegistry();
+            $invoice = $registry->get($invoiceKey);
+            InvoiceValidator::validateOrFail($invoice);
+            $entityName = (string) ($invoice['entity'] ?? '');
+            if ($entityName === '') {
+                respondJson($response, 'error', 'entity requerido en invoice', [], 400);
+                return;
+            }
+            if ($recordId === null || $recordId === '') {
+                respondJson($response, 'error', 'record_id requerido', [], 400);
+                return;
+            }
+            $entities = new EntityRegistry();
+            $entity = $entities->get($entityName);
+            $repo = new \App\Core\BaseRepository($entity);
+            $record = $repo->find($recordId);
+            if (!$record) {
+                respondJson($response, 'error', 'Registro no encontrado', [], 404);
+                return;
+            }
+            $gridName = (string) (($invoice['mapping']['items']['source_grid'] ?? '') ?: '');
+            $gridItems = fetchGridItems($entity, $gridName, $recordId);
+            $mapper = new InvoiceMapper();
+            $payloadData = $mapper->buildPayload($invoice, $record, $gridItems);
+            if (!empty($invoice['emit_endpoint'])) {
+                $endpoint = $invoice['emit_endpoint'];
+            }
+        } else {
+            respondJson($response, 'error', 'payload o invoice requerido', [], 400);
+            return;
+        }
+
+        $result = $client->emitDocument($endpoint, $payloadData);
+        $externalId = $result['data']['id'] ?? ($result['data']['documentId'] ?? null);
+
+        $store = new IntegrationStore();
+        $store->saveDocument($integrationId, $entityName, $recordId ? (string) $recordId : null, $externalId ? (string) $externalId : null, 'sent', $payloadData, $result['data']);
+
+        respondJson($response, 'success', 'Documento emitido', [
+            'status' => $result['status'],
+            'data' => $result['data'],
+            'external_id' => $externalId
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'integrations/alanube/status') {
+    $payload = requestData();
+    $integrationId = (string) ($payload['integration_id'] ?? $_GET['integration_id'] ?? 'alanube_main');
+    $externalId = (string) ($payload['external_id'] ?? $_GET['external_id'] ?? '');
+    if ($externalId === '') {
+        respondJson($response, 'error', 'external_id requerido', [], 400);
+        return;
+    }
+    try {
+        $integrations = new IntegrationRegistry();
+        $integration = $integrations->get($integrationId);
+        $tokenEnv = $integration['auth']['token_env'] ?? 'ALANUBE_TOKEN';
+        $token = getenv($tokenEnv) ?: '';
+        if ($token === '') {
+            respondJson($response, 'error', 'Token no encontrado en .env', [], 400);
+            return;
+        }
+        $client = new AlanubeClient($integration['base_url'], $token);
+        $endpoint = (string) ($payload['endpoint'] ?? '/documents');
+        $result = $client->getDocument($endpoint, $externalId);
+        $store = new IntegrationStore();
+        $store->updateDocumentStatus($integrationId, $externalId, 'status', $result['data']);
+        respondJson($response, 'success', 'Estado consultado', $result);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'integrations/alanube/cancel') {
+    $payload = requestData();
+    $integrationId = (string) ($payload['integration_id'] ?? 'alanube_main');
+    $externalId = (string) ($payload['external_id'] ?? '');
+    if ($externalId === '') {
+        respondJson($response, 'error', 'external_id requerido', [], 400);
+        return;
+    }
+    try {
+        $integrations = new IntegrationRegistry();
+        $integration = $integrations->get($integrationId);
+        $tokenEnv = $integration['auth']['token_env'] ?? 'ALANUBE_TOKEN';
+        $token = getenv($tokenEnv) ?: '';
+        if ($token === '') {
+            respondJson($response, 'error', 'Token no encontrado en .env', [], 400);
+            return;
+        }
+        $client = new AlanubeClient($integration['base_url'], $token);
+        $endpoint = (string) ($payload['endpoint'] ?? '/documents');
+        $result = $client->cancelDocument($endpoint, $externalId, $payload['payload'] ?? []);
+        $store = new IntegrationStore();
+        $store->updateDocumentStatus($integrationId, $externalId, 'cancelled', $result['data']);
+        respondJson($response, 'success', 'Documento anulado', $result);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'integrations/alanube/webhook') {
+    $payload = requestData();
+    $integrationId = (string) ($payload['integration_id'] ?? $_GET['integration_id'] ?? 'alanube_main');
+    $event = (string) ($payload['event'] ?? $payload['type'] ?? $payload['action'] ?? '');
+    $externalId = null;
+    if (isset($payload['id'])) {
+        $externalId = (string) $payload['id'];
+    } elseif (isset($payload['documentId'])) {
+        $externalId = (string) $payload['documentId'];
+    } elseif (isset($payload['document']['id'])) {
+        $externalId = (string) $payload['document']['id'];
+    }
+    try {
+        $store = new IntegrationStore();
+        $store->logWebhook($integrationId, $event ?: null, $externalId, $payload);
+        if ($externalId) {
+            $store->updateDocumentStatus($integrationId, $externalId, $event ?: 'webhook', $payload);
+        }
+        respondJson($response, 'success', 'Webhook recibido', ['external_id' => $externalId]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
 }
 
 if (str_starts_with($route, 'records/')) {

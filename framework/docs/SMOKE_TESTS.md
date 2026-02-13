@@ -42,12 +42,22 @@ This validates JSON contracts and warns about broken formulas or ambiguous colum
   - Buttons work (create form, save)
   - UI sections toggle
   - JSON output updates after edits
+  - Revision rapida muestra pendientes claros
 
 ### E) Chat tests (API)
 - Open: Editor JSON > Chat/Pruebas
 - Set API base to project host
 - Run "Pruebas rapidas"
 - Expect: responses success (CreateRecord + QueryRecords)
+
+### F) Integracion Alanube (sandbox)
+- Open: Editor JSON > Facturacion
+- Set pais, sandbox, token_env
+- Click "Probar conexion"
+- Click "Guardar integracion"
+- Expect: integration contract saved + DB tables created (no error)
+- (Opcional) Coloca record_id real y "Enviar sandbox"
+- Expect: respuesta success + guarda external_id en tabla integration_documents
 
 ## 2) Minimum Release Rules
 - If any step fails, rollback or fix before deploy.

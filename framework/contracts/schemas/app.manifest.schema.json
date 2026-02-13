@@ -105,6 +105,8 @@
             "enum": ["e-invoicing", "payments", "erp", "crm", "custom"]
           },
           "provider": { "type": "string" },
+          "country": { "type": "string" },
+          "environment": { "type": "string", "enum": ["sandbox", "production"] },
           "base_url": { "type": "string" },
           "enabled": { "type": "boolean" },
           "auth": {
@@ -113,12 +115,17 @@
             "properties": {
               "type": {
                 "type": "string",
-                "enum": ["api_key", "oauth2", "basic", "jwt", "custom"]
+                "enum": ["bearer", "api_key", "oauth2", "basic", "jwt", "custom"]
               },
               "ref": { "type": "string" },
               "header": { "type": "string" },
-              "token_param": { "type": "string" }
+              "token_param": { "type": "string" },
+              "token_env": { "type": "string" }
             }
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
           },
           "webhooks": {
             "type": "array",
