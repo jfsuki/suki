@@ -25,6 +25,7 @@
     - wizard/form-from-entity
     - entity/save, import/csv
     - records/*, command
+    - chat/message
     - integrations/alanube/* (test/save/emit/status/cancel/webhook)
 
 ## Menu driven routes

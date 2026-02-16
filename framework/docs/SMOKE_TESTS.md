@@ -10,6 +10,13 @@ powershell -ExecutionPolicy Bypass -File framework/docs/smoke.ps1
 ```
 This validates JSON contracts and warns about broken formulas or ambiguous columns.
 
+### Unit Tests (CLI)
+```
+php framework/tests/run.php
+```
+Notas:
+- db_connection y llm_config pueden salir WARN si no hay .env configurado.
+
 ## 1) Manual Smoke (5-10 minutes)
 
 ### A) Facturas
@@ -49,6 +56,13 @@ This validates JSON contracts and warns about broken formulas or ambiguous colum
 - Set API base to project host
 - Run "Pruebas rapidas"
 - Expect: responses success (CreateRecord + QueryRecords)
+
+### E2) Chat Gateway (local)
+- Open: /chat_gateway.html (en el proyecto)
+- Enviar: "crear cliente nombre=Ana nit=900"
+- Enviar: "listar cliente"
+- Enviar: "probar sistema"
+- Expect: respuesta OK + data
 
 ### F) Integracion Alanube (sandbox)
 - Open: Editor JSON > Facturacion

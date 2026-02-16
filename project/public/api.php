@@ -176,7 +176,7 @@ function parseChatMessage(array $payload): array
 {
     $message = trim((string) ($payload['message'] ?? $payload['text'] ?? ''));
     if ($message === '') {
-        return ['error' => 'Mensaje vacio'];
+        return ['command' => 'Help', 'reason' => 'empty'];
     }
 
     $tokens = tokenizeChatMessage($message);
@@ -205,7 +205,7 @@ function parseChatMessage(array $payload): array
     ];
 
     if (!isset($verbMap[$verb])) {
-        return ['error' => 'Verbo no soportado'];
+        return ['command' => 'Help', 'reason' => 'unknown_verb'];
     }
 
     $entity = '';
@@ -241,7 +241,7 @@ function parseChatMessage(array $payload): array
     }
 
     if ($entity === '') {
-        return ['error' => 'Entidad requerida'];
+        return ['command' => 'Help', 'reason' => 'missing_entity'];
     }
 
     if ($verbMap[$verb] === 'QueryRecords' && $id !== null && $id !== '') {
@@ -255,6 +255,58 @@ function parseChatMessage(array $payload): array
         'filters' => $filters,
         'id' => $id,
     ];
+}
+
+function isHelpIntent(string $text): bool
+{
+    $text = trim(mb_strtolower($text));
+    if ($text === '') return true;
+    $keywords = ['hola', 'buenas', 'buenos', 'ayuda', 'help', 'menu', 'funciones', 'que puedes', 'que haces', 'cami'];
+    foreach ($keywords as $kw) {
+        if (str_contains($text, $kw)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+function buildHelpMessage(): string
+{
+    $forms = glob(PROJECT_ROOT . '/contracts/forms/*.json') ?: [];
+    $entities = glob(PROJECT_ROOT . '/contracts/entities/*.entity.json') ?: [];
+    $integrations = glob(PROJECT_ROOT . '/contracts/integrations/*.integration.json') ?: [];
+    $invoices = glob(PROJECT_ROOT . '/contracts/invoices/*.invoice.json') ?: [];
+
+    $formNames = [];
+    foreach ($forms as $path) {
+        $data = json_decode((string) @file_get_contents($path), true);
+        $name = is_array($data) ? ($data['title'] ?? $data['name'] ?? basename($path, '.json')) : basename($path, '.json');
+        $formNames[] = $name;
+    }
+    $entityNames = [];
+    foreach ($entities as $path) {
+        $data = json_decode((string) @file_get_contents($path), true);
+        $name = is_array($data) ? ($data['label'] ?? $data['name'] ?? basename($path, '.entity.json')) : basename($path, '.entity.json');
+        $entityNames[] = $name;
+    }
+
+    $lines = [];
+    $lines[] = 'Hola, soy Cami. Estoy lista para ayudarte.';
+    $lines[] = 'Puedes escribirme como hablas en WhatsApp.';
+    $lines[] = 'Ejemplos rapidos:';
+    $lines[] = '- crear cliente nombre=Juan nit=123';
+    $lines[] = '- listar cliente';
+    $lines[] = '- actualizar cliente id=1 email=juan@mail.com';
+    $lines[] = '- eliminar cliente id=1';
+    $lines[] = 'Formularios activos: ' . (count($formNames) ? implode(', ', array_slice($formNames, 0, 5)) : 'sin formularios');
+    $lines[] = 'Entidades activas: ' . (count($entityNames) ? implode(', ', array_slice($entityNames, 0, 5)) : 'sin entidades');
+    if (count($integrations) > 0 && count($invoices) > 0) {
+        $lines[] = 'Facturacion electronica: activa (Alanube).';
+    } else {
+        $lines[] = 'Facturacion electronica: no activa aun.';
+    }
+    $lines[] = 'Puedes enviar archivos (audio/imagen/PDF). Se procesaran cuando el OCR/voz este habilitado.';
+    return implode("\n", $lines);
 }
 
 function fetchGridItems(array $entity, string $gridName, $recordId): array
@@ -380,6 +432,23 @@ if (str_starts_with($route, 'dashboards')) {
         $engine = new DashboardEngine();
         $data = $engine->build($formKey, $dashKey, $entity ?: null);
         respondJson($response, 'success', 'Dashboard listo', $data);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'chat/message') {
+    $payload = requestData();
+    try {
+        $agent = new \App\Core\ChatAgent();
+        $result = $agent->handle($payload);
+        $status = (string) ($result['status'] ?? 'success');
+        $message = (string) ($result['message'] ?? 'OK');
+        $data = (array) ($result['data'] ?? []);
+        $code = $status === 'error' ? 400 : 200;
+        respondJson($response, $status, $message, $data, $code);
         return;
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 500);

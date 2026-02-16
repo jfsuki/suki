@@ -37,12 +37,15 @@
 - framework/public/.htaccess: headers básicos (sin routing).
 - framework/vendor/*, framework/composer.json: dependencias del kernel.
 - framework/docs/*: fuente de verdad del contrato.
+- framework/docs/DB_INDEX_CHECKLIST.md: checklist de indices + reglas del QueryBuilder.
+- framework/docs/SQL_MEMORY_TABLES.sql: tablas minimas de memoria + chat logs.
 
 ## Project (app)
 - project/public/index.php: router de vistas + layout.
 - project/public/api.php: router API hacia controllers.
 - project/public/assets.php: proxy de assets al framework (fallback).
 - project/public/.htaccess: rutas /api y /<vista>, fallback de assets.
+- project/public/chat_gateway.html: UI local para simular chat WhatsApp/Telegram.
 - project/views/*: vistas del app.
 - project/contracts/*: contratos JSON del app.
 - project/contracts/app.manifest.json: contrato global del app (db/registry/integrations/processes).

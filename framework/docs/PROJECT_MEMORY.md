@@ -9,6 +9,8 @@ Build a low-code "mother app" platform that generates business apps from JSON co
 - Do not change existing keys without versioning + fallback.
 - No SQL in app layer; persistence goes through Kernel/ORM.
 - Keep framework/project separation.
+- Every query must be index-friendly (tenant_id first).
+- Optimize schema from day 1 for millions of records.
 
 ## Core modules
 - FormGenerator: orchestrates form rendering.
@@ -17,6 +19,9 @@ Build a low-code "mother app" platform that generates business apps from JSON co
 - Entity contracts + registry + migrator (DB kernel MVP).
 - Editor JSON: dashboard + forms + DB/process editor.
 - Editor JSON (modo amigable): arbol/inspector/canvas, modo guiado, reportes y dashboards basicos (UI).
+- Chat Gateway (local HTML) para simular WhatsApp/Telegram sin instalar nada.
+- ChatAgent (API) con routing local + LLM (Groq/Gemini) y comandos para crear tablas/forms.
+- UnitTestRunner basico (framework/tests/run.php) + comando chat "probar sistema".
 
 ## What works today
 - Forms + grids render from JSON.
@@ -42,6 +47,8 @@ Build a low-code "mother app" platform that generates business apps from JSON co
 - Smoke tests checklist in framework/docs/SMOKE_TESTS.md (run before deploy).
 
 ## What is missing
+- Manual testing end-to-end (still pending).
+- Multimodal pipeline (audio/img/doc) + OCR + transcripcion.
 - Validation engine (UI) con mensajes claros.
 - Snapshot persistence of FORM_STORE/GRID_STORE for audit/history.
 - Migration diff/alter (only CREATE IF NOT EXISTS).

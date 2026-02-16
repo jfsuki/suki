@@ -1,0 +1,244 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Suki Chat Gateway (Local)</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap');
+        :root {
+            --bg: #f6f7fb;
+            --panel: #ffffff;
+            --border: #e6e9f2;
+            --text: #0f172a;
+            --muted: #6b7280;
+            --accent: #111827;
+            --accent-soft: #eef2ff;
+            --brand: #2563eb;
+            --brand-2: #22c55e;
+            --shadow: 0 10px 30px rgba(15, 23, 42, 0.08);
+        }
+        * { box-sizing: border-box; font-family: 'Space Grotesk', Arial, sans-serif; }
+        body { margin: 0; background: linear-gradient(130deg, #f5f7ff, #f8fafc); color: var(--text); }
+        header {
+            background: var(--panel);
+            border-bottom: 1px solid var(--border);
+            padding: 14px 18px;
+            display:flex;
+            align-items:center;
+            justify-content: space-between;
+            gap:10px;
+            box-shadow: var(--shadow);
+        }
+        header h1 { font-size: 16px; margin: 0; }
+        header small { color: var(--muted); }
+        .badge { background: var(--accent-soft); color: var(--brand); font-size: 11px; padding: 4px 8px; border-radius: 999px; }
+        .layout { display: grid; grid-template-columns: 240px 1fr 280px; gap: 14px; padding: 14px; height: calc(100vh - 66px); }
+        .panel { background: var(--panel); border: 1px solid var(--border); border-radius: 16px; padding: 14px; display: flex; flex-direction: column; box-shadow: var(--shadow); }
+        .panel h3 { font-size: 12px; margin: 0 0 8px 0; text-transform: uppercase; color: var(--muted); letter-spacing: 0.08em; }
+        .sessions { overflow-y: auto; gap: 8px; display: flex; flex-direction: column; }
+        .session { padding: 10px; border: 1px solid var(--border); border-radius: 12px; cursor:pointer; font-size: 12px; display: flex; align-items:center; gap:8px; }
+        .session.active { border-color: var(--brand); background: #eff6ff; }
+        .session-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--brand); }
+        .chat { flex: 1; overflow-y: auto; padding: 12px; background: #f9fafb; border-radius: 14px; border: 1px solid var(--border); }
+        .bubble { max-width: 70%; padding: 10px 12px; margin-bottom: 8px; border-radius: 14px; font-size: 12px; line-height: 1.4; white-space: pre-line; }
+        .in { background: #ffffff; border: 1px solid var(--border); }
+        .out { background: #dbeafe; margin-left: auto; }
+        .input-row { display: flex; gap: 8px; margin-top: 8px; }
+        .input-row input[type="text"] { flex: 1; padding: 10px; border:1px solid var(--border); border-radius: 10px; font-size: 12px; }
+        button { padding: 10px 12px; border: none; border-radius: 10px; background: var(--brand); color: white; font-size: 12px; cursor: pointer; }
+        button.secondary { background: #e2e8f0; color: var(--text); }
+        .meta { font-size: 11px; color: var(--muted); }
+        .form-row { display: flex; flex-direction: column; gap: 6px; }
+        .form-row label { font-size: 11px; color: var(--muted); }
+        .form-row input, .form-row select { padding: 8px; border:1px solid var(--border); border-radius: 10px; font-size: 12px; }
+        .log { font-size: 11px; color: var(--muted); margin-top: 6px; white-space: pre-line; }
+        .status { font-size: 11px; padding: 6px 8px; border-radius: 10px; background: #ecfeff; color: #0f766e; }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>Suki • Cami Chat</h1>
+            <small>Simula Telegram/WhatsApp sin instalar nada</small>
+        </div>
+        <div class="badge" id="agentStatus">Cami en linea</div>
+    </header>
+
+    <div class="layout">
+        <div class="panel">
+            <h3>Sesiones</h3>
+            <div class="sessions" id="sessions"></div>
+            <div class="input-row">
+                <button class="secondary" id="newSession">Nueva sesion</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>Chat</h3>
+            <div class="chat" id="chat"></div>
+            <div class="input-row">
+                <input type="text" id="message" placeholder="Escribe: crear cliente nombre=Juan nit=123" />
+                <button id="send">Enviar</button>
+            </div>
+            <div class="input-row">
+                <input type="file" id="file" />
+                <button class="secondary" id="sendFile">Enviar archivo</button>
+            </div>
+            <div class="meta">Canal simulado: se envia a /api/chat/message</div>
+        </div>
+
+        <div class="panel">
+            <h3>Configuracion</h3>
+            <div class="form-row">
+                <label>Canal</label>
+                <select id="channel">
+                    <option value="telegram">Telegram</option>
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="local">Local</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label>User ID</label>
+                <input type="text" id="userId" value="user_demo" />
+            </div>
+            <div class="form-row">
+                <label>Session ID</label>
+                <input type="text" id="sessionId" />
+            </div>
+            <div class="form-row">
+                <label>API Base</label>
+                <input type="text" id="apiBase" value="" placeholder="(vacio = mismo host)" />
+            </div>
+            <div class="status" id="statusText">Cami lista para ayudarte</div>
+            <div class="log" id="log"></div>
+        </div>
+    </div>
+
+    <script>
+        const sessionsEl = document.getElementById('sessions');
+        const chatEl = document.getElementById('chat');
+        const messageEl = document.getElementById('message');
+        const sendEl = document.getElementById('send');
+        const channelEl = document.getElementById('channel');
+        const userIdEl = document.getElementById('userId');
+        const sessionIdEl = document.getElementById('sessionId');
+        const apiBaseEl = document.getElementById('apiBase');
+        const logEl = document.getElementById('log');
+        const statusTextEl = document.getElementById('statusText');
+        const agentStatusEl = document.getElementById('agentStatus');
+        const fileEl = document.getElementById('file');
+        const sendFileEl = document.getElementById('sendFile');
+
+        let sessions = [];
+
+        function apiBase() {
+            const raw = apiBaseEl.value.trim();
+            return raw ? raw.replace(/\/+$/, '') : window.location.origin;
+        }
+
+        function addSession(id) {
+            const session = { id, messages: [] };
+            sessions.push(session);
+            renderSessions();
+            selectSession(id);
+        }
+
+        function selectSession(id) {
+            sessionIdEl.value = id;
+            renderSessions();
+            renderChat();
+        }
+
+        function currentSession() {
+            const id = sessionIdEl.value.trim();
+            return sessions.find(s => s.id === id);
+        }
+
+        function renderSessions() {
+            sessionsEl.innerHTML = '';
+            sessions.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'session' + (s.id === sessionIdEl.value.trim() ? ' active' : '');
+                div.textContent = s.id;
+                div.onclick = () => selectSession(s.id);
+                sessionsEl.appendChild(div);
+            });
+        }
+
+        function renderChat() {
+            const session = currentSession();
+            chatEl.innerHTML = '';
+            if (!session) return;
+            session.messages.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'bubble ' + (m.dir === 'in' ? 'in' : 'out');
+                div.textContent = m.text;
+                chatEl.appendChild(div);
+            });
+            chatEl.scrollTop = chatEl.scrollHeight;
+        }
+
+        function log(msg) {
+            logEl.textContent = msg;
+        }
+
+        async function sendMessage(text, meta = {}) {
+            const session = currentSession();
+            if (!session) return;
+            session.messages.push({ dir: 'in', text });
+            renderChat();
+
+            const payload = {
+                channel: channelEl.value,
+                user_id: userIdEl.value.trim() || 'user_demo',
+                session_id: session.id,
+                message: text,
+                meta
+            };
+
+            try {
+                const res = await fetch(apiBase() + '/api/chat/message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                const reply = (data.reply || (data.data && data.data.reply) || data.message || JSON.stringify(data));
+                session.messages.push({ dir: 'out', text: reply });
+                renderChat();
+                log('OK: ' + (data.status || 'success'));
+                statusTextEl.textContent = 'Cami respondio';
+            } catch (e) {
+                log('Error: ' + e.message);
+                statusTextEl.textContent = 'No pude conectar con Cami';
+                agentStatusEl.textContent = 'Cami desconectada';
+            }
+        }
+
+        sendEl.onclick = () => {
+            const text = messageEl.value.trim();
+            if (!text) return;
+            messageEl.value = '';
+            sendMessage(text);
+        };
+
+        sendFileEl.onclick = () => {
+            const file = fileEl.files[0];
+            if (!file) return;
+            sendMessage('[archivo] ' + file.name, { media_name: file.name, media_type: file.type, size: file.size });
+            fileEl.value = '';
+        };
+
+        document.getElementById('newSession').onclick = () => {
+            const id = 'sess_' + Date.now();
+            addSession(id);
+        };
+
+        // init
+        addSession('sess_demo');
+        // saludo inicial
+        sendMessage('hola');
+    </script>
+</body>
+</html>
