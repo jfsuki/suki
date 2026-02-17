@@ -1,0 +1,41 @@
+{
+  "type": "market_research",
+  "version": "1.0",
+  "cadence": "weekly|monthly",
+  "sources": [
+    "official_docs",
+    "trusted_media",
+    "customer_feedback",
+    "usage_telemetry"
+  ],
+  "focus": [
+    "governance",
+    "security",
+    "cost_optimization",
+    "ux_accessibility",
+    "chat_first"
+  ],
+  "outputs": {
+    "insights": "array",
+    "risks": "array",
+    "opportunities": "array",
+    "backlog_updates": "array"
+  },
+  "competitor_landscape": {
+    "vendors": "array",
+    "strengths": "array",
+    "gaps": "array"
+  },
+  "customer_expectations": {
+    "top_pains": "array",
+    "desired_outcomes": "array",
+    "adoption_barriers": "array"
+  },
+  "trend_log": [
+    {
+      "date": "string",
+      "summary": "string",
+      "impact": "low|medium|high"
+    }
+  ]
+}

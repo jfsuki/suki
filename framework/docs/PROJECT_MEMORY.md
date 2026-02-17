@@ -26,6 +26,7 @@ Build a low-code "mother app" platform that generates business apps from JSON co
 - LLMRouter multi-proveedor (Groq/Gemini/OpenRouter/Claude) con fallback y circuit breaker.
 - Telemetry JSONL + AgentNurtureJob para enriquecer lexicon.
 - RoleContext + permisos por entidad (admin/seller) en CommandLayer.
+ - Research Policy (docs/RESEARCH_POLICY.md) + contract de market research.
 
 ## What works today
 - Forms + grids render from JSON.
@@ -62,6 +63,8 @@ Build a low-code "mother app" platform that generates business apps from JSON co
 - Dashboards + charts avanzados (KPI, analitica).
 - Process engine + async jobs + audit log.
 - Security hardening (CSRF, RBAC/IDOR, rate limiting).
+- Metadata de apps en DB (hoy: contratos en archivos, falta versionado/patch en DB).
+- Separacion formal Build vs Use (agentes dedicados + permisos estrictos).
 
 ## Known risks
 - Two grid engines (form-grid.js and grid-engine.php) can drift.

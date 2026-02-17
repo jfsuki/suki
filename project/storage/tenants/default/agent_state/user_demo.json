@@ -1,0 +1,25 @@
+{
+    "active_task": null,
+    "intent": "question",
+    "entity": "",
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "hola",
+            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "ts": 1771342254
+        },
+        {
+            "u": "hola",
+            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "ts": 1771342259
+        },
+        {
+            "u": "que app tengo activa?",
+            "a": "",
+            "ts": 1771342273
+        }
+    ],
+    "summary": "hola"
+}
