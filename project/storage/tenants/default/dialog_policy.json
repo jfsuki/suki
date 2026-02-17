@@ -1,0 +1,8 @@
+{
+    "ask_style": "short",
+    "confirm_delete": true,
+    "max_questions_before_llm": 2,
+    "latency_budget_ms": 1200,
+    "max_output_tokens": 400,
+    "question_templates": []
+}

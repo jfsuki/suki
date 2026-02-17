@@ -1,0 +1,6 @@
+{
+  "ask_style": "short",
+  "confirm_delete": true,
+  "max_questions_before_llm": 2,
+  "question_templates": "object"
+}

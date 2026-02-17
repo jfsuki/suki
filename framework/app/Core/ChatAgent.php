@@ -3,6 +3,10 @@
 
 namespace App\Core;
 
+use App\Core\Agents\ConversationGateway;
+use App\Core\Agents\Telemetry;
+use App\Core\LLM\LLMRouter;
+
 use RuntimeException;
 
 final class ChatAgent
@@ -10,11 +14,13 @@ final class ChatAgent
     private ?CommandLayer $command = null;
     private EntityRegistry $entities;
     private ?EntityMigrator $migrator = null;
+    private ?ConversationGateway $gateway = null;
+    private ?LLMRouter $llmRouter = null;
+    private ?Telemetry $telemetry = null;
     private FormWizard $wizard;
     private ContractWriter $writer;
     private EntityBuilder $builder;
     private ChatMemoryStore $memory;
-    private LlmRouter $llm;
 
     public function __construct()
     {
@@ -23,7 +29,6 @@ final class ChatAgent
         $this->writer = new ContractWriter();
         $this->builder = new EntityBuilder();
         $this->memory = new ChatMemoryStore();
-        $this->llm = new LlmRouter();
     }
 
     public function handle(array $payload): array
@@ -32,7 +37,11 @@ final class ChatAgent
         $channel = (string) ($payload['channel'] ?? 'local');
         $sessionId = (string) ($payload['session_id'] ?? 'sess_' . time());
         $userId = (string) ($payload['user_id'] ?? 'anon');
-        $sessionMemory = $this->memory->getSession($sessionId);
+        $tenantId = (string) ($payload['tenant_id'] ?? getenv('TENANT_ID') ?? 'default');
+        $role = (string) ($payload['role'] ?? $payload['user_role'] ?? getenv('DEFAULT_ROLE') ?? 'admin');
+        \App\Core\RoleContext::setRole($role);
+        \App\Core\RoleContext::setUserId($userId);
+        \App\Core\RoleContext::setUserLabel((string) ($payload['user_label'] ?? ''));
 
         if ($text === '' && empty($payload['meta'])) {
             return $this->reply('Mensaje vacio.', $channel, $sessionId, $userId, 'error');
@@ -42,33 +51,53 @@ final class ChatAgent
             return $this->reply('Archivo recibido. Procesaremos OCR/Audio cuando este habilitado.', $channel, $sessionId, $userId);
         }
 
-        if ($this->isHelpIntent($text)) {
-            $reply = $this->reply($this->buildHelpMessage(), $channel, $sessionId, $userId);
-            $this->storeMemory($sessionId, $text, $reply['data']['reply'] ?? '');
+        $gateway = $this->gateway();
+        $result = $gateway->handle($tenantId, $userId, $text);
+        $action = $result['action'] ?? 'respond_local';
+        $telemetry = $result['telemetry'] ?? [];
+
+        if ($action === 'respond_local' || $action === 'ask_user') {
+            $reply = $this->reply((string) ($result['reply'] ?? ''), $channel, $sessionId, $userId);
+            $this->telemetry()->record($tenantId, array_merge($telemetry, [
+                'message' => $text,
+                'resolved_locally' => true,
+            ]));
             return $reply;
         }
 
-        $local = $this->parseLocal($text);
-        if (($local['command'] ?? '') !== '') {
-            $reply = $this->executeLocal($local, $channel, $sessionId, $userId);
-            $this->storeMemory($sessionId, $text, $reply['data']['reply'] ?? '');
+        if ($action === 'execute_command' && !empty($result['command'])) {
+            $reply = $this->executeCommandPayload((array) $result['command'], $channel, $sessionId, $userId);
+            $this->telemetry()->record($tenantId, array_merge($telemetry, [
+                'message' => $text,
+                'resolved_locally' => true,
+            ]));
             return $reply;
         }
 
-        $context = $this->buildContext();
-        if (!empty($sessionMemory['summary'])) {
-            $context['memory'] = (string) $sessionMemory['summary'];
-        }
-        $intent = $this->llm->interpret($text, $context, $payload);
-        if (!$intent) {
-            $reply = $this->reply('IA no configurada o no disponible. Usa comandos simples o configura API keys.', $channel, $sessionId, $userId);
-            $this->storeMemory($sessionId, $text, $reply['data']['reply'] ?? '');
-            return $reply;
+        if ($action === 'send_to_llm' && !empty($result['llm_request'])) {
+            try {
+                $llmResult = $this->llmRouter()->chat((array) $result['llm_request']);
+            } catch (\Throwable $e) {
+                return $this->reply('IA no disponible. Usa comandos simples.', $channel, $sessionId, $userId);
+            }
+            $provider = $llmResult['provider'] ?? 'llm';
+            $this->telemetry()->record($tenantId, array_merge($telemetry, [
+                'message' => $text,
+                'provider_used' => $provider,
+                'resolved_locally' => false,
+            ]));
+
+            $json = $llmResult['json'] ?? null;
+            if (is_array($json)) {
+                $reply = $this->executeLlmJson($json, $channel, $sessionId, $userId);
+                return $reply;
+            }
+
+            $textReply = (string) ($llmResult['text'] ?? '');
+            return $this->reply($textReply !== '' ? $textReply : 'Listo.', $channel, $sessionId, $userId);
         }
 
-        $reply = $this->executeIntent($intent, $channel, $sessionId, $userId);
-        $this->storeMemory($sessionId, $text, $reply['data']['reply'] ?? '');
-        return $reply;
+        return $this->reply('No entendi. Puedes decir: crear cliente nombre=Juan nit=123', $channel, $sessionId, $userId, 'error');
     }
 
     public function parseLocal(string $text): array
@@ -489,6 +518,94 @@ final class ChatAgent
             $this->migrator = new EntityMigrator($this->entities);
         }
         return $this->migrator;
+    }
+
+    private function gateway(): ConversationGateway
+    {
+        if (!$this->gateway) {
+            $this->gateway = new ConversationGateway();
+        }
+        return $this->gateway;
+    }
+
+    private function llmRouter(): LLMRouter
+    {
+        if (!$this->llmRouter) {
+            $this->llmRouter = new LLMRouter();
+        }
+        return $this->llmRouter;
+    }
+
+    private function telemetry(): Telemetry
+    {
+        if (!$this->telemetry) {
+            $this->telemetry = new Telemetry();
+        }
+        return $this->telemetry;
+    }
+
+    private function executeCommandPayload(array $command, string $channel, string $sessionId, string $userId): array
+    {
+        $cmd = (string) ($command['command'] ?? '');
+        $entity = (string) ($command['entity'] ?? '');
+        $id = $command['id'] ?? null;
+        $data = (array) ($command['data'] ?? []);
+        $filters = (array) ($command['filters'] ?? []);
+
+        if ($cmd === '') {
+            return $this->reply('Comando incompleto.', $channel, $sessionId, $userId, 'error');
+        }
+
+        switch ($cmd) {
+            case 'CreateRecord':
+                $result = $this->command()->createRecord($entity, $data);
+                return $this->reply('Registro creado en ' . $entity, $channel, $sessionId, $userId, 'success', $result);
+            case 'QueryRecords':
+                $result = $this->command()->queryRecords($entity, $filters, 20, 0);
+                return $this->reply('Resultados para ' . $entity . ': ' . count($result), $channel, $sessionId, $userId, 'success', $result);
+            case 'ReadRecord':
+                $result = $this->command()->readRecord($entity, $id, true);
+                return $this->reply('Registro de ' . $entity, $channel, $sessionId, $userId, 'success', $result);
+            case 'UpdateRecord':
+                $result = $this->command()->updateRecord($entity, $id, $data);
+                return $this->reply('Registro actualizado en ' . $entity, $channel, $sessionId, $userId, 'success', $result);
+            case 'DeleteRecord':
+                $result = $this->command()->deleteRecord($entity, $id);
+                return $this->reply('Registro eliminado en ' . $entity, $channel, $sessionId, $userId, 'success', $result);
+        }
+
+        return $this->reply('Comando no soportado.', $channel, $sessionId, $userId, 'error');
+    }
+
+    private function executeLlmJson(array $json, string $channel, string $sessionId, string $userId): array
+    {
+        if (isset($json['command'])) {
+            return $this->executeCommandPayload((array) $json['command'], $channel, $sessionId, $userId);
+        }
+        if (isset($json['actions']) && is_array($json['actions'])) {
+            foreach ($json['actions'] as $action) {
+                if (!is_array($action)) continue;
+                $type = strtolower((string) ($action['type'] ?? ''));
+                if ($type === 'create_record') {
+                    return $this->executeCommandPayload([
+                        'command' => 'CreateRecord',
+                        'entity' => $action['entity'] ?? '',
+                        'data' => $action['data'] ?? [],
+                    ], $channel, $sessionId, $userId);
+                }
+                if ($type === 'query_records') {
+                    return $this->executeCommandPayload([
+                        'command' => 'QueryRecords',
+                        'entity' => $action['entity'] ?? '',
+                        'filters' => $action['filters'] ?? [],
+                    ], $channel, $sessionId, $userId);
+                }
+            }
+        }
+        if (isset($json['reply'])) {
+            return $this->reply((string) $json['reply'], $channel, $sessionId, $userId);
+        }
+        return $this->reply('Listo.', $channel, $sessionId, $userId);
     }
 
     private function storeMemory(string $sessionId, string $userText, string $replyText): void

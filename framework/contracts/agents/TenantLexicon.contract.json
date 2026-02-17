@@ -1,0 +1,7 @@
+{
+  "synonyms": "object",
+  "shortcuts": "object",
+  "stop_phrases": "array",
+  "entity_aliases": "object",
+  "field_aliases": "object"
+}

@@ -66,6 +66,12 @@ En `/chat_gateway.html`:
 - `actualizar producto id=1 precio=55000`
 - `eliminar producto id=1`
 
+## 5.1) Probar roles (multiusuario)
+1) En el chat, selecciona Rol = "Vendedora" (seller).
+2) Intenta `eliminar producto id=1`.
+3) Espera: permiso denegado si el contrato limita delete a admin.
+4) Cambia Rol = "Administrador" y repite.
+
 ## 6) Probar app UI (forms reales)
 Abrir en navegador:
 - `/clientes`
@@ -85,8 +91,18 @@ Chat:
 probar sistema
 ```
 
-## 8) Errores comunes
+## 8) Probar Conversation Gateway (memoria local)
+1) Enviar: `hola`
+2) Enviar: `crear cliente nombre=Ana nit=123`
+3) Verificar archivos:
+   - `project/storage/tenants/default/agent_state/user_demo.json`
+   - `project/storage/tenants/default/lexicon.json`
+4) (Opcional) Ejecutar job:
+```
+php -r "require 'framework/app/autoload.php'; (new App\\Jobs\\AgentNurtureJob())->run('default');"
+```
+
+## 9) Errores comunes
 - **Access denied root**: DB_PASS incorrecto.
 - **mysql_native_password**: usuario MySQL incompatible; crea usuario nuevo con autenticacion moderna.
 - **IA no configurada**: faltan API keys, usa comandos simples.
-

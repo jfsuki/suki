@@ -21,6 +21,12 @@
 - framework/app/Core/TenantContext.php: tenant_id resolver.
 - framework/app/Core/MigrationStore.php: schema_migrations tracker.
 - framework/app/Core/CommandLayer.php: CRUD + Command layer (Create/Query/Update/Delete).
+- framework/app/Core/ChatAgent.php: API chat agent (local-first + LLM fallback).
+- framework/app/Core/Agents/ConversationGateway.php: filtro local + slots + estado por tenant.
+- framework/app/Core/Agents/Telemetry.php: telemetry JSONL por tenant.
+- framework/app/Jobs/AgentNurtureJob.php: job que nutre lexicon/intents.
+- framework/app/Core/LLM/LLMRouter.php: router multi-proveedor con fallback.
+- framework/app/Core/LLM/Providers/*: adaptadores Gemini/Groq/OpenRouter/Claude.
 - framework/app/Core/IntegrationRegistry.php: loader + validator for integration contracts.
 - framework/app/Core/InvoiceRegistry.php: loader + validator for invoice contracts.
 - framework/app/Core/IntegrationMigrator.php: tablas base de integracion + outbox.
@@ -39,6 +45,8 @@
 - framework/docs/*: fuente de verdad del contrato.
 - framework/docs/DB_INDEX_CHECKLIST.md: checklist de indices + reglas del QueryBuilder.
 - framework/docs/SQL_MEMORY_TABLES.sql: tablas minimas de memoria + chat logs.
+- framework/docs/AGENTS_CONVERSATION_GATEWAY.md: arquitectura del gateway conversacional.
+- framework/docs/TESTING_MANUAL.md: manual de pruebas end-to-end.
 
 ## Project (app)
 - project/public/index.php: router de vistas + layout.

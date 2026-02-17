@@ -16,6 +16,10 @@ spl_autoload_register(function ($class) {
 
     $candidates = [
         FRAMEWORK_ROOT . '/app/Core/' . $baseName . '.php',
+        FRAMEWORK_ROOT . '/app/Core/Agents/' . $baseName . '.php',
+        FRAMEWORK_ROOT . '/app/Core/LLM/' . $baseName . '.php',
+        FRAMEWORK_ROOT . '/app/Core/LLM/Providers/' . $baseName . '.php',
+        FRAMEWORK_ROOT . '/app/Jobs/' . $baseName . '.php',
         FRAMEWORK_ROOT . '/app/controller/' . $baseName . '.php',
         PROJECT_ROOT . '/app/controller/' . $baseName . '.php',
     ];

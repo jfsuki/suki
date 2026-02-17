@@ -1,0 +1,9 @@
+{
+  "active_task": "string|null",
+  "intent": "create|update|delete|list|question|null",
+  "entity": "string|null",
+  "collected": "object",
+  "missing": "array",
+  "last_messages": "array",
+  "summary": "string|null"
+}

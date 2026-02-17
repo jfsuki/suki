@@ -16,6 +16,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('db_connection', fn() => Database::connection()->getAttribute(\PDO::ATTR_DRIVER_NAME));
         $tests[] = $this->wrap('llm_config', fn() => $this->checkLlmConfig());
         $tests[] = $this->wrap('chat_parser', fn() => $this->checkParser());
+        $tests[] = $this->wrap('gateway_local', fn() => $this->checkGateway());
 
         $summary = [
             'passed' => count(array_filter($tests, fn($t) => $t['status'] === 'pass')),
@@ -60,6 +61,15 @@ final class UnitTestRunner
         $result = $agent->parseLocal('crear cliente nombre=Ana');
         if (($result['command'] ?? '') !== 'CreateRecord') {
             throw new \RuntimeException('Parser local no reconoce CreateRecord.');
+        }
+    }
+
+    private function checkGateway(): void
+    {
+        $gateway = new \App\Core\Agents\ConversationGateway();
+        $result = $gateway->handle('default', 'test', 'hola');
+        if (($result['action'] ?? '') !== 'respond_local') {
+            throw new \RuntimeException('Gateway no responde saludo local.');
         }
     }
 }

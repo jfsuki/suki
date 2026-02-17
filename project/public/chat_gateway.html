@@ -103,6 +103,13 @@
                 <input type="text" id="userId" value="user_demo" />
             </div>
             <div class="form-row">
+                <label>Rol</label>
+                <select id="role">
+                    <option value="admin">Administrador</option>
+                    <option value="seller">Vendedora</option>
+                </select>
+            </div>
+            <div class="form-row">
                 <label>Session ID</label>
                 <input type="text" id="sessionId" />
             </div>
@@ -129,6 +136,7 @@
         const agentStatusEl = document.getElementById('agentStatus');
         const fileEl = document.getElementById('file');
         const sendFileEl = document.getElementById('sendFile');
+        const roleEl = document.getElementById('role');
 
         let sessions = [];
 
@@ -192,6 +200,7 @@
             const payload = {
                 channel: channelEl.value,
                 user_id: userIdEl.value.trim() || 'user_demo',
+                role: roleEl.value,
                 session_id: session.id,
                 message: text,
                 meta

@@ -1,0 +1,11 @@
+{
+  "intents": [
+    {
+      "name": "string",
+      "patterns": "array",
+      "examples": "array",
+      "required": "array",
+      "build_command": "object"
+    }
+  ]
+}

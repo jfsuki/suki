@@ -32,6 +32,7 @@ class CommandLayer
     {
         $entity = $this->registry->get($entityName);
         $this->ensureTenant($entity);
+        $this->ensurePermission($entity, 'create');
         $this->migrator->migrateEntity($entity, true);
 
         [$data, $grids] = $this->splitPayload($entity, $payload);
@@ -59,6 +60,7 @@ class CommandLayer
     {
         $entity = $this->registry->get($entityName);
         $this->ensureTenant($entity);
+        $this->ensurePermission($entity, 'read');
 
         $repo = new BaseRepository($entity, null, $this->tenantId);
         return $repo->list($filters, $limit, $offset);
@@ -68,6 +70,7 @@ class CommandLayer
     {
         $entity = $this->registry->get($entityName);
         $this->ensureTenant($entity);
+        $this->ensurePermission($entity, 'read');
 
         $repo = new BaseRepository($entity, null, $this->tenantId);
         $record = $repo->find($id);
@@ -87,6 +90,7 @@ class CommandLayer
     {
         $entity = $this->registry->get($entityName);
         $this->ensureTenant($entity);
+        $this->ensurePermission($entity, 'update');
 
         [$data, $grids] = $this->splitPayload($entity, $payload);
         [$clean, $errors] = $this->validateAndNormalize($entity, $data, false);
@@ -114,6 +118,7 @@ class CommandLayer
     {
         $entity = $this->registry->get($entityName);
         $this->ensureTenant($entity);
+        $this->ensurePermission($entity, 'delete');
 
         $repo = new BaseRepository($entity, null, $this->tenantId);
         $affected = $repo->delete($id);
@@ -129,6 +134,24 @@ class CommandLayer
         $tenantScoped = (bool) ($entity['table']['tenantScoped'] ?? false);
         if ($tenantScoped && $this->tenantId === null) {
             throw new RuntimeException('tenant_id requerido para esta entidad.');
+        }
+    }
+
+    private function ensurePermission(array $entity, string $action): void
+    {
+        $permissions = $entity['permissions'][$action] ?? null;
+        if (!is_array($permissions)) {
+            return;
+        }
+        $role = RoleContext::getRole();
+        if ($role === 'admin') {
+            return;
+        }
+        if (in_array('*', $permissions, true)) {
+            return;
+        }
+        if (!in_array($role, $permissions, true)) {
+            throw new RuntimeException('Permisos insuficientes para ' . $action . ' en ' . ($entity['name'] ?? 'entidad'));
         }
     }
 

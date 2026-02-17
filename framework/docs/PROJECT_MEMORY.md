@@ -22,6 +22,10 @@ Build a low-code "mother app" platform that generates business apps from JSON co
 - Chat Gateway (local HTML) para simular WhatsApp/Telegram sin instalar nada.
 - ChatAgent (API) con routing local + LLM (Groq/Gemini) y comandos para crear tablas/forms.
 - UnitTestRunner basico (framework/tests/run.php) + comando chat "probar sistema".
+- ConversationGateway local-first (PHP) con memoria por tenant + Context Capsule minimo.
+- LLMRouter multi-proveedor (Groq/Gemini/OpenRouter/Claude) con fallback y circuit breaker.
+- Telemetry JSONL + AgentNurtureJob para enriquecer lexicon.
+- RoleContext + permisos por entidad (admin/seller) en CommandLayer.
 
 ## What works today
 - Forms + grids render from JSON.

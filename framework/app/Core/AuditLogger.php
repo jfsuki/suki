@@ -67,6 +67,10 @@ final class AuditLogger
 
     private function getActorId(): ?string
     {
+        $ctx = RoleContext::getUserId();
+        if ($ctx !== null) {
+            return $ctx;
+        }
         if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION['user_id'])) {
             return (string) $_SESSION['user_id'];
         }
@@ -75,6 +79,10 @@ final class AuditLogger
 
     private function getActorLabel(): ?string
     {
+        $ctx = RoleContext::getUserLabel();
+        if ($ctx !== null) {
+            return $ctx;
+        }
         if (session_status() === PHP_SESSION_ACTIVE && isset($_SESSION['user_name'])) {
             return (string) $_SESSION['user_name'];
         }

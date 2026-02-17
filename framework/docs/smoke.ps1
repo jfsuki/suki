@@ -1,5 +1,6 @@
 param(
-    [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot "..")).Path
+    # Workspace root (contains framework/ and project/)
+    [string]$Root = (Resolve-Path (Join-Path $PSScriptRoot "../..")).Path
 )
 
 $ErrorActionPreference = "Stop"
@@ -123,4 +124,3 @@ foreach ($file in $contractFiles) {
 }
 
 Write-Host "Smoke checks completed."
-
