@@ -16,6 +16,21 @@ Objetivo: resolver conversaciones con costo minimo. Local-first, y LLM solo si e
 - `app/Core/LLM/LLMRouter.php`
 - `app/Core/LLM/Providers/*`
 
+## Base conversacional (JSON)
+Se consolidó y conectó al router local:
+```
+framework/contracts/agents/conversation_training_base.json
+```
+Contiene intents, entidades, typos, memoria activa y smoke tests.  
+El gateway usa esta base para clasificar intents como **estado del proyecto**, **tablas**, **formularios** y **qué puedo hacer** sin llamar a IA.
+
+## Auto‑nutrición (telemetry → training_overrides)
+El job `AgentNurtureJob` analiza telemetry reciente y genera:
+```
+project/storage/tenants/{tenantId}/training_overrides.json
+```
+Estas utterances se mezclan con el training base sin reescribirlo.
+
 ## Memoria por tenant
 Ruta:
 ```
@@ -57,3 +72,9 @@ php -r "require 'framework/app/autoload.php'; (new App\\Jobs\\AgentNurtureJob())
 - Local-first siempre.
 - Contexto minimo (no historial completo).
 - Cache de resultados frecuentes.
+
+## Prompts y entrenamiento (resumen)
+- **Agent Training Prompt**: JSON-first, cambios incrementales, cero tecnicismos, IA solo fallback.
+- **ConversationTrainer**: mejora intents/utterances/sinónimos sin reescribir; agrega pruebas smoke.
+- **Memory Active Profile**: mantener objetivo, contexto del proyecto y preferencias del usuario; 1 pregunta mínima.
+- **Auto‑training flow**: usa telemetry para nutrir lexicon/utterances y reducir llamadas LLM.

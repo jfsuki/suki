@@ -1,0 +1,15 @@
+{
+    "active_task": null,
+    "intent": null,
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "estado del proyecto",
+            "a": "Estado del proyecto:\n- Entidades: 3\n- Formularios: 3\n- Vistas: 6\nUltimas entidades: cliente, clientes, factura\nUltimos formularios: cliente.form, cuentasxcobrar.form, fact.form",
+            "ts": 1771381480
+        }
+    ],
+    "summary": "estado del proyecto"
+}

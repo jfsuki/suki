@@ -1,0 +1,15 @@
+{
+    "active_task": null,
+    "intent": "FORM_LIST",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "que formularios?",
+            "a": "Formularios: cliente.form, clientes.form, cuentasxcobrar.form, fact.form. ¿Quieres abrir alguno?",
+            "ts": 1771462303
+        }
+    ],
+    "summary": "que formularios?"
+}

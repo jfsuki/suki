@@ -1,0 +1,33 @@
+{
+    "active_task": null,
+    "intent": "create",
+    "entity": "cliente",
+    "collected": {
+        "nombre": "juan",
+        "nit": "123"
+    },
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "crear cliente nombre=Juan nit=123",
+            "a": "OK",
+            "ts": 1771451654
+        },
+        {
+            "u": "crear cliente nombre=Juan nit=123",
+            "a": "OK",
+            "ts": 1771458369
+        },
+        {
+            "u": "crear producto",
+            "a": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "ts": 1771462188
+        },
+        {
+            "u": "crear producto",
+            "a": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "ts": 1771462242
+        }
+    ],
+    "summary": "listar cliente"
+}

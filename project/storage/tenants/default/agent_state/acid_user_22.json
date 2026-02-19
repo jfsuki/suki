@@ -1,0 +1,20 @@
+{
+    "active_task": null,
+    "intent": "PROJECT_STATUS",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "que hay hecho",
+            "a": "Estado del proyecto:\n- Entidades: 3\n- Formularios: 4\n- Vistas: 6\nUltimas entidades: cliente, clientes, factura\nUltimos formularios: cliente.form, clientes.form, cuentasxcobrar.form",
+            "ts": 1771462188
+        },
+        {
+            "u": "que hay hecho",
+            "a": "Estado del proyecto:\n- Entidades: 3\n- Formularios: 4\n- Vistas: 6\nUltimas entidades: cliente, clientes, factura\nUltimos formularios: cliente.form, clientes.form, cuentasxcobrar.form",
+            "ts": 1771462242
+        }
+    ],
+    "summary": "que hay hecho"
+}

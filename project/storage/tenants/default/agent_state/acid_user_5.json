@@ -1,0 +1,30 @@
+{
+    "active_task": null,
+    "intent": "APP_CAPABILITIES",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "que opciones puedo usar ahora",
+            "a": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\n¿Quieres crear algo nuevo o usar lo que ya tienes?",
+            "ts": 1771451654
+        },
+        {
+            "u": "que opciones puedo usar ahora",
+            "a": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\n¿Quieres crear algo nuevo o usar lo que ya tienes?",
+            "ts": 1771458369
+        },
+        {
+            "u": "que opciones puedo usar ahora",
+            "a": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\n¿Quieres crear algo nuevo o usar lo que ya tienes?",
+            "ts": 1771462188
+        },
+        {
+            "u": "que opciones puedo usar ahora",
+            "a": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\n¿Quieres crear algo nuevo o usar lo que ya tienes?",
+            "ts": 1771462242
+        }
+    ],
+    "summary": "dame el estado del proyecto"
+}

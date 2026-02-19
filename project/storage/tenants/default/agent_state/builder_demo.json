@@ -1,0 +1,32 @@
+{
+    "active_task": "USER_CREATE",
+    "intent": "USER_CREATE",
+    "entity": "",
+    "collected": {
+        "usuario": "ana"
+    },
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "que hay hecho y que puedo hacer",
+            "a": "Estado del proyecto:\n- Entidades: 3\n- Formularios: 4\n- Vistas: 6\nUltimas entidades: cliente, clientes, factura\nUltimos formularios: cliente.form, clientes.form, cuentasxcobrar.form",
+            "ts": 1771442627
+        },
+        {
+            "u": "crear usuario usuario=ana rol=vendedor clave=1234",
+            "a": "¿Qué rol tendrá (admin, vendedor, contador)?",
+            "ts": 1771442640
+        },
+        {
+            "u": "crear usuario usuario=ana rol=vendedor clave=1234",
+            "a": "¿Qué rol tendrá (admin, vendedor, contador)?",
+            "ts": 1771442682
+        },
+        {
+            "u": "crear usuario usuario=ana rol=vendedor clave=1234",
+            "a": "¿Qué rol tendrá (admin, vendedor, contador)?",
+            "ts": 1771442748
+        }
+    ],
+    "summary": "hola dime estatus del proyecto que se ha creado"
+}

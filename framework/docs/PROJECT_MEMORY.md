@@ -1,71 +1,68 @@
 # PROJECT_MEMORY (framework/docs)
 
 ## Objective
-Build a low-code "mother app" platform that generates business apps from JSON contracts. Users get a friendly UI; the engine hides complexity and keeps backward compatibility.
+Build a low-code/AI-first platform that generates business apps from JSON contracts.
+Core principle: chat-first usage, visual UI only when needed (tables, reports, charts).
 
-## Non-negotiable rules
-- No rewrite. Only incremental, backward-compatible changes.
-- JSON contracts are the single source of truth.
-- Do not change existing keys without versioning + fallback.
-- No SQL in app layer; persistence goes through Kernel/ORM.
-- Keep framework/project separation.
-- Every query must be index-friendly (tenant_id first).
-- Optimize schema from day 1 for millions of records.
+## Vision (working memory, 2026-02-19)
+- Meta: generar apps ERP por conversacion (chat-first) con panel visual para lo necesario.
+- North star: cero tecnicismos, JSON-first, IA solo fallback, cambios incrementales.
+- UX: 1 pregunta minima, chat para operar, panel visual para ver datos.
+- Arquitectura: Router local-first + CRUD + report engine + agentes (lider + mini).
+- Metricas: JSON hit-rate >= 85%, menos llamadas LLM con el tiempo.
 
-## Core modules
-- FormGenerator: orchestrates form rendering.
-- FormBuilder: UI primitives.
-- Grid runtime (form-grid.js): rows, totals, formulas, summary graph.
+## Operating commitments (non-negotiable)
+- Investigar y comparar referentes antes de cambiar logica (Emergent, PowerApps, Velneo, Supabase, v0, etc.).
+- Definir flujo logico y diagnostico antes de codificar.
+- Cambios siempre incrementales, retro-compatibles y probados.
+- Contratos JSON son fuente unica de verdad.
+- No SQL en capa app; todo pasa por Kernel/ORM.
+- Cada consulta debe ser index-friendly (tenant_id primero).
+- Tests acidos y manuales actualizados antes de entregar.
+
+## Core modules (actual)
+- FormGenerator + FormBuilder + grid runtime (form-grid.js).
 - Entity contracts + registry + migrator (DB kernel MVP).
-- Editor JSON: dashboard + forms + DB/process editor.
-- Editor JSON (modo amigable): arbol/inspector/canvas, modo guiado, reportes y dashboards basicos (UI).
-- Chat Gateway (local HTML) para simular WhatsApp/Telegram sin instalar nada.
-- ChatAgent (API) con routing local + LLM (Groq/Gemini) y comandos para crear tablas/forms.
-- UnitTestRunner basico (framework/tests/run.php) + comando chat "probar sistema".
-- ConversationGateway local-first (PHP) con memoria por tenant + Context Capsule minimo.
-- LLMRouter multi-proveedor (Groq/Gemini/OpenRouter/Claude) con fallback y circuit breaker.
-- Telemetry JSONL + AgentNurtureJob para enriquecer lexicon.
-- RoleContext + permisos por entidad (admin/seller) en CommandLayer.
- - Research Policy (docs/RESEARCH_POLICY.md) + contract de market research.
+- Editor JSON (dashboard + builder).
+- Chat UI: chat_builder.html (build) + chat_app.html (use).
+- ChatAgent (API) con routing local + LLM fallback.
+- ConversationGateway local-first con memoria por tenant.
+- LLMRouter multi-proveedor con fallback.
+- Telemetry JSONL + AgentNurtureJob para lexicon.
+- CommandLayer (CRUD + validacion + auditoria).
+- Report runtime (preview + PDF MVP) + Dashboard runtime.
+- IntegrationContract + InvoiceContract + Alanube client + webhooks.
+- ProjectRegistry (usuarios, proyectos, sesiones, deploys).
 
 ## What works today
-- Forms + grids render from JSON.
-- Summary dependency ordering (graph).
-- FORM_STORE/GRID_STORE in localStorage.
-- Entity/manifest schema validation.
-- DB Kernel MVP (QueryBuilder + Repository + create-if-missing migrations).
-- CLI migration runner (project/bin/migrate.php).
-- Output escaping (Html::e) for server-rendered labels/values.
-- Safe formula engine (no eval/new Function).
-- CRUD API endpoints /api/records/* + command endpoint /api/command.
-- Contract cache + ETag (contracts) and assets cache headers.
-- DB persistence for main entity + grid rows via CommandLayer.
-- Report runtime (preview + PDF MVP) via /api/reports.
-- Dashboard runtime (KPI + chart series) via /api/dashboards.
-- Wizard tabla->form (FormWizard) con soporte maestro-detalle + reportes fiscales.
-- CSV->EntityContract + migracion.
-- ValidationEngine backend (min/max/pattern/enum) + AuditLogger.
-- IntegrationContract + InvoiceContract schemas.
-- Integracion Alanube (wizard + endpoints + webhook) con base_url parametrico por pais.
-- Report designer fiscal basico (emisor/cliente/documento/totales) en editor.
-- Tablas base de integracion (connections/documents/outbox/webhooks).
-- Smoke tests checklist in framework/docs/SMOKE_TESTS.md (run before deploy).
+- Forms + grids render desde JSON.
+- Summary dependency ordering estable.
+- Entity contracts validados (schema).
+- DB Kernel MVP (QueryBuilder + Repository + tenant scope).
+- CRUD API + Command endpoint.
+- Report preview/PDF MVP + dashboards KPIs.
+- CSV -> EntityContract + migration.
+- ValidationEngine backend + AuditLogger.
+- ConversationGateway local-first:
+  - valida entidad antes de CRUD
+  - slot-filling con requested_slot
+  - build/use guard
+  - ayuda y ejemplos desde registry real
+- Chat help external JSON: conversation_training_base.json.
+- Acid test actualizado (framework/tests/chat_acid.php) y reportes.
 
 ## What is missing
-- Manual testing end-to-end (still pending).
-- Multimodal pipeline (audio/img/doc) + OCR + transcripcion.
-- Validation engine (UI) con mensajes claros.
-- Snapshot persistence of FORM_STORE/GRID_STORE for audit/history.
-- Migration diff/alter (only CREATE IF NOT EXISTS).
-- Import wizard (CSV/Excel/JSON -> DataContract + seeds).
-- Visual form builder (drag/drop, layout grid).
-- Report manager/designer avanzado (facturas, cotizaciones, PDF).
-- Dashboards + charts avanzados (KPI, analitica).
-- Process engine + async jobs + audit log.
-- Security hardening (CSRF, RBAC/IDOR, rate limiting).
-- Metadata de apps en DB (hoy: contratos en archivos, falta versionado/patch en DB).
-- Separacion formal Build vs Use (agentes dedicados + permisos estrictos).
+- Manual testing end-to-end (pendiente).
+- UI avanzada: builder visual drag/drop, inspector completo.
+- Multi-modal (audio/img/PDF) + OCR + transcripcion.
+- Persistencia historica FORM_STORE/GRID_STORE (snapshot/audit).
+- Migraciones diff/alter (solo CREATE IF NOT EXISTS).
+- Metadata de contratos en DB (versionado/patch en DB).
+- Modo build/use con agentes separados y permisos estrictos (formal).
+- Seguridad avanzada: CSRF, rate limiting, IDOR.
 
 ## Known risks
-- Two grid engines (form-grid.js and grid-engine.php) can drift.
-- Grid engines still duplicate logic (needs consolidation later).
+- Deriva entre grid engines (JS vs PHP).
+- Ayuda y ejemplos pueden quedar desfasados si no se alimentan del registry.
+- Estado conversacional debe resetearse cuando cambia proyecto/tenant.
+

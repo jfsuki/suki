@@ -1,0 +1,16 @@
+{
+    "synonyms": [],
+    "shortcuts": [],
+    "stop_phrases": [],
+    "entity_aliases": {
+        "cliente": "cliente",
+        "clientes": "cliente",
+        "factura": "factura",
+        "facturas": "factura"
+    },
+    "field_aliases": {
+        "nit": "nit",
+        "telefono": "telefono",
+        "correo": "email"
+    }
+}

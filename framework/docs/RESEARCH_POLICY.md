@@ -12,6 +12,7 @@ Objetivo: asegurar mejora continua basada en evidencia para mantener competitivi
 - Comunicados técnicos (release notes, deprecations).
 - Telemetry interna (errores, costos, abandono).
 - Feedback de usuarios (dolores y fricción).
+- Referentes a comparar en cada feature: Emergent, PowerApps, Velneo, Supabase, v0, OpenClaw.
 
 ## Salidas obligatorias
 - Insights accionables (máx 10).

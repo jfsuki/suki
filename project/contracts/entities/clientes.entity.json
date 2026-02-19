@@ -1,0 +1,69 @@
+{
+    "type": "entity",
+    "name": "clientes",
+    "label": "Clientes",
+    "version": "1.0",
+    "table": {
+        "name": "clientes",
+        "primaryKey": "id",
+        "timestamps": true,
+        "softDelete": false,
+        "tenantScoped": true
+    },
+    "fields": [
+        {
+            "name": "id",
+            "type": "int",
+            "primary": true,
+            "source": "system"
+        },
+        {
+            "name": "nombre",
+            "type": "string",
+            "label": "Nombre",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "nit",
+            "type": "string",
+            "label": "Nit",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "email",
+            "type": "string",
+            "label": "Email",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "saldo",
+            "type": "decimal",
+            "label": "Saldo",
+            "required": false,
+            "source": "form"
+        }
+    ],
+    "grids": [],
+    "relations": [],
+    "rules": [],
+    "permissions": {
+        "read": [
+            "admin",
+            "seller"
+        ],
+        "create": [
+            "admin",
+            "seller"
+        ],
+        "update": [
+            "admin",
+            "seller"
+        ],
+        "delete": [
+            "admin"
+        ]
+    }
+}

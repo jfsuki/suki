@@ -1,0 +1,33 @@
+{
+    "active_task": null,
+    "intent": "CRUD_GUIDE",
+    "entity": "clientes",
+    "collected": {
+        "nombre": "juan",
+        "nit": "123"
+    },
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "crear formulario clientes",
+            "a": "OK",
+            "ts": 1771451654
+        },
+        {
+            "u": "crear formulario clientes",
+            "a": "OK",
+            "ts": 1771458369
+        },
+        {
+            "u": "crear formulario clientes",
+            "a": "Eso se hace en el Creador de apps. Abre el chat creador para crear tablas o formularios.",
+            "ts": 1771462188
+        },
+        {
+            "u": "crear formulario clientes",
+            "a": "OK",
+            "ts": 1771462242
+        }
+    ],
+    "summary": "crear cliente nombre=Juan nit=123"
+}

@@ -1,0 +1,22 @@
+{
+    "active_task": "crud",
+    "intent": "create",
+    "entity": "factura",
+    "collected": [],
+    "missing": [
+        "nombre"
+    ],
+    "last_messages": [
+        {
+            "u": "guardar factura",
+            "a": "Me falta nombre. ¿Cuál es?",
+            "ts": 1771458324
+        },
+        {
+            "u": "ana",
+            "a": "",
+            "ts": 1771458324
+        }
+    ],
+    "summary": "guardar factura"
+}

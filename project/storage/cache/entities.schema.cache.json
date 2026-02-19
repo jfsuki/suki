@@ -1,7 +1,8 @@
 {
     "schema": "8ac8b6223b9cf1e5a32d27e236622e46e9fbd95c7d2a90b858dbb0ab3ff5be24",
     "files": {
-        "C:\\laragon\\www\\suki/project/contracts/entities/cliente.entity.json": "623f7af9197588eefa2286068237a0b91d64b8506e71c1cc17066d1ee6af4580",
-        "C:\\laragon\\www\\suki/project/contracts/entities/factura.entity.json": "68062ea507b6e94c9aca31d333ca0e267defc1128c2bbc437975e92434720153"
+        "C:\\laragon\\www\\suki/project/contracts/entities/cliente.entity.json": "a85f91bb0b58f49582eeac52a603187cebe990ea07f9ebd4937d4777103938e7",
+        "C:\\laragon\\www\\suki/project/contracts/entities/clientes.entity.json": "2f687ce2ac95372c04f614684ac9ed8720e53d96f81e378208f95333ca912516",
+        "C:\\laragon\\www\\suki/project/contracts/entities/factura.entity.json": "f12af2c7a397a45a51bf21e9542af4f0aab282162bb6d941df899ce29f959ef8"
     }
 }

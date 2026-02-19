@@ -18,6 +18,8 @@ final class AgentNurtureJob
         $tenantId = $tenantId !== '' ? $tenantId : 'default';
         $telemetryDir = $this->projectRoot . '/storage/tenants/' . $this->safe($tenantId) . '/telemetry';
         $lexiconPath = $this->projectRoot . '/storage/tenants/' . $this->safe($tenantId) . '/lexicon.json';
+        $overridePath = $this->projectRoot . '/storage/tenants/' . $this->safe($tenantId) . '/training_overrides.json';
+        $trainingPath = dirname(__DIR__, 2) . '/contracts/agents/conversation_training_base.json';
 
         $lexicon = $this->readJson($lexiconPath, [
             'synonyms' => [],
@@ -27,7 +29,20 @@ final class AgentNurtureJob
             'field_aliases' => [],
         ]);
 
+        $overrides = $this->readJson($overridePath, [
+            'intents' => [],
+            'updated' => date('Y-m-d'),
+        ]);
+        $baseTraining = $this->readJson($trainingPath, []);
+        $baseIntents = [];
+        foreach (($baseTraining['intents'] ?? []) as $intent) {
+            if (!empty($intent['name'])) {
+                $baseIntents[(string) $intent['name']] = true;
+            }
+        }
+
         $added = 0;
+        $addedUtterances = 0;
         $files = glob($telemetryDir . '/*.jsonl') ?: [];
         rsort($files);
         foreach ($files as $file) {
@@ -49,15 +64,65 @@ final class AgentNurtureJob
                         }
                     }
                 }
+                if (!empty($row['intent']) && !empty($row['message']) && !empty($row['resolved_locally'])) {
+                    $intent = (string) $row['intent'];
+                    if (!isset($baseIntents[$intent])) {
+                        continue;
+                    }
+                    $normalized = $this->normalizeUtterance((string) $row['message']);
+                    if ($this->shouldSkipUtterance($normalized)) {
+                        continue;
+                    }
+                    if (!isset($overrides['intents'][$intent])) {
+                        $overrides['intents'][$intent] = ['utterances' => []];
+                    }
+                    if (!isset($overrides['intents'][$intent]['utterances'])) {
+                        $overrides['intents'][$intent]['utterances'] = [];
+                    }
+                    if (!in_array($normalized, $overrides['intents'][$intent]['utterances'], true)) {
+                        $overrides['intents'][$intent]['utterances'][] = $normalized;
+                        $overrides['intents'][$intent]['utterances'] = array_slice(
+                            $overrides['intents'][$intent]['utterances'],
+                            -60
+                        );
+                        $addedUtterances++;
+                    }
+                }
             }
         }
 
         $this->writeJson($lexiconPath, $lexicon);
+        $overrides['updated'] = date('Y-m-d');
+        $this->writeJson($overridePath, $overrides);
 
         return [
             'tenant' => $tenantId,
             'added' => $added,
+            'added_utterances' => $addedUtterances,
         ];
+    }
+
+    private function normalizeUtterance(string $text): string
+    {
+        $text = mb_strtolower($text, 'UTF-8');
+        $text = preg_replace('/[^a-z0-9ñáéíóúü\\s]/u', ' ', $text) ?? $text;
+        $text = preg_replace('/\\s+/', ' ', trim($text)) ?? $text;
+        return $text;
+    }
+
+    private function shouldSkipUtterance(string $text): bool
+    {
+        if ($text === '' || mb_strlen($text, 'UTF-8') < 4) {
+            return true;
+        }
+        $stop = ['hola', 'buenas', 'ok', 'listo', 'gracias', 'thanks'];
+        if (in_array($text, $stop, true)) {
+            return true;
+        }
+        if (preg_match('/^\\d+$/', $text)) {
+            return true;
+        }
+        return false;
     }
 
     private function readJson(string $path, array $default): array

@@ -4,6 +4,7 @@
 namespace App\Core;
 
 use App\Core\Agents\ConversationGateway;
+use App\Core\Agents\AcidChatRunner;
 use App\Core\Agents\Telemetry;
 use App\Core\LLM\LLMRouter;
 
@@ -39,6 +40,28 @@ final class ChatAgent
         $userId = (string) ($payload['user_id'] ?? 'anon');
         $tenantId = (string) ($payload['tenant_id'] ?? getenv('TENANT_ID') ?? 'default');
         $role = (string) ($payload['role'] ?? $payload['user_role'] ?? getenv('DEFAULT_ROLE') ?? 'admin');
+        $mode = strtolower((string) ($payload['mode'] ?? 'app'));
+        $projectId = (string) ($payload['project_id'] ?? '');
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        if ($projectId === '') {
+            $projectId = $manifest['id'] ?? 'default';
+        }
+        if (!defined('TENANT_ID')) {
+            if (is_numeric($tenantId)) {
+                define('TENANT_ID', (int) $tenantId);
+                putenv('TENANT_ID=' . $tenantId);
+            } else {
+                $hash = abs(crc32((string) $tenantId));
+                define('TENANT_ID', $hash);
+                putenv('TENANT_ID=' . $hash);
+                putenv('TENANT_KEY=' . $tenantId);
+            }
+        }
+        $registry->ensureProject($projectId, $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', $userId);
+        $registry->touchUser($userId, $role, $mode === 'builder' ? 'creator' : 'app', $tenantId);
+        $registry->assignUserToProject($projectId, $userId, $role);
+        $registry->touchSession($sessionId, $userId, $projectId, $tenantId, $channel);
         \App\Core\RoleContext::setRole($role);
         \App\Core\RoleContext::setUserId($userId);
         \App\Core\RoleContext::setUserLabel((string) ($payload['user_label'] ?? ''));
@@ -51,8 +74,17 @@ final class ChatAgent
             return $this->reply('Archivo recibido. Procesaremos OCR/Audio cuando este habilitado.', $channel, $sessionId, $userId);
         }
 
+        if ($this->isHelpIntent($text) && !$this->isCrudGuideTrigger($text)) {
+            return $this->reply($this->buildHelpMessage($mode), $channel, $sessionId, $userId, 'success');
+        }
+
+        $local = $this->parseLocal($text);
+        if (!empty($local['command']) && in_array($local['command'], ['RunTests', 'CreateEntity', 'CreateForm'], true)) {
+            return $this->executeLocal($local, $channel, $sessionId, $userId, $mode, $tenantId);
+        }
+
         $gateway = $this->gateway();
-        $result = $gateway->handle($tenantId, $userId, $text);
+        $result = $gateway->handle($tenantId, $userId, $text, $mode);
         $action = $result['action'] ?? 'respond_local';
         $telemetry = $result['telemetry'] ?? [];
 
@@ -61,15 +93,23 @@ final class ChatAgent
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
                 'message' => $text,
                 'resolved_locally' => true,
+                'mode' => $mode,
             ]));
             return $reply;
         }
 
         if ($action === 'execute_command' && !empty($result['command'])) {
-            $reply = $this->executeCommandPayload((array) $result['command'], $channel, $sessionId, $userId);
+            try {
+                $reply = $this->executeCommandPayload((array) $result['command'], $channel, $sessionId, $userId, $mode);
+            } catch (\Throwable $e) {
+                $reply = $this->reply('No pude ejecutar ese paso. Revisa permisos o datos.', $channel, $sessionId, $userId, 'error', [
+                    'error' => $e->getMessage(),
+                ]);
+            }
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
                 'message' => $text,
                 'resolved_locally' => true,
+                'mode' => $mode,
             ]));
             return $reply;
         }
@@ -85,11 +125,12 @@ final class ChatAgent
                 'message' => $text,
                 'provider_used' => $provider,
                 'resolved_locally' => false,
+                'mode' => $mode,
             ]));
 
             $json = $llmResult['json'] ?? null;
             if (is_array($json)) {
-                $reply = $this->executeLlmJson($json, $channel, $sessionId, $userId);
+                $reply = $this->executeLlmJson($json, $channel, $sessionId, $userId, $mode);
                 return $reply;
             }
 
@@ -126,7 +167,7 @@ final class ChatAgent
         return $this->parseCrud($tokens);
     }
 
-    private function executeLocal(array $parsed, string $channel, string $sessionId, string $userId): array
+    private function executeLocal(array $parsed, string $channel, string $sessionId, string $userId, string $mode = 'app', string $tenantId = 'default'): array
     {
         $cmd = $parsed['command'] ?? '';
         if ($cmd === 'RunTests') {
@@ -144,10 +185,25 @@ final class ChatAgent
             if ($failList !== '') {
                 $reply .= " Fail: {$failList}.";
             }
-            return $this->reply($reply, $channel, $sessionId, $userId, 'success', $result);
+            $acid = null;
+            try {
+                $acidRunner = new AcidChatRunner();
+                $acid = $acidRunner->run($tenantId ?: 'default', ['save' => true]);
+                $acidSummary = $acid['summary'] ?? [];
+                $reply .= " Chat ácido: " . ($acidSummary['passed'] ?? 0) . " ok, " . ($acidSummary['failed'] ?? 0) . " fail.";
+            } catch (\Throwable $e) {
+                $reply .= " Chat ácido: error al ejecutar.";
+            }
+            return $this->reply($reply, $channel, $sessionId, $userId, 'success', [
+                'unit' => $result,
+                'acid' => $acid ?? null,
+            ]);
         }
 
         if ($cmd === 'CreateEntity') {
+            if ($mode === 'app') {
+                return $this->reply('Estas en modo app. Usa el chat creador para crear tablas.', $channel, $sessionId, $userId, 'error');
+            }
             $entityName = (string) ($parsed['entity'] ?? '');
             if ($entityName === '') {
                 return $this->reply('Necesito el nombre de la tabla.', $channel, $sessionId, $userId, 'error');
@@ -159,6 +215,9 @@ final class ChatAgent
         }
 
         if ($cmd === 'CreateForm') {
+            if ($mode === 'app') {
+                return $this->reply('Estas en modo app. Usa el chat creador para crear formularios.', $channel, $sessionId, $userId, 'error');
+            }
             $entityName = (string) ($parsed['entity'] ?? '');
             if ($entityName === '') {
                 return $this->reply('Necesito la entidad para el formulario.', $channel, $sessionId, $userId, 'error');
@@ -170,6 +229,9 @@ final class ChatAgent
         }
 
         if (in_array($cmd, ['CreateRecord', 'QueryRecords', 'ReadRecord', 'UpdateRecord', 'DeleteRecord'], true)) {
+            if ($mode === 'builder') {
+                return $this->reply('Estas en modo creador. Usa el chat app para registrar datos.', $channel, $sessionId, $userId, 'error');
+            }
             return $this->executeCrud($parsed, $channel, $sessionId, $userId);
         }
 
@@ -246,6 +308,16 @@ final class ChatAgent
                     }
                     if ($failList !== '') {
                         $line .= " Fail: {$failList}.";
+                    }
+                    try {
+                        $tenantId = getenv('TENANT_KEY') ?: (getenv('TENANT_ID') ?: 'default');
+                        $acidRunner = new AcidChatRunner();
+                        $acid = $acidRunner->run((string) $tenantId, ['save' => true]);
+                        $results[] = ['acid' => $acid];
+                        $acidSummary = $acid['summary'] ?? [];
+                        $line .= " Chat ácido: " . ($acidSummary['passed'] ?? 0) . " ok, " . ($acidSummary['failed'] ?? 0) . " fail.";
+                    } catch (\Throwable $e) {
+                        $line .= " Chat ácido: error al ejecutar.";
                     }
                     $replyParts[] = $line;
                     break;
@@ -427,21 +499,17 @@ final class ChatAgent
         return $tokens;
     }
 
-    private function isHelpIntent(string $text): bool
+    public function buildHelpMessage(string $mode = 'app'): string
     {
-        $text = trim(mb_strtolower($text));
-        if ($text === '') return true;
-        $keywords = ['hola', 'buenas', 'buenos', 'ayuda', 'help', 'menu', 'funciones', 'que puedes', 'que haces', 'cami'];
-        foreach ($keywords as $kw) {
-            if (str_contains($text, $kw)) {
-                return true;
-            }
+        if ($mode === 'builder') {
+            return $this->buildHelpMessageBuilder();
         }
-        return false;
+        return $this->buildHelpMessageApp();
     }
 
-    private function buildHelpMessage(): string
+    private function buildHelpMessageApp(): string
     {
+        $help = $this->loadTrainingHelp();
         $catalog = new ContractsCatalog();
         $forms = $catalog->forms();
         $entities = $catalog->entities();
@@ -459,18 +527,155 @@ final class ChatAgent
             $entityNames[] = $name;
         }
 
+        $stateKey = count($entityNames) === 0 ? 'empty' : 'ready';
         $lines = [];
         $lines[] = 'Hola, soy Cami. Estoy lista para ayudarte.';
+        $lines = array_merge($lines, $help['app']['intro'] ?? []);
+        $lines = array_merge($lines, $help['app']['steps'][$stateKey] ?? []);
         $lines[] = 'Ejemplos rapidos:';
-        $lines[] = '- crear cliente nombre=Juan nit=123';
-        $lines[] = '- listar cliente';
-        $lines[] = '- crear tabla productos nombre:texto precio:numero';
-        $lines[] = '- crear formulario productos';
-        $lines[] = '- probar sistema';
+        $examples = $this->buildCrudExamples($entityNames, $help['app']['examples'] ?? []);
+        foreach ($examples as $ex) {
+            $lines[] = '- ' . $ex;
+        }
         $lines[] = 'Formularios activos: ' . (count($formNames) ? implode(', ', array_slice($formNames, 0, 5)) : 'sin formularios');
         $lines[] = 'Entidades activas: ' . (count($entityNames) ? implode(', ', array_slice($entityNames, 0, 5)) : 'sin entidades');
+        $question = $help['app']['next_questions'][$stateKey] ?? '';
+        if ($question !== '') {
+            $lines[] = $question;
+        }
         $lines[] = 'Puedes enviar archivos (audio/imagen/PDF). Se procesaran cuando el OCR/voz este habilitado.';
         return implode("\n", $lines);
+    }
+
+    private function buildHelpMessageBuilder(): string
+    {
+        $help = $this->loadTrainingHelp();
+        $catalog = new ContractsCatalog();
+        $forms = $catalog->forms();
+        $entities = $catalog->entities();
+
+        $formNames = [];
+        foreach ($forms as $path) {
+            $data = json_decode((string) @file_get_contents($path), true);
+            $name = is_array($data) ? ($data['title'] ?? $data['name'] ?? basename($path, '.json')) : basename($path, '.json');
+            $formNames[] = $name;
+        }
+        $entityNames = [];
+        foreach ($entities as $path) {
+            $data = json_decode((string) @file_get_contents($path), true);
+            $name = is_array($data) ? ($data['label'] ?? $data['name'] ?? basename($path, '.entity.json')) : basename($path, '.entity.json');
+            $entityNames[] = $name;
+        }
+
+        $stateKey = count($entityNames) === 0 ? 'empty' : (count($formNames) === 0 ? 'no_forms' : 'ready');
+        $lines = [];
+        $lines[] = 'Estas en el modo CREADOR.';
+        $lines = array_merge($lines, $help['builder']['intro'] ?? []);
+        $lines = array_merge($lines, $help['builder']['steps'][$stateKey] ?? []);
+        $lines[] = 'Ejemplos rapidos:';
+        $examples = $this->buildBuilderExamples($entityNames, $help['builder']['examples'] ?? []);
+        foreach ($examples as $ex) {
+            $lines[] = '- ' . $ex;
+        }
+        $lines[] = 'Formularios activos: ' . (count($formNames) ? implode(', ', array_slice($formNames, 0, 5)) : 'sin formularios');
+        $lines[] = 'Entidades activas: ' . (count($entityNames) ? implode(', ', array_slice($entityNames, 0, 5)) : 'sin entidades');
+        $question = $help['builder']['next_questions'][$stateKey] ?? '';
+        if ($question !== '') {
+            $lines[] = $question;
+        }
+        return implode("\n", $lines);
+    }
+
+    private function buildCrudExamples(array $entityNames, array $fallback): array
+    {
+        if (empty($entityNames)) {
+            return $fallback;
+        }
+        $entity = $this->slugEntity($entityNames[0]);
+        return [
+            'crear ' . $entity . ' nombre=Ana',
+            'listar ' . $entity,
+            'actualizar ' . $entity . ' id=1 campo=valor',
+            'eliminar ' . $entity . ' id=1',
+        ];
+    }
+
+    private function buildBuilderExamples(array $entityNames, array $fallback): array
+    {
+        if (empty($entityNames)) {
+            return $fallback;
+        }
+        $entity = $this->slugEntity($entityNames[0]);
+        return [
+            'crear tabla ' . $entity . ' nombre:texto',
+            'crear formulario ' . $entity,
+            'probar sistema',
+        ];
+    }
+
+    private function slugEntity(string $label): string
+    {
+        $label = mb_strtolower($label, 'UTF-8');
+        $label = preg_replace('/[^a-z0-9áéíóúñü\\s_-]/u', '', $label) ?? $label;
+        $label = preg_replace('/\\s+/', '_', trim($label)) ?? $label;
+        return $label;
+    }
+
+    private function loadTrainingHelp(): array
+    {
+        $path = APP_ROOT . '/contracts/agents/conversation_training_base.json';
+        if (!is_file($path)) {
+            return [];
+        }
+        $raw = file_get_contents($path);
+        if ($raw === false || $raw === '') {
+            return [];
+        }
+        $raw = ltrim($raw, "\xEF\xBB\xBF");
+        $json = json_decode($raw, true);
+        if (!is_array($json)) {
+            return [];
+        }
+        return (array) ($json['help'] ?? []);
+    }
+
+    private function isHelpIntent(string $text): bool
+    {
+        $text = trim(mb_strtolower($text));
+        if ($text === '') return true;
+        $keywords = ['hola', 'buenas', 'buenos', 'ayuda', 'help', 'menu', 'funciones', 'que puedes', 'que haces', 'opciones', 'guia'];
+        foreach ($keywords as $kw) {
+            if (str_contains($text, $kw)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function isCrudGuideTrigger(string $text): bool
+    {
+        $text = trim(mb_strtolower($text));
+        if ($text === '') {
+            return false;
+        }
+        $patterns = [
+            'como creo',
+            'como crear',
+            'como hago para crear',
+            'como puedo crear',
+            'como registro',
+            'como agrego',
+            'como se crea',
+            'explicame como',
+            'explica como',
+            'dime como crear',
+        ];
+        foreach ($patterns as $pattern) {
+            if (str_contains($text, $pattern)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function buildContext(): array
@@ -544,7 +749,7 @@ final class ChatAgent
         return $this->telemetry;
     }
 
-    private function executeCommandPayload(array $command, string $channel, string $sessionId, string $userId): array
+    private function executeCommandPayload(array $command, string $channel, string $sessionId, string $userId, string $mode = 'app'): array
     {
         $cmd = (string) ($command['command'] ?? '');
         $entity = (string) ($command['entity'] ?? '');
@@ -556,7 +761,95 @@ final class ChatAgent
             return $this->reply('Comando incompleto.', $channel, $sessionId, $userId, 'error');
         }
 
+        if ($mode === 'builder' && !in_array($cmd, ['CreateEntity', 'CreateForm'], true)) {
+            return $this->reply('Estas en modo creador. Usa el chat app para registrar datos.', $channel, $sessionId, $userId, 'error');
+        }
+
+        if (in_array($cmd, ['CreateRecord', 'QueryRecords', 'ReadRecord', 'UpdateRecord', 'DeleteRecord'], true)) {
+            if ($entity === '' || !$this->entityExists($entity)) {
+                if ($mode === 'builder') {
+                    return $this->reply('No existe esa tabla. ¿Quieres crearla en el creador?', $channel, $sessionId, $userId, 'error');
+                }
+                return $this->reply('Esa tabla no existe en esta app. Debe ser agregada por el creador.', $channel, $sessionId, $userId, 'error');
+            }
+        }
+
         switch ($cmd) {
+            case 'AuthLogin':
+                $loginId = (string) ($command['user_id'] ?? $data['user_id'] ?? '');
+                $password = (string) ($command['password'] ?? $data['password'] ?? '');
+                if ($loginId === '' || $password === '') {
+                    return $this->reply('Necesito usuario y clave para iniciar sesión.', $channel, $sessionId, $userId, 'error');
+                }
+                $registry = new ProjectRegistry();
+                $manifest = $registry->resolveProjectFromManifest();
+                $projectId = (string) ($command['project_id'] ?? $_SESSION['current_project_id'] ?? $manifest['id'] ?? 'default');
+                $user = $registry->verifyAuthUser($projectId, $loginId, $password);
+                if (!$user) {
+                    return $this->reply('Usuario o clave incorrecta.', $channel, $sessionId, $userId, 'error');
+                }
+                if (session_status() === PHP_SESSION_ACTIVE) {
+                    $_SESSION['auth_user'] = [
+                        'id' => $user['id'],
+                        'role' => $user['role'] ?? 'admin',
+                        'tenant_id' => $user['tenant_id'] ?? 'default',
+                        'project_id' => $projectId,
+                        'label' => $user['label'] ?? $user['id'],
+                    ];
+                    $_SESSION['current_project_id'] = $projectId;
+                }
+                return $this->reply('Login listo. Ya puedes usar la app.', $channel, $sessionId, $userId, 'success', ['user' => $user]);
+            case 'AuthCreateUser':
+                $newId = (string) ($command['user_id'] ?? $data['user_id'] ?? '');
+                $role = (string) ($command['role'] ?? $data['role'] ?? 'seller');
+                $password = (string) ($command['password'] ?? $data['password'] ?? '');
+                if ($newId === '' || $password === '') {
+                    return $this->reply('Necesito usuario y clave para crear la cuenta.', $channel, $sessionId, $userId, 'error');
+                }
+                $registry = new ProjectRegistry();
+                $manifest = $registry->resolveProjectFromManifest();
+                $projectId = (string) ($command['project_id'] ?? $_SESSION['current_project_id'] ?? $manifest['id'] ?? 'default');
+                $registry->createAuthUser($projectId, $newId, $password, $role, $command['tenant_id'] ?? 'default', $command['label'] ?? $newId);
+                $registry->touchUser($newId, $role, 'auth', $command['tenant_id'] ?? 'default', $command['label'] ?? $newId);
+                $registry->assignUserToProject($projectId, $newId, $role);
+                return $this->reply('Usuario creado. ¿Quieres iniciar sesión ahora?', $channel, $sessionId, $userId, 'success');
+            case 'CreateEntity':
+                if ($mode === 'app') {
+                    return $this->reply('Estas en modo app. Usa el chat creador para crear tablas.', $channel, $sessionId, $userId, 'error');
+                }
+                if ($entity === '') {
+                    return $this->reply('Necesito el nombre de la tabla.', $channel, $sessionId, $userId, 'error');
+                }
+                $entityPayload = $this->builder->build($entity, $command['fields'] ?? []);
+                $this->writer->writeEntity($entityPayload);
+                $this->migrator()->migrateEntity($entityPayload, true);
+                try {
+                    $registry = new ProjectRegistry();
+                    $manifest = $registry->resolveProjectFromManifest();
+                    $registry->ensureProject($manifest['id'] ?? 'default', $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', $userId);
+                    $registry->registerEntity($manifest['id'] ?? 'default', $entityPayload['name'] ?? $entity, 'chat');
+                } catch (\Throwable $e) {
+                    // ignore registry errors
+                }
+                return $this->reply('Tabla creada: ' . $entityPayload['name'], $channel, $sessionId, $userId, 'success', ['entity' => $entityPayload]);
+            case 'CreateForm':
+                if ($mode === 'app') {
+                    return $this->reply('Estas en modo app. Usa el chat creador para crear formularios.', $channel, $sessionId, $userId, 'error');
+                }
+                if ($entity === '') {
+                    return $this->reply('Necesito la entidad para el formulario.', $channel, $sessionId, $userId, 'error');
+                }
+                $entityData = $this->entities->get($entity);
+                $form = $this->wizard->buildFromEntity($entityData);
+                $this->writer->writeForm($form);
+                try {
+                    $registry = new ProjectRegistry();
+                    $manifest = $registry->resolveProjectFromManifest();
+                    $registry->ensureProject($manifest['id'] ?? 'default', $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', $userId);
+                } catch (\Throwable $e) {
+                    // ignore registry errors
+                }
+                return $this->reply('Formulario creado para ' . $entity, $channel, $sessionId, $userId, 'success', ['form' => $form]);
             case 'CreateRecord':
                 $result = $this->command()->createRecord($entity, $data);
                 return $this->reply('Registro creado en ' . $entity, $channel, $sessionId, $userId, 'success', $result);
@@ -577,10 +870,10 @@ final class ChatAgent
         return $this->reply('Comando no soportado.', $channel, $sessionId, $userId, 'error');
     }
 
-    private function executeLlmJson(array $json, string $channel, string $sessionId, string $userId): array
+    private function executeLlmJson(array $json, string $channel, string $sessionId, string $userId, string $mode = 'app'): array
     {
         if (isset($json['command'])) {
-            return $this->executeCommandPayload((array) $json['command'], $channel, $sessionId, $userId);
+            return $this->executeCommandPayload((array) $json['command'], $channel, $sessionId, $userId, $mode);
         }
         if (isset($json['actions']) && is_array($json['actions'])) {
             foreach ($json['actions'] as $action) {
@@ -591,14 +884,14 @@ final class ChatAgent
                         'command' => 'CreateRecord',
                         'entity' => $action['entity'] ?? '',
                         'data' => $action['data'] ?? [],
-                    ], $channel, $sessionId, $userId);
+                    ], $channel, $sessionId, $userId, $mode);
                 }
                 if ($type === 'query_records') {
                     return $this->executeCommandPayload([
                         'command' => 'QueryRecords',
                         'entity' => $action['entity'] ?? '',
                         'filters' => $action['filters'] ?? [],
-                    ], $channel, $sessionId, $userId);
+                    ], $channel, $sessionId, $userId, $mode);
                 }
             }
         }
@@ -606,6 +899,19 @@ final class ChatAgent
             return $this->reply((string) $json['reply'], $channel, $sessionId, $userId);
         }
         return $this->reply('Listo.', $channel, $sessionId, $userId);
+    }
+
+    private function entityExists(string $entity): bool
+    {
+        if ($entity === '') {
+            return false;
+        }
+        try {
+            $this->entities->get($entity);
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 
     private function storeMemory(string $sessionId, string $userText, string $replyText): void

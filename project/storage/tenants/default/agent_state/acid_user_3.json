@@ -1,0 +1,30 @@
+{
+    "active_task": null,
+    "intent": "ENTITY_LIST",
+    "entity": "",
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "que tablas?",
+            "a": "Tablas creadas: cliente, clientes, factura. ¿Quieres ver los campos de alguna?",
+            "ts": 1771451654
+        },
+        {
+            "u": "que tablas?",
+            "a": "Tablas creadas: cliente, clientes, factura. ¿Quieres ver los campos de alguna?",
+            "ts": 1771458369
+        },
+        {
+            "u": "que tablas?",
+            "a": "Tablas creadas: cliente, clientes, factura. ¿Quieres ver los campos de alguna?",
+            "ts": 1771462188
+        },
+        {
+            "u": "que tablas?",
+            "a": "Tablas creadas: cliente, clientes, factura. ¿Quieres ver los campos de alguna?",
+            "ts": 1771462242
+        }
+    ],
+    "summary": "que formularios?"
+}

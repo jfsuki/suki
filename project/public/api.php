@@ -5,6 +5,9 @@ declare(strict_types=1);
 
 define('PROJECT_ROOT', dirname(__DIR__));
 require_once PROJECT_ROOT . '/config/env_loader.php';
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 
 $frameworkRoot = getenv('SUKI_FRAMEWORK_ROOT') ?: dirname(PROJECT_ROOT) . '/framework';
 define('APP_ROOT', $frameworkRoot);
@@ -32,6 +35,7 @@ use App\Core\InvoiceValidator;
 use App\Core\InvoiceMapper;
 use App\Core\Database;
 use App\Core\QueryBuilder;
+use App\Core\ProjectRegistry;
 
 $route = trim($_GET['route'] ?? '');
 $manifestError = null;
@@ -80,6 +84,24 @@ if ($manifestError) {
     }
 }
 
+function setTenantContext(array $payload = []): void
+{
+    $tenant = $payload['tenant_id'] ?? ($_SERVER['HTTP_X_TENANT_ID'] ?? '');
+    if ($tenant === '' || $tenant === null) {
+        return;
+    }
+    if (!defined('TENANT_ID')) {
+        if (is_numeric($tenant)) {
+            define('TENANT_ID', (int) $tenant);
+        } else {
+            $hash = abs(crc32((string) $tenant));
+            define('TENANT_ID', $hash);
+            putenv('TENANT_KEY=' . $tenant);
+        }
+    }
+    putenv('TENANT_ID=' . (defined('TENANT_ID') ? (string) TENANT_ID : (string) $tenant));
+}
+
 function requestData(): array
 {
     $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
@@ -110,6 +132,18 @@ function respondJson(Response $response, string $status, string $message, array 
     echo $response->json($status, $message, $data);
 }
 
+function resolveProjectId(array $payload = []): string
+{
+    $projectId = (string) ($payload['project_id'] ?? $_GET['project_id'] ?? '');
+    if ($projectId !== '') {
+        return $projectId;
+    }
+    if (session_status() === PHP_SESSION_ACTIVE && !empty($_SESSION['current_project_id'])) {
+        return (string) $_SESSION['current_project_id'];
+    }
+    return '';
+}
+
 function writeJsonFile(string $path, array $data): void
 {
     $dir = dirname($path);
@@ -125,6 +159,13 @@ function writeJsonFile(string $path, array $data): void
     if (file_put_contents($path, $json) === false) {
         throw new RuntimeException('No se pudo escribir archivo: ' . $path);
     }
+}
+
+function sanitizeKey(string $value): string
+{
+    $clean = preg_replace('/[^a-zA-Z0-9_-]/', '_', $value);
+    $clean = $clean !== null ? $clean : $value;
+    return $clean !== '' ? $clean : 'default';
 }
 
 function tokenizeChatMessage(string $message): array
@@ -441,6 +482,22 @@ if (str_starts_with($route, 'dashboards')) {
 
 if ($route === 'chat/message') {
     $payload = requestData();
+    if (isset($_SESSION['auth_user']) && is_array($_SESSION['auth_user'])) {
+        $auth = $_SESSION['auth_user'];
+        if (empty($payload['user_id'])) {
+            $payload['user_id'] = $auth['id'] ?? '';
+        }
+        if (empty($payload['role'])) {
+            $payload['role'] = $auth['role'] ?? 'admin';
+        }
+        if (empty($payload['tenant_id'])) {
+            $payload['tenant_id'] = $auth['tenant_id'] ?? '';
+        }
+        if (empty($payload['project_id'])) {
+            $payload['project_id'] = $auth['project_id'] ?? '';
+        }
+    }
+    setTenantContext($payload);
     try {
         $agent = new \App\Core\ChatAgent();
         $result = $agent->handle($payload);
@@ -454,6 +511,69 @@ if ($route === 'chat/message') {
         respondJson($response, 'error', $e->getMessage(), [], 500);
         return;
     }
+}
+
+if ($route === 'chat/help') {
+    $payload = requestData();
+    setTenantContext($payload);
+    $mode = (string) ($payload['mode'] ?? 'app');
+    $projectId = resolveProjectId($payload);
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        if ($projectId === '') {
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        }
+        $summary = $registry->summary($projectId);
+        $project = $registry->getProject($projectId);
+    } catch (\Throwable $e) {
+        $summary = null;
+        $project = null;
+    }
+    $agent = new \App\Core\ChatAgent();
+    $reply = $agent->buildHelpMessage($mode === 'builder' ? 'builder' : 'app');
+    respondJson($response, 'success', 'OK', [
+        'reply' => $reply,
+        'summary' => $summary,
+        'project' => $project,
+    ]);
+    return;
+}
+
+if ($route === 'chat/acid-test') {
+    $payload = requestData();
+    $tenantId = (string) ($payload['tenant_id'] ?? $_GET['tenant_id'] ?? getenv('TENANT_KEY') ?? getenv('TENANT_ID') ?? 'default');
+    $tenantId = $tenantId !== '' ? $tenantId : 'default';
+    setTenantContext($payload);
+    try {
+        $runner = new \App\Core\Agents\AcidChatRunner(PROJECT_ROOT);
+        $report = $runner->run($tenantId, ['save' => true]);
+        respondJson($response, 'success', 'Acid test listo', [
+            'report' => $report,
+        ]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
+if ($route === 'chat/acid-report') {
+    $payload = requestData();
+    $tenantId = (string) ($payload['tenant_id'] ?? $_GET['tenant_id'] ?? getenv('TENANT_KEY') ?? getenv('TENANT_ID') ?? 'default');
+    $safeTenant = sanitizeKey($tenantId);
+    $path = PROJECT_ROOT . '/storage/reports/chat_acid_' . $safeTenant . '.json';
+    if (!is_file($path)) {
+        respondJson($response, 'success', 'Sin reporte', [
+            'report' => null,
+        ]);
+        return;
+    }
+    $raw = file_get_contents($path);
+    $data = $raw !== false ? json_decode($raw, true) : null;
+    respondJson($response, 'success', 'Reporte', [
+        'report' => is_array($data) ? $data : null,
+    ]);
+    return;
 }
 
 if ($route === 'wizard/form-from-entity') {
@@ -512,6 +632,14 @@ if ($route === 'entity/save') {
         writeJsonFile($path, $entity);
         $migrator = new EntityMigrator(new EntityRegistry());
         $migration = $migrator->migrateEntity($entity, true);
+        try {
+            $registry = new ProjectRegistry();
+            $manifest = $registry->resolveProjectFromManifest();
+            $registry->ensureProject($manifest['id'] ?? 'default', $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', '');
+            $registry->registerEntity($manifest['id'] ?? 'default', $name, 'editor');
+        } catch (\Throwable $e) {
+            // ignore registry errors
+        }
         respondJson($response, 'success', 'Entidad guardada', [
             'file' => $fileName,
             'migration' => $migration,
@@ -541,6 +669,15 @@ if ($route === 'import/csv') {
             writeJsonFile(PROJECT_ROOT . '/contracts/forms/' . $formFile, $form);
         }
 
+        try {
+            $registry = new ProjectRegistry();
+            $manifest = $registry->resolveProjectFromManifest();
+            $registry->ensureProject($manifest['id'] ?? 'default', $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', '');
+            $registry->registerEntity($manifest['id'] ?? 'default', $entity['name'] ?? 'entity', 'csv');
+        } catch (\Throwable $e) {
+            // ignore registry errors
+        }
+
         respondJson($response, 'success', 'CSV importado', [
             'entity' => $entity,
             'migration' => $result['migration'] ?? [],
@@ -551,6 +688,453 @@ if ($route === 'import/csv') {
         respondJson($response, 'error', $e->getMessage(), [], 500);
         return;
     }
+}
+
+if ($route === 'registry/status') {
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        $registry->ensureProject($manifest['id'] ?? 'default', $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', '');
+        $projectId = resolveProjectId();
+        if ($projectId === '') {
+            $projectId = (string) ($manifest['id'] ?? 'default');
+            if (session_status() === PHP_SESSION_ACTIVE) {
+                $_SESSION['current_project_id'] = $projectId;
+            }
+        }
+        $summary = $registry->summary($projectId);
+        $project = $registry->getProject($projectId) ?: $manifest;
+        respondJson($response, 'success', 'OK', [
+            'project' => $project,
+            'summary' => $summary,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'registry/entities') {
+    try {
+        $entities = glob(PROJECT_ROOT . '/contracts/entities/*.entity.json') ?: [];
+        $list = [];
+        foreach ($entities as $path) {
+            $data = json_decode((string) @file_get_contents($path), true);
+            if (!is_array($data)) {
+                continue;
+            }
+            $name = (string) ($data['name'] ?? basename($path, '.entity.json'));
+            $label = (string) ($data['label'] ?? $name);
+            $fields = [];
+            $required = [];
+            foreach (($data['fields'] ?? []) as $field) {
+                if (!is_array($field)) {
+                    continue;
+                }
+                $fname = (string) ($field['name'] ?? '');
+                if ($fname === '' || $fname === 'id') {
+                    continue;
+                }
+                $source = (string) ($field['source'] ?? '');
+                if (!empty($field['grid']) || str_starts_with($source, 'grid:')) {
+                    continue;
+                }
+                $fields[] = $fname;
+                if (!empty($field['required'])) {
+                    $required[] = $fname;
+                }
+            }
+            $sample = !empty($required) ? array_slice($required, 0, 2) : array_slice($fields, 0, 2);
+            $exampleParts = [];
+            foreach ($sample as $fname) {
+                $exampleParts[] = $fname . '=valor';
+            }
+            $example = $name !== '' ? 'crear ' . $name . ' ' . implode(' ', $exampleParts) : '';
+            $list[] = [
+                'name' => $name,
+                'label' => $label,
+                'fields' => $fields,
+                'required' => $required,
+                'example' => $example,
+            ];
+        }
+        respondJson($response, 'success', 'OK', [
+            'entities' => $list,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'registry/users') {
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        $projectId = resolveProjectId();
+        if ($projectId === '') {
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        }
+        $users = $registry->listUsers($projectId);
+        respondJson($response, 'success', 'OK', [
+            'project_id' => $projectId,
+            'users' => $users,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'registry/user') {
+    $payload = requestData();
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        $projectId = resolveProjectId($payload);
+        if ($projectId === '') {
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        }
+        $userId = (string) ($payload['id'] ?? $payload['user_id'] ?? '');
+        if ($userId === '') {
+            respondJson($response, 'error', 'user id requerido', [], 400);
+            return;
+        }
+        $role = (string) ($payload['role'] ?? 'viewer');
+        $type = (string) ($payload['type'] ?? 'app');
+        $tenantId = (string) ($payload['tenant_id'] ?? 'default');
+        $label = (string) ($payload['label'] ?? $userId);
+        $registry->ensureProject($projectId, $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', $userId);
+        $registry->touchUser($userId, $role, $type, $tenantId, $label);
+        $registry->assignUserToProject($projectId, $userId, $role);
+        respondJson($response, 'success', 'Usuario registrado', [
+            'project_id' => $projectId,
+            'user_id' => $userId,
+            'role' => $role,
+            'type' => $type,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'registry/deploys') {
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        $projectId = resolveProjectId();
+        if ($projectId === '') {
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        }
+        $deploys = $registry->listDeploys($projectId);
+        respondJson($response, 'success', 'OK', [
+            'project_id' => $projectId,
+            'deploys' => $deploys,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'registry/deploy') {
+    $payload = requestData();
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        $projectId = resolveProjectId($payload);
+        if ($projectId === '') {
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        }
+        $name = (string) ($payload['name'] ?? '');
+        $env = (string) ($payload['env'] ?? 'dev');
+        $url = (string) ($payload['url'] ?? '');
+        $status = (string) ($payload['status'] ?? 'pending');
+        $deploy = $registry->addDeploy($projectId, $name, $env, $url, $status);
+        respondJson($response, 'success', 'Deploy registrado', [
+            'deploy' => $deploy
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'registry/projects') {
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        $registry->ensureProject($manifest['id'] ?? 'default', $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', '');
+        if (session_status() === PHP_SESSION_ACTIVE && empty($_SESSION['current_project_id'])) {
+            $_SESSION['current_project_id'] = $manifest['id'] ?? 'default';
+        }
+        $projects = $registry->listProjects();
+        respondJson($response, 'success', 'OK', [
+            'projects' => $projects,
+            'current' => $_SESSION['current_project_id'] ?? null,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'registry/project') {
+    $payload = requestData();
+    try {
+        $registry = new ProjectRegistry();
+        $id = (string) ($payload['id'] ?? '');
+        $name = (string) ($payload['name'] ?? '');
+        if ($id === '' || $name === '') {
+            respondJson($response, 'error', 'id y name requeridos', [], 400);
+            return;
+        }
+        $status = (string) ($payload['status'] ?? 'draft');
+        $tenantMode = (string) ($payload['tenant_mode'] ?? 'shared');
+        $owner = (string) ($payload['owner_user_id'] ?? '');
+        $registry->ensureProject($id, $name, $status, $tenantMode, $owner);
+        respondJson($response, 'success', 'Proyecto guardado', [
+            'project_id' => $id,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'registry/select') {
+    $payload = requestData();
+    $projectId = (string) ($payload['project_id'] ?? $_GET['project_id'] ?? '');
+    if ($projectId === '') {
+        respondJson($response, 'error', 'project_id requerido', [], 400);
+        return;
+    }
+    $_SESSION['current_project_id'] = $projectId;
+    respondJson($response, 'success', 'Proyecto activo actualizado', [
+        'project_id' => $projectId,
+    ]);
+    return;
+}
+
+if ($route === 'auth/register') {
+    $payload = requestData();
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        $projectId = resolveProjectId($payload);
+        if ($projectId === '') {
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        }
+        $userId = (string) ($payload['id'] ?? $payload['user_id'] ?? '');
+        $password = (string) ($payload['password'] ?? '');
+        $role = (string) ($payload['role'] ?? 'admin');
+        $tenantId = (string) ($payload['tenant_id'] ?? 'default');
+        $label = (string) ($payload['label'] ?? $userId);
+        $registry->createAuthUser($projectId, $userId, $password, $role, $tenantId, $label);
+        $registry->touchUser($userId, $role, 'auth', $tenantId, $label);
+        $registry->assignUserToProject($projectId, $userId, $role);
+        respondJson($response, 'success', 'Usuario creado', [
+            'project_id' => $projectId,
+            'user_id' => $userId,
+            'role' => $role,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'auth/request_code') {
+    $payload = requestData();
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        $projectId = (string) ($payload['project_id'] ?? $manifest['id'] ?? 'default');
+        $phone = preg_replace('/[^0-9]/', '', (string) ($payload['phone'] ?? ''));
+        if ($phone === '') {
+            respondJson($response, 'error', 'Telefono requerido', [], 400);
+            return;
+        }
+        $code = (string) random_int(100000, 999999);
+        $registry->storeAuthCode($projectId, $phone, $code);
+        respondJson($response, 'success', 'Codigo generado (simulado)', [
+            'phone' => $phone,
+            'code' => $code,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'auth/verify_code') {
+    $payload = requestData();
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        $projectId = (string) ($payload['project_id'] ?? $manifest['id'] ?? 'default');
+        $phone = preg_replace('/[^0-9]/', '', (string) ($payload['phone'] ?? ''));
+        $code = (string) ($payload['code'] ?? '');
+        $role = (string) ($payload['role'] ?? 'admin');
+        $tenantId = (string) ($payload['tenant_id'] ?? 'default');
+        if ($phone === '' || $code === '') {
+            respondJson($response, 'error', 'Telefono y codigo requeridos', [], 400);
+            return;
+        }
+        if (!$registry->verifyAuthCode($projectId, $phone, $code)) {
+            respondJson($response, 'error', 'Codigo invalido', [], 401);
+            return;
+        }
+        $registry->createAuthUser($projectId, $phone, $code, $role, $tenantId, $phone);
+        $registry->touchUser($phone, $role, 'auth', $tenantId, $phone);
+        $registry->assignUserToProject($projectId, $phone, $role);
+        respondJson($response, 'success', 'Telefono verificado', [
+            'user_id' => $phone,
+            'project_id' => $projectId,
+            'role' => $role,
+            'tenant_id' => $tenantId,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'auth/login') {
+    $payload = requestData();
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        $projectId = resolveProjectId($payload);
+        if ($projectId === '') {
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        }
+        $userId = (string) ($payload['id'] ?? $payload['user_id'] ?? '');
+        $password = (string) ($payload['password'] ?? '');
+        $user = $registry->verifyAuthUser($projectId, $userId, $password);
+        if (!$user) {
+            respondJson($response, 'error', 'Credenciales invalidas', [], 401);
+            return;
+        }
+        $_SESSION['auth_user'] = [
+            'id' => $user['id'],
+            'project_id' => $projectId,
+            'role' => $user['role'],
+            'tenant_id' => $user['tenant_id'],
+            'label' => $user['label'],
+        ];
+        $_SESSION['current_project_id'] = $projectId;
+        respondJson($response, 'success', 'Login OK', [
+            'user' => $_SESSION['auth_user'],
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'auth/me') {
+    $user = $_SESSION['auth_user'] ?? null;
+    if (!$user) {
+        respondJson($response, 'error', 'No autenticado', [], 401);
+        return;
+    }
+    respondJson($response, 'success', 'OK', [
+        'user' => $user
+    ]);
+    return;
+}
+
+if ($route === 'auth/logout') {
+    $_SESSION['auth_user'] = null;
+    respondJson($response, 'success', 'Logout OK', []);
+    return;
+}
+
+if ($route === 'auth/users') {
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        $projectId = resolveProjectId();
+        if ($projectId === '') {
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        }
+        $users = $registry->listAuthUsers($projectId);
+        respondJson($response, 'success', 'OK', [
+            'project_id' => $projectId,
+            'users' => $users,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'llm/health') {
+    $payload = requestData();
+    $mode = (string) ($payload['mode'] ?? $_GET['mode'] ?? 'ping');
+    $result = [];
+    $providers = [
+        'gemini' => ['key' => 'GEMINI_API_KEY', 'type' => 'client'],
+        'groq' => ['key' => 'GROQ_API_KEY', 'type' => 'client'],
+        'openrouter' => ['key' => 'OPENROUTER_API_KEY', 'type' => 'provider'],
+        'claude' => ['key' => 'CLAUDE_API_KEY', 'type' => 'provider'],
+    ];
+    foreach ($providers as $name => $meta) {
+        $hasKey = getenv($meta['key']) ? true : false;
+        $entry = ['available' => $hasKey, 'ok' => false, 'message' => ''];
+        if (!$hasKey) {
+            $entry['message'] = 'Key missing';
+            $result[$name] = $entry;
+            continue;
+        }
+        if ($mode !== 'ping') {
+            $entry['ok'] = true;
+            $entry['message'] = 'Key OK';
+            $result[$name] = $entry;
+            continue;
+        }
+        try {
+            if ($name === 'gemini') {
+                $client = new \App\Core\GeminiClient();
+                $client->generate('ping', ['max_tokens' => 5]);
+            } elseif ($name === 'groq') {
+                $client = new \App\Core\GroqClient();
+                $client->chat([['role' => 'user', 'content' => 'ping']], ['max_tokens' => 5]);
+            } elseif ($name === 'openrouter') {
+                $provider = new \App\Core\LLM\Providers\OpenRouterProvider();
+                $provider->sendChat([['role' => 'user', 'content' => 'ping']], ['max_tokens' => 5]);
+            } elseif ($name === 'claude') {
+                $provider = new \App\Core\LLM\Providers\ClaudeProvider();
+                $provider->sendChat([['role' => 'user', 'content' => 'ping']], ['max_tokens' => 5]);
+            }
+            $entry['ok'] = true;
+            $entry['message'] = 'Ping OK';
+        } catch (\Throwable $e) {
+            $entry['ok'] = false;
+            $entry['message'] = $e->getMessage();
+        }
+        $result[$name] = $entry;
+    }
+    respondJson($response, 'success', 'Health check', [
+        'mode' => $mode,
+        'providers' => $result
+    ]);
+    return;
 }
 
 if ($route === 'integrations/alanube/test') {
@@ -789,6 +1373,7 @@ if (str_starts_with($route, 'records/')) {
 
     try {
         if ($method === 'GET') {
+            setTenantContext($_GET);
             if ($id !== null && $id !== '') {
                 $data = $command->readRecord($entity, $id, true);
                 respondJson($response, 'success', 'Registro cargado', $data);
@@ -807,6 +1392,7 @@ if (str_starts_with($route, 'records/')) {
 
         if ($method === 'POST') {
             $payload = requestData();
+            setTenantContext($payload);
             $data = $command->createRecord($entity, $payload);
             respondJson($response, 'success', 'Registro creado', $data);
             return;
@@ -818,6 +1404,7 @@ if (str_starts_with($route, 'records/')) {
                 return;
             }
             $payload = requestData();
+            setTenantContext($payload);
             $data = $command->updateRecord($entity, $id, $payload);
             respondJson($response, 'success', 'Registro actualizado', $data);
             return;
@@ -828,6 +1415,7 @@ if (str_starts_with($route, 'records/')) {
                 respondJson($response, 'error', 'ID requerido', [], 400);
                 return;
             }
+            setTenantContext($_GET);
             $data = $command->deleteRecord($entity, $id);
             respondJson($response, 'success', 'Registro eliminado', $data);
             return;
@@ -846,6 +1434,7 @@ if (str_starts_with($route, 'records/')) {
 
 if ($route === 'command') {
     $payload = requestData();
+    setTenantContext($payload);
     $commandName = $payload['command'] ?? '';
     $entity = $payload['entity'] ?? '';
     $command = new CommandLayer();

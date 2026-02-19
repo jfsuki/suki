@@ -38,6 +38,8 @@ class EntityMigrator
 
     public function migrateEntity(array $entity, bool $apply = true): array
     {
+        $this->store->ensureTable();
+
         $name = (string) ($entity['name'] ?? '');
         if ($name === '') {
             throw new RuntimeException('Entidad sin name.');
@@ -199,6 +201,9 @@ class EntityMigrator
             $parts[] = 'UNIQUE';
         }
         if ($primary) {
+            if (stripos($sqlType, 'int') !== false) {
+                $parts[] = 'AUTO_INCREMENT';
+            }
             $parts[] = 'PRIMARY KEY';
         }
 

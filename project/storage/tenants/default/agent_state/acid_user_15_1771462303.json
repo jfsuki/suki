@@ -1,0 +1,17 @@
+{
+    "active_task": null,
+    "intent": "delete",
+    "entity": "cliente",
+    "collected": {
+        "id": "1"
+    },
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "eliminar cliente id=1",
+            "a": "OK",
+            "ts": 1771462304
+        }
+    ],
+    "summary": "eliminar cliente id=1"
+}

@@ -6,6 +6,21 @@ Este manual valida que el generador, la BD, el CRUD y el chat funcionen de extre
 1) Laragon activo (Apache + MySQL).
 2) Proyecto en `C:\laragon\www\suki`.
 3) Archivo `.env` correcto.
+4) (Opcional) Autotest rapido:
+```
+powershell -ExecutionPolicy Bypass -File framework/scripts/acid_test.ps1
+```
+Si la base es distinta:
+```
+SUKI_TEST_BASE="http://suki.test:8080/api" powershell -File framework/scripts/acid_test.ps1
+```
+5) Auto-testing chat (acid test):
+```
+php framework/tests/chat_acid.php
+```
+Debe devolver `failed = 0` y `training_error = "No error"`.
+Reporte CLI: `framework/tests/chat_acid_result.json`
+Reporte desde chat ("Probar sistema"): `project/storage/reports/chat_acid_default.json`
 
 ## 1) Configurar la base de datos
 Editar `project/.env`:
@@ -51,7 +66,7 @@ Si no pones keys, el chat funciona solo con comandos simples (local).
 4) Verificar que se guardo en `project/contracts/forms`.
 
 ## 4) Crear app desde chat (sin UI)
-1) Abrir: `/chat_gateway.html`
+1) Abrir: `/chat_builder.html` (chat creador).
 2) Enviar:
    - `crear tabla productos nombre:texto precio:numero`
    - `crear formulario productos`
@@ -59,15 +74,19 @@ Si no pones keys, el chat funciona solo con comandos simples (local).
    - `project/contracts/entities/productos.entity.json`
    - `project/contracts/forms/productos.form.json`
 
-## 5) Probar CRUD desde chat
-En `/chat_gateway.html`:
+## 5) Probar CRUD desde chat (App)
+En `/chat_app.html`:
 - `crear producto nombre=Camisa precio=50000`
 - `listar producto`
 - `actualizar producto id=1 precio=55000`
 - `eliminar producto id=1`
 
+Si la entidad no existe:
+- App: "Esa tabla no existe en esta app. Debe ser agregada por el creador."
+- Builder: "No existe la tabla X. ¿Quieres crearla?"
+
 ## 5.1) Probar roles (multiusuario)
-1) En el chat, selecciona Rol = "Vendedora" (seller).
+1) En el chat de la app (`/chat_app.html`), selecciona Rol = "Vendedora" (seller).
 2) Intenta `eliminar producto id=1`.
 3) Espera: permiso denegado si el contrato limita delete a admin.
 4) Cambia Rol = "Administrador" y repite.
@@ -90,6 +109,7 @@ Chat:
 ```
 probar sistema
 ```
+El bot ejecuta pruebas unitarias + acid test y actualiza el reporte en Home.
 
 ## 8) Probar Conversation Gateway (memoria local)
 1) Enviar: `hola`
@@ -101,8 +121,24 @@ probar sistema
 ```
 php -r "require 'framework/app/autoload.php'; (new App\\Jobs\\AgentNurtureJob())->run('default');"
 ```
+Cron diario:
+```
+php framework/cron/agent_nurture.php default
+```
+5) Si necesitas un modo mixto (app+builder), usar `/chat_gateway.html` (legacy).
 
-## 9) Errores comunes
+## 9) Probar login en chat (auth basico)
+En `/chat_builder.html` o `/chat_app.html`:
+- `crear usuario usuario=ana rol=vendedor clave=1234`
+- `iniciar sesion usuario=ana clave=1234`
+Espera: "Login listo. Ya puedes usar la app."
+
+## 10) Validar ayuda dinamica (registry real)
+- En chat, escribe: `ayuda`
+- Verifica que ejemplos y botones coincidan con entidades reales.
+
+## 11) Errores comunes
 - **Access denied root**: DB_PASS incorrecto.
 - **mysql_native_password**: usuario MySQL incompatible; crea usuario nuevo con autenticacion moderna.
 - **IA no configurada**: faltan API keys, usa comandos simples.
+

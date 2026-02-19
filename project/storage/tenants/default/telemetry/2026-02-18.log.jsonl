@@ -1,0 +1,48 @@
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","ts":1771374100}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola suki","mode":"builder","ts":1771376320}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"cami no es el de las apps?","provider_used":"gemini","mode":"builder","ts":1771376334}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771376533}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que haces","mode":"app","ts":1771376538}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"que opciones hay en el momento no conozco el sistema","provider_used":"gemini","mode":"app","ts":1771376563}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola suki","mode":"builder","ts":1771377045}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"ayudame a crear una tabla","mode":"builder","ts":1771377057}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"dame el status del proyecto q hemos creado","provider_used":"gemini","mode":"builder","ts":1771377176}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771378230}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771378255}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que puedes hacer","mode":"app","ts":1771378261}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"q opciones tiene el sistema","provider_used":"gemini","mode":"app","ts":1771378294}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola dime estatus del proyecto que se ha creado","mode":"builder","ts":1771379759}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola dame el status del proyecto, he hemos hecho","mode":"builder","ts":1771379792}
+{"classification":"status","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola dame un estatus de proyecto q hemos creado","mode":"builder","ts":1771381349}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"q tablas?","provider_used":"gemini","mode":"builder","ts":1771381367}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola q puedo hacer","mode":"app","ts":1771381468}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"que opcion puedo usar ahora","provider_used":"gemini","mode":"app","ts":1771381477}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"voy a vender","provider_used":"gemini","mode":"app","ts":1771381490}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"","missing":["entidad"],"message":"quiero ver q productos hay o si debo crear","mode":"app","ts":1771381508}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"explicame q puedes hacer ahora","provider_used":"gemini","mode":"app","ts":1771381527}
+{"classification":"status","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dame el estado del proyecto","mode":"builder","ts":1771441452}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"que tablas hay","provider_used":"gemini","mode":"builder","ts":1771441463}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"que tablas hay","provider_used":"gemini","mode":"builder","ts":1771441476}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"que tablas hay","provider_used":"gemini","mode":"builder","ts":1771441515}
+{"classification":"training","resolved_locally":true,"intent":"ENTITY_LIST","entity":null,"missing":[],"message":"que tablas hay","mode":"builder","ts":1771441994}
+{"classification":"training","resolved_locally":true,"intent":"FORM_LIST","entity":null,"missing":[],"message":"que formularios hay","mode":"builder","ts":1771442016}
+{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que puedes hacer","mode":"builder","ts":1771442028}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"HOLA","mode":"app","ts":1771442224}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"que hay hecho y q puedo hacer","provider_used":"gemini","mode":"app","ts":1771442238}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"y sobre la app?","provider_used":"gemini","mode":"app","ts":1771442256}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"que hay hecho y que puedo hacer","provider_used":"gemini","mode":"builder","ts":1771442508}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"que hay hecho y que puedo hacer","mode":"builder","ts":1771442627}
+{"classification":"training","resolved_locally":true,"intent":"USER_CREATE","entity":null,"missing":[],"message":"crear usuario usuario=ana rol=vendedor clave=1234","mode":"builder","ts":1771442640}
+{"classification":"training","resolved_locally":true,"intent":"USER_CREATE","entity":null,"missing":[],"message":"crear usuario usuario=ana rol=vendedor clave=1234","mode":"builder","ts":1771442682}
+{"classification":"training","resolved_locally":true,"intent":"USER_CREATE","entity":null,"missing":[],"message":"crear usuario usuario=ana rol=vendedor clave=1234","mode":"builder","ts":1771442748}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"hola explicame como creo un cliente","provider_used":"gemini","mode":"app","ts":1771449534}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola tu q haces","mode":"app","ts":1771450469}
+{"classification":"training","resolved_locally":true,"intent":"CRUD_GUIDE","entity":"cliente","missing":[],"message":"como puedo crear un cliente y producto","mode":"app","ts":1771450488}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"y los productos?","provider_used":"gemini","mode":"app","ts":1771450506}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"puedo ya guardar una factura?","provider_used":"gemini","mode":"app","ts":1771457734}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"ana","provider_used":"gemini","mode":"app","ts":1771457746}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"q mas necesitas","provider_used":"gemini","mode":"app","ts":1771457761}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"ana","provider_used":"gemini","mode":"app","ts":1771457767}
+{"classification":"llm","resolved_locally":false,"intent":null,"entity":null,"missing":[],"message":"ahora?","provider_used":"gemini","mode":"app","ts":1771457772}
+{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"a puedo hacer con este programa?","mode":"app","ts":1771458507}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"cliente","missing":["nombre"],"message":"puedo crear producto?","mode":"app","ts":1771458522}

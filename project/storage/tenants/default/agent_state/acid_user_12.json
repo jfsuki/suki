@@ -1,0 +1,37 @@
+{
+    "active_task": "crud",
+    "intent": "create",
+    "entity": "cliente",
+    "collected": {
+        "crud_action": "ELIMINAR",
+        "money_cop": "1",
+        "id": "1",
+        "email": "juan@mail.com",
+        "nombre": "juan",
+        "nit": "123"
+    },
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "actualizar cliente id=1 email=juan@mail.com",
+            "a": "OK",
+            "ts": 1771451654
+        },
+        {
+            "u": "actualizar cliente id=1 email=juan@mail.com",
+            "a": "OK",
+            "ts": 1771458369
+        },
+        {
+            "u": "crear cliente nombre=Juan nit=123",
+            "a": "OK",
+            "ts": 1771462188
+        },
+        {
+            "u": "crear cliente nombre=Juan nit=123",
+            "a": "OK",
+            "ts": 1771462242
+        }
+    ],
+    "summary": "eliminar cliente id=1"
+}

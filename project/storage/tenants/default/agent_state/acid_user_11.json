@@ -1,0 +1,35 @@
+{
+    "active_task": "create_table",
+    "intent": "list",
+    "entity": "crear",
+    "collected": {
+        "crud_action": "ACTUALIZAR",
+        "money_cop": "1",
+        "email": "juan@mail.com",
+        "id": "1"
+    },
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "listar cliente",
+            "a": "OK",
+            "ts": 1771451654
+        },
+        {
+            "u": "listar cliente",
+            "a": "OK",
+            "ts": 1771458369
+        },
+        {
+            "u": "crear producto",
+            "a": "No existe la tabla producto. ¿Quieres crearla? Ej: crear tabla producto nombre:texto",
+            "ts": 1771462188
+        },
+        {
+            "u": "crear producto",
+            "a": "Que campos quieres en crear? Ej: nombre:texto nit:texto",
+            "ts": 1771462242
+        }
+    ],
+    "summary": "actualizar cliente id=1 email=juan@mail.com"
+}

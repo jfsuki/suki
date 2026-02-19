@@ -1,0 +1,30 @@
+{
+    "active_task": null,
+    "intent": "PROJECT_STATUS",
+    "entity": "clientes",
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "dame el estado del proyecto",
+            "a": "Estado del proyecto:\n- Entidades: 3\n- Formularios: 4\n- Vistas: 6\nUltimas entidades: cliente, clientes, factura\nUltimos formularios: cliente.form, clientes.form, cuentasxcobrar.form",
+            "ts": 1771451654
+        },
+        {
+            "u": "dame el estado del proyecto",
+            "a": "Estado del proyecto:\n- Entidades: 3\n- Formularios: 4\n- Vistas: 6\nUltimas entidades: cliente, clientes, factura\nUltimos formularios: cliente.form, clientes.form, cuentasxcobrar.form",
+            "ts": 1771458369
+        },
+        {
+            "u": "dame el estado del proyecto",
+            "a": "Estado del proyecto:\n- Entidades: 3\n- Formularios: 4\n- Vistas: 6\nUltimas entidades: cliente, clientes, factura\nUltimos formularios: cliente.form, clientes.form, cuentasxcobrar.form",
+            "ts": 1771462188
+        },
+        {
+            "u": "dame el estado del proyecto",
+            "a": "Estado del proyecto:\n- Entidades: 3\n- Formularios: 4\n- Vistas: 6\nUltimas entidades: cliente, clientes, factura\nUltimos formularios: cliente.form, clientes.form, cuentasxcobrar.form",
+            "ts": 1771462242
+        }
+    ],
+    "summary": "crear tabla clientes nombre:texto nit:texto"
+}

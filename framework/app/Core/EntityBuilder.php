@@ -47,9 +47,9 @@ final class EntityBuilder
             'relations' => [],
             'rules' => [],
             'permissions' => [
-                'read' => ['admin'],
-                'create' => ['admin'],
-                'update' => ['admin'],
+                'read' => ['admin', 'seller'],
+                'create' => ['admin', 'seller'],
+                'update' => ['admin', 'seller'],
                 'delete' => ['admin'],
             ],
         ];

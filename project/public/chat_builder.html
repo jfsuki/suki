@@ -1,0 +1,490 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Suki Builder Chat</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
+        :root {
+            --bg: #f4fffb;
+            --panel: #ffffff;
+            --border: #e5e7eb;
+            --text: #0f172a;
+            --muted: #6b7280;
+            --primary: #14b8a6;
+            --primary-soft: #ccfbf1;
+            --shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
+        }
+        * { box-sizing: border-box; font-family: 'Manrope', Arial, sans-serif; }
+        body {
+            margin: 0;
+            background:
+                radial-gradient(circle at 10% 10%, #ccfbf1, transparent 40%),
+                radial-gradient(circle at 90% 0%, #e0f2fe, transparent 35%),
+                linear-gradient(180deg, #f8fafc 0%, #ecfeff 100%);
+            color: var(--text);
+        }
+        header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            padding: 18px 24px;
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border);
+            box-shadow: var(--shadow);
+        }
+        header h1 { margin: 0; font-size: 18px; }
+        header span { font-size: 12px; color: var(--muted); }
+        .badge {
+            background: var(--primary-soft);
+            color: #0f766e;
+            padding: 6px 12px;
+            border-radius: 999px;
+            font-size: 12px;
+        }
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .link-btn {
+            padding: 8px 12px;
+            border-radius: 999px;
+            border: 1px solid var(--border);
+            text-decoration: none;
+            font-size: 12px;
+            color: var(--text);
+            background: #ffffff;
+        }
+        .layout {
+            display: grid;
+            grid-template-columns: 260px 1fr 300px;
+            gap: 16px;
+            padding: 18px;
+            height: calc(100vh - 80px);
+        }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--border);
+            border-radius: 18px;
+            box-shadow: var(--shadow);
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+        }
+        .panel h3 {
+            font-size: 12px;
+            margin: 0 0 10px 0;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--muted);
+        }
+        .sessions { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
+        .session {
+            padding: 10px 12px;
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+        }
+        .session.active { border-color: var(--primary); background: #f0fdfa; }
+        .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--primary); }
+        .chat {
+            flex: 1;
+            overflow-y: auto;
+            padding: 12px;
+            border-radius: 16px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
+        }
+        .bubble {
+            max-width: 75%;
+            padding: 12px 14px;
+            border-radius: 16px;
+            margin-bottom: 10px;
+            font-size: 13px;
+            line-height: 1.5;
+            white-space: pre-line;
+        }
+        .bubble.in { background: #ffffff; border: 1px solid var(--border); }
+        .bubble.out { background: #ccfbf1; margin-left: auto; }
+        .input-row { display: flex; gap: 8px; margin-top: 10px; }
+        .input-row input[type="text"] {
+            flex: 1;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 13px;
+        }
+        button {
+            padding: 12px 14px;
+            border: none;
+            border-radius: 12px;
+            background: var(--primary);
+            color: white;
+            font-size: 13px;
+            cursor: pointer;
+        }
+        button.secondary { background: #e2e8f0; color: var(--text); }
+        .meta { font-size: 11px; color: var(--muted); margin-top: 8px; }
+        .form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+        .form-row label { font-size: 11px; color: var(--muted); }
+        .form-row input, .form-row select { padding: 10px; border:1px solid var(--border); border-radius: 10px; font-size: 12px; }
+        .status { font-size: 12px; padding: 8px 10px; border-radius: 10px; background: #ecfeff; color: #0f766e; }
+        .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+        .chip { padding: 6px 10px; border-radius: 999px; background: var(--primary-soft); color: #0f766e; font-size: 11px; cursor: pointer; }
+        @media (max-width: 1100px) {
+            .layout { grid-template-columns: 1fr; height: auto; }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <div>
+            <h1>Suki - Chat Creador</h1>
+            <span>Modo creador (tablas, formularios, contratos)</span>
+        </div>
+        <div class="header-actions">
+            <a class="link-btn" href="chat_app.html">Ir al chat de la app</a>
+            <div class="badge">Modo BUILD</div>
+        </div>
+    </header>
+
+    <div class="layout">
+        <div class="panel">
+            <h3>Sesiones</h3>
+            <div class="sessions" id="sessions"></div>
+            <div class="input-row">
+                <button class="secondary" id="newSession">Nueva sesion</button>
+            </div>
+        </div>
+
+        <div class="panel">
+            <h3>Conversacion</h3>
+            <div class="chat" id="chat"></div>
+            <div class="chips" id="quickChips"></div>
+            <div class="input-row">
+                <input type="text" id="message" placeholder="Ej: crear tabla clientes nombre:texto nit:texto" />
+                <button id="send">Enviar</button>
+            </div>
+            <div class="input-row">
+                <input type="file" id="file" />
+                <button class="secondary" id="sendFile">Enviar archivo</button>
+            </div>
+            <div class="meta">Canal simulado: /api/chat/message | Probar sistema: /api/chat/acid-test</div>
+        </div>
+
+        <div class="panel">
+            <h3>Configuracion</h3>
+            <div class="form-row">
+                <label>Canal</label>
+                <select id="channel">
+                    <option value="telegram">Telegram</option>
+                    <option value="whatsapp">WhatsApp</option>
+                    <option value="local">Local</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label>User ID</label>
+                <input type="text" id="userId" value="builder_demo" />
+            </div>
+            <div class="form-row">
+                <label>Rol</label>
+                <select id="role">
+                    <option value="admin">Administrador</option>
+                    <option value="builder">Creador</option>
+                </select>
+            </div>
+            <div class="form-row">
+                <label>Tenant ID</label>
+                <input type="text" id="tenantId" value="default" />
+            </div>
+            <div class="form-row">
+                <label>Project ID</label>
+                <input type="text" id="projectId" value="" placeholder="(opcional)" />
+            </div>
+            <div class="form-row">
+                <label>Session ID</label>
+                <input type="text" id="sessionId" />
+            </div>
+            <div class="form-row">
+                <label>API Base</label>
+                <input type="text" id="apiBase" value="" placeholder="(vacio = mismo host)" />
+            </div>
+            <div class="status" id="statusText">Lista para construir</div>
+        </div>
+    </div>
+
+    <script>
+        const MODE = 'builder';
+        const sessionsEl = document.getElementById('sessions');
+        const chatEl = document.getElementById('chat');
+        const messageEl = document.getElementById('message');
+        const sendEl = document.getElementById('send');
+        const channelEl = document.getElementById('channel');
+        const userIdEl = document.getElementById('userId');
+        const sessionIdEl = document.getElementById('sessionId');
+        const apiBaseEl = document.getElementById('apiBase');
+        const fileEl = document.getElementById('file');
+        const sendFileEl = document.getElementById('sendFile');
+        const roleEl = document.getElementById('role');
+        const statusEl = document.getElementById('statusText');
+        const tenantIdEl = document.getElementById('tenantId');
+        const projectIdEl = document.getElementById('projectId');
+        const chipsEl = document.getElementById('quickChips');
+
+        let sessions = [];
+
+        function loadSettings() {
+            const saved = JSON.parse(localStorage.getItem('suki_chat_builder_settings') || '{}');
+            if (saved.userId) userIdEl.value = saved.userId;
+            if (saved.role) roleEl.value = saved.role;
+            if (saved.tenantId) tenantIdEl.value = saved.tenantId;
+            if (saved.projectId) projectIdEl.value = saved.projectId;
+            if (saved.channel) channelEl.value = saved.channel;
+            if (saved.apiBase !== undefined) apiBaseEl.value = saved.apiBase;
+            loadQuickChips();
+        }
+
+        function saveSettings() {
+            const payload = {
+                userId: userIdEl.value.trim(),
+                role: roleEl.value,
+                tenantId: tenantIdEl.value.trim(),
+                projectId: projectIdEl.value.trim(),
+                channel: channelEl.value,
+                apiBase: apiBaseEl.value.trim(),
+            };
+            localStorage.setItem('suki_chat_builder_settings', JSON.stringify(payload));
+        }
+
+        function apiBase() {
+            const raw = apiBaseEl.value.trim();
+            return raw ? raw.replace(/\/+$/, '') : window.location.origin;
+        }
+
+        function addChip(label, msg = '', action = '') {
+            const chip = document.createElement('div');
+            chip.className = 'chip';
+            if (msg) chip.dataset.msg = msg;
+            if (action) chip.dataset.action = action;
+            chip.textContent = label;
+            chip.addEventListener('click', () => {
+                const act = chip.dataset.action || '';
+                const message = chip.dataset.msg || '';
+                if (act === 'help') {
+                    fetchHelp();
+                    return;
+                }
+                if (act === 'acid') {
+                    runAcidTest();
+                    return;
+                }
+                if (message) {
+                    messageEl.value = message;
+                    messageEl.focus();
+                    sendMessage();
+                }
+            });
+            chipsEl.appendChild(chip);
+        }
+
+        async function loadQuickChips() {
+            chipsEl.innerHTML = '';
+            addChip('Ayuda viva', '', 'help');
+            addChip('Crear tabla', 'crear tabla clientes nombre:texto nit:texto', '');
+            addChip('Probar sistema', '', 'acid');
+            try {
+                const res = await fetch(apiBase() + '/api/registry/entities');
+                if (!res.ok) return;
+                const json = await res.json();
+                const entities = (json.data && json.data.entities) ? json.data.entities : (json.entities || []);
+                if (!Array.isArray(entities) || entities.length === 0) {
+                    return;
+                }
+                const ent = entities[0];
+                if (ent && ent.name) {
+                    const label = ent.label || ent.name;
+                    addChip('Crear formulario ' + label, 'crear formulario ' + ent.name, '');
+                }
+            } catch (e) {
+                // ignore
+            }
+        }
+
+        function basePayload(session) {
+            return {
+                mode: MODE,
+                channel: channelEl.value,
+                user_id: userIdEl.value.trim() || 'builder_demo',
+                role: roleEl.value,
+                tenant_id: tenantIdEl.value.trim() || 'default',
+                project_id: projectIdEl.value.trim() || '',
+                session_id: session.id,
+            };
+        }
+
+        function addSession(id) {
+            sessions.push({ id, messages: [] });
+            renderSessions();
+            selectSession(id);
+        }
+
+        function selectSession(id) {
+            sessionIdEl.value = id;
+            renderSessions();
+            renderChat();
+        }
+
+        function currentSession() {
+            const id = sessionIdEl.value.trim();
+            return sessions.find(s => s.id === id);
+        }
+
+        function renderSessions() {
+            sessionsEl.innerHTML = '';
+            sessions.forEach(s => {
+                const div = document.createElement('div');
+                div.className = 'session' + (s.id === sessionIdEl.value.trim() ? ' active' : '');
+                div.innerHTML = '<span class="dot"></span>' + s.id;
+                div.onclick = () => selectSession(s.id);
+                sessionsEl.appendChild(div);
+            });
+        }
+
+        function renderChat() {
+            const session = currentSession();
+            chatEl.innerHTML = '';
+            if (!session) return;
+            session.messages.forEach(m => {
+                const div = document.createElement('div');
+                div.className = 'bubble ' + (m.dir === 'in' ? 'in' : 'out');
+                div.textContent = m.text;
+                chatEl.appendChild(div);
+            });
+            chatEl.scrollTop = chatEl.scrollHeight;
+        }
+
+        async function sendMessage(text, meta = {}) {
+            const session = currentSession();
+            if (!session) return;
+            session.messages.push({ dir: 'in', text });
+            renderChat();
+
+            const payload = {
+                ...basePayload(session),
+                message: text,
+                meta
+            };
+            saveSettings();
+
+            try {
+                const res = await fetch(apiBase() + '/api/chat/message', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(payload)
+                });
+                const data = await res.json();
+                const reply = (data.reply || (data.data && data.data.reply) || data.message || JSON.stringify(data));
+                session.messages.push({ dir: 'out', text: reply });
+                renderChat();
+            } catch (err) {
+                session.messages.push({ dir: 'out', text: 'Error de conexion con el servidor.' });
+                renderChat();
+            }
+        }
+
+        async function fetchHelp() {
+            const session = currentSession();
+            if (!session) return;
+            session.messages.push({ dir: 'in', text: '[ayuda viva]' });
+            renderChat();
+            saveSettings();
+            try {
+                const res = await fetch(apiBase() + '/api/chat/help', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(basePayload(session))
+                });
+                const data = await res.json();
+                const reply = (data.data && data.data.reply) || data.reply || data.message || 'Listo.';
+                session.messages.push({ dir: 'out', text: reply });
+                renderChat();
+            } catch (err) {
+                session.messages.push({ dir: 'out', text: 'No pude cargar la ayuda viva.' });
+                renderChat();
+            }
+        }
+
+        async function runAcidTest() {
+            const session = currentSession();
+            if (!session) return;
+            session.messages.push({ dir: 'in', text: '[probar sistema] Ejecutando diagnostico...' });
+            renderChat();
+            statusEl.textContent = 'Ejecutando diagnostico...';
+            saveSettings();
+            try {
+                const res = await fetch(apiBase() + '/api/chat/acid-test', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(basePayload(session))
+                });
+                const data = await res.json();
+                const report = data.data && data.data.report ? data.data.report : null;
+                const summary = report && report.summary ? report.summary : null;
+                let reply = 'Diagnostico chat listo.';
+                if (summary) {
+                    reply = `Diagnostico chat: ${summary.passed} ok, ${summary.failed} fail.`;
+                    const fails = (report.results || []).filter(r => !r.ok).slice(0, 3);
+                    if (fails.length) {
+                        reply += ' Fallas: ' + fails.map(f => `#${f.id} ${f.message}`).join(', ');
+                    }
+                }
+                session.messages.push({ dir: 'out', text: reply });
+                statusEl.textContent = summary && summary.failed > 0 ? 'Diagnostico con fallas' : 'Diagnostico OK';
+                renderChat();
+            } catch (err) {
+                session.messages.push({ dir: 'out', text: 'Error ejecutando diagnostico.' });
+                statusEl.textContent = 'Error en diagnostico';
+                renderChat();
+            }
+        }
+
+        sendEl.addEventListener('click', () => {
+            const text = messageEl.value.trim();
+            if (!text) return;
+            messageEl.value = '';
+            sendMessage(text);
+        });
+
+        messageEl.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') sendEl.click();
+        });
+
+        sendFileEl.addEventListener('click', () => {
+            const file = fileEl.files[0];
+            if (!file) return;
+            sendMessage('[archivo] ' + file.name, { files: [{ name: file.name, size: file.size }] });
+            fileEl.value = '';
+        });
+
+        document.getElementById('newSession').addEventListener('click', () => {
+            addSession('sess_' + Date.now());
+        });
+
+        [userIdEl, roleEl, tenantIdEl, projectIdEl, channelEl, apiBaseEl].forEach(el => {
+            el.addEventListener('change', saveSettings);
+        });
+        apiBaseEl.addEventListener('change', loadQuickChips);
+
+        loadSettings();
+        addSession('sess_demo');
+    </script>
+</body>
+</html>

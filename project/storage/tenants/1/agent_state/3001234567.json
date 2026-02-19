@@ -1,0 +1,30 @@
+{
+    "active_task": null,
+    "intent": "list",
+    "entity": "cliente",
+    "collected": {
+        "nombre": "juan",
+        "nit": "123",
+        "email": "juan@mail.com",
+        "saldo": "100"
+    },
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "estado del proyecto",
+            "a": "Estado del proyecto:\n- Entidades: 3\n- Formularios: 4\n- Vistas: 6\nUltimas entidades: cliente, clientes, factura\nUltimos formularios: cliente.form, clientes.form, cuentasxcobrar.form",
+            "ts": 1771381920
+        },
+        {
+            "u": "crear cliente nombre=Juan nit=123 email=juan@mail.com saldo=100",
+            "a": "OK",
+            "ts": 1771381920
+        },
+        {
+            "u": "listar cliente",
+            "a": "OK",
+            "ts": 1771381920
+        }
+    ],
+    "summary": "estado del proyecto"
+}

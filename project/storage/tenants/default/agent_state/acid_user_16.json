@@ -1,0 +1,34 @@
+{
+    "active_task": "profile",
+    "intent": "profile",
+    "entity": "",
+    "collected": {
+        "usuario": "ana",
+        "clave": "1234",
+        "rol": "vendedor"
+    },
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "crear usuario usuario=ana rol=vendedor clave=1234",
+            "a": "OK",
+            "ts": 1771451654
+        },
+        {
+            "u": "crear usuario usuario=ana rol=vendedor clave=1234",
+            "a": "OK",
+            "ts": 1771458369
+        },
+        {
+            "u": "mi negocio es ferreteria",
+            "a": "Listo, lo tendre en cuenta.",
+            "ts": 1771462188
+        },
+        {
+            "u": "mi negocio es ferreteria",
+            "a": "Listo, lo tendre en cuenta.",
+            "ts": 1771462242
+        }
+    ],
+    "summary": "iniciar sesion usuario=ana clave=1234"
+}

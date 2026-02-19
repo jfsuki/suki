@@ -1,0 +1,32 @@
+{
+    "active_task": "profile",
+    "intent": "list",
+    "entity": "cliente",
+    "collected": {
+        "id": "1"
+    },
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "eliminar cliente id=1",
+            "a": "OK",
+            "ts": 1771451654
+        },
+        {
+            "u": "eliminar cliente id=1",
+            "a": "OK",
+            "ts": 1771458369
+        },
+        {
+            "u": "listar cliente",
+            "a": "OK",
+            "ts": 1771462188
+        },
+        {
+            "u": "listar cliente",
+            "a": "OK",
+            "ts": 1771462242
+        }
+    ],
+    "summary": "mi negocio es ferreteria"
+}

@@ -1,0 +1,30 @@
+{
+    "active_task": null,
+    "intent": null,
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "hola",
+            "a": "Puedo ayudarte a crear y usar la app.\nEjemplos rapidos:\n- crear tabla clientes nombre:texto nit:texto\n- crear formulario clientes\n- crear cliente nombre=Juan nit=123\n- listar cliente\nTambien puedes pedir: estado del proyecto\nEntidades: cliente, clientes, factura\nFormularios: cliente.form, clientes.form, cuentasxcobrar.form, fact.form",
+            "ts": 1771451654
+        },
+        {
+            "u": "hola",
+            "a": "Puedo ayudarte a crear y usar la app.\nEjemplos rapidos:\n- crear tabla clientes nombre:texto nit:texto\n- crear formulario clientes\n- crear cliente nombre=Juan nit=123\n- listar cliente\nTambien puedes pedir: estado del proyecto\nEntidades: cliente, clientes, factura\nFormularios: cliente.form, clientes.form, cuentasxcobrar.form, fact.form",
+            "ts": 1771458369
+        },
+        {
+            "u": "hola",
+            "a": "Puedo ayudarte a crear y usar la app.\nEjemplos rapidos:\n- crear tabla clientes nombre:texto nit:texto\n- crear formulario clientes\n- crear cliente nombre=Juan nit=123\n- listar cliente\nTambien puedes pedir: estado del proyecto\nEntidades: cliente, clientes, factura\nFormularios: cliente.form, clientes.form, cuentasxcobrar.form, fact.form",
+            "ts": 1771462188
+        },
+        {
+            "u": "hola",
+            "a": "Puedo ayudarte a crear y usar la app.\nEjemplos rapidos:\n- crear tabla clientes nombre:texto nit:texto\n- crear formulario clientes\n- crear cliente nombre=Juan nit=123\n- listar cliente\nTambien puedes pedir: estado del proyecto\nEntidades: cliente, clientes, factura\nFormularios: cliente.form, clientes.form, cuentasxcobrar.form, fact.form",
+            "ts": 1771462242
+        }
+    ],
+    "summary": "hola"
+}

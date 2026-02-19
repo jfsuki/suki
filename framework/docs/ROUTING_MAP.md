@@ -25,7 +25,10 @@
     - wizard/form-from-entity
     - entity/save, import/csv
     - records/*, command
-    - chat/message
+    - chat/message, chat/help, chat/acid-test, chat/acid-report
+    - registry/status, registry/projects, registry/select, registry/users, registry/user
+    - registry/deploys, registry/deploy, registry/entities
+    - auth/send-code, auth/verify-code, auth/login, auth/users
     - integrations/alanube/* (test/save/emit/status/cancel/webhook)
 
 ## Menu driven routes

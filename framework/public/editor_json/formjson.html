@@ -8,40 +8,97 @@
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
+        @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&display=swap');
+        :root {
+            --ink: #0f172a;
+            --muted: #64748b;
+            --accent: #10b981;
+            --accent-strong: #059669;
+            --accent-warm: #f59e0b;
+            --panel: rgba(255,255,255,0.92);
+            --panel-border: #e2e8f0;
+            --shadow-soft: 0 12px 32px rgba(15,23,42,0.08);
+        }
+        body { font-family: 'Outfit', 'Segoe UI', sans-serif; color: var(--ink); }
+        .panel { background: var(--panel); border: 1px solid var(--panel-border); box-shadow: var(--shadow-soft); border-radius: 16px; }
+        .panel-soft { background: rgba(255,255,255,0.78); border: 1px solid #e5e7eb; border-radius: 14px; }
+        .hero-card {
+            background: radial-gradient(circle at top, rgba(15,23,42,0.65), rgba(2,6,23,0.98)),
+                        linear-gradient(135deg, rgba(15,23,42,0.95), rgba(2,6,23,0.95));
+            color: #f8fafc;
+            border: 1px solid rgba(148,163,184,0.2);
+            box-shadow: 0 20px 60px rgba(15,23,42,0.35);
+            border-radius: 20px;
+        }
+        .hero-card .muted { color: rgba(226,232,240,0.75); }
         .json-preview { font-family: 'Consolas', 'Monaco', monospace; font-size: 0.80rem; }
-        .tab-active { border-bottom: 2px solid #ea580c; color: #ea580c; font-weight: 600; background-color: #fff7ed; }
+        .tab-active { border-bottom: 2px solid var(--accent-warm); color: var(--accent-warm); font-weight: 600; background-color: #fff7ed; }
         .tab-inactive { color: #6b7280; }
         .tab-inactive:hover { color: #374151; background-color: #f9fafb; }
+        .canvas-grid {
+            position: relative;
+            background-image:
+                linear-gradient(to right, rgba(148,163,184,0.25) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(148,163,184,0.25) 1px, transparent 1px);
+            background-size: 24px 24px;
+            border-radius: 12px;
+        }
+        .canvas-grid::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, rgba(248,250,252,0.8), rgba(255,255,255,0.4));
+            pointer-events: none;
+            border-radius: 12px;
+        }
+        .canvas-item {
+            position: relative;
+            z-index: 1;
+        }
+        .canvas-hint {
+            font-size: 10px;
+            color: #64748b;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .drag-handle {
+            color: #94a3b8;
+            cursor: grab;
+        }
+        .drag-handle:active {
+            cursor: grabbing;
+        }
         /* Scrollbar fina para el JSON */
         ::-webkit-scrollbar { width: 8px; height: 8px; }
-        ::-webkit-scrollbar-track { background: #1f2937; }
+        ::-webkit-scrollbar-track { background: #0f172a; }
         ::-webkit-scrollbar-thumb { background: #4b5563; border-radius: 4px; }
         ::-webkit-scrollbar-thumb:hover { background: #6b7280; }
     </style>
 </head>
-<body class="bg-gray-100 h-screen overflow-hidden flex flex-col" x-data="formBuilder()" x-init="init()">
+<body class="bg-gradient-to-br from-slate-50 via-white to-emerald-50 h-screen overflow-hidden flex flex-col" x-data="formBuilder()" x-init="init()">
 
-    <header class="bg-white border-b px-6 py-3 flex justify-between items-center shadow-sm z-10 h-16">
+    <header class="bg-slate-900/95 border-b border-slate-800 px-6 py-3 flex justify-between items-center shadow-sm z-10 h-16 text-white">
         <div class="flex items-center gap-3">
-            <div class="bg-orange-600 text-white p-2 rounded-lg shadow-md"><i class="fa-solid fa-layer-group"></i></div>
+            <div class="bg-emerald-500 text-white p-2 rounded-lg shadow-md"><i class="fa-solid fa-layer-group"></i></div>
             <div>
-                <h1 class="font-bold text-gray-800 text-lg leading-tight">Suki Studio</h1>
-                <p class="text-[11px] text-gray-500 font-medium">Creador visual de apps (sin tecnicismos)</p>
+                <h1 class="font-bold text-lg leading-tight">Suki Studio</h1>
+                <p class="text-[11px] text-slate-300 font-medium">Creador visual de apps (modo simple por defecto)</p>
             </div>
         </div>
         <div class="flex gap-2">
-            <button @click="loadExample()" class="px-3 py-2 text-xs font-medium text-gray-600 hover:bg-gray-100 rounded border transition">
+            <button @click="loadExample()" class="px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded border border-slate-700 transition">
                 <i class="fa-solid fa-upload mr-1"></i> Cargar JSON
             </button>
-            <button @click="startGuided()" class="px-3 py-2 text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white rounded shadow transition">
-                <i class="fa-solid fa-person-walking-luggage mr-1"></i> Modo guiado
+            <button @click="startGuided()" class="px-3 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded shadow transition">
+                <i class="fa-solid fa-person-walking-luggage mr-1"></i> Asistente rápido
             </button>
             <button @click="showAdvanced = !showAdvanced; if(!showAdvanced && activeTab === 'output') activeTab = 'general'; if(!showAdvanced && mainTab === 'database') mainTab = 'forms'" class="px-3 py-2 text-xs font-bold rounded border transition"
-                :class="showAdvanced ? 'bg-slate-900 text-white border-slate-900' : 'bg-white text-slate-700 border-slate-200'">
+                :class="showAdvanced ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-slate-700 border-slate-200'">
                 <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>
-                <span x-text="showAdvanced ? 'Modo avanzado' : 'Modo amigable'"></span>
+                <span x-text="showAdvanced ? 'Detalles técnicos' : 'Modo amigable'"></span>
             </button>
-            <button @click="downloadJson()" class="px-4 py-2 bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold uppercase rounded shadow transition flex items-center">
+            <button @click="downloadJson()" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold uppercase rounded shadow transition flex items-center">
                 <i class="fa-solid fa-download mr-2"></i> Descargar JSON
             </button>
             <button @click="saveToProject()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded shadow transition flex items-center">
@@ -90,28 +147,83 @@
             <div class="flex-1 overflow-y-auto p-6 scroll-smooth">
 
                 <div x-show="mainTab === 'Indicadores'" class="space-y-6 max-w-5xl mx-auto" x-transition.opacity>
-                    <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
+                    <div class="hero-card p-6">
                         <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                             <div>
-                                <h3 class="font-bold text-gray-800 text-lg">Indicadores del proyecto</h3>
-                                <p class="text-xs text-gray-500">Panorama rapido del avance: formularios, Listas y estado.</p>
+                                <h3 class="font-bold text-lg">Inicio del proyecto</h3>
+                                <p class="text-xs muted">Resumen rapido: formularios, listas, estado y despliegues.</p>
                             </div>
-                            <div class="flex gap-2">
-                                <button @click="selectProjectRoot()" class="px-3 py-2 text-xs font-bold bg-slate-800 text-white rounded shadow">
+                            <div class="flex flex-wrap gap-2">
+                                <button @click="selectProjectRoot()" class="px-3 py-2 text-xs font-bold bg-slate-100 text-slate-900 rounded shadow">
                                     Seleccionar proyecto
                                 </button>
                                 <button @click="refreshProjectSnapshot()" class="px-3 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded shadow">
                                     Refrescar
                                 </button>
+                                <a href="/chat_builder.html" class="px-3 py-2 text-xs font-bold bg-white/10 text-white rounded shadow">Chat creador</a>
+                                <a href="/chat_app.html" class="px-3 py-2 text-xs font-bold bg-emerald-500 text-white rounded shadow">Chat app</a>
                             </div>
                         </div>
-                        <div class="mt-2 text-[11px] text-gray-500">
+                        <div class="mt-2 text-[11px] muted">
                             Carpeta: <span x-text="projectSnapshot.rootName || 'Sin seleccionar'"></span> |
                             Actualizado: <span x-text="projectSnapshot.updatedAt || '-'"></span>
                         </div>
                     </div>
 
-                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="panel p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="text-xs font-bold text-gray-600 uppercase">Proyectos recientes</h4>
+                                <span class="text-[10px] text-gray-400">form + vistas</span>
+                            </div>
+                            <div class="grid grid-cols-2 gap-2 text-xs text-gray-600">
+                                <div class="border rounded p-2 bg-gray-50">
+                                    <div class="text-[10px] text-gray-400 uppercase">Formularios</div>
+                                    <div class="text-lg font-bold text-gray-800" x-text="projectSnapshot.forms.length"></div>
+                                </div>
+                                <div class="border rounded p-2 bg-gray-50">
+                                    <div class="text-[10px] text-gray-400 uppercase">Vistas</div>
+                                    <div class="text-lg font-bold text-gray-800" x-text="projectSnapshot.views.length"></div>
+                                </div>
+                            </div>
+                            <div class="mt-3 text-[11px] text-gray-500">
+                                Ultimos formularios:
+                                <span x-text="projectSnapshot.forms.slice(0,3).join(', ') || 'Sin formularios'"></span>
+                            </div>
+                        </div>
+                        <div class="panel p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="text-xs font-bold text-gray-600 uppercase">Deploy / estado</h4>
+                                <span class="text-[10px] text-gray-400">appStatus</span>
+                            </div>
+                            <div class="flex items-center gap-3">
+                                <div class="w-10 h-10 rounded-full bg-slate-900 text-white flex items-center justify-center text-sm">
+                                    <i class="fa-solid fa-rocket"></i>
+                                </div>
+                                <div class="text-xs text-gray-600">
+                                    Estado actual: <span class="font-bold text-gray-800" x-text="project.appStatus || 'draft'"></span><br>
+                                    Tenant: <span class="font-semibold" x-text="project.appTenantMode || 'shared'"></span>
+                                </div>
+                            </div>
+                            <div class="mt-3 text-[11px] text-gray-500">
+                                Ultimo guardado: <span x-text="projectSnapshot.updatedAt || '-'"></span>
+                            </div>
+                            <div class="mt-3 text-[11px] text-gray-500">Deploys recientes:</div>
+                            <div class="mt-2 space-y-1 text-[11px]">
+                                <template x-for="(dep, dIndex) in (projectSnapshot.deploys || []).slice(0,3)" :key="'dep-'+dIndex">
+                                    <div class="flex items-center justify-between border rounded px-2 py-1 bg-gray-50">
+                                        <span x-text="typeof dep === 'string' ? dep : (dep.name || dep.env || dep.url || 'deploy')"></span>
+                                        <span class="text-[10px] text-gray-400" x-text="typeof dep === 'string' ? '' : (dep.status || '')"></span>
+                                    </div>
+                                </template>
+                                <div x-show="!projectSnapshot.deploys || projectSnapshot.deploys.length === 0" class="text-[10px] text-gray-400">
+                                    Sin deploys registrados.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel p-4">
                         <div class="flex items-center justify-between">
                             <h4 class="text-xs font-bold text-gray-600 uppercase">Progreso</h4>
                             <span class="text-xs font-bold text-emerald-700" x-text="progressPercent() + '%'"></span>
@@ -126,6 +238,232 @@
                                     <span x-text="step.label"></span>
                                 </div>
                             </template>
+                        </div>
+                    </div>
+
+                    <div class="panel p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">DiagnÃ³stico chat</h4>
+                            <div class="flex gap-2">
+                                <button @click="runAcidTest()" class="px-2 py-1 text-[10px] font-bold bg-slate-900 text-white rounded">Ejecutar</button>
+                                <button @click="refreshAcidReport()" class="px-2 py-1 text-[10px] font-bold bg-slate-100 rounded">Refrescar</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-gray-600">
+                            <div class="border rounded p-2 bg-gray-50">
+                                <div class="text-[10px] text-gray-400 uppercase">OK</div>
+                                <div class="text-lg font-bold text-emerald-600" x-text="projectSnapshot.acid?.summary?.passed ?? '-'"></div>
+                            </div>
+                            <div class="border rounded p-2 bg-gray-50">
+                                <div class="text-[10px] text-gray-400 uppercase">Fail</div>
+                                <div class="text-lg font-bold text-rose-600" x-text="projectSnapshot.acid?.summary?.failed ?? '-'"></div>
+                            </div>
+                            <div class="border rounded p-2 bg-gray-50">
+                                <div class="text-[10px] text-gray-400 uppercase">Total</div>
+                                <div class="text-lg font-bold text-gray-800" x-text="projectSnapshot.acid?.summary?.total ?? '-'"></div>
+                            </div>
+                            <div class="border rounded p-2 bg-gray-50">
+                                <div class="text-[10px] text-gray-400 uppercase">Ultimo</div>
+                                <div class="text-xs font-semibold text-gray-700" x-text="projectSnapshot.acid?.summary?.ran_at || '-'"></div>
+                            </div>
+                        </div>
+                        <div class="text-[11px] text-gray-500">Fallas detectadas:</div>
+                        <div class="space-y-1 text-[11px]">
+                            <template x-for="fail in (projectSnapshot.acid?.results || []).filter(r => !r.ok).slice(0,5)" :key="'acid-'+fail.id">
+                                <div class="flex items-center justify-between border rounded px-2 py-1 bg-rose-50 text-rose-700">
+                                    <span>#<span x-text="fail.id"></span> <span x-text="fail.message"></span></span>
+                                    <span class="text-[10px]" x-text="fail.action"></span>
+                                </div>
+                            </template>
+                            <div x-show="!projectSnapshot.acid?.results || projectSnapshot.acid.results.filter(r => !r.ok).length === 0" class="text-[10px] text-gray-400">
+                                Sin fallas reportadas.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="panel p-4 space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">Usuarios del proyecto</h4>
+                            <div class="flex gap-2">
+                                <button @click="refreshRegistryStatus(); refreshRegistryUsers();" class="px-2 py-1 text-[10px] font-bold bg-slate-100 rounded">Refrescar</button>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs text-gray-600">
+                            <div class="border rounded p-3 bg-gray-50">
+                                <div class="text-[10px] text-gray-400 uppercase">Resumen</div>
+                                <div class="mt-1">Usuarios: <span class="font-bold" x-text="projectSnapshot.registry.summary?.users ?? 0"></span></div>
+                                <div>Entidades: <span class="font-bold" x-text="projectSnapshot.registry.summary?.entities ?? 0"></span></div>
+                                <div>Sesiones: <span class="font-bold" x-text="projectSnapshot.registry.summary?.sessions ?? 0"></span></div>
+                            </div>
+                            <div class="border rounded p-3 bg-gray-50">
+                                <div class="text-[10px] text-gray-400 uppercase mb-2">Usuarios</div>
+                                <div class="space-y-1 max-h-28 overflow-auto">
+                                    <template x-for="user in (projectSnapshot.registry.users || [])" :key="user.id">
+                                        <button @click="selectRegistryUser(user)" class="w-full text-left px-2 py-1 rounded border bg-white hover:bg-slate-50">
+                                            <div class="font-semibold" x-text="user.label || user.id"></div>
+                                            <div class="text-[10px] text-gray-500" x-text="(user.role || 'rol') + ' · ' + (user.tenant_id || 'default')"></div>
+                                        </button>
+                                    </template>
+                                    <div x-show="!projectSnapshot.registry.users || projectSnapshot.registry.users.length === 0" class="text-[10px] text-gray-400">Sin usuarios registrados.</div>
+                                </div>
+                                <div class="text-[10px] text-gray-500 mt-2" x-show="selectedUser">
+                                    Seleccionado: <span x-text="selectedUser?.id"></span>
+                                </div>
+                            </div>
+                            <div class="border rounded p-3 bg-white">
+                                <div class="text-[10px] text-gray-400 uppercase mb-2">Crear usuario</div>
+                                <div class="space-y-2">
+                                    <input x-model="userForm.id" class="w-full border rounded px-2 py-1 text-xs" placeholder="user_id (ej: admin1)">
+                                    <input x-model="userForm.label" class="w-full border rounded px-2 py-1 text-xs" placeholder="Nombre visible">
+                                    <div class="grid grid-cols-2 gap-2">
+                                        <select x-model="userForm.role" class="w-full border rounded px-2 py-1 text-xs bg-white">
+                                            <option value="admin">Administrador</option>
+                                            <option value="seller">Vendedora</option>
+                                            <option value="viewer">Consulta</option>
+                                        </select>
+                                        <select x-model="userForm.type" class="w-full border rounded px-2 py-1 text-xs bg-white">
+                                            <option value="creator">Creador</option>
+                                            <option value="app">App</option>
+                                        </select>
+                                    </div>
+                                    <input x-model="userForm.tenant_id" class="w-full border rounded px-2 py-1 text-xs" placeholder="tenant_id (default)">
+                                    <button @click="createRegistryUser()" class="w-full px-2 py-1 text-xs font-bold bg-emerald-600 text-white rounded">Guardar usuario</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm space-y-3">
+                        <div class="flex items-center justify-between">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">Proyecto activo</h4>
+                            <button @click="refreshProjects()" class="px-2 py-1 text-[10px] font-bold bg-slate-100 rounded">Refrescar</button>
+                        </div>
+                        <div class="text-[11px] text-gray-500">
+                            Activo: <span class="font-semibold" x-text="currentProjectId || (projectSnapshot.registry.project?.id || 'default')"></span>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-3 text-xs">
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Seleccionar proyecto</label>
+                                <select class="w-full border rounded px-2 py-1 text-xs bg-white" x-model="currentProjectId" @change="selectProject(currentProjectId)">
+                                    <option value="">-- Selecciona --</option>
+                                    <template x-for="proj in projectList" :key="proj.id">
+                                        <option :value="proj.id" x-text="proj.name + ' (' + proj.id + ')'"></option>
+                                    </template>
+                                </select>
+                                <div class="text-[10px] text-gray-400">Cambia el contexto del Home y del chat.</div>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Crear proyecto</label>
+                                <input x-model="projectForm.id" class="w-full border rounded px-2 py-1 text-xs" placeholder="ID (ej: suki_erp)">
+                                <input x-model="projectForm.name" class="w-full border rounded px-2 py-1 text-xs" placeholder="Nombre visible">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <select x-model="projectForm.status" class="w-full border rounded px-2 py-1 text-xs bg-white">
+                                        <option value="draft">draft</option>
+                                        <option value="active">active</option>
+                                    </select>
+                                    <select x-model="projectForm.tenant_mode" class="w-full border rounded px-2 py-1 text-xs bg-white">
+                                        <option value="shared">shared</option>
+                                        <option value="dedicated">dedicated</option>
+                                    </select>
+                                </div>
+                                <button @click="createProject()" class="w-full px-2 py-1 text-xs font-bold bg-slate-900 text-white rounded">Guardar proyecto</button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div class="panel p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="text-xs font-bold text-gray-600 uppercase">Login real (sesiones)</h4>
+                                <button @click="refreshAuthUsers(); refreshAuthMe();" class="px-2 py-1 text-[10px] font-bold bg-slate-100 rounded">Refrescar</button>
+                            </div>
+                            <div class="text-[11px] text-gray-500 mb-2">Usuario actual: <span class="font-semibold" x-text="currentAuthUser?.id || 'sin login'"></span></div>
+                            <div class="grid grid-cols-1 gap-2">
+                                <input x-model="authForm.id" class="w-full border rounded px-2 py-1 text-xs" placeholder="Usuario (ej: admin1)">
+                                <input x-model="authForm.password" type="password" class="w-full border rounded px-2 py-1 text-xs" placeholder="Password">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <select x-model="authForm.role" class="w-full border rounded px-2 py-1 text-xs bg-white">
+                                        <option value="admin">Administrador</option>
+                                        <option value="seller">Vendedora</option>
+                                        <option value="viewer">Consulta</option>
+                                    </select>
+                                    <input x-model="authForm.tenant_id" class="w-full border rounded px-2 py-1 text-xs" placeholder="tenant_id">
+                                </div>
+                                <input x-model="authForm.label" class="w-full border rounded px-2 py-1 text-xs" placeholder="Nombre visible (opcional)">
+                                <div class="flex gap-2">
+                                    <button @click="createAuthUser()" class="flex-1 px-2 py-1 text-xs font-bold bg-emerald-600 text-white rounded">Crear login</button>
+                                    <button @click="loginAuthUser()" class="flex-1 px-2 py-1 text-xs font-bold bg-indigo-600 text-white rounded">Login</button>
+                                    <button @click="logoutAuthUser()" class="flex-1 px-2 py-1 text-xs font-bold bg-slate-200 text-slate-700 rounded">Salir</button>
+                                </div>
+                            </div>
+                            <div class="mt-3 text-[11px] text-gray-500">Usuarios con login:</div>
+                            <div class="mt-2 space-y-1 max-h-28 overflow-auto">
+                                <template x-for="user in (projectSnapshot.registry.authUsers || [])" :key="user.id">
+                                    <div class="border rounded px-2 py-1 text-xs bg-gray-50">
+                                        <span class="font-semibold" x-text="user.label || user.id"></span>
+                                        <span class="text-[10px] text-gray-400" x-text="' · ' + (user.role || '')"></span>
+                                    </div>
+                                </template>
+                                <div x-show="!projectSnapshot.registry.authUsers || projectSnapshot.registry.authUsers.length === 0" class="text-[10px] text-gray-400">
+                                    Sin usuarios con login.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="panel p-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <h4 class="text-xs font-bold text-gray-600 uppercase">Deploys reales</h4>
+                                <button @click="refreshDeploys()" class="px-2 py-1 text-[10px] font-bold bg-slate-100 rounded">Refrescar</button>
+                            </div>
+                            <div class="space-y-2">
+                                <input x-model="deployForm.name" class="w-full border rounded px-2 py-1 text-xs" placeholder="Nombre deploy (ej: v0.1)">
+                                <div class="grid grid-cols-2 gap-2">
+                                    <select x-model="deployForm.env" class="w-full border rounded px-2 py-1 text-xs bg-white">
+                                        <option value="dev">dev</option>
+                                        <option value="staging">staging</option>
+                                        <option value="prod">prod</option>
+                                    </select>
+                                    <select x-model="deployForm.status" class="w-full border rounded px-2 py-1 text-xs bg-white">
+                                        <option value="pending">pending</option>
+                                        <option value="ok">ok</option>
+                                        <option value="failed">failed</option>
+                                    </select>
+                                </div>
+                                <input x-model="deployForm.url" class="w-full border rounded px-2 py-1 text-xs" placeholder="URL (opcional)">
+                                <button @click="createDeploy()" class="w-full px-2 py-1 text-xs font-bold bg-slate-900 text-white rounded">Guardar deploy</button>
+                            </div>
+                            <div class="mt-3 text-[11px] text-gray-500">Ultimos deploys:</div>
+                            <div class="mt-2 space-y-1 max-h-28 overflow-auto">
+                                <template x-for="dep in (projectSnapshot.registry.deploys || [])" :key="dep.id">
+                                    <div class="border rounded px-2 py-1 text-xs bg-gray-50">
+                                        <span class="font-semibold" x-text="dep.name"></span>
+                                        <span class="text-[10px] text-gray-400" x-text="' · ' + dep.env + ' · ' + dep.status"></span>
+                                    </div>
+                                </template>
+                                <div x-show="!projectSnapshot.registry.deploys || projectSnapshot.registry.deploys.length === 0" class="text-[10px] text-gray-400">
+                                    Sin deploys.
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                        <div class="flex items-center justify-between mb-2">
+                            <h4 class="text-xs font-bold text-gray-600 uppercase">IA - Health check</h4>
+                            <button @click="checkLlmHealth()" class="px-2 py-1 text-[10px] font-bold bg-indigo-600 text-white rounded">Probar IA</button>
+                        </div>
+                        <div class="text-[11px] text-gray-500 mb-2">Ultima prueba: <span x-text="llmHealth.lastRun || '-'"></span></div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
+                            <template x-for="(info, key) in llmHealth.providers" :key="key">
+                                <div class="border rounded px-2 py-1 bg-gray-50 flex items-center justify-between">
+                                    <span class="font-semibold" x-text="key"></span>
+                                    <span class="text-[10px]" :class="info.ok ? 'text-emerald-600' : 'text-rose-600'" x-text="info.ok ? 'OK' : 'FAIL'"></span>
+                                    <span class="text-[10px] text-gray-400" x-text="info.message"></span>
+                                </div>
+                            </template>
+                            <div x-show="!llmHealth.providers || Object.keys(llmHealth.providers).length === 0" class="text-[10px] text-gray-400">
+                                Sin pruebas ejecutadas.
+                            </div>
                         </div>
                     </div>
 
@@ -207,7 +545,7 @@
                         <p class="text-xs text-gray-500">Define perfil de BD (shared_schema o dedicated_db) y genera el app.manifest.json.</p>
                         <div class="mt-3 text-xs bg-amber-50 border border-amber-200 text-amber-900 rounded p-3">
                             Enfoque <span class="font-bold">amigable</span>: puedes crear Listas, relaciones, CRUD y procesos sin ver SQL.
-                            Lo tecnico queda como informacion avanzada.
+                            Lo técnico queda como info opcional (si la necesitas).
                         </div>
                     </div>
 
@@ -522,7 +860,7 @@
                         <h3 class="font-bold text-gray-800 text-lg">Pruebas por chat</h3>
                         <p class="text-xs text-gray-500">Usa mensajes para probar formularios y funciones igual que un usuario final.</p>
                         <div class="mt-3 text-xs bg-emerald-50 border border-emerald-200 text-emerald-900 rounded p-3">
-                            Todo se ejecuta por el mismo endpoint <span class="font-bold">/api/command</span>. Si funciona por chat, funciona en UI.
+                            Todo se ejecuta por el mismo endpoint <span class="font-bold">/api/chat/message</span>. Si funciona por chat, funciona en UI.
                         </div>
                     </div>
 
@@ -545,6 +883,34 @@
                             <div class="md:col-span-2 flex items-center gap-2 text-xs text-gray-600">
                                 <input type="checkbox" x-model="chatTest.autoRun" @change="saveChatSettings()" class="rounded text-emerald-600">
                                 Probar automaticamente al guardar
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Modo</label>
+                                <select x-model="chatTest.mode" @change="saveChatSettings()" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                                    <option value="app">App (usar datos)</option>
+                                    <option value="builder">Builder (crear tablas/forms)</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">User ID</label>
+                                <input x-model="chatTest.user_id" @change="saveChatSettings()" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="user_demo">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Rol</label>
+                                <input x-model="chatTest.role" @change="saveChatSettings()" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="admin">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Tenant ID</label>
+                                <input x-model="chatTest.tenant_id" @change="saveChatSettings()" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="default">
+                            </div>
+                            <div>
+                                <label class="text-[10px] font-bold text-gray-500 uppercase">Project ID</label>
+                                <input x-model="chatTest.project_id" @change="saveChatSettings()" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="(opcional)">
+                            </div>
+                            <div class="md:col-span-2">
+                                <button @click="applySelectedUserToChat()" class="px-3 py-2 text-xs font-bold bg-emerald-50 text-emerald-700 rounded border border-emerald-200">
+                                    Usar usuario seleccionado del Home
+                                </button>
                             </div>
                         </div>
                     </div>
@@ -591,8 +957,8 @@
                     <div class="bg-white p-4 rounded-xl shadow-sm border border-gray-200">
                         <div class="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
                             <div>
-                                <h3 class="font-bold text-gray-800 text-lg">Constructor visual (sin tecnicismos)</h3>
-                                <p class="text-xs text-gray-500">Elige un elemento en el arbol y ajusta sus propiedades a la derecha.</p>
+                                <h3 class="font-bold text-gray-800 text-lg">Builder visual (modo simple)</h3>
+                                <p class="text-xs text-gray-500">Selecciona un objeto a la izquierda, edita sus propiedades a la derecha.</p>
                             </div>
                             <div class="flex flex-wrap gap-2">
                                 <button @click="builderTopTab='insert'; openWizard()" :class="builderTopTab==='insert' ? 'bg-orange-600 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
@@ -602,13 +968,13 @@
                                     <i class="fa-solid fa-database mr-1"></i> Datos
                                 </button>
                                 <button @click="builderTopTab='reports'" :class="builderTopTab==='reports' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
-                                    <i class="fa-solid fa-file-lines mr-1"></i> Documentos
+                                    <i class="fa-solid fa-file-lines mr-1"></i> Informes
                                 </button>
                                 <button @click="builderTopTab='Indicadoress'" :class="builderTopTab==='Indicadoress' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
-                                    <i class="fa-solid fa-chart-line mr-1"></i> Indicadores
+                                    <i class="fa-solid fa-chart-line mr-1"></i> Dashboard
                                 </button>
                                 <button @click="showAlanubeWizard = true" class="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold uppercase rounded shadow">
-                                    <i class="fa-solid fa-receipt mr-1"></i> Facturacion
+                                    <i class="fa-solid fa-receipt mr-1"></i> E-factura
                                 </button>
                                 <button @click="mainTab = 'chat'" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded shadow">
                                     <i class="fa-solid fa-comments mr-1"></i> Probar
@@ -638,10 +1004,10 @@
                             <div x-show="uiIssues().length === 0" class="text-[10px] text-gray-500">Sin bloqueos. Puedes guardar y probar.</div>
                         </div>
                     </div>
-                    <div class="grid grid-cols-1 xl:grid-cols-[260px_1fr_320px] gap-4">
+                    <div class="grid grid-cols-1 xl:grid-cols-[280px_1fr_340px] gap-4">
                         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
                             <div class="flex items-center justify-between">
-                                <h4 class="text-xs font-bold text-gray-600 uppercase">Arbol</h4>
+                                <h4 class="text-xs font-bold text-gray-600 uppercase">Objetos</h4>
                                 <button @click="selectObject('form')" class="text-[10px] text-indigo-600">Pantalla</button>
                             </div>
 
@@ -672,7 +1038,7 @@
 
                                 <details open class="border border-gray-100 rounded">
                                     <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
-                                        <i class="fa-solid fa-list-check mr-2"></i> Datos
+                                        <i class="fa-solid fa-list-check mr-2"></i> Campos
                                     </summary>
                                     <div class="space-y-1 px-2 pb-2">
                                         <template x-for="(field, fIndex) in data.fields" :key="'field-'+fIndex">
@@ -688,7 +1054,7 @@
 
                                 <details open class="border border-gray-100 rounded">
                                     <summary class="cursor-pointer px-2 py-2 text-[11px] font-bold text-gray-600 uppercase">
-                                        <i class="fa-solid fa-table mr-2"></i> Listas
+                                        <i class="fa-solid fa-table mr-2"></i> Tablas
                                     </summary>
                                     <div class="space-y-2 px-2 pb-2">
                                         <template x-for="(grid, gIndex) in data.grids" :key="'grid-'+gIndex">
@@ -779,10 +1145,10 @@
                                 </details>
                             </div>
                         </div>
-                        <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-4">
+                        <div class="panel p-4 space-y-4 canvas-grid">
                             <div class="flex items-center justify-between">
-                                <h4 class="text-xs font-bold text-gray-600 uppercase">Lienzo</h4>
-                                <span class="text-[10px] text-gray-400">Asi se vera</span>
+                                <h4 class="text-xs font-bold text-gray-600 uppercase">Vista previa</h4>
+                                <span class="canvas-hint"><i class="fa-solid fa-grip-vertical drag-handle"></i> Arrastra para ordenar (guia)</span>
                             </div>
                             <div x-show="builderTopTab === 'Indicadoress'" class="border rounded-lg p-3 bg-gray-50">
                                 <div class="flex items-center justify-between mb-2">
@@ -870,11 +1236,14 @@
                             </div>
                             <div class="space-y-4">
                                 <template x-for="(section, sIndex) in (data.layout?.sections || [])" :key="'prev-sec-'+sIndex">
-                                    <div class="border rounded-lg p-3 bg-gray-50">
-                                        <div class="text-xs font-semibold text-gray-700" x-text="section.title || ('Seccion ' + (sIndex+1))"></div>
+                                    <div class="border rounded-lg p-3 bg-gray-50 canvas-item">
+                                        <div class="flex items-center justify-between">
+                                            <div class="text-xs font-semibold text-gray-700" x-text="section.title || ('Seccion ' + (sIndex+1))"></div>
+                                            <i class="fa-solid fa-grip-vertical drag-handle text-[10px]"></i>
+                                        </div>
                                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2 mt-3">
                                             <template x-for="fieldId in (section.fields || [])" :key="'prev-field-'+fieldId">
-                                                <div class="border bg-white rounded px-2 py-2 text-xs text-gray-600">
+                                                <div class="border bg-white rounded px-2 py-2 text-xs text-gray-600 canvas-item">
                                                     <div class="font-semibold" x-text="fieldById(fieldId)?.label || fieldId"></div>
                                                     <div class="text-[10px] text-gray-400" x-text="fieldById(fieldId)?.type || ''"></div>
                                                 </div>
@@ -885,7 +1254,7 @@
                                 <template x-if="!data.layout || !data.layout.sections || data.layout.sections.length === 0">
                                     <div class="grid grid-cols-1 md:grid-cols-2 gap-2">
                                         <template x-for="(field, fIndex) in data.fields" :key="'prev-field-'+fIndex">
-                                            <div class="border bg-white rounded px-2 py-2 text-xs text-gray-600">
+                                            <div class="border bg-white rounded px-2 py-2 text-xs text-gray-600 canvas-item">
                                                 <div class="font-semibold" x-text="field.label || field.name || ('Campo ' + (fIndex+1))"></div>
                                                 <div class="text-[10px] text-gray-400" x-text="field.type || ''"></div>
                                             </div>
@@ -893,8 +1262,11 @@
                                     </div>
                                 </template>
                                 <template x-for="(grid, gIndex) in data.grids" :key="'prev-grid-'+gIndex">
-                                    <div class="border rounded-lg p-3">
-                                        <div class="text-xs font-semibold text-gray-700" x-text="grid.label || grid.name || ('Lista ' + (gIndex+1))"></div>
+                                    <div class="border rounded-lg p-3 canvas-item">
+                                        <div class="flex items-center justify-between">
+                                            <div class="text-xs font-semibold text-gray-700" x-text="grid.label || grid.name || ('Lista ' + (gIndex+1))"></div>
+                                            <i class="fa-solid fa-grip-vertical drag-handle text-[10px]"></i>
+                                        </div>
                                         <div class="mt-2 overflow-x-auto">
                                             <table class="w-full text-[10px] border">
                                                 <thead class="bg-gray-50">
@@ -908,8 +1280,11 @@
                                         </div>
                                     </div>
                                 </template>
-                                <div class="border rounded-lg p-3 bg-indigo-50" x-show="data.summary.length > 0">
-                                    <div class="text-xs font-semibold text-indigo-900">Totales</div>
+                                <div class="border rounded-lg p-3 bg-indigo-50 canvas-item" x-show="data.summary.length > 0">
+                                    <div class="flex items-center justify-between">
+                                        <div class="text-xs font-semibold text-indigo-900">Totales</div>
+                                        <i class="fa-solid fa-grip-vertical drag-handle text-[10px]"></i>
+                                    </div>
                                     <div class="space-y-1 mt-2">
                                         <template x-for="(sum, sIndex) in data.summary" :key="'prev-sum-'+sIndex">
                                             <div class="flex justify-between text-[11px] text-indigo-900">
@@ -924,8 +1299,8 @@
                         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-4">
                             <div class="flex items-start justify-between gap-2">
                                 <div>
-                                    <h4 class="text-xs font-bold text-gray-600 uppercase">Propiedades</h4>
-                                    <div class="text-[10px] text-gray-400">Solo lo necesario. Lo técnico está en “Opciones avanzadas”.</div>
+                                    <h4 class="text-xs font-bold text-gray-600 uppercase">Inspector</h4>
+                                    <div class="text-[10px] text-gray-400">Solo lo necesario. Lo técnico está en Detalles opcionales.</div>
                                 </div>
                                 <span class="text-[10px] text-gray-400" x-text="selectedObjectLabel()"></span>
                             </div>
@@ -945,7 +1320,7 @@
                                         </select>
                                     </div>
                                     <details class="border rounded p-2">
-                                        <summary class="cursor-pointer text-[10px] font-bold text-gray-500 uppercase">Opciones avanzadas</summary>
+                                        <summary class="cursor-pointer text-[10px] font-bold text-gray-500 uppercase">Detalles opcionales</summary>
                                         <div class="mt-2 space-y-2">
                                             <div>
                                                 <label class="text-[10px] font-bold text-gray-500 uppercase">ID (no se ve)</label>
@@ -1000,7 +1375,7 @@
                                         Obligatorio
                                     </div>
                                     <details class="border rounded p-2">
-                                        <summary class="cursor-pointer text-[10px] font-bold text-gray-500 uppercase">Opciones avanzadas</summary>
+                                        <summary class="cursor-pointer text-[10px] font-bold text-gray-500 uppercase">Detalles opcionales</summary>
                                         <div class="mt-2">
                                             <label class="text-[10px] font-bold text-gray-500 uppercase">ID (no se ve)</label>
                                             <input x-model="data.fields[selectedObject.index].name" class="w-full border rounded px-3 py-2 text-sm font-mono">
@@ -1016,7 +1391,7 @@
                                         <input x-model="data.grids[selectedObject.index].label" class="w-full border rounded px-3 py-2 text-sm">
                                     </div>
                                     <details class="border rounded p-2">
-                                        <summary class="cursor-pointer text-[10px] font-bold text-gray-500 uppercase">Opciones avanzadas</summary>
+                                        <summary class="cursor-pointer text-[10px] font-bold text-gray-500 uppercase">Detalles opcionales</summary>
                                         <div class="mt-2">
                                             <label class="text-[10px] font-bold text-gray-500 uppercase">ID (no se ve)</label>
                                             <input x-model="data.grids[selectedObject.index].name" class="w-full border rounded px-3 py-2 text-sm font-mono">
@@ -1042,7 +1417,7 @@
                                         </select>
                                     </div>
                                     <details class="border rounded p-2">
-                                        <summary class="cursor-pointer text-[10px] font-bold text-gray-500 uppercase">Opciones avanzadas</summary>
+                                        <summary class="cursor-pointer text-[10px] font-bold text-gray-500 uppercase">Detalles opcionales</summary>
                                         <div class="mt-2">
                                             <label class="text-[10px] font-bold text-gray-500 uppercase">Cálculo (fórmula)</label>
                                             <input x-model="data.grids[selectedObject.parentIndex].columns[selectedObject.index].formula.expression" class="w-full border rounded px-3 py-2 text-sm font-mono">
@@ -1550,6 +1925,9 @@
                 </div>
 
                 <div x-show="mainTab === 'forms' && showAdvanced" x-transition.opacity>
+                    <div class="bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl p-4 mb-6 text-xs">
+                        Estas en opciones tecnicas. Si solo necesitas crear pantallas rapidamente, vuelve a <span class="font-bold">Modo simple</span>.
+                    </div>
                 <div x-show="activeTab === 'general'" class="space-y-6 max-w-3xl mx-auto" x-transition.opacity>
                     <div class="bg-white p-6 rounded-xl shadow-sm border border-gray-200">
                         <h3 class="font-bold text-gray-800 mb-5 pb-2 border-b flex items-center gap-2">
@@ -2222,11 +2600,11 @@
     <script>
         function formBuilder() {
             return {
-                mainTab: 'forms',
+                mainTab: 'Indicadores',
                 mainTabs: [
                     { id: 'Indicadores', label: 'Inicio', icon: 'fa-solid fa-gauge-high' },
-                    { id: 'forms', label: 'Dise?ar', icon: 'fa-solid fa-pen-to-square' },
-                    { id: 'database', label: 'Datos (avanzado)', icon: 'fa-solid fa-database' },
+                    { id: 'forms', label: 'Disenar', icon: 'fa-solid fa-pen-to-square' },
+                    { id: 'database', label: 'Datos (opcional)', icon: 'fa-solid fa-database' },
                     { id: 'chat', label: 'Probar', icon: 'fa-solid fa-comments' }
                 ],
                 activeTab: 'general',
@@ -2240,8 +2618,45 @@
                     entities: [],
                     views: [],
                     database: [],
+                    deploys: [],
                     manifest: null,
-                    updatedAt: ''
+                    updatedAt: '',
+                    registry: { summary: null, users: [], project: null, deploys: [], authUsers: [] },
+                    acid: { summary: null, results: [] }
+                },
+                projectList: [],
+                currentProjectId: '',
+                projectForm: {
+                    id: '',
+                    name: '',
+                    status: 'draft',
+                    tenant_mode: 'shared'
+                },
+                selectedUser: null,
+                userForm: {
+                    id: '',
+                    label: '',
+                    role: 'admin',
+                    type: 'creator',
+                    tenant_id: 'default'
+                },
+                authForm: {
+                    id: '',
+                    password: '',
+                    role: 'admin',
+                    tenant_id: 'default',
+                    label: ''
+                },
+                currentAuthUser: null,
+                deployForm: {
+                    name: '',
+                    env: 'dev',
+                    url: '',
+                    status: 'pending'
+                },
+                llmHealth: {
+                    lastRun: '',
+                    providers: {}
                 },
                 csvImport: {
                     fileName: '',
@@ -2254,7 +2669,7 @@
                 tabs: [
                     { id: 'general', label: 'General', icon: 'fa-solid fa-sliders' },
                     { id: 'fields', label: 'Datos', icon: 'fa-regular fa-keyboard' },
-                    { id: 'layout', label: 'Diseño', icon: 'fa-solid fa-table-columns' },
+                    { id: 'layout', label: 'Diseno', icon: 'fa-solid fa-table-columns' },
                     { id: 'grids', label: 'Grids/Listas', icon: 'fa-solid fa-table-list' },
                     { id: 'summary', label: 'Totales', icon: 'fa-solid fa-calculator' },
                     { id: 'output', label: 'Proyecto', icon: 'fa-solid fa-sitemap', advanced: true }
@@ -2340,6 +2755,11 @@
                     apiBase: '',
                     entity: '',
                     message: '',
+                    mode: 'app',
+                    user_id: '',
+                    role: 'admin',
+                    tenant_id: 'default',
+                    project_id: '',
                     autoRun: false,
                     busy: false,
                     logs: [],
@@ -2386,6 +2806,13 @@
                     if (this.project.alanube && !this.project.alanube.invoiceContract) {
                         this.project.alanube.invoiceContract = this.normalizeEntityName() || 'factura';
                     }
+                    this.refreshRegistryStatus();
+                    this.refreshRegistryUsers();
+                    this.refreshAuthUsers();
+                    this.refreshAuthMe();
+                    this.refreshDeploys();
+                    this.refreshProjects();
+                    this.refreshAcidReport();
                 },
 
                 loadChatSettings() {
@@ -2393,9 +2820,19 @@
                         const apiBase = localStorage.getItem('suki_chat_api') || '';
                         const autoRun = localStorage.getItem('suki_chat_autorun') || '';
                         const entity = localStorage.getItem('suki_chat_entity') || '';
+                        const mode = localStorage.getItem('suki_chat_mode') || 'app';
+                        const userId = localStorage.getItem('suki_chat_user') || '';
+                        const role = localStorage.getItem('suki_chat_role') || 'admin';
+                        const tenantId = localStorage.getItem('suki_chat_tenant') || 'default';
+                        const projectId = localStorage.getItem('suki_chat_project') || '';
                         this.chatTest.apiBase = apiBase;
                         this.chatTest.autoRun = autoRun === '1';
                         this.chatTest.entity = entity;
+                        this.chatTest.mode = mode;
+                        this.chatTest.user_id = userId;
+                        this.chatTest.role = role;
+                        this.chatTest.tenant_id = tenantId;
+                        this.chatTest.project_id = projectId;
                     } catch (e) {
                         // ignore
                     }
@@ -2406,6 +2843,11 @@
                         localStorage.setItem('suki_chat_api', (this.chatTest.apiBase || '').trim());
                         localStorage.setItem('suki_chat_autorun', this.chatTest.autoRun ? '1' : '0');
                         localStorage.setItem('suki_chat_entity', (this.chatTest.entity || '').trim());
+                        localStorage.setItem('suki_chat_mode', (this.chatTest.mode || 'app').trim());
+                        localStorage.setItem('suki_chat_user', (this.chatTest.user_id || '').trim());
+                        localStorage.setItem('suki_chat_role', (this.chatTest.role || 'admin').trim());
+                        localStorage.setItem('suki_chat_tenant', (this.chatTest.tenant_id || 'default').trim());
+                        localStorage.setItem('suki_chat_project', (this.chatTest.project_id || '').trim());
                     } catch (e) {
                         // ignore
                     }
@@ -2970,16 +3412,23 @@
                     this.appendChatLog('out', message);
 
                     try {
-                        const res = await fetch(`${base}/api/command`, {
+                        const res = await fetch(`${base}/api/chat/message`, {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
                                 message: message,
-                                entity: this.resolveChatEntity()
+                                entity: this.resolveChatEntity(),
+                                mode: this.chatTest.mode || 'app',
+                                user_id: this.chatTest.user_id || 'user_demo',
+                                role: this.chatTest.role || 'admin',
+                                tenant_id: this.chatTest.tenant_id || 'default',
+                                project_id: this.chatTest.project_id || '',
+                                session_id: 'editor_' + Date.now()
                             })
                         });
                         const json = await res.json();
-                        this.appendChatLog('in', JSON.stringify(json));
+                        const reply = json.data?.reply || json.message || JSON.stringify(json);
+                        this.appendChatLog('in', reply);
                         this.chatTest.lastRun = new Date().toLocaleString();
                     } catch (e) {
                         this.appendChatLog('in', 'Error: ' + (e.message || e));
@@ -4029,6 +4478,7 @@ $formGenerator = new FormGenerator();
                     const database = await this.listFilesInPath(this.projectRootHandle, 'database');
                     const entities = await this.listEntitiesWithFields(this.projectRootHandle);
                     const manifest = await this.readManifest(this.projectRootHandle);
+                    const deploys = await this.readDeploys(this.projectRootHandle);
 
                     this.projectSnapshot = {
                         rootName: this.projectRootHandle.name || 'project',
@@ -4036,9 +4486,392 @@ $formGenerator = new FormGenerator();
                         entities: entities,
                         views: views,
                         database: database,
+                        deploys: deploys,
                         manifest: manifest,
-                        updatedAt: new Date().toISOString().replace('T', ' ').split('.')[0]
+                        updatedAt: new Date().toISOString().replace('T', ' ').split('.')[0],
+                        registry: this.projectSnapshot.registry || { summary: null, users: [], project: null, deploys: [], authUsers: [] },
+                        acid: this.projectSnapshot.acid || { summary: null, results: [] }
                     };
+                    await this.refreshRegistryStatus();
+                    await this.refreshRegistryUsers();
+                    await this.refreshAuthUsers();
+                    await this.refreshDeploys();
+                    await this.refreshAcidReport();
+                },
+                async refreshRegistryStatus() {
+                    try {
+                        const res = await fetch('/api/registry/status');
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.projectSnapshot.registry = {
+                                summary: json.data?.summary || null,
+                                users: this.projectSnapshot.registry?.users || [],
+                                project: json.data?.project || null,
+                                deploys: this.projectSnapshot.registry?.deploys || [],
+                                authUsers: this.projectSnapshot.registry?.authUsers || []
+                            };
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                },
+                async refreshRegistryUsers() {
+                    try {
+                        const res = await fetch('/api/registry/users');
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.projectSnapshot.registry = {
+                                summary: this.projectSnapshot.registry?.summary || null,
+                                users: json.data?.users || [],
+                                project: this.projectSnapshot.registry?.project || null,
+                                deploys: this.projectSnapshot.registry?.deploys || [],
+                                authUsers: this.projectSnapshot.registry?.authUsers || []
+                            };
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                },
+                async refreshAuthUsers() {
+                    try {
+                        const res = await fetch('/api/auth/users');
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.projectSnapshot.registry = {
+                                summary: this.projectSnapshot.registry?.summary || null,
+                                users: this.projectSnapshot.registry?.users || [],
+                                project: this.projectSnapshot.registry?.project || null,
+                                deploys: this.projectSnapshot.registry?.deploys || [],
+                                authUsers: json.data?.users || []
+                            };
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                },
+                async refreshDeploys() {
+                    try {
+                        const res = await fetch('/api/registry/deploys');
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.projectSnapshot.registry = {
+                                summary: this.projectSnapshot.registry?.summary || null,
+                                users: this.projectSnapshot.registry?.users || [],
+                                project: this.projectSnapshot.registry?.project || null,
+                                deploys: json.data?.deploys || [],
+                                authUsers: this.projectSnapshot.registry?.authUsers || []
+                            };
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                },
+                async refreshProjects() {
+                    try {
+                        const res = await fetch('/api/registry/projects');
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.projectList = json.data?.projects || [];
+                            this.currentProjectId = json.data?.current || '';
+                            if (!this.currentProjectId && this.projectSnapshot.registry?.project?.id) {
+                                this.currentProjectId = this.projectSnapshot.registry.project.id;
+                            }
+                            this.applySelectedProjectToChat();
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                },
+                async selectProject(projectId) {
+                    if (!projectId) return;
+                    try {
+                        const res = await fetch('/api/registry/select', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ project_id: projectId })
+                        });
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.currentProjectId = projectId;
+                            this.notify('success', 'Proyecto activo: ' + projectId);
+                            await this.refreshRegistryStatus();
+                            await this.refreshRegistryUsers();
+                            await this.refreshAuthUsers();
+                            await this.refreshDeploys();
+                            this.applySelectedProjectToChat();
+                        } else {
+                            this.notify('error', json.message || 'No se pudo seleccionar proyecto.');
+                        }
+                    } catch (e) {
+                        this.notify('error', 'Error al seleccionar proyecto.');
+                    }
+                },
+                async createProject() {
+                    const id = (this.projectForm.id || '').trim();
+                    const name = (this.projectForm.name || '').trim();
+                    if (!id || !name) {
+                        this.notify('error', 'ID y nombre requeridos.');
+                        return;
+                    }
+                    const payload = {
+                        id,
+                        name,
+                        status: this.projectForm.status || 'draft',
+                        tenant_mode: this.projectForm.tenant_mode || 'shared'
+                    };
+                    try {
+                        const res = await fetch('/api/registry/project', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.notify('success', 'Proyecto creado.');
+                            this.projectForm.id = '';
+                            this.projectForm.name = '';
+                            await this.refreshProjects();
+                        } else {
+                            this.notify('error', json.message || 'No se pudo crear proyecto.');
+                        }
+                    } catch (e) {
+                        this.notify('error', 'Error al crear proyecto.');
+                    }
+                },
+                async createRegistryUser() {
+                    const id = (this.userForm.id || '').trim();
+                    if (!id) {
+                        this.notify('error', 'Define un ID de usuario.');
+                        return;
+                    }
+                    const payload = {
+                        id: id,
+                        label: (this.userForm.label || id).trim(),
+                        role: this.userForm.role,
+                        type: this.userForm.type,
+                        tenant_id: (this.userForm.tenant_id || 'default').trim()
+                    };
+                    try {
+                        const res = await fetch('/api/registry/user', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.notify('success', 'Usuario registrado.');
+                            this.userForm.id = '';
+                            this.userForm.label = '';
+                            await this.refreshRegistryUsers();
+                            await this.refreshRegistryStatus();
+                        } else {
+                            this.notify('error', json.message || 'No se pudo crear usuario.');
+                        }
+                    } catch (e) {
+                        this.notify('error', 'Error al crear usuario.');
+                    }
+                },
+                selectRegistryUser(user) {
+                    this.selectedUser = user;
+                    if (user && user.id) {
+                        this.notify('success', 'Usuario seleccionado: ' + user.id);
+                        this.applySelectedUserToChat();
+                    }
+                },
+                applySelectedUserToChat() {
+                    if (!this.selectedUser) return;
+                    this.chatTest.user_id = this.selectedUser.id || '';
+                    this.chatTest.role = this.selectedUser.role || 'admin';
+                    this.chatTest.tenant_id = this.selectedUser.tenant_id || 'default';
+                    this.saveChatSettings();
+                },
+                applySelectedProjectToChat() {
+                    if (this.currentProjectId) {
+                        this.chatTest.project_id = this.currentProjectId;
+                        this.saveChatSettings();
+                    }
+                },
+                async createAuthUser() {
+                    const id = (this.authForm.id || '').trim();
+                    if (!id || !(this.authForm.password || '').trim()) {
+                        this.notify('error', 'ID y password requeridos.');
+                        return;
+                    }
+                    const payload = {
+                        id: id,
+                        password: this.authForm.password,
+                        role: this.authForm.role,
+                        tenant_id: this.authForm.tenant_id || 'default',
+                        label: (this.authForm.label || id).trim()
+                    };
+                    try {
+                        const res = await fetch('/api/auth/register', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.notify('success', 'Login creado.');
+                            this.authForm.id = '';
+                            this.authForm.password = '';
+                            this.authForm.label = '';
+                            await this.refreshAuthUsers();
+                        } else {
+                            this.notify('error', json.message || 'No se pudo crear login.');
+                        }
+                    } catch (e) {
+                        this.notify('error', 'Error al crear login.');
+                    }
+                },
+                async loginAuthUser() {
+                    const id = (this.authForm.id || '').trim();
+                    const password = (this.authForm.password || '').trim();
+                    if (!id || !password) {
+                        this.notify('error', 'ID y password requeridos.');
+                        return;
+                    }
+                    try {
+                        const res = await fetch('/api/auth/login', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ id, password })
+                        });
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.currentAuthUser = json.data?.user || null;
+                            this.notify('success', 'Login OK.');
+                            if (this.currentAuthUser) {
+                                this.selectedUser = {
+                                    id: this.currentAuthUser.id,
+                                    role: this.currentAuthUser.role,
+                                    tenant_id: this.currentAuthUser.tenant_id,
+                                    label: this.currentAuthUser.label
+                                };
+                                this.applySelectedUserToChat();
+                            }
+                        } else {
+                            this.notify('error', json.message || 'Login invalido.');
+                        }
+                    } catch (e) {
+                        this.notify('error', 'Error en login.');
+                    }
+                },
+                async logoutAuthUser() {
+                    try {
+                        await fetch('/api/auth/logout', { method: 'POST' });
+                        this.currentAuthUser = null;
+                        this.notify('success', 'Sesion cerrada.');
+                    } catch (e) {
+                        this.notify('error', 'Error al cerrar sesion.');
+                    }
+                },
+                async refreshAuthMe() {
+                    try {
+                        const res = await fetch('/api/auth/me');
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.currentAuthUser = json.data?.user || null;
+                            if (this.currentAuthUser) {
+                                this.selectedUser = {
+                                    id: this.currentAuthUser.id,
+                                    role: this.currentAuthUser.role,
+                                    tenant_id: this.currentAuthUser.tenant_id,
+                                    label: this.currentAuthUser.label
+                                };
+                                this.applySelectedUserToChat();
+                            }
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                },
+                async createDeploy() {
+                    const name = (this.deployForm.name || '').trim();
+                    if (!name) {
+                        this.notify('error', 'Nombre de deploy requerido.');
+                        return;
+                    }
+                    const payload = {
+                        name,
+                        env: (this.deployForm.env || 'dev').trim(),
+                        url: (this.deployForm.url || '').trim(),
+                        status: (this.deployForm.status || 'pending').trim()
+                    };
+                    try {
+                        const res = await fetch('/api/registry/deploy', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload)
+                        });
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.notify('success', 'Deploy guardado.');
+                            this.deployForm.name = '';
+                            this.deployForm.url = '';
+                            await this.refreshDeploys();
+                        } else {
+                            this.notify('error', json.message || 'No se pudo guardar deploy.');
+                        }
+                    } catch (e) {
+                        this.notify('error', 'Error al guardar deploy.');
+                    }
+                },
+                async checkLlmHealth() {
+                    try {
+                        const res = await fetch('/api/llm/health', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'ping' }) });
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.llmHealth.providers = json.data?.providers || {};
+                            this.llmHealth.lastRun = new Date().toLocaleString();
+                            const providers = Object.entries(this.llmHealth.providers || {})
+                                .filter(([_, value]) => value && value.ok)
+                                .map(([key]) => key);
+                            const msg = providers.length
+                                ? 'IA lista: ' + providers.join(', ') + '.'
+                                : 'IA activa pero sin proveedores disponibles.';
+                            this.notify('success', msg);
+                        } else {
+                            this.notify('warning', 'No pude validar la IA ahora. Revisa tus keys en .env y vuelve a intentar.');
+                        }
+                    } catch (e) {
+                        this.notify('warning', 'No pude contactar la IA. Verifica internet y tus keys.');
+                    }
+                },
+                async refreshAcidReport() {
+                    try {
+                        const tenantId = this.chatTest.tenant_id || 'default';
+                        const res = await fetch(`/api/chat/acid-report?tenant_id=${encodeURIComponent(tenantId)}`);
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.projectSnapshot.acid = json.data?.report || { summary: null, results: [] };
+                        }
+                    } catch (e) {
+                        // ignore
+                    }
+                },
+                async runAcidTest() {
+                    try {
+                        const payload = {
+                            tenant_id: this.chatTest.tenant_id || 'default',
+                            user_id: this.chatTest.user_id || 'builder_demo',
+                            project_id: this.chatTest.project_id || '',
+                        };
+                        const res = await fetch('/api/chat/acid-test', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(payload),
+                        });
+                        const json = await res.json();
+                        if (json && json.status === 'success') {
+                            this.projectSnapshot.acid = json.data?.report || { summary: null, results: [] };
+                            this.notify('success', 'Diagnostico chat actualizado.');
+                        } else {
+                            this.notify('warning', json.message || 'No pude ejecutar el diagnostico.');
+                        }
+                    } catch (e) {
+                        this.notify('warning', 'Error al ejecutar el diagnostico.');
+                    }
                 },
                 async listFilesInPath(root, path) {
                     try {
@@ -4092,6 +4925,29 @@ $formGenerator = new FormGenerator();
                     } catch (e) {
                         return null;
                     }
+                },
+                async readDeploys(root) {
+                    const candidates = [
+                        { dir: 'contracts', file: 'deploys.json' },
+                        { dir: '', file: 'deploys.json' }
+                    ];
+                    for (const candidate of candidates) {
+                        try {
+                            const dirHandle = candidate.dir
+                                ? await this.getDirHandle(root, candidate.dir, false)
+                                : root;
+                            const fileHandle = await dirHandle.getFileHandle(candidate.file, { create: false });
+                            const file = await fileHandle.getFile();
+                            const text = await file.text();
+                            const json = JSON.parse(text);
+                            if (Array.isArray(json)) return json;
+                            if (json && Array.isArray(json.items)) return json.items;
+                            return [];
+                        } catch (e) {
+                            continue;
+                        }
+                    }
+                    return [];
                 },
                 buildSqlSchema() {
                     const table = this.normalizeSqlName(this.project.tableName);

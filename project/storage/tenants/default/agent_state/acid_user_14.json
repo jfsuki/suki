@@ -1,0 +1,33 @@
+{
+    "active_task": "profile",
+    "intent": "update",
+    "entity": "cliente",
+    "collected": {
+        "id": "1",
+        "email": "juan@mail.com"
+    },
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "mi negocio es ferreteria",
+            "a": "Listo, lo tendre en cuenta.",
+            "ts": 1771451654
+        },
+        {
+            "u": "mi negocio es ferreteria",
+            "a": "Listo, lo tendre en cuenta.",
+            "ts": 1771458369
+        },
+        {
+            "u": "actualizar cliente id=1 email=juan@mail.com",
+            "a": "OK",
+            "ts": 1771462188
+        },
+        {
+            "u": "actualizar cliente id=1 email=juan@mail.com",
+            "a": "OK",
+            "ts": 1771462242
+        }
+    ],
+    "summary": "guarda estas expresiones para después"
+}

@@ -1,0 +1,30 @@
+{
+    "active_task": null,
+    "intent": "FORM_LIST",
+    "entity": "",
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "que formularios?",
+            "a": "Formularios: cliente.form, clientes.form, cuentasxcobrar.form, fact.form. ¿Quieres abrir alguno?",
+            "ts": 1771451654
+        },
+        {
+            "u": "que formularios?",
+            "a": "Formularios: cliente.form, clientes.form, cuentasxcobrar.form, fact.form. ¿Quieres abrir alguno?",
+            "ts": 1771458369
+        },
+        {
+            "u": "que formularios?",
+            "a": "Formularios: cliente.form, clientes.form, cuentasxcobrar.form, fact.form. ¿Quieres abrir alguno?",
+            "ts": 1771462188
+        },
+        {
+            "u": "que formularios?",
+            "a": "Formularios: cliente.form, clientes.form, cuentasxcobrar.form, fact.form. ¿Quieres abrir alguno?",
+            "ts": 1771462242
+        }
+    ],
+    "summary": "que opciones puedo usar ahora"
+}

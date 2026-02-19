@@ -1,0 +1,15 @@
+{
+    "active_task": null,
+    "intent": null,
+    "entity": "clientes",
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "crear formulario clientes",
+            "a": "OK",
+            "ts": 1771462304
+        }
+    ],
+    "summary": "crear formulario clientes"
+}

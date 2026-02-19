@@ -43,6 +43,7 @@ class BaseRepository
 
     public function create(array $data): int
     {
+        $this->guardTenant();
         $payload = $this->filterData($data);
         if ($this->tenantScoped && $this->tenantId !== null) {
             $payload['tenant_id'] = $this->tenantId;
@@ -54,6 +55,7 @@ class BaseRepository
 
     public function find($id): ?array
     {
+        $this->guardTenant();
         $qb = $this->newQuery()
             ->where($this->primaryKey, '=', $id);
 
@@ -63,6 +65,7 @@ class BaseRepository
 
     public function update($id, array $data): int
     {
+        $this->guardTenant();
         $payload = $this->filterData($data);
         if (empty($payload)) {
             throw new InvalidArgumentException('No hay datos permitidos para actualizar.');
@@ -77,6 +80,7 @@ class BaseRepository
 
     public function delete($id): int
     {
+        $this->guardTenant();
         $qb = $this->newQuery()
             ->where($this->primaryKey, '=', $id);
 
@@ -91,6 +95,7 @@ class BaseRepository
 
     public function list(array $filters = [], int $limit = 100, int $offset = 0): array
     {
+        $this->guardTenant();
         $qb = $this->newQuery();
         $this->applyTenantScope($qb);
 
@@ -119,6 +124,13 @@ class BaseRepository
             if (in_array('tenant_id', $this->allowedColumns, true)) {
                 $qb->where('tenant_id', '=', $this->tenantId);
             }
+        }
+    }
+
+    protected function guardTenant(): void
+    {
+        if ($this->tenantScoped && $this->tenantId === null) {
+            throw new InvalidArgumentException('tenant_id requerido para esta entidad.');
         }
     }
 

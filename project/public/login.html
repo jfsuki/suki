@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Suki Login</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;600;700&display=swap');
+        :root { --bg:#f8fafc; --card:#fff; --border:#e5e7eb; --text:#0f172a; --muted:#6b7280; --primary:#2563eb; }
+        * { box-sizing: border-box; font-family: 'Manrope', Arial, sans-serif; }
+        body { margin:0; background: var(--bg); color: var(--text); display:flex; align-items:center; justify-content:center; min-height:100vh; }
+        .card { width: min(420px, 92vw); background: var(--card); border:1px solid var(--border); border-radius:16px; padding:20px; box-shadow:0 16px 40px rgba(15,23,42,0.08); }
+        h1 { margin:0 0 6px; font-size:20px; }
+        p { margin:0 0 16px; color: var(--muted); font-size:12px; }
+        label { font-size:11px; color: var(--muted); }
+        input, select { width:100%; padding:10px; border:1px solid var(--border); border-radius:10px; font-size:13px; }
+        .row { display:flex; gap:10px; }
+        .btn { padding:10px 12px; border:none; border-radius:10px; background: var(--primary); color:#fff; font-weight:600; cursor:pointer; }
+        .btn.secondary { background:#e2e8f0; color: var(--text); }
+        .msg { margin-top:10px; font-size:12px; color: var(--muted); }
+    </style>
+</head>
+<body>
+    <div class="card">
+        <h1>Login Suki</h1>
+        <p>Acceso basico para pruebas (auth + sesiones).</p>
+        <div class="row">
+            <div style="flex:1">
+                <label>Usuario</label>
+                <input id="userId" placeholder="admin1">
+            </div>
+            <div style="flex:1">
+                <label>Password</label>
+                <input id="password" type="password" placeholder="******">
+            </div>
+        </div>
+        <div class="row" style="margin-top:10px;">
+            <button class="btn" id="loginBtn">Login</button>
+            <button class="btn secondary" id="logoutBtn">Salir</button>
+        </div>
+
+        <div style="margin-top:16px; border-top:1px dashed var(--border); padding-top:14px;">
+            <h1 style="font-size:16px;">Crear usuario</h1>
+            <div class="row">
+                <div style="flex:1">
+                    <label>Rol</label>
+                    <select id="role">
+                        <option value="admin">Administrador</option>
+                        <option value="seller">Vendedora</option>
+                        <option value="viewer">Consulta</option>
+                    </select>
+                </div>
+                <div style="flex:1">
+                    <label>Tenant ID</label>
+                    <input id="tenantId" placeholder="default">
+                </div>
+            </div>
+            <div class="row" style="margin-top:10px;">
+                <button class="btn" id="registerBtn">Crear login</button>
+            </div>
+        </div>
+        <div class="msg" id="status">Listo.</div>
+    </div>
+
+    <script>
+        const statusEl = document.getElementById('status');
+        const userIdEl = document.getElementById('userId');
+        const passwordEl = document.getElementById('password');
+        const roleEl = document.getElementById('role');
+        const tenantIdEl = document.getElementById('tenantId');
+
+        function show(msg) { statusEl.textContent = msg; }
+
+        async function post(url, payload) {
+            const res = await fetch(url, { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(payload) });
+            return res.json();
+        }
+
+        document.getElementById('loginBtn').addEventListener('click', async () => {
+            const id = userIdEl.value.trim();
+            const password = passwordEl.value.trim();
+            if (!id || !password) { show('Usuario y password requeridos.'); return; }
+            try {
+                const json = await post('/api/auth/login', { id, password });
+                show(json.status === 'success' ? 'Login OK.' : (json.message || 'Error'));
+            } catch (e) { show('Error de conexion.'); }
+        });
+
+        document.getElementById('logoutBtn').addEventListener('click', async () => {
+            try {
+                const json = await post('/api/auth/logout', {});
+                show(json.message || 'Sesion cerrada.');
+            } catch (e) { show('Error de conexion.'); }
+        });
+
+        document.getElementById('registerBtn').addEventListener('click', async () => {
+            const id = userIdEl.value.trim();
+            const password = passwordEl.value.trim();
+            if (!id || !password) { show('Usuario y password requeridos.'); return; }
+            try {
+                const json = await post('/api/auth/register', { id, password, role: roleEl.value, tenant_id: tenantIdEl.value || 'default' });
+                show(json.status === 'success' ? 'Usuario creado.' : (json.message || 'Error'));
+            } catch (e) { show('Error de conexion.'); }
+        });
+    </script>
+</body>
+</html>

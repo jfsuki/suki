@@ -1,24 +1,31 @@
 {
-    "active_task": null,
-    "intent": "question",
-    "entity": "",
+    "active_task": "crud",
+    "intent": "create",
+    "entity": "cliente",
     "collected": [],
-    "missing": [],
+    "missing": [
+        "nombre"
+    ],
     "last_messages": [
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771342254
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771342259
-        },
-        {
-            "u": "que app tengo activa?",
+            "u": "ana",
             "a": "",
-            "ts": 1771342273
+            "ts": 1771457766
+        },
+        {
+            "u": "ahora?",
+            "a": "",
+            "ts": 1771457771
+        },
+        {
+            "u": "a puedo hacer con este programa?",
+            "a": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\n¿Quieres crear algo nuevo o usar lo que ya tienes?",
+            "ts": 1771458507
+        },
+        {
+            "u": "puedo crear producto?",
+            "a": "Me falta nombre. ¿Cuál es?",
+            "ts": 1771458522
         }
     ],
     "summary": "hola"
