@@ -47,7 +47,18 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
   - valida entidad antes de CRUD
   - slot-filling con requested_slot
   - build/use guard
+  - guard reforzado: en modo APP bloquea solicitudes de crear app/estructura y redirige al chat creador
   - ayuda y ejemplos desde registry real
+  - flujo guiado corto en builder: paso minimo + confirmacion `si/no` antes de crear tabla sugerida
+  - sugerencia de campos en lenguaje no tecnico para usuarios basicos
+  - ruta tecnica resumida (logica + base de datos + pasos de construccion) disponible por chat en modo builder
+- Knowledge base externa reforzada (sin hardcode):
+  - `framework/contracts/agents/domain_playbooks.json` con perfiles de negocio, entidades sugeridas y reportes
+  - `framework/contracts/agents/accounting_tax_knowledge_co.json` con base contable/tributaria operativa y checklists
+  - merge de entidades contables minimas por tipo de negocio en onboarding
+  - cobertura ampliada universal: ERP/CRM/contable, salud, iglesia/fundacion, restaurante, retail, manufactura, taller, ecommerce, constructora, educacion, hoteleria, agro
+  - protocolo para dominios desconocidos: si no hay plantilla exacta, se registra cola de investigacion y el chat continua con preguntas minimas
+  - memoria compartida de investigacion en `project/storage/chat/research/{tenant}.json` (usable por todos los mini-agentes)
 - Chat help external JSON: conversation_training_base.json.
 - Acid test actualizado (framework/tests/chat_acid.php) y reportes.
 
@@ -66,3 +77,47 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Ayuda y ejemplos pueden quedar desfasados si no se alimentan del registry.
 - Estado conversacional debe resetearse cuando cambia proyecto/tenant.
 
+## Checkpoint (2026-02-19, pre-manual-test reset)
+- Proyecto limpiado para pruebas desde cero:
+  - `project/contracts/entities/*` vacio
+  - `project/contracts/forms/*` vacio
+  - `project/views/` solo `dashboard.php` + `includes/`
+  - `project/config/menu.json` minimal (Dashboard)
+- Runtime state limpiado:
+  - `project/storage/meta/project_registry.sqlite` reiniciado (se regenera al primer uso)
+  - `project/storage/chat/*` y `project/storage/tenants/*/agent_state/*` limpiados
+  - cache de contratos/esquemas limpiada
+- Base MySQL de pruebas revisada:
+  - queda solo `audit_log` (sin tablas de entidades activas)
+- Validacion tecnica posterior a limpieza:
+  - `UnitTestRunner`: 7 pass, 0 fail, 0 warn
+  - `chat_acid.php`: 23 pass, 0 fail
+
+## Checkpoint (2026-02-19, knowledge upgrade build-chat)
+- ConversationGateway reforzado para modo creador:
+  - deteccion de tipo de negocio con aliases desde playbook externo
+  - plan de arranque con tablas, flujo, reportes y controles contables minimos
+  - sugerencias de campos por negocio/entidad con explicacion simple de tipos
+  - carga en cache de `domain_playbooks` y `accounting_tax_knowledge`
+- Base de conocimiento ampliada:
+  - nuevos perfiles: servicios y mantenimiento, restaurante/cafeteria, retail, consultoria, iglesia/fundacion, etc.
+  - plantillas de entidades contables: facturas, items, pagos, cartera, gastos, impuestos
+  - checklists de creador para asegurar estructura contable minima antes de operar
+- Validacion posterior:
+  - `php framework/tests/run.php`: 7 pass, 0 fail
+  - `php framework/tests/chat_acid.php`: 23 pass, 0 fail
+
+## Checkpoint (2026-02-19, universal business memory)
+- Chat builder actualizado a flujo mas asistido para usuario no tecnico:
+  - propone tabla sugerida por negocio
+  - explica datos a guardar
+  - confirma con `si/no` antes de crear
+- Memoria de dominio expandida para mini-apps complementarias de ERP (ej. SAP-side apps):
+  - mantenimiento interno
+  - inventario de taller
+  - control de lotes/calidad
+  - solicitudes/aprobaciones internas
+- Base contable ampliada:
+  - plantillas de entidades por industria
+  - controles operativos por vertical
+  - checklists para cierre y control tributario operativo

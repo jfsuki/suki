@@ -1,0 +1,17 @@
+{
+    "active_task": null,
+    "intent": "ENTITY_LIST",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "last_messages": [
+        {
+            "u": "que tablas hay",
+            "a": "Aun no hay tablas creadas. Quieres crear una?",
+            "ts": 1771515068
+        }
+    ],
+    "summary": "que tablas hay"
+}

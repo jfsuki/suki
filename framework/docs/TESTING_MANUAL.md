@@ -142,3 +142,17 @@ Espera: "Login listo. Ya puedes usar la app."
 - **mysql_native_password**: usuario MySQL incompatible; crea usuario nuevo con autenticacion moderna.
 - **IA no configurada**: faltan API keys, usa comandos simples.
 
+## 12) Medir consumo IA (requests y tokens)
+En chat (builder o app) escribe:
+- `consumo ia`
+- `tokens ia`
+
+Respuesta esperada:
+- Requests IA del dia
+- Prompt tokens
+- Completion tokens
+- Total tokens
+- Proveedores usados
+
+Fuente del reporte:
+- `project/storage/tenants/{tenant}/telemetry/YYYY-MM-DD.log.jsonl`

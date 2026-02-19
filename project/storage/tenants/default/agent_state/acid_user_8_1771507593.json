@@ -1,0 +1,16 @@
+{
+    "active_task": "create_table",
+    "intent": null,
+    "entity": "clientes",
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "last_messages": [
+        {
+            "u": "crear tabla clientes",
+            "a": "Que campos quieres? Ej: nombre:texto nit:texto",
+            "ts": 1771507593
+        }
+    ],
+    "summary": "crear tabla clientes"
+}

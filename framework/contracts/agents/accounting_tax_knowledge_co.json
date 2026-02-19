@@ -1,0 +1,538 @@
+{
+    "meta": {
+        "name": "accounting_tax_knowledge_co",
+        "version": "0.3.2",
+        "updated_at": "2026-02-19",
+        "scope": "Operational accounting and tax baseline for app builder guidance.",
+        "warning": "Reference support content only. Legal and tax decisions require accountant validation."
+    },
+    "country_scope": {
+        "default_country": "CO",
+        "supported_country_profiles": [
+            "CO",
+            "MX",
+            "CL",
+            "PE",
+            "AR",
+            "US",
+            "ES"
+        ],
+        "notes": [
+            "Tax rates and legal validations are configurable per tenant.",
+            "Assistant should never hardcode tax percentages as legal truth."
+        ]
+    },
+    "core_concepts": {
+        "accounting": [
+            "ventas",
+            "compras",
+            "gastos",
+            "cuentas_por_cobrar",
+            "cuentas_por_pagar",
+            "bancos",
+            "inventario",
+            "asientos",
+            "costos",
+            "centros_de_costo"
+        ],
+        "tax": [
+            "iva",
+            "retencion_fuente",
+            "reteiva",
+            "reteica",
+            "renta",
+            "facturacion_electronica"
+        ]
+    },
+    "minimum_entities": {
+        "default": [
+            "clientes",
+            "facturas",
+            "factura_items",
+            "pagos",
+            "gastos"
+        ]
+    },
+    "minimum_entities_by_business": {
+        "servicios": [
+            "servicios",
+            "ordenes_trabajo",
+            "cuentas_por_cobrar"
+        ],
+        "servicios_mantenimiento": [
+            "servicios",
+            "ordenes_trabajo",
+            "abonos",
+            "cuentas_por_cobrar"
+        ],
+        "productos": [
+            "productos",
+            "inventario_movimientos",
+            "proveedores",
+            "compras"
+        ],
+        "mixto": [
+            "productos",
+            "servicios",
+            "ordenes_trabajo",
+            "compras",
+            "inventario_movimientos"
+        ],
+        "veterinaria": [
+            "pacientes",
+            "historia_clinica",
+            "productos",
+            "servicios"
+        ],
+        "farmacia_naturista": [
+            "productos",
+            "laboratorios",
+            "compras",
+            "inventario_movimientos"
+        ],
+        "ferreteria": [
+            "productos",
+            "marcas",
+            "proveedores",
+            "compras",
+            "cuentas_por_pagar"
+        ],
+        "restaurante_cafeteria": [
+            "productos",
+            "recetas",
+            "ordenes_venta"
+        ],
+        "retail_tienda": [
+            "productos",
+            "categorias",
+            "devoluciones"
+        ],
+        "corte_laser": [
+            "materiales",
+            "consumos_material",
+            "ordenes_trabajo",
+            "abonos"
+        ],
+        "consultoria_profesional": [
+            "proyectos",
+            "hitos",
+            "cuentas_por_cobrar"
+        ],
+        "iglesia_fundacion": [
+            "donantes",
+            "donaciones",
+            "programas",
+            "comprobantes"
+        ],
+        "crm_comercial": [
+            "leads",
+            "oportunidades",
+            "cotizaciones",
+            "ventas"
+        ],
+        "contabilidad_general": [
+            "terceros",
+            "cuentas_contables",
+            "comprobantes",
+            "asientos_contables",
+            "periodos_contables"
+        ],
+        "clinica_medica": [
+            "pacientes",
+            "citas",
+            "historias_clinicas",
+            "procedimientos",
+            "facturas",
+            "cuentas_por_cobrar"
+        ],
+        "odontologia": [
+            "pacientes",
+            "planes_tratamiento",
+            "procedimientos",
+            "facturas",
+            "abonos"
+        ],
+        "taller_automotriz": [
+            "vehiculos",
+            "ordenes_trabajo",
+            "repuestos",
+            "facturas",
+            "abonos",
+            "inventario_movimientos"
+        ],
+        "manufactura_pyme": [
+            "ordenes_produccion",
+            "materias_primas",
+            "lotes",
+            "costos_produccion"
+        ],
+        "distribuidora_mayorista": [
+            "pedidos",
+            "despachos",
+            "facturas",
+            "cuentas_por_cobrar",
+            "inventario_movimientos"
+        ],
+        "ecommerce_marketplace": [
+            "pedidos_web",
+            "pagos",
+            "envios",
+            "devoluciones",
+            "facturas"
+        ],
+        "constructora_obras": [
+            "proyectos_obra",
+            "presupuestos_obra",
+            "avances_obra",
+            "cuentas_por_pagar",
+            "gastos"
+        ],
+        "colegio_academia": [
+            "estudiantes",
+            "matriculas",
+            "facturas",
+            "pagos_matricula",
+            "cuentas_por_cobrar"
+        ],
+        "hotel_turismo": [
+            "reservas",
+            "habitaciones",
+            "facturas",
+            "pagos",
+            "gastos"
+        ],
+        "agropecuario": [
+            "lotes_cultivo",
+            "insumos",
+            "produccion_cosecha",
+            "ventas",
+            "gastos"
+        ]
+    },
+    "entity_field_templates": {
+        "clientes": [
+            "nombre:texto",
+            "documento:texto",
+            "telefono:texto",
+            "email:texto",
+            "direccion:texto",
+            "activo:bool"
+        ],
+        "proveedores": [
+            "nombre:texto",
+            "documento:texto",
+            "telefono:texto",
+            "email:texto",
+            "direccion:texto",
+            "activo:bool"
+        ],
+        "productos": [
+            "codigo:texto",
+            "nombre:texto",
+            "categoria:texto",
+            "stock_actual:decimal",
+            "precio_compra:decimal",
+            "precio_venta:decimal",
+            "impuesto_codigo:texto",
+            "activo:bool"
+        ],
+        "servicios": [
+            "codigo:texto",
+            "nombre:texto",
+            "categoria:texto",
+            "precio_base:decimal",
+            "impuesto_codigo:texto",
+            "activo:bool"
+        ],
+        "facturas": [
+            "fecha:fecha",
+            "cliente_id:numero",
+            "subtotal:decimal",
+            "impuestos:decimal",
+            "total:decimal",
+            "estado:texto"
+        ],
+        "factura_items": [
+            "factura_id:numero",
+            "item_tipo:texto",
+            "item_id:numero",
+            "descripcion:texto",
+            "cantidad:decimal",
+            "precio_unitario:decimal",
+            "impuesto_codigo:texto",
+            "subtotal:decimal",
+            "total:decimal"
+        ],
+        "pagos": [
+            "fecha:fecha",
+            "cliente_id:numero",
+            "factura_id:numero",
+            "valor:decimal",
+            "medio_pago:texto",
+            "referencia:texto"
+        ],
+        "gastos": [
+            "fecha:fecha",
+            "categoria:texto",
+            "concepto:texto",
+            "valor:decimal",
+            "metodo_pago:texto",
+            "soporte:texto"
+        ],
+        "ordenes_trabajo": [
+            "numero:texto",
+            "fecha:fecha",
+            "cliente_id:numero",
+            "descripcion:texto",
+            "estado:texto",
+            "valor_total:decimal",
+            "saldo:decimal"
+        ],
+        "cuentas_por_cobrar": [
+            "fecha:fecha",
+            "cliente_id:numero",
+            "referencia:texto",
+            "valor:decimal",
+            "saldo:decimal",
+            "estado:texto"
+        ],
+        "cuentas_por_pagar": [
+            "fecha:fecha",
+            "proveedor_id:numero",
+            "referencia:texto",
+            "valor:decimal",
+            "saldo:decimal",
+            "estado:texto"
+        ],
+        "impuestos": [
+            "codigo:texto",
+            "nombre:texto",
+            "tipo:texto",
+            "porcentaje:decimal",
+            "activo:bool"
+        ],
+        "leads": [
+            "fecha_registro:fecha",
+            "nombre:texto",
+            "empresa:texto",
+            "telefono:texto",
+            "email:texto",
+            "estado:texto"
+        ],
+        "oportunidades": [
+            "fecha:fecha",
+            "lead_id:numero",
+            "etapa:texto",
+            "valor_estimado:decimal",
+            "probabilidad:numero",
+            "estado:texto"
+        ],
+        "asientos_contables": [
+            "fecha:fecha",
+            "comprobante_id:numero",
+            "cuenta_id:numero",
+            "tercero_id:numero",
+            "detalle:texto",
+            "debito:decimal",
+            "credito:decimal"
+        ],
+        "ordenes_produccion": [
+            "numero:texto",
+            "fecha:fecha",
+            "producto_id:numero",
+            "cantidad_plan:decimal",
+            "cantidad_real:decimal",
+            "estado:texto",
+            "costo_total:decimal"
+        ],
+        "lotes": [
+            "codigo:texto",
+            "producto_id:numero",
+            "fecha_produccion:fecha",
+            "fecha_vencimiento:fecha",
+            "cantidad:decimal",
+            "estado:texto"
+        ],
+        "ordenes_mtto": [
+            "numero:texto",
+            "fecha:fecha",
+            "activo_id:numero",
+            "descripcion:texto",
+            "estado:texto",
+            "prioridad:texto",
+            "costo_estimado:decimal"
+        ],
+        "inspecciones_calidad": [
+            "fecha:fecha",
+            "lote_id:numero",
+            "resultado:texto",
+            "observaciones:texto",
+            "responsable:texto"
+        ],
+        "reservas": [
+            "numero:texto",
+            "huesped_id:numero",
+            "habitacion_id:numero",
+            "fecha_entrada:fecha",
+            "fecha_salida:fecha",
+            "estado:texto",
+            "valor_total:decimal"
+        ]
+    },
+    "invoice_minimum_fields": [
+        "fecha",
+        "cliente_id",
+        "tipo_documento_cliente",
+        "numero_documento_cliente",
+        "items",
+        "subtotal",
+        "impuestos",
+        "total"
+    ],
+    "invoice_item_minimum_fields": [
+        "item_id",
+        "descripcion",
+        "cantidad",
+        "precio_unitario",
+        "impuesto_codigo",
+        "valor_total_linea"
+    ],
+    "assistant_rules": {
+        "never_emit_real_invoice_without_provider_config": true,
+        "never_confirm_sent_to_tax_authority_if_no_provider_response": true,
+        "always_store_provider_id_and_status": true,
+        "always_log_audit_event": true,
+        "always_explain_missing_data_in_plain_language": true,
+        "always_use_registry_before_replying_available_actions": true
+    },
+    "checklists": {
+        "creator_minimum": [
+            "Define clientes con documento y contacto.",
+            "Define facturas y factura_items para detalle maestro-detalle.",
+            "Incluye tabla de pagos/abonos para cartera.",
+            "Incluye gastos para control de utilidad.",
+            "Configura impuestos con codigos editables.",
+            "Activa auditoria y usuario responsable en operaciones criticas."
+        ],
+        "before_invoice_emission": [
+            "empresa_emisora_configurada",
+            "resolucion_o_equivalente_configurada",
+            "cliente_con_documento_valido",
+            "items_con_impuesto_definido",
+            "totales_validados"
+        ],
+        "after_invoice_emission": [
+            "guardar_provider_invoice_id",
+            "guardar_estado_emision",
+            "guardar_xml_pdf_si_aplica",
+            "registrar_evento_auditoria"
+        ],
+        "monthly_close": [
+            "conciliar ingresos del periodo",
+            "conciliar pagos y bancos",
+            "validar cuentas por cobrar y por pagar",
+            "revisar gastos sin soporte",
+            "generar estado de resultados y flujo"
+        ],
+        "tax_periodic_control": [
+            "validar base gravable de impuestos",
+            "revisar retenciones aplicadas",
+            "consolidar reporte por periodo",
+            "preparar soporte para contador"
+        ]
+    },
+    "tax_profiles": {
+        "CO": {
+            "priority_checks": [
+                "tipo_documento_cliente",
+                "responsabilidad_fiscal_cliente",
+                "impuesto_por_item",
+                "resolucion_facturacion_si_aplica",
+                "estado_envio_electronico"
+            ],
+            "documents": [
+                "factura_venta",
+                "nota_credito",
+                "nota_debito"
+            ]
+        },
+        "generic_latam": {
+            "priority_checks": [
+                "identificacion_cliente",
+                "impuesto_configurado_por_item",
+                "folio_serie_si_aplica",
+                "estado_envio_proveedor"
+            ],
+            "documents": [
+                "invoice",
+                "credit_note",
+                "debit_note"
+            ]
+        }
+    },
+    "chat_templates": {
+        "missing_customer": "Para facturar me falta el cliente. Dime nombre y documento.",
+        "missing_items": "Para facturar me falta al menos un item con cantidad y precio.",
+        "provider_not_configured": "La facturacion electronica aun no esta configurada. Primero configuramos el proveedor.",
+        "invoice_saved_not_sent": "La factura quedo guardada en la app. Aun no fue enviada electronicamente.",
+        "entity_creation_guidance": "Te guio paso a paso: primero tabla, luego formulario y despues pruebas de registro.",
+        "missing_business_context": "Para guiarte mejor necesito saber tu tipo de negocio. Ejemplo: ferreteria, servicios, clinica.",
+        "confirm_create_table": "Voy a crear la tabla sugerida. Confirmas con si o prefieres cambiar campos?"
+    },
+    "industry_controls": {
+        "sap_side_apps": [
+            "Aislar datos por tenant y proyecto",
+            "Sincronizar por APIs, no por acceso directo al ERP",
+            "Registrar auditoria por cada accion automatizada",
+            "Definir ownership del dato: ERP central vs mini-app"
+        ],
+        "manufactura_pyme": [
+            "Control de lotes y trazabilidad",
+            "Costo real vs costo plan",
+            "Merma y reproceso con causa"
+        ],
+        "servicios_mantenimiento": [
+            "Orden abierta/cerrada con tiempos",
+            "Consumo de repuestos por orden",
+            "Facturacion ligada a cierre tecnico"
+        ]
+    },
+    "software_engineering_checklist": [
+        "Definir alcance del modulo antes de crear tablas.",
+        "Separar datos maestros, transacciones y reportes.",
+        "Aplicar validaciones de negocio en backend, no solo UI.",
+        "Probar flujo happy-path y errores antes de publicar.",
+        "Registrar auditoria de operaciones criticas.",
+        "Documentar pasos para usuario no tecnico."
+    ],
+    "database_design_checklist": [
+        "Identificar claves primarias y foraneas por modulo.",
+        "Agregar tenant_id y timestamps en tablas transaccionales.",
+        "Crear indices para consultas de lista y filtros frecuentes.",
+        "Evitar duplicidad de campos semanticos entre tablas.",
+        "Definir tablas detalle para procesos maestro-detalle.",
+        "Validar que reportes usen campos indexados."
+    ],
+    "operation_model_entities": {
+        "contado": [
+            "pagos"
+        ],
+        "credito": [
+            "cuentas_por_cobrar",
+            "abonos",
+            "pagos"
+        ],
+        "mixto": [
+            "cuentas_por_cobrar",
+            "abonos",
+            "pagos"
+        ]
+    },
+    "logic_rules": {
+        "invoice_requires_customer": true,
+        "invoice_requires_items": true,
+        "credit_requires_receivable_flow": true,
+        "lot_tracking_requires_products": true,
+        "lot_tracking_requires_inventory_moves": true
+    }
+}

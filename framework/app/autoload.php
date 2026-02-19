@@ -11,6 +11,11 @@ if (!defined('PROJECT_ROOT')) {
     define('PROJECT_ROOT', $workspaceRoot . '/project');
 }
 
+$projectEnvLoader = PROJECT_ROOT . '/config/env_loader.php';
+if (is_file($projectEnvLoader)) {
+    require_once $projectEnvLoader;
+}
+
 spl_autoload_register(function ($class) {
     $baseName = basename(str_replace('\\', '/', $class));
 

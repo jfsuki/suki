@@ -1,0 +1,16 @@
+{
+    "active_task": null,
+    "intent": null,
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "last_messages": [
+        {
+            "u": "listar cliente",
+            "a": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "ts": 1771507349
+        }
+    ],
+    "summary": "listar cliente"
+}

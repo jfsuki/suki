@@ -1,0 +1,24 @@
+{
+    "active_task": "builder_onboarding",
+    "intent": "builder_onboarding",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "unknown_business_notice_sent": true,
+    "last_messages": [
+        {
+            "u": "quiero crear un programa para criadero de peces ornamentales",
+            "a": "Perfecto. No tengo plantilla exacta para \"criadero de peces ornamentales\" todavia. Ya lo registre para investigarlo y compartirlo con todos los agentes.\nPaso 1: para empezar rapido, dime si manejas productos, servicios o ambos.",
+            "ts": 1771517850
+        },
+        {
+            "u": "que sigue",
+            "a": "Perfecto. Vamos paso a paso para crear tu app.\nPaso 1: responde solo una opcion: servicios, productos o ambos.",
+            "ts": 1771517850
+        }
+    ],
+    "summary": "quiero crear un programa para criadero de peces ornamentales",
+    "onboarding_step": "business_type"
+}

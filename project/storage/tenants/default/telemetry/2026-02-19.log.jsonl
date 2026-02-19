@@ -1,39 +1,16 @@
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que puedo hacer con tu app?","mode":"app","ts":1771468067}
-{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771468678}
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que puedo hacer con tu app?","mode":"app","ts":1771468678}
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que opciones tienes activas","mode":"app","ts":1771468678}
-{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"que hay hecho y puedo hacer","mode":"app","ts":1771468678}
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que opciones tienes activas","mode":"app","ts":1771468690}
-{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771468732}
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que puedo hacer con tu app?","mode":"app","ts":1771468732}
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que opciones tienes activas","mode":"app","ts":1771468732}
-{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771468750}
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"q puedo hacer con este programa?","mode":"app","ts":1771468750}
-{"classification":"missing_entity","resolved_locally":true,"intent":"create","entity":"puedo","missing":[],"message":"puedo crear producto?","mode":"app","ts":1771468750}
-{"classification":"missing_entity","resolved_locally":true,"intent":"create","entity":"quiero","missing":[],"message":"quiero crear un cliente","mode":"app","ts":1771468750}
-{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771468871}
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"q puedo hacer con este programa?","mode":"app","ts":1771468871}
-{"classification":"missing_entity","resolved_locally":true,"intent":"create","entity":"producto?","missing":[],"message":"puedo crear producto?","mode":"app","ts":1771468871}
-{"classification":"crud","resolved_locally":true,"intent":"create","entity":"cliente","missing":["nombre"],"message":"quiero crear un cliente","mode":"app","ts":1771468871}
-{"classification":"crud","resolved_locally":true,"intent":"create","entity":"cliente","missing":[],"message":"ana","mode":"app","ts":1771468871}
-{"classification":"training","resolved_locally":true,"intent":"APP_CREATE","entity":null,"missing":[],"message":"nit 123","mode":"app","ts":1771468871}
-{"classification":"crud","resolved_locally":true,"intent":"create","entity":"cliente","missing":["nombre"],"message":"quiero crear un cliente","mode":"app","ts":1771468883}
-{"classification":"crud","resolved_locally":true,"intent":"create","entity":"cliente","missing":[],"message":"ana","mode":"app","ts":1771468883}
-{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771468914}
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que puedo hacer con tu app?","mode":"app","ts":1771468914}
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que opciones tienes activas","mode":"app","ts":1771468914}
-{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771468963}
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que puedo hacer con tu app?","mode":"app","ts":1771468963}
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que opciones tienes activas","mode":"app","ts":1771468963}
-{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771468973}
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"q puedo hacer con este programa?","mode":"app","ts":1771468973}
-{"classification":"missing_entity","resolved_locally":true,"intent":"create","entity":"producto?","missing":[],"message":"puedo crear producto?","mode":"app","ts":1771468973}
-{"classification":"crud","resolved_locally":true,"intent":"create","entity":"cliente","missing":["nombre"],"message":"quiero crear un cliente","mode":"app","ts":1771468973}
-{"classification":"crud","resolved_locally":true,"intent":"create","entity":"cliente","missing":[],"message":"ana","mode":"app","ts":1771468973}
-{"classification":"training","resolved_locally":true,"intent":"APP_CREATE","entity":null,"missing":[],"message":"nit 123","mode":"app","ts":1771468973}
-{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771469069}
-{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"q puedo hacer con este programa?","mode":"app","ts":1771469069}
-{"classification":"missing_entity","resolved_locally":true,"intent":"create","entity":"producto?","missing":[],"message":"puedo crear producto?","mode":"app","ts":1771469069}
-{"classification":"crud","resolved_locally":true,"intent":"create","entity":"cliente","missing":["nombre"],"message":"quiero crear un cliente","mode":"app","ts":1771469069}
-{"classification":"crud","resolved_locally":true,"intent":"create","entity":"cliente","missing":[],"message":"ana","mode":"app","ts":1771469069}
-{"classification":"training","resolved_locally":true,"intent":"APP_CREATE","entity":null,"missing":[],"message":"nit 123","mode":"app","ts":1771469069}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771511767}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero hacer un programa para facturar en mi ferreteria","mode":"builder","ts":1771511786}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cual seria el primer paso?","mode":"builder","ts":1771511816}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"ayudame_a_crear_tabla_para_clientes","missing":[],"message":"ayudame a crear la tabla para los clientes","mode":"builder","ts":1771511834}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"que_debe_llevar","missing":[],"message":"q debe llevar eso?","mode":"builder","ts":1771511853}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771518333}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para consultorio medico","mode":"builder","ts":1771518348}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"misto","mode":"builder","ts":1771518361}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771518366}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"pero no le pongas cliente, son pacientes","mode":"builder","ts":1771518394}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"clientes","missing":[],"message":"cuales debe tener?","mode":"builder","ts":1771518409}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola quiero crear una app","mode":"builder","ts":1771519568}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que vas a crear?","mode":"builder","ts":1771519578}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no sabes lo q voy hacer","mode":"builder","ts":1771519585}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"sabes","missing":[],"message":"sabes sobre presidente petro?","mode":"builder","ts":1771519620}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no sabes nada","mode":"builder","ts":1771519630}

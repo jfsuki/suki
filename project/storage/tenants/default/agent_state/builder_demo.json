@@ -1,32 +1,83 @@
 {
-    "active_task": "USER_CREATE",
-    "intent": "USER_CREATE",
-    "entity": "",
-    "collected": {
-        "usuario": "ana"
-    },
+    "active_task": "create_table",
+    "intent": "create",
+    "entity": "sabes",
+    "collected": [],
     "missing": [],
+    "requested_slot": null,
     "last_messages": [
         {
-            "u": "que hay hecho y que puedo hacer",
-            "a": "Estado del proyecto:\n- Entidades: 3\n- Formularios: 4\n- Vistas: 6\nUltimas entidades: cliente, clientes, factura\nUltimos formularios: cliente.form, clientes.form, cuentasxcobrar.form",
-            "ts": 1771442627
+            "u": "que vas a crear?",
+            "a": "Para continuar, responde \"si\" para crearla o \"no\" para cambiar nombre/campos.",
+            "ts": 1771519578
         },
         {
-            "u": "crear usuario usuario=ana rol=vendedor clave=1234",
-            "a": "¿Qué rol tendrá (admin, vendedor, contador)?",
-            "ts": 1771442640
+            "u": "no sabes lo q voy hacer",
+            "a": "Perfecto. Cambiamos la tabla a sabes.\nAhora dime que datos quieres guardar. Ejemplo: nombre:texto documento:texto telefono:texto",
+            "ts": 1771519585
         },
         {
-            "u": "crear usuario usuario=ana rol=vendedor clave=1234",
-            "a": "¿Qué rol tendrá (admin, vendedor, contador)?",
-            "ts": 1771442682
+            "u": "sabes sobre presidente petro?",
+            "a": "Vamos paso a paso.\nPaso 1: crearemos la tabla sabes.\nSe guardara esta informacion: nombre, descripcion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771519620
         },
         {
-            "u": "crear usuario usuario=ana rol=vendedor clave=1234",
-            "a": "¿Qué rol tendrá (admin, vendedor, contador)?",
-            "ts": 1771442748
+            "u": "no sabes nada",
+            "a": "Perfecto. Cambiamos la tabla a sabes.\nAhora dime que datos quieres guardar. Ejemplo: nombre:texto documento:texto telefono:texto",
+            "ts": 1771519630
         }
     ],
-    "summary": "hola dime estatus del proyecto que se ha creado"
+    "summary": "hola",
+    "builder_plan": {
+        "business_type": "mixto",
+        "operation_model": "mixto",
+        "entities": [
+            "clientes",
+            "productos",
+            "servicios",
+            "ordenes_trabajo",
+            "facturas",
+            "gastos",
+            "factura_items",
+            "pagos",
+            "compras",
+            "inventario_movimientos",
+            "cuentas_por_cobrar",
+            "abonos"
+        ],
+        "first_entity": "clientes",
+        "forms": [],
+        "reports": [],
+        "workflows": [
+            "Crear cliente",
+            "Crear producto o servicio",
+            "Registrar factura",
+            "Registrar pago o abono",
+            "Revisar cartera"
+        ],
+        "accounting_focus": [],
+        "accounting_checks": [
+            "Define clientes con documento y contacto.",
+            "Define facturas y factura_items para detalle maestro-detalle.",
+            "Incluye tabla de pagos/abonos para cartera.",
+            "Incluye gastos para control de utilidad.",
+            "Configura impuestos con codigos editables.",
+            "Activa auditoria y usuario responsable en operaciones criticas."
+        ],
+        "tax_profile": {
+            "priority_checks": [
+                "tipo_documento_cliente",
+                "responsabilidad_fiscal_cliente",
+                "impuesto_por_item",
+                "resolucion_facturacion_si_aplica",
+                "estado_envio_electronico"
+            ],
+            "documents": [
+                "factura_venta",
+                "nota_credito",
+                "nota_debito"
+            ]
+        }
+    },
+    "onboarding_step": "plan_ready"
 }

@@ -1,0 +1,120 @@
+{
+    "active_task": "create_table",
+    "intent": "builder_onboarding",
+    "entity": "clientes",
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": {
+        "command": "CreateEntity",
+        "entity": "clientes",
+        "fields": [
+            {
+                "name": "nombre",
+                "type": "texto"
+            },
+            {
+                "name": "documento",
+                "type": "texto"
+            },
+            {
+                "name": "telefono",
+                "type": "texto"
+            },
+            {
+                "name": "email",
+                "type": "texto"
+            },
+            {
+                "name": "direccion",
+                "type": "texto"
+            },
+            {
+                "name": "activo",
+                "type": "bool"
+            }
+        ]
+    },
+    "last_messages": [
+        {
+            "u": "quiero crear programa para facturar en ferreteria",
+            "a": "Perfecto. Paso 2: como manejas pagos? contado, credito o mixto.",
+            "ts": 1771515124
+        },
+        {
+            "u": "contado y credito",
+            "a": "Ruta para Ferreteria:\n- Tablas base: clientes, productos, marcas, proveedores, compras, facturas\n- Primer paso: crear tabla clientes.\nVamos paso a paso.\nPaso 1: crearemos la tabla clientes.\nSe guardara esta informacion: nombre, documento, telefono, email, direccion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771515124
+        },
+        {
+            "u": "crear tabla facturas fecha:fecha cliente_id:numero total:decimal",
+            "a": "Para crear facturas primero necesitamos: clientes y productos o servicios.\nVamos paso a paso.\nPaso 1: crearemos la tabla clientes.\nSe guardara esta informacion: nombre, documento, telefono, email, direccion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771515124
+        }
+    ],
+    "summary": "quiero crear programa para facturar en ferreteria",
+    "onboarding_step": "plan_ready",
+    "builder_plan": {
+        "business_type": "ferreteria",
+        "operation_model": "mixto",
+        "entities": [
+            "clientes",
+            "productos",
+            "marcas",
+            "proveedores",
+            "compras",
+            "facturas",
+            "cuentas_por_cobrar",
+            "cuentas_por_pagar",
+            "gastos",
+            "factura_items",
+            "pagos",
+            "abonos"
+        ],
+        "first_entity": "clientes",
+        "forms": [
+            "productos.form",
+            "facturas.form",
+            "compras.form"
+        ],
+        "reports": [
+            "ventas_por_producto",
+            "compras_por_proveedor",
+            "cartera"
+        ],
+        "workflows": [
+            "Crear cliente",
+            "Crear producto o servicio",
+            "Registrar factura",
+            "Registrar pago o abono",
+            "Revisar cartera"
+        ],
+        "accounting_focus": [
+            "Inventario",
+            "Compras",
+            "Cuentas por cobrar/pagar"
+        ],
+        "accounting_checks": [
+            "Define clientes con documento y contacto.",
+            "Define facturas y factura_items para detalle maestro-detalle.",
+            "Incluye tabla de pagos/abonos para cartera.",
+            "Incluye gastos para control de utilidad.",
+            "Configura impuestos con codigos editables.",
+            "Activa auditoria y usuario responsable en operaciones criticas."
+        ],
+        "tax_profile": {
+            "priority_checks": [
+                "tipo_documento_cliente",
+                "responsabilidad_fiscal_cliente",
+                "impuesto_por_item",
+                "resolucion_facturacion_si_aplica",
+                "estado_envio_electronico"
+            ],
+            "documents": [
+                "factura_venta",
+                "nota_credito",
+                "nota_debito"
+            ]
+        }
+    }
+}

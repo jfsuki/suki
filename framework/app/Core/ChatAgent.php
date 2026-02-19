@@ -35,11 +35,26 @@ final class ChatAgent
     public function handle(array $payload): array
     {
         $text = trim((string) ($payload['message'] ?? $payload['text'] ?? ''));
-        $channel = (string) ($payload['channel'] ?? 'local');
-        $sessionId = (string) ($payload['session_id'] ?? 'sess_' . time());
-        $userId = (string) ($payload['user_id'] ?? 'anon');
-        $tenantId = (string) ($payload['tenant_id'] ?? getenv('TENANT_ID') ?? 'default');
-        $role = (string) ($payload['role'] ?? $payload['user_role'] ?? getenv('DEFAULT_ROLE') ?? 'admin');
+        $channel = trim((string) ($payload['channel'] ?? 'local'));
+        $sessionId = trim((string) ($payload['session_id'] ?? 'sess_' . time()));
+        $userId = trim((string) ($payload['user_id'] ?? 'anon'));
+        $tenantId = trim((string) ($payload['tenant_id'] ?? getenv('TENANT_ID') ?? 'default'));
+        $role = trim((string) ($payload['role'] ?? $payload['user_role'] ?? ''));
+        if ($channel === '') {
+            $channel = 'local';
+        }
+        if ($sessionId === '') {
+            $sessionId = 'sess_' . time();
+        }
+        if ($userId === '') {
+            $userId = 'anon';
+        }
+        if ($tenantId === '') {
+            $tenantId = (string) (getenv('TENANT_ID') ?: 'default');
+        }
+        if ($role === '') {
+            $role = (string) (getenv('DEFAULT_ROLE') ?: 'admin');
+        }
         $mode = strtolower((string) ($payload['mode'] ?? 'app'));
         $projectId = (string) ($payload['project_id'] ?? '');
         $registry = new ProjectRegistry();
@@ -75,8 +90,18 @@ final class ChatAgent
         }
 
         $local = $this->parseLocal($text);
-        if (!empty($local['command']) && in_array($local['command'], ['RunTests', 'CreateEntity', 'CreateForm'], true)) {
-            return $this->executeLocal($local, $channel, $sessionId, $userId, $mode, $tenantId);
+        if (!empty($local['command']) && in_array($local['command'], ['RunTests', 'CreateEntity', 'CreateForm', 'LLMUsage'], true)) {
+            try {
+                return $this->executeLocal($local, $channel, $sessionId, $userId, $mode, $tenantId);
+            } catch (\Throwable $e) {
+                $rawError = (string) $e->getMessage();
+                $human = str_contains($rawError, 'SQLSTATE')
+                    ? 'No pude conectar la base de datos. El contrato se guarda, pero falta revisar credenciales DB.'
+                    : 'No pude ejecutar ese paso. Revisa configuracion o permisos.';
+                return $this->reply($human, $channel, $sessionId, $userId, 'error', [
+                    'error' => $rawError,
+                ]);
+            }
         }
 
         $gateway = $this->gateway();
@@ -98,8 +123,13 @@ final class ChatAgent
             try {
                 $reply = $this->executeCommandPayload((array) $result['command'], $channel, $sessionId, $userId, $mode);
             } catch (\Throwable $e) {
+                $rawError = (string) $e->getMessage();
+                $human = str_contains($rawError, 'SQLSTATE')
+                    ? 'No pude ejecutar porque la base de datos no esta conectada o las credenciales son invalidas.'
+                    : 'No pude ejecutar ese paso. Revisa permisos o datos.';
                 $reply = $this->reply('No pude ejecutar ese paso. Revisa permisos o datos.', $channel, $sessionId, $userId, 'error', [
-                    'error' => $e->getMessage(),
+                    'reply' => $human,
+                    'error' => $rawError,
                 ]);
             }
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
@@ -117,11 +147,14 @@ final class ChatAgent
                 return $this->reply('IA no disponible. Usa comandos simples.', $channel, $sessionId, $userId);
             }
             $provider = $llmResult['provider'] ?? 'llm';
+            $usage = $this->normalizeUsage((array) ($llmResult['usage'] ?? []));
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
                 'message' => $text,
                 'provider_used' => $provider,
                 'resolved_locally' => false,
                 'mode' => $mode,
+                'llm_request_count' => 1,
+                'usage' => $usage,
             ]));
 
             $json = $llmResult['json'] ?? null;
@@ -139,6 +172,11 @@ final class ChatAgent
 
     public function parseLocal(string $text): array
     {
+        $normalized = mb_strtolower(trim($text), 'UTF-8');
+        if ($this->isLlmUsageRequest($normalized)) {
+            return ['command' => 'LLMUsage'];
+        }
+
         $tokens = $this->tokenize($text);
         if (!$tokens) {
             return [];
@@ -196,6 +234,11 @@ final class ChatAgent
             ]);
         }
 
+        if ($cmd === 'LLMUsage') {
+            $summary = $this->buildLlmUsageSummary($tenantId);
+            return $this->reply($summary['reply'], $channel, $sessionId, $userId, 'success', $summary['data']);
+        }
+
         if ($cmd === 'CreateEntity') {
             if ($mode === 'app') {
                 return $this->reply('Estas en modo app. Usa el chat creador para crear tablas.', $channel, $sessionId, $userId, 'error');
@@ -206,7 +249,18 @@ final class ChatAgent
             }
             $entity = $this->builder->build($entityName, $parsed['fields'] ?? []);
             $this->writer->writeEntity($entity);
-            $this->migrator()->migrateEntity($entity, true);
+            try {
+                $this->migrator()->migrateEntity($entity, true);
+            } catch (\Throwable $e) {
+                $rawError = (string) $e->getMessage();
+                $human = str_contains($rawError, 'SQLSTATE')
+                    ? 'Tabla de contrato creada. Falta conectar correctamente la base de datos para crear la tabla fisica.'
+                    : 'Tabla de contrato creada, pero no pude migrar a DB.';
+                return $this->reply($human, $channel, $sessionId, $userId, 'warn', [
+                    'entity' => $entity,
+                    'error' => $rawError,
+                ]);
+            }
             return $this->reply('Tabla creada: ' . $entity['name'], $channel, $sessionId, $userId, 'success', ['entity' => $entity]);
         }
 
@@ -672,6 +726,123 @@ final class ChatAgent
             }
         }
         return false;
+    }
+
+    private function isLlmUsageRequest(string $text): bool
+    {
+        $patterns = [
+            'consumo ia',
+            'uso ia',
+            'tokens ia',
+            'cuantos tokens',
+            'cuantos request',
+            'requests ia',
+            'gasto ia',
+            'uso de llm',
+        ];
+        foreach ($patterns as $pattern) {
+            if (str_contains($text, $pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function normalizeUsage(array $usage): array
+    {
+        $prompt = (int) ($usage['prompt_tokens']
+            ?? $usage['promptTokenCount']
+            ?? $usage['input_tokens']
+            ?? $usage['inputTokenCount']
+            ?? 0);
+        $completion = (int) ($usage['completion_tokens']
+            ?? $usage['candidatesTokenCount']
+            ?? $usage['output_tokens']
+            ?? $usage['outputTokenCount']
+            ?? 0);
+        $total = (int) ($usage['total_tokens']
+            ?? $usage['totalTokenCount']
+            ?? ($prompt + $completion));
+
+        return [
+            'prompt_tokens' => max(0, $prompt),
+            'completion_tokens' => max(0, $completion),
+            'total_tokens' => max(0, $total),
+        ];
+    }
+
+    private function buildLlmUsageSummary(string $tenantId): array
+    {
+        $tenantId = trim($tenantId) !== '' ? trim($tenantId) : 'default';
+        $safeTenant = preg_replace('/[^a-zA-Z0-9_\\-]/', '_', $tenantId) ?? 'default';
+        $dir = PROJECT_ROOT . '/storage/tenants/' . trim($safeTenant, '_') . '/telemetry';
+        $file = $dir . '/' . date('Y-m-d') . '.log.jsonl';
+
+        if (!is_file($file)) {
+            return [
+                'reply' => 'Hoy no hay consumo IA registrado. Requests IA: 0, Tokens: 0.',
+                'data' => [
+                    'llm_requests' => 0,
+                    'prompt_tokens' => 0,
+                    'completion_tokens' => 0,
+                    'total_tokens' => 0,
+                    'providers' => [],
+                    'source' => $file,
+                ],
+            ];
+        }
+
+        $lines = file($file, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+        $llmRequests = 0;
+        $promptTokens = 0;
+        $completionTokens = 0;
+        $totalTokens = 0;
+        $providers = [];
+
+        foreach ($lines as $line) {
+            $row = json_decode((string) $line, true);
+            if (!is_array($row)) {
+                continue;
+            }
+            $provider = (string) ($row['provider_used'] ?? '');
+            if ($provider === '') {
+                continue;
+            }
+            $llmRequests++;
+            $providers[$provider] = (int) ($providers[$provider] ?? 0) + 1;
+            $usage = $this->normalizeUsage((array) ($row['usage'] ?? []));
+            $promptTokens += (int) ($usage['prompt_tokens'] ?? 0);
+            $completionTokens += (int) ($usage['completion_tokens'] ?? 0);
+            $totalTokens += (int) ($usage['total_tokens'] ?? 0);
+        }
+
+        arsort($providers);
+        $providerText = empty($providers)
+            ? 'sin llamadas a proveedor'
+            : implode(', ', array_map(
+                static fn(string $name, int $count): string => $name . ':' . $count,
+                array_keys($providers),
+                array_values($providers)
+            ));
+
+        $reply = 'Consumo IA de hoy:'
+            . "\n- Requests IA: " . $llmRequests
+            . "\n- Prompt tokens: " . $promptTokens
+            . "\n- Completion tokens: " . $completionTokens
+            . "\n- Total tokens: " . $totalTokens
+            . "\n- Proveedores: " . $providerText;
+
+        return [
+            'reply' => $reply,
+            'data' => [
+                'llm_requests' => $llmRequests,
+                'prompt_tokens' => $promptTokens,
+                'completion_tokens' => $completionTokens,
+                'total_tokens' => $totalTokens,
+                'providers' => $providers,
+                'source' => $file,
+            ],
+        ];
     }
 
     private function buildContext(): array

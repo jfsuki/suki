@@ -1,0 +1,112 @@
+{
+    "active_task": "create_table",
+    "intent": "builder_onboarding",
+    "entity": "pacientes",
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": {
+        "command": "CreateEntity",
+        "entity": "pacientes",
+        "fields": [
+            {
+                "name": "nombre",
+                "type": "texto"
+            },
+            {
+                "name": "documento",
+                "type": "texto"
+            },
+            {
+                "name": "fecha_nacimiento",
+                "type": "fecha"
+            },
+            {
+                "name": "telefono",
+                "type": "texto"
+            },
+            {
+                "name": "email",
+                "type": "texto"
+            },
+            {
+                "name": "aseguradora",
+                "type": "texto"
+            },
+            {
+                "name": "activo",
+                "type": "bool"
+            }
+        ]
+    },
+    "last_messages": [
+        {
+            "u": "tengo una clinica medica y quiero organizar citas",
+            "a": "Ruta para Clinica medica:\n- Tablas base: pacientes, citas, historias_clinicas, procedimientos, facturas, autorizaciones\n- Primer paso: crear tabla pacientes.\nVamos paso a paso.\nPaso 1: crearemos la tabla pacientes.\nSe guardara esta informacion: nombre, documento, fecha_nacimiento, telefono, email, aseguradora.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771513636
+        }
+    ],
+    "summary": "tengo una clinica medica y quiero organizar citas",
+    "builder_plan": {
+        "business_type": "clinica_medica",
+        "entities": [
+            "pacientes",
+            "citas",
+            "historias_clinicas",
+            "procedimientos",
+            "facturas",
+            "autorizaciones",
+            "cuentas_por_cobrar",
+            "gastos",
+            "clientes",
+            "factura_items",
+            "pagos"
+        ],
+        "first_entity": "pacientes",
+        "forms": [
+            "pacientes.form",
+            "citas.form",
+            "procedimientos.form"
+        ],
+        "reports": [
+            "citas_por_especialidad",
+            "facturacion_por_medico",
+            "cartera_eps"
+        ],
+        "workflows": [
+            "Crear cliente",
+            "Crear producto o servicio",
+            "Registrar factura",
+            "Registrar pago o abono",
+            "Revisar cartera"
+        ],
+        "accounting_focus": [
+            "Facturacion servicios medicos",
+            "Cartera por pagador",
+            "Gastos operativos"
+        ],
+        "accounting_checks": [
+            "Define clientes con documento y contacto.",
+            "Define facturas y factura_items para detalle maestro-detalle.",
+            "Incluye tabla de pagos/abonos para cartera.",
+            "Incluye gastos para control de utilidad.",
+            "Configura impuestos con codigos editables.",
+            "Activa auditoria y usuario responsable en operaciones criticas."
+        ],
+        "tax_profile": {
+            "priority_checks": [
+                "tipo_documento_cliente",
+                "responsabilidad_fiscal_cliente",
+                "impuesto_por_item",
+                "resolucion_facturacion_si_aplica",
+                "estado_envio_electronico"
+            ],
+            "documents": [
+                "factura_venta",
+                "nota_credito",
+                "nota_debito"
+            ]
+        }
+    },
+    "onboarding_step": "plan_ready"
+}

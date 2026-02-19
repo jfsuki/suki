@@ -1,0 +1,18 @@
+{
+    "active_task": null,
+    "intent": null,
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "unknown_business_notice_sent": false,
+    "last_messages": [
+        {
+            "u": "hola",
+            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "ts": 1771517944
+        }
+    ],
+    "summary": "hola"
+}

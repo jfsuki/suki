@@ -41,6 +41,12 @@ project/storage/tenants/{tenantId}/
   telemetry/YYYY-MM-DD.log.jsonl
 ```
 
+Memoria compartida entre agentes (por tenant):
+```
+project/storage/chat/research/{tenantId}.json
+```
+Uso: cuando el usuario pide un tipo de app que no tiene plantilla exacta, se registra el caso para investigacion y se reutiliza en futuras conversaciones.
+
 ## Context Capsule minimo
 ```
 {
@@ -61,6 +67,16 @@ project/storage/tenants/{tenantId}/
 - crear tabla productos nombre:texto precio:numero
 - crear formulario productos
 - probar sistema
+
+## Guardrails de modo
+- En **modo app**: si el usuario pide crear app/programa/tablas, el agente lo redirige al chat creador.
+- En **modo builder**: si falta plantilla de negocio, el agente registra tema de investigacion y sigue con una pregunta minima.
+
+## Ruta tecnica guiada (builder)
+El agente puede explicar por chat una ruta profesional de construccion:
+- logica de programacion (validaciones, prerequisitos, 1 pregunta minima)
+- arquitectura de base de datos (tenant_id, indices, maestro-detalle)
+- secuencia de entrega (tablas -> formularios -> pruebas -> reportes)
 
 ## Job de nutricion
 Ejecuta `AgentNurtureJob` para sumar aliases:

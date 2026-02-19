@@ -1,0 +1,105 @@
+{
+    "active_task": "create_table",
+    "intent": "builder_onboarding",
+    "entity": "clientes",
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": {
+        "command": "CreateEntity",
+        "entity": "clientes",
+        "fields": [
+            {
+                "name": "nombre",
+                "type": "texto"
+            },
+            {
+                "name": "documento",
+                "type": "texto"
+            },
+            {
+                "name": "telefono",
+                "type": "texto"
+            },
+            {
+                "name": "email",
+                "type": "texto"
+            },
+            {
+                "name": "direccion",
+                "type": "texto"
+            },
+            {
+                "name": "activo",
+                "type": "bool"
+            }
+        ]
+    },
+    "last_messages": [
+        {
+            "u": "crear producto",
+            "a": "Ruta para Tienda retail:\n- Tablas base: clientes, productos, categorias, tallas_colores, facturas, devoluciones\n- Primer paso: crear tabla clientes.\nVamos paso a paso.\nPaso 1: crearemos la tabla clientes.\nSe guardara esta informacion: nombre, documento, telefono, email, direccion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771512531
+        }
+    ],
+    "summary": "crear producto",
+    "builder_plan": {
+        "business_type": "retail_tienda",
+        "entities": [
+            "clientes",
+            "productos",
+            "categorias",
+            "tallas_colores",
+            "facturas",
+            "devoluciones",
+            "gastos",
+            "factura_items",
+            "pagos"
+        ],
+        "first_entity": "clientes",
+        "forms": [
+            "productos.form",
+            "facturas.form"
+        ],
+        "reports": [
+            "ventas_por_categoria",
+            "rotacion",
+            "margen"
+        ],
+        "workflows": [
+            "Crear cliente",
+            "Crear producto o servicio",
+            "Registrar factura",
+            "Registrar pago o abono",
+            "Revisar cartera"
+        ],
+        "accounting_focus": [
+            "Inventario",
+            "Ventas",
+            "Devoluciones"
+        ],
+        "accounting_checks": [
+            "Define clientes con documento y contacto.",
+            "Define facturas y factura_items para detalle maestro-detalle.",
+            "Incluye tabla de pagos/abonos para cartera.",
+            "Incluye gastos para control de utilidad.",
+            "Configura impuestos con codigos editables.",
+            "Activa auditoria y usuario responsable en operaciones criticas."
+        ],
+        "tax_profile": {
+            "priority_checks": [
+                "tipo_documento_cliente",
+                "responsabilidad_fiscal_cliente",
+                "impuesto_por_item",
+                "resolucion_facturacion_si_aplica",
+                "estado_envio_electronico"
+            ],
+            "documents": [
+                "factura_venta",
+                "nota_credito",
+                "nota_debito"
+            ]
+        }
+    },
+    "onboarding_step": "plan_ready"
+}

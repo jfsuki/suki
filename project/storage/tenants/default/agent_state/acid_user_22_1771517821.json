@@ -1,0 +1,18 @@
+{
+    "active_task": null,
+    "intent": "FORM_LIST",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "unknown_business_notice_sent": false,
+    "last_messages": [
+        {
+            "u": "que pantallas tengo",
+            "a": "Aun no hay formularios. Quieres crear uno?",
+            "ts": 1771517822
+        }
+    ],
+    "summary": "que pantallas tengo"
+}

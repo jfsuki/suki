@@ -1,0 +1,95 @@
+{
+    "active_task": null,
+    "intent": "create",
+    "entity": "clientes",
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "last_messages": [
+        {
+            "u": "credito",
+            "a": "Ruta para Ferreteria:\n- Tablas base: clientes, productos, marcas, proveedores, compras, facturas\n- Primer paso: crear tabla clientes.\nVamos paso a paso.\nPaso 1: crearemos la tabla clientes.\nSe guardara esta informacion: nombre, documento, telefono, email, direccion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771515180
+        },
+        {
+            "u": "ayudame a crear la tabla para los clientes",
+            "a": "Vamos paso a paso.\nPaso 1: crearemos la tabla clientes.\nSe guardara esta informacion: nombre, documento, telefono, email, direccion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771515180
+        },
+        {
+            "u": "q debe llevar eso?",
+            "a": "Vamos paso a paso.\nPaso 1: crearemos la tabla clientes.\nSe guardara esta informacion: nombre, documento, telefono, email, direccion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771515180
+        },
+        {
+            "u": "si",
+            "a": "OK",
+            "ts": 1771515180
+        }
+    ],
+    "summary": "hola",
+    "onboarding_step": "plan_ready",
+    "builder_plan": {
+        "business_type": "ferreteria",
+        "operation_model": "credito",
+        "entities": [
+            "clientes",
+            "productos",
+            "marcas",
+            "proveedores",
+            "compras",
+            "facturas",
+            "cuentas_por_cobrar",
+            "cuentas_por_pagar",
+            "gastos",
+            "factura_items",
+            "pagos",
+            "abonos"
+        ],
+        "first_entity": "clientes",
+        "forms": [
+            "productos.form",
+            "facturas.form",
+            "compras.form"
+        ],
+        "reports": [
+            "ventas_por_producto",
+            "compras_por_proveedor",
+            "cartera"
+        ],
+        "workflows": [
+            "Crear cliente",
+            "Crear producto o servicio",
+            "Registrar factura",
+            "Registrar pago o abono",
+            "Revisar cartera"
+        ],
+        "accounting_focus": [
+            "Inventario",
+            "Compras",
+            "Cuentas por cobrar/pagar"
+        ],
+        "accounting_checks": [
+            "Define clientes con documento y contacto.",
+            "Define facturas y factura_items para detalle maestro-detalle.",
+            "Incluye tabla de pagos/abonos para cartera.",
+            "Incluye gastos para control de utilidad.",
+            "Configura impuestos con codigos editables.",
+            "Activa auditoria y usuario responsable en operaciones criticas."
+        ],
+        "tax_profile": {
+            "priority_checks": [
+                "tipo_documento_cliente",
+                "responsabilidad_fiscal_cliente",
+                "impuesto_por_item",
+                "resolucion_facturacion_si_aplica",
+                "estado_envio_electronico"
+            ],
+            "documents": [
+                "factura_venta",
+                "nota_credito",
+                "nota_debito"
+            ]
+        }
+    }
+}

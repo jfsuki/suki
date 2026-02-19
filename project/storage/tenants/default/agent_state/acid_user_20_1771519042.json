@@ -1,0 +1,21 @@
+{
+    "active_task": null,
+    "intent": "AUTH_LOGIN",
+    "entity": null,
+    "collected": {
+        "usuario": "ana",
+        "clave": "1234"
+    },
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "unknown_business_notice_sent": false,
+    "last_messages": [
+        {
+            "u": "iniciar sesion usuario=ana clave=1234",
+            "a": "OK",
+            "ts": 1771519043
+        }
+    ],
+    "summary": "iniciar sesion usuario=ana clave=1234"
+}

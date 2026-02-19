@@ -1,0 +1,1530 @@
+{
+    "meta": {
+        "name": "domain_playbooks",
+        "version": "0.3.3",
+        "updated_at": "2026-02-19",
+        "goal": "Universal business playbooks to create ERP/CRM/accounting and operational mini-apps by conversation.",
+        "notes": [
+            "Operational guidance only. Legal decisions require accountant validation.",
+            "Builder asks one minimal question at a time.",
+            "Agent must validate real entities/forms from registry before promising actions.",
+            "Coverage expanded for ERP, CRM, accounting, medical, church, commerce and SAP-side mini-apps."
+        ]
+    },
+    "discovery": {
+        "questions": [
+            "Que tipo de negocio tienes?",
+            "Vendes productos, servicios o ambos?",
+            "Tus ventas son de contado, credito o mixtas?",
+            "Necesitas inventario?",
+            "Que reportes quieres primero: ventas, cartera, gastos o utilidad?"
+        ],
+        "minimum_profile_fields": [
+            "business_type",
+            "operation_model",
+            "billing_need",
+            "inventory_need"
+        ]
+    },
+    "common_entities": [
+        {
+            "name": "clientes",
+            "fields": [
+                {
+                    "name": "nombre",
+                    "type": "texto",
+                    "required": true
+                },
+                {
+                    "name": "documento",
+                    "type": "texto",
+                    "required": true
+                },
+                {
+                    "name": "telefono",
+                    "type": "texto",
+                    "required": false
+                },
+                {
+                    "name": "email",
+                    "type": "texto",
+                    "required": false
+                },
+                {
+                    "name": "direccion",
+                    "type": "texto",
+                    "required": false
+                },
+                {
+                    "name": "activo",
+                    "type": "bool",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "name": "facturas",
+            "fields": [
+                {
+                    "name": "fecha",
+                    "type": "fecha",
+                    "required": true
+                },
+                {
+                    "name": "cliente_id",
+                    "type": "numero",
+                    "required": true
+                },
+                {
+                    "name": "subtotal",
+                    "type": "decimal",
+                    "required": true
+                },
+                {
+                    "name": "impuestos",
+                    "type": "decimal",
+                    "required": true
+                },
+                {
+                    "name": "total",
+                    "type": "decimal",
+                    "required": true
+                },
+                {
+                    "name": "estado",
+                    "type": "texto",
+                    "required": true
+                }
+            ]
+        },
+        {
+            "name": "gastos",
+            "fields": [
+                {
+                    "name": "fecha",
+                    "type": "fecha",
+                    "required": true
+                },
+                {
+                    "name": "categoria",
+                    "type": "texto",
+                    "required": true
+                },
+                {
+                    "name": "concepto",
+                    "type": "texto",
+                    "required": true
+                },
+                {
+                    "name": "valor",
+                    "type": "decimal",
+                    "required": true
+                },
+                {
+                    "name": "metodo_pago",
+                    "type": "texto",
+                    "required": false
+                }
+            ]
+        }
+    ],
+    "profiles": [
+        {
+            "key": "servicios_mantenimiento",
+            "label": "Servicios y mantenimiento",
+            "aliases": [
+                "servicios",
+                "mantenimiento",
+                "soporte tecnico",
+                "reparacion",
+                "orden de trabajo"
+            ],
+            "entities": [
+                "clientes",
+                "servicios",
+                "ordenes_trabajo",
+                "visitas_tecnicas",
+                "facturas",
+                "abonos",
+                "cuentas_por_cobrar",
+                "gastos"
+            ],
+            "forms": [
+                "clientes.form",
+                "ordenes_trabajo.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "ordenes_por_estado",
+                "ventas_por_tecnico",
+                "cartera_vencida",
+                "utilidad_mensual"
+            ],
+            "accounting_focus": [
+                "Ingresos por servicio",
+                "Costos directos de servicio",
+                "Cartera por cliente",
+                "Gastos operativos"
+            ],
+            "suggestions": {
+                "servicios_fields": [
+                    "codigo:texto",
+                    "nombre:texto",
+                    "categoria:texto",
+                    "precio_base:decimal",
+                    "impuesto_codigo:texto",
+                    "activo:bool"
+                ],
+                "ordenes_trabajo_fields": [
+                    "numero:texto",
+                    "fecha:fecha",
+                    "cliente_id:numero",
+                    "servicio_id:numero",
+                    "equipo:texto",
+                    "estado:texto",
+                    "tecnico:texto",
+                    "valor_total:decimal",
+                    "saldo:decimal"
+                ],
+                "abonos_fields": [
+                    "fecha:fecha",
+                    "cliente_id:numero",
+                    "factura_id:numero",
+                    "valor:decimal",
+                    "medio_pago:texto",
+                    "referencia:texto"
+                ]
+            }
+        },
+        {
+            "key": "veterinaria",
+            "label": "Veterinaria",
+            "aliases": [
+                "mascota",
+                "clinica veterinaria",
+                "veterinario"
+            ],
+            "entities": [
+                "clientes",
+                "pacientes",
+                "historia_clinica",
+                "productos",
+                "servicios",
+                "facturas",
+                "gastos"
+            ],
+            "forms": [
+                "pacientes.form",
+                "historia_clinica.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "consultas_por_periodo",
+                "ventas_productos",
+                "utilidad_servicios"
+            ],
+            "accounting_focus": [
+                "Servicios medicos",
+                "Inventario de medicamentos",
+                "Cartera"
+            ],
+            "suggestions": {
+                "pacientes_fields": [
+                    "nombre:texto",
+                    "especie:texto",
+                    "raza:texto",
+                    "sexo:texto",
+                    "fecha_nacimiento:fecha",
+                    "dueno_id:numero",
+                    "activo:bool"
+                ],
+                "historia_clinica_fields": [
+                    "fecha:fecha",
+                    "paciente_id:numero",
+                    "motivo:texto",
+                    "diagnostico:texto",
+                    "tratamiento:texto",
+                    "proxima_cita:fecha"
+                ]
+            }
+        },
+        {
+            "key": "farmacia_naturista",
+            "label": "Farmacia o tienda naturista",
+            "aliases": [
+                "farmacia",
+                "naturista",
+                "drogueria",
+                "suplementos"
+            ],
+            "entities": [
+                "clientes",
+                "productos",
+                "laboratorios",
+                "compras",
+                "facturas",
+                "inventario_movimientos",
+                "gastos"
+            ],
+            "forms": [
+                "productos.form",
+                "compras.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "rotacion_inventario",
+                "vencimientos",
+                "margen_por_categoria"
+            ],
+            "accounting_focus": [
+                "Control de inventario",
+                "Compras",
+                "Impuestos en venta"
+            ],
+            "suggestions": {
+                "productos_fields": [
+                    "codigo:texto",
+                    "nombre:texto",
+                    "laboratorio_id:numero",
+                    "categoria:texto",
+                    "presentacion:texto",
+                    "lote:texto",
+                    "fecha_vencimiento:fecha",
+                    "stock_actual:decimal",
+                    "precio_compra:decimal",
+                    "precio_venta:decimal",
+                    "impuesto_codigo:texto",
+                    "activo:bool"
+                ]
+            }
+        },
+        {
+            "key": "ferreteria",
+            "label": "Ferreteria",
+            "aliases": [
+                "ferreteria",
+                "herramientas",
+                "materiales"
+            ],
+            "entities": [
+                "clientes",
+                "productos",
+                "marcas",
+                "proveedores",
+                "compras",
+                "facturas",
+                "cuentas_por_cobrar",
+                "cuentas_por_pagar",
+                "gastos"
+            ],
+            "forms": [
+                "productos.form",
+                "facturas.form",
+                "compras.form"
+            ],
+            "reports": [
+                "ventas_por_producto",
+                "compras_por_proveedor",
+                "cartera"
+            ],
+            "accounting_focus": [
+                "Inventario",
+                "Compras",
+                "Cuentas por cobrar/pagar"
+            ],
+            "suggestions": {
+                "productos_fields": [
+                    "codigo:texto",
+                    "nombre:texto",
+                    "marca_id:numero",
+                    "unidad:texto",
+                    "stock_actual:decimal",
+                    "stock_minimo:decimal",
+                    "precio_compra:decimal",
+                    "precio_venta:decimal",
+                    "impuesto_codigo:texto",
+                    "activo:bool"
+                ]
+            }
+        },
+        {
+            "key": "restaurante_cafeteria",
+            "label": "Restaurante o cafeteria",
+            "aliases": [
+                "restaurante",
+                "cafeteria",
+                "comidas",
+                "bar"
+            ],
+            "entities": [
+                "clientes",
+                "productos",
+                "recetas",
+                "mesas",
+                "ordenes_venta",
+                "facturas",
+                "gastos"
+            ],
+            "forms": [
+                "productos.form",
+                "ordenes_venta.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "ventas_por_hora",
+                "producto_mas_vendido",
+                "consumo_insumos"
+            ],
+            "accounting_focus": [
+                "Ventas diarias",
+                "Control de costo receta",
+                "Caja"
+            ],
+            "suggestions": {
+                "productos_fields": [
+                    "codigo:texto",
+                    "nombre:texto",
+                    "tipo:texto",
+                    "precio_venta:decimal",
+                    "costo_referencia:decimal",
+                    "impuesto_codigo:texto",
+                    "activo:bool"
+                ],
+                "ordenes_venta_fields": [
+                    "numero:texto",
+                    "fecha:fecha",
+                    "cliente_id:numero",
+                    "mesa_id:numero",
+                    "estado:texto",
+                    "subtotal:decimal",
+                    "total:decimal"
+                ]
+            }
+        },
+        {
+            "key": "retail_tienda",
+            "label": "Tienda retail",
+            "aliases": [
+                "tienda",
+                "ropa",
+                "calzado",
+                "boutique",
+                "almacen"
+            ],
+            "entities": [
+                "clientes",
+                "productos",
+                "categorias",
+                "tallas_colores",
+                "facturas",
+                "devoluciones",
+                "gastos"
+            ],
+            "forms": [
+                "productos.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "ventas_por_categoria",
+                "rotacion",
+                "margen"
+            ],
+            "accounting_focus": [
+                "Inventario",
+                "Ventas",
+                "Devoluciones"
+            ],
+            "suggestions": {
+                "productos_fields": [
+                    "codigo:texto",
+                    "nombre:texto",
+                    "categoria_id:numero",
+                    "precio_compra:decimal",
+                    "precio_venta:decimal",
+                    "stock_actual:decimal",
+                    "activo:bool"
+                ]
+            }
+        },
+        {
+            "key": "corte_laser",
+            "label": "Servicios de corte laser",
+            "aliases": [
+                "corte laser",
+                "laser",
+                "diseno laser"
+            ],
+            "entities": [
+                "clientes",
+                "ordenes_trabajo",
+                "materiales",
+                "consumos_material",
+                "facturas",
+                "abonos",
+                "gastos"
+            ],
+            "forms": [
+                "ordenes_trabajo.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "ordenes_por_estado",
+                "costos_material",
+                "rentabilidad_orden"
+            ],
+            "accounting_focus": [
+                "Costeo por orden",
+                "Abonos",
+                "Cartera"
+            ],
+            "suggestions": {
+                "ordenes_trabajo_fields": [
+                    "numero:texto",
+                    "fecha:fecha",
+                    "cliente_id:numero",
+                    "material_id:numero",
+                    "ancho_mm:decimal",
+                    "alto_mm:decimal",
+                    "cantidad:decimal",
+                    "estado:texto",
+                    "valor_total:decimal"
+                ]
+            }
+        },
+        {
+            "key": "consultoria_profesional",
+            "label": "Consultoria profesional",
+            "aliases": [
+                "consultoria",
+                "asesoria",
+                "abogado",
+                "contador",
+                "ingenieria"
+            ],
+            "entities": [
+                "clientes",
+                "servicios",
+                "proyectos",
+                "hitos",
+                "facturas",
+                "cuentas_por_cobrar",
+                "gastos"
+            ],
+            "forms": [
+                "proyectos.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "facturacion_por_proyecto",
+                "horas_vs_ingreso",
+                "cartera"
+            ],
+            "accounting_focus": [
+                "Facturacion por hitos",
+                "Cartera",
+                "Gastos"
+            ],
+            "suggestions": {
+                "proyectos_fields": [
+                    "codigo:texto",
+                    "nombre:texto",
+                    "cliente_id:numero",
+                    "fecha_inicio:fecha",
+                    "fecha_fin:fecha",
+                    "estado:texto",
+                    "valor_contrato:decimal"
+                ]
+            }
+        },
+        {
+            "key": "iglesia_fundacion",
+            "label": "Iglesia o fundacion",
+            "aliases": [
+                "iglesia",
+                "fundacion",
+                "donaciones",
+                "ong"
+            ],
+            "entities": [
+                "donantes",
+                "donaciones",
+                "programas",
+                "gastos",
+                "comprobantes",
+                "reportes_sociales"
+            ],
+            "forms": [
+                "donaciones.form",
+                "gastos.form"
+            ],
+            "reports": [
+                "ingresos_por_fuente",
+                "ejecucion_programa",
+                "balance_social"
+            ],
+            "accounting_focus": [
+                "Trazabilidad de donaciones",
+                "Ejecucion de gastos",
+                "Soportes"
+            ],
+            "suggestions": {
+                "donaciones_fields": [
+                    "fecha:fecha",
+                    "donante_id:numero",
+                    "valor:decimal",
+                    "medio_pago:texto",
+                    "destino:texto",
+                    "comprobante:texto"
+                ]
+            }
+        },
+        {
+            "key": "crm_comercial",
+            "label": "CRM comercial",
+            "aliases": [
+                "crm",
+                "ventas b2b",
+                "pipeline",
+                "leads",
+                "oportunidades",
+                "funnel"
+            ],
+            "entities": [
+                "leads",
+                "oportunidades",
+                "actividades",
+                "clientes",
+                "cotizaciones",
+                "ventas",
+                "gastos"
+            ],
+            "forms": [
+                "leads.form",
+                "oportunidades.form",
+                "cotizaciones.form"
+            ],
+            "reports": [
+                "pipeline_ventas",
+                "conversion_leads",
+                "ventas_por_ejecutivo"
+            ],
+            "accounting_focus": [
+                "Seguimiento comercial",
+                "Ingresos por cierre",
+                "Comisiones y gastos"
+            ],
+            "suggestions": {
+                "leads_fields": [
+                    "fecha_registro:fecha",
+                    "nombre:texto",
+                    "empresa:texto",
+                    "telefono:texto",
+                    "email:texto",
+                    "origen:texto",
+                    "estado:texto"
+                ],
+                "oportunidades_fields": [
+                    "fecha:fecha",
+                    "lead_id:numero",
+                    "etapa:texto",
+                    "valor_estimado:decimal",
+                    "probabilidad:numero",
+                    "fecha_cierre_estimada:fecha",
+                    "estado:texto"
+                ]
+            }
+        },
+        {
+            "key": "contabilidad_general",
+            "label": "Contabilidad general",
+            "aliases": [
+                "contabilidad",
+                "contable",
+                "libro mayor",
+                "asientos",
+                "balance"
+            ],
+            "entities": [
+                "terceros",
+                "cuentas_contables",
+                "comprobantes",
+                "asientos_contables",
+                "centros_costo",
+                "impuestos",
+                "periodos_contables"
+            ],
+            "forms": [
+                "comprobantes.form",
+                "asientos_contables.form"
+            ],
+            "reports": [
+                "balance_general",
+                "estado_resultados",
+                "auxiliar_cuenta",
+                "libro_mayor"
+            ],
+            "accounting_focus": [
+                "Plan de cuentas",
+                "Asientos balanceados",
+                "Cierre contable"
+            ],
+            "suggestions": {
+                "cuentas_contables_fields": [
+                    "codigo:texto",
+                    "nombre:texto",
+                    "naturaleza:texto",
+                    "nivel:numero",
+                    "acepta_movimiento:bool",
+                    "activo:bool"
+                ],
+                "asientos_contables_fields": [
+                    "fecha:fecha",
+                    "comprobante_id:numero",
+                    "cuenta_id:numero",
+                    "tercero_id:numero",
+                    "detalle:texto",
+                    "debito:decimal",
+                    "credito:decimal"
+                ]
+            }
+        },
+        {
+            "key": "clinica_medica",
+            "label": "Clinica medica",
+            "aliases": [
+                "clinica",
+                "medico",
+                "hospital",
+                "salud",
+                "consultorio"
+            ],
+            "entities": [
+                "pacientes",
+                "citas",
+                "historias_clinicas",
+                "procedimientos",
+                "facturas",
+                "autorizaciones",
+                "cuentas_por_cobrar",
+                "gastos"
+            ],
+            "forms": [
+                "pacientes.form",
+                "citas.form",
+                "procedimientos.form"
+            ],
+            "reports": [
+                "citas_por_especialidad",
+                "facturacion_por_medico",
+                "cartera_eps"
+            ],
+            "accounting_focus": [
+                "Facturacion servicios medicos",
+                "Cartera por pagador",
+                "Gastos operativos"
+            ],
+            "suggestions": {
+                "pacientes_fields": [
+                    "nombre:texto",
+                    "documento:texto",
+                    "fecha_nacimiento:fecha",
+                    "telefono:texto",
+                    "email:texto",
+                    "aseguradora:texto",
+                    "activo:bool"
+                ],
+                "citas_fields": [
+                    "fecha:fecha",
+                    "paciente_id:numero",
+                    "profesional:texto",
+                    "especialidad:texto",
+                    "estado:texto",
+                    "valor:decimal"
+                ]
+            }
+        },
+        {
+            "key": "odontologia",
+            "label": "Odontologia",
+            "aliases": [
+                "odontologia",
+                "odontologo",
+                "dental",
+                "clinica dental"
+            ],
+            "entities": [
+                "pacientes",
+                "citas",
+                "planes_tratamiento",
+                "procedimientos",
+                "facturas",
+                "abonos",
+                "cuentas_por_cobrar"
+            ],
+            "forms": [
+                "pacientes.form",
+                "planes_tratamiento.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "tratamientos_activos",
+                "facturacion_mensual",
+                "cartera_pacientes"
+            ],
+            "accounting_focus": [
+                "Facturacion por tratamiento",
+                "Abonos",
+                "Cartera"
+            ],
+            "suggestions": {
+                "planes_tratamiento_fields": [
+                    "fecha:fecha",
+                    "paciente_id:numero",
+                    "descripcion:texto",
+                    "valor_total:decimal",
+                    "estado:texto"
+                ],
+                "procedimientos_fields": [
+                    "fecha:fecha",
+                    "paciente_id:numero",
+                    "tratamiento_id:numero",
+                    "procedimiento:texto",
+                    "valor:decimal"
+                ]
+            }
+        },
+        {
+            "key": "taller_automotriz",
+            "label": "Taller automotriz",
+            "aliases": [
+                "taller automotriz",
+                "mecanica",
+                "mecanico",
+                "vehiculos",
+                "automotriz"
+            ],
+            "entities": [
+                "clientes",
+                "vehiculos",
+                "ordenes_trabajo",
+                "servicios",
+                "repuestos",
+                "facturas",
+                "abonos",
+                "inventario_movimientos",
+                "gastos"
+            ],
+            "forms": [
+                "vehiculos.form",
+                "ordenes_trabajo.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "ordenes_por_estado",
+                "ventas_repuestos",
+                "rentabilidad_taller"
+            ],
+            "accounting_focus": [
+                "Costo por orden",
+                "Inventario de repuestos",
+                "Cartera"
+            ],
+            "suggestions": {
+                "vehiculos_fields": [
+                    "placa:texto",
+                    "cliente_id:numero",
+                    "marca:texto",
+                    "linea:texto",
+                    "modelo:texto",
+                    "kilometraje:numero"
+                ],
+                "ordenes_trabajo_fields": [
+                    "numero:texto",
+                    "fecha:fecha",
+                    "cliente_id:numero",
+                    "vehiculo_id:numero",
+                    "diagnostico:texto",
+                    "estado:texto",
+                    "valor_total:decimal",
+                    "saldo:decimal"
+                ]
+            }
+        },
+        {
+            "key": "manufactura_pyme",
+            "label": "Manufactura PYME",
+            "aliases": [
+                "manufactura",
+                "produccion",
+                "fabrica",
+                "planta",
+                "orden de produccion"
+            ],
+            "entities": [
+                "productos",
+                "materias_primas",
+                "ordenes_produccion",
+                "consumos_produccion",
+                "lotes",
+                "costos_produccion",
+                "facturas",
+                "gastos"
+            ],
+            "forms": [
+                "ordenes_produccion.form",
+                "lotes.form",
+                "productos.form"
+            ],
+            "reports": [
+                "costo_por_lote",
+                "eficiencia_produccion",
+                "mermas"
+            ],
+            "accounting_focus": [
+                "Costeo de produccion",
+                "Control de lotes",
+                "Inventario"
+            ],
+            "suggestions": {
+                "ordenes_produccion_fields": [
+                    "numero:texto",
+                    "fecha:fecha",
+                    "producto_id:numero",
+                    "cantidad_plan:decimal",
+                    "cantidad_real:decimal",
+                    "estado:texto",
+                    "costo_total:decimal"
+                ],
+                "lotes_fields": [
+                    "codigo:texto",
+                    "producto_id:numero",
+                    "fecha_produccion:fecha",
+                    "fecha_vencimiento:fecha",
+                    "cantidad:decimal",
+                    "estado:texto"
+                ]
+            }
+        },
+        {
+            "key": "distribuidora_mayorista",
+            "label": "Distribuidora mayorista",
+            "aliases": [
+                "distribuidora",
+                "mayorista",
+                "bodega central",
+                "ruteo comercial"
+            ],
+            "entities": [
+                "clientes",
+                "productos",
+                "listas_precios",
+                "pedidos",
+                "despachos",
+                "facturas",
+                "cuentas_por_cobrar",
+                "inventario_movimientos"
+            ],
+            "forms": [
+                "pedidos.form",
+                "despachos.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "ventas_por_ruta",
+                "backorder",
+                "rotacion_inventario"
+            ],
+            "accounting_focus": [
+                "Ventas por canal",
+                "Inventario y despachos",
+                "Cartera"
+            ],
+            "suggestions": {
+                "pedidos_fields": [
+                    "numero:texto",
+                    "fecha:fecha",
+                    "cliente_id:numero",
+                    "estado:texto",
+                    "subtotal:decimal",
+                    "total:decimal"
+                ],
+                "despachos_fields": [
+                    "numero:texto",
+                    "pedido_id:numero",
+                    "fecha:fecha",
+                    "transportador:texto",
+                    "estado:texto"
+                ]
+            }
+        },
+        {
+            "key": "ecommerce_marketplace",
+            "label": "Ecommerce y marketplace",
+            "aliases": [
+                "ecommerce",
+                "tienda online",
+                "marketplace",
+                "shopify",
+                "woocommerce"
+            ],
+            "entities": [
+                "clientes",
+                "productos",
+                "pedidos_web",
+                "pagos",
+                "envios",
+                "devoluciones",
+                "facturas",
+                "inventario_movimientos"
+            ],
+            "forms": [
+                "productos.form",
+                "pedidos_web.form",
+                "envios.form"
+            ],
+            "reports": [
+                "ventas_por_canal",
+                "tickets_promedio",
+                "devoluciones_por_causa"
+            ],
+            "accounting_focus": [
+                "Conciliacion de pagos",
+                "Costo de envio",
+                "Devoluciones"
+            ],
+            "suggestions": {
+                "pedidos_web_fields": [
+                    "numero:texto",
+                    "fecha:fecha",
+                    "cliente_id:numero",
+                    "canal:texto",
+                    "estado:texto",
+                    "total:decimal"
+                ],
+                "envios_fields": [
+                    "pedido_id:numero",
+                    "transportadora:texto",
+                    "guia:texto",
+                    "fecha_salida:fecha",
+                    "fecha_entrega:fecha",
+                    "estado:texto"
+                ]
+            }
+        },
+        {
+            "key": "constructora_obras",
+            "label": "Constructora y obras",
+            "aliases": [
+                "constructora",
+                "obra",
+                "proyecto de obra",
+                "ingenieria civil"
+            ],
+            "entities": [
+                "proyectos_obra",
+                "presupuestos_obra",
+                "avances_obra",
+                "materiales",
+                "contratistas",
+                "cuentas_por_pagar",
+                "gastos",
+                "facturas"
+            ],
+            "forms": [
+                "proyectos_obra.form",
+                "avances_obra.form",
+                "presupuestos_obra.form"
+            ],
+            "reports": [
+                "avance_vs_presupuesto",
+                "costos_por_frente",
+                "pagos_contratistas"
+            ],
+            "accounting_focus": [
+                "Control presupuestal",
+                "Costos por obra",
+                "Cuentas por pagar"
+            ],
+            "suggestions": {
+                "proyectos_obra_fields": [
+                    "codigo:texto",
+                    "nombre:texto",
+                    "fecha_inicio:fecha",
+                    "fecha_fin:fecha",
+                    "estado:texto",
+                    "presupuesto_total:decimal"
+                ],
+                "avances_obra_fields": [
+                    "fecha:fecha",
+                    "proyecto_id:numero",
+                    "frente:texto",
+                    "porcentaje_avance:decimal",
+                    "costo_acumulado:decimal"
+                ]
+            }
+        },
+        {
+            "key": "colegio_academia",
+            "label": "Colegio o academia",
+            "aliases": [
+                "colegio",
+                "escuela",
+                "academia",
+                "instituto",
+                "educacion"
+            ],
+            "entities": [
+                "estudiantes",
+                "acudientes",
+                "matriculas",
+                "pagos_matricula",
+                "cursos",
+                "facturas",
+                "cuentas_por_cobrar"
+            ],
+            "forms": [
+                "estudiantes.form",
+                "matriculas.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "cartera_por_estudiante",
+                "matriculas_por_periodo",
+                "ingresos_educativos"
+            ],
+            "accounting_focus": [
+                "Facturacion de matriculas",
+                "Cartera estudiantil",
+                "Recaudo"
+            ],
+            "suggestions": {
+                "estudiantes_fields": [
+                    "nombre:texto",
+                    "documento:texto",
+                    "curso_id:numero",
+                    "acudiente_id:numero",
+                    "estado:texto"
+                ],
+                "matriculas_fields": [
+                    "fecha:fecha",
+                    "estudiante_id:numero",
+                    "periodo:texto",
+                    "valor:decimal",
+                    "estado:texto"
+                ]
+            }
+        },
+        {
+            "key": "hotel_turismo",
+            "label": "Hotel y turismo",
+            "aliases": [
+                "hotel",
+                "hostal",
+                "turismo",
+                "reservas",
+                "hospedaje"
+            ],
+            "entities": [
+                "huespedes",
+                "habitaciones",
+                "reservas",
+                "checkin_checkout",
+                "facturas",
+                "pagos",
+                "gastos"
+            ],
+            "forms": [
+                "reservas.form",
+                "huespedes.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "ocupacion",
+                "ingresos_por_habitacion",
+                "reservas_canceladas"
+            ],
+            "accounting_focus": [
+                "Ingresos por alojamiento",
+                "Caja diaria",
+                "Gastos operativos"
+            ],
+            "suggestions": {
+                "reservas_fields": [
+                    "numero:texto",
+                    "huesped_id:numero",
+                    "habitacion_id:numero",
+                    "fecha_entrada:fecha",
+                    "fecha_salida:fecha",
+                    "estado:texto",
+                    "valor_total:decimal"
+                ],
+                "habitaciones_fields": [
+                    "codigo:texto",
+                    "tipo:texto",
+                    "capacidad:numero",
+                    "tarifa_noche:decimal",
+                    "estado:texto"
+                ]
+            }
+        },
+        {
+            "key": "agropecuario",
+            "label": "Agropecuario",
+            "aliases": [
+                "agro",
+                "agropecuario",
+                "finca",
+                "ganaderia",
+                "cultivo"
+            ],
+            "entities": [
+                "lotes_cultivo",
+                "insumos",
+                "produccion_cosecha",
+                "compras",
+                "ventas",
+                "facturas",
+                "gastos"
+            ],
+            "forms": [
+                "lotes_cultivo.form",
+                "produccion_cosecha.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "rendimiento_por_lote",
+                "costos_por_ciclo",
+                "ventas_agro"
+            ],
+            "accounting_focus": [
+                "Costos por lote",
+                "Insumos",
+                "Rentabilidad de cosecha"
+            ],
+            "suggestions": {
+                "lotes_cultivo_fields": [
+                    "codigo:texto",
+                    "hectareas:decimal",
+                    "tipo_cultivo:texto",
+                    "fecha_siembra:fecha",
+                    "estado:texto"
+                ],
+                "produccion_cosecha_fields": [
+                    "fecha:fecha",
+                    "lote_id:numero",
+                    "cantidad:decimal",
+                    "unidad:texto",
+                    "costo_total:decimal"
+                ]
+            }
+        }
+    ],
+    "workflow_templates": {
+        "ventas_basico": [
+            "Crear cliente",
+            "Crear producto o servicio",
+            "Registrar factura",
+            "Registrar pago o abono",
+            "Revisar cartera"
+        ],
+        "servicios_con_orden": [
+            "Crear cliente",
+            "Crear orden de trabajo",
+            "Cerrar orden",
+            "Facturar orden",
+            "Controlar pago"
+        ]
+    },
+    "response_policy": {
+        "must_use_real_registry": true,
+        "never_assume_existing_records": true,
+        "ask_one_question_at_a_time": true,
+        "if_entity_missing_in_app": "advise_creator",
+        "if_entity_missing_in_builder": "offer_create_table",
+        "if_user_is_non_technical": "answer_with_next_step",
+        "must_show_next_step": true,
+        "confirm_before_create": true
+    },
+        "unknown_business_protocol": {
+            "enabled": true,
+            "message_template": "No tengo plantilla exacta para \"{business}\" todavia. Ya lo registre para investigarlo y compartirlo con todos los agentes.",
+            "store_path": "project/storage/chat/research/{tenant}.json",
+            "next_step_question": "Para avanzar rapido, dime si manejas productos, servicios o ambos.",
+            "discovery_questions": [
+                "Que informacion quieres guardar primero?",
+                "Como cobras: contado, credito o mixto?",
+                "Que reporte necesitas primero (ventas, cartera, gastos o utilidad)?"
+            ]
+    },
+    "software_build_route": [
+        "Descubrir objetivo del negocio y proceso principal.",
+        "Definir tablas base y sus relaciones clave.",
+        "Crear formularios CRUD para cada tabla critica.",
+        "Configurar seguridad: usuarios, roles y permisos.",
+        "Definir reportes, indicadores y validaciones.",
+        "Probar flujo completo: crear, consultar, actualizar y cerrar proceso."
+    ],
+    "programming_logic_principles": [
+        "Primero validar contexto y entidad antes de ejecutar cualquier accion.",
+        "Preguntar un solo dato critico por turno para evitar confusion.",
+        "No prometer acciones que no existan en contratos reales del proyecto.",
+        "Si falta un prerequisito, guiar al siguiente paso minimo y confirmar.",
+        "Separar modo creador (build) y modo usuario (use) sin mezclar respuestas.",
+        "Cada cambio debe mantener compatibilidad y poder probarse de extremo a extremo."
+    ],
+    "database_architecture_principles": [
+        "Cada tabla de negocio debe incluir tenant_id para aislamiento multiempresa.",
+        "Indices obligatorios por tenant_id + campos de consulta frecuente.",
+        "Relaciones maestro-detalle con claves claras (ej. facturas y factura_items).",
+        "No ejecutar SQL crudo desde chat; usar siempre CommandLayer/Kernel.",
+        "Registrar auditoria de cambios y errores para trazabilidad operativa.",
+        "Diseñar para volumen: paginacion, filtros por indice y queries acotadas."
+    ],
+    "enterprise_area_guides": {
+        "erp": [
+            "clientes",
+            "proveedores",
+            "productos",
+            "compras",
+            "facturas",
+            "pagos",
+            "gastos"
+        ],
+        "crm": [
+            "leads",
+            "oportunidades",
+            "actividades",
+            "clientes"
+        ],
+        "contabilidad": [
+            "cuentas_contables",
+            "comprobantes",
+            "asientos_contables",
+            "centros_costo"
+        ],
+        "operaciones_servicio": [
+            "ordenes_trabajo",
+            "visitas_tecnicas",
+            "consumos",
+            "cierres_servicio"
+        ]
+    },
+    "solution_catalog": {
+        "erp_core": {
+            "entities": [
+                "clientes",
+                "proveedores",
+                "productos",
+                "facturas",
+                "pagos",
+                "gastos"
+            ],
+            "purpose": "Operacion administrativa y contable base"
+        },
+        "crm_growth": {
+            "entities": [
+                "leads",
+                "oportunidades",
+                "actividades",
+                "clientes"
+            ],
+            "purpose": "Gestion comercial y cierre de ventas"
+        },
+        "sap_side_apps": [
+            {
+                "name": "ordenes_mantenimiento_interno",
+                "entities": [
+                    "ordenes_mtto",
+                    "activos",
+                    "tecnicos",
+                    "consumos_mtto"
+                ],
+                "purpose": "Control interno de mantenimiento fuera del ERP central"
+            },
+            {
+                "name": "inventario_taller",
+                "entities": [
+                    "repuestos",
+                    "inventario_movimientos",
+                    "ubicaciones_taller"
+                ],
+                "purpose": "Control detallado de bodega/taller"
+            },
+            {
+                "name": "control_lotes_calidad",
+                "entities": [
+                    "lotes",
+                    "inspecciones_calidad",
+                    "no_conformidades"
+                ],
+                "purpose": "Trazabilidad y calidad por lote"
+            },
+            {
+                "name": "solicitudes_internas",
+                "entities": [
+                    "solicitudes",
+                    "aprobaciones",
+                    "centros_costo"
+                ],
+                "purpose": "Flujos internos rapidos sin tocar ERP principal"
+            }
+        ]
+    },
+    "entity_dependencies": {
+        "facturas": {
+            "requires": [
+                [
+                    "clientes"
+                ],
+                [
+                    "productos",
+                    "servicios"
+                ]
+            ],
+            "recommended_forms": [
+                "clientes.form",
+                "productos.form",
+                "servicios.form",
+                "facturas.form"
+            ],
+            "notes": "Factura requiere cliente y al menos productos o servicios activos."
+        },
+        "factura_items": {
+            "requires": [
+                [
+                    "facturas"
+                ],
+                [
+                    "productos",
+                    "servicios"
+                ]
+            ],
+            "notes": "Detalle factura depende de factura cabecera y catalogo de items."
+        },
+        "pagos": {
+            "requires": [
+                [
+                    "clientes"
+                ],
+                [
+                    "facturas"
+                ]
+            ],
+            "notes": "Pagos permiten controlar contado y credito."
+        },
+        "abonos": {
+            "requires": [
+                [
+                    "clientes"
+                ],
+                [
+                    "facturas"
+                ]
+            ],
+            "notes": "Abonos aplican a cartera de facturas a credito."
+        },
+        "cuentas_por_cobrar": {
+            "requires": [
+                [
+                    "clientes"
+                ],
+                [
+                    "facturas"
+                ]
+            ]
+        },
+        "cuentas_por_pagar": {
+            "requires": [
+                [
+                    "proveedores"
+                ],
+                [
+                    "compras"
+                ]
+            ]
+        },
+        "lotes": {
+            "requires": [
+                [
+                    "productos"
+                ]
+            ],
+            "recommended_forms": [
+                "productos.form",
+                "lotes.form"
+            ],
+            "notes": "Control de lotes exige trazabilidad por producto."
+        },
+        "inventario_movimientos": {
+            "requires": [
+                [
+                    "productos"
+                ],
+                [
+                    "lotes",
+                    "ordenes_trabajo",
+                    "facturas",
+                    "compras"
+                ]
+            ],
+            "notes": "Movimientos deben tener origen de entrada o salida."
+        },
+        "ordenes_trabajo": {
+            "requires": [
+                [
+                    "clientes"
+                ],
+                [
+                    "servicios",
+                    "productos"
+                ]
+            ],
+            "notes": "Ordenes requieren cliente y catalogo de servicio o repuesto."
+        },
+        "pedidos_web": {
+            "requires": [
+                [
+                    "clientes"
+                ],
+                [
+                    "productos"
+                ]
+            ]
+        },
+        "reservas": {
+            "requires": [
+                [
+                    "huespedes"
+                ],
+                [
+                    "habitaciones"
+                ]
+            ]
+        },
+        "asientos_contables": {
+            "requires": [
+                [
+                    "cuentas_contables"
+                ],
+                [
+                    "comprobantes"
+                ]
+            ],
+            "notes": "Asiento contable requiere plan de cuentas y comprobante."
+        }
+    },
+    "build_questions": {
+        "default_sequence": [
+            "Que tipo de negocio tienes?",
+            "Trabajas contado, credito o mixto?",
+            "Necesitas inventario o solo servicios?",
+            "Cual es el primer proceso que quieres controlar?"
+        ],
+        "invoice_sequence": [
+            "Vas a facturar productos, servicios o ambos?",
+            "Tus clientes pagan de contado, credito o mixto?",
+            "Necesitas controlar cartera y abonos?",
+            "Quieres activar reporte de ventas y cartera desde el inicio?"
+        ]
+    }
+}

@@ -1,0 +1,18 @@
+{
+    "active_task": null,
+    "intent": null,
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "unknown_business_notice_sent": false,
+    "last_messages": [
+        {
+            "u": "quiero crear una app",
+            "a": "Eso se hace en el Creador de apps. Abre el chat creador para crear tablas o formularios.",
+            "ts": 1771517944
+        }
+    ],
+    "summary": "quiero crear una app"
+}

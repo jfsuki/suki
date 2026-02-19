@@ -1,0 +1,23 @@
+{
+    "active_task": "builder_onboarding",
+    "intent": "builder_onboarding",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "last_messages": [
+        {
+            "u": "quiero crear un programa para laboratorio dental especializado",
+            "a": "Perfecto. Paso 2: como manejas pagos? contado, credito o mixto.",
+            "ts": 1771515896
+        },
+        {
+            "u": "que sigue",
+            "a": "Perfecto. Paso 2: como manejas pagos? contado, credito o mixto.",
+            "ts": 1771515896
+        }
+    ],
+    "summary": "quiero crear un programa para laboratorio dental especializado",
+    "onboarding_step": "operation_model"
+}

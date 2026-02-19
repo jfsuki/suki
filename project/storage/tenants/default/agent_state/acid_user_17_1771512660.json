@@ -1,0 +1,17 @@
+{
+    "active_task": null,
+    "intent": "MEMORY_UPDATE_REQUEST",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "last_messages": [
+        {
+            "u": "guarda estas expresiones para despues",
+            "a": "Listo, lo guardo para entenderte mejor.",
+            "ts": 1771512661
+        }
+    ],
+    "summary": "guarda estas expresiones para despues"
+}

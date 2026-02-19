@@ -1,0 +1,18 @@
+{
+    "active_task": null,
+    "intent": null,
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "unknown_business_notice_sent": false,
+    "last_messages": [
+        {
+            "u": "crear cliente nombre=Juan nit=123",
+            "a": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "ts": 1771520559
+        }
+    ],
+    "summary": "crear cliente nombre=Juan nit=123"
+}

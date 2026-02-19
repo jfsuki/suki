@@ -42,6 +42,6 @@
 - project/contracts/integrations/*.integration.json: integraciones externas.
 - project/contracts/invoices/*.invoice.json: factura electronica.
 - project/storage/tenants/*: memoria conversacional (state, lexicon, policy).
+- project/storage/chat/research/*.json: cola de investigacion para dominios de negocio nuevos (memoria compartida de agentes).
 - project/storage/reports/*: reportes de pruebas acidas.
 - project/.env: variables del proyecto.
-

@@ -1,0 +1,19 @@
+{
+    "active_task": "builder_onboarding",
+    "intent": "builder_onboarding",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "unknown_business_notice_sent": false,
+    "last_messages": [
+        {
+            "u": "quiero crear una app",
+            "a": "Perfecto. Vamos paso a paso para crear tu app.\nPaso 1: responde solo una opcion: servicios, productos o ambos.",
+            "ts": 1771520559
+        }
+    ],
+    "summary": "quiero crear una app",
+    "onboarding_step": "business_type"
+}

@@ -1,0 +1,18 @@
+{
+    "active_task": null,
+    "intent": "APP_CAPABILITIES",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "unknown_business_notice_sent": false,
+    "last_messages": [
+        {
+            "u": "ayuda rapida",
+            "a": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\nOpciones activas ahora:\n- pedir al creador que agregue una tabla base\nEntidades activas: sin entidades",
+            "ts": 1771520470
+        }
+    ],
+    "summary": "ayuda rapida"
+}

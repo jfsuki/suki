@@ -4,21 +4,27 @@
     "entity": null,
     "collected": [],
     "missing": [],
+    "requested_slot": null,
     "last_messages": [
         {
             "u": "hola",
             "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771340336
+            "ts": 1771518963
         },
         {
             "u": "hola",
             "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771341608
+            "ts": 1771519042
         },
         {
             "u": "hola",
             "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771341746
+            "ts": 1771520349
+        },
+        {
+            "u": "hola",
+            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "ts": 1771520583
         }
     ],
     "summary": "hola"

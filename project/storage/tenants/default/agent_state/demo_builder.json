@@ -1,0 +1,94 @@
+{
+    "active_task": "builder_onboarding",
+    "intent": "builder_onboarding",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "last_messages": [
+        {
+            "u": "hola",
+            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "ts": 1771507365
+        },
+        {
+            "u": "tengo una empresa de servicios y mantenimiento de equipos",
+            "a": "Para tu negocio (Servicios y mantenimiento) te recomiendo esta ruta:\n- Tablas base: clientes, servicios, ordenes_trabajo, visitas_tecnicas, facturas, abonos, cuentas_por_cobrar, gastos, factura_items, pagos\n- Controles clave: Ingresos por servicio, Costos directos de servicio, Cartera por cliente\n- Reportes sugeridos: ordenes_por_estado, ventas_por_tecnico, cartera_vencida\n- Flujo recomendado: Crear cliente -> Crear orden de trabajo -> Cerrar orden -> Facturar orden\nSiguiente tabla recomendada: clientes.\nPaso siguiente:\n1) Crea la tabla.\n2) Crea el formulario.\n3) Prueba crear un primer registro.\nPara clientes te sugiero estos campos base:\n- nombre:texto\n- documento:texto\n- telefono:texto\n- email:texto\n- direccion:texto\n- activo:bool\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nSi estas de acuerdo, enviame una sola linea asi:\ncrear tabla clientes nombre:texto documento:texto telefono:texto email:texto direccion:texto activo:bool\nControl contable minimo sugerido:\n- Define clientes con documento y contacto.\n- Define facturas y factura_items para detalle maestro-detalle.\n- Incluye tabla de pagos/abonos para cartera.\n- Incluye gastos para control de utilidad.\nCuando la crees, te guio al siguiente paso (formulario y flujo).",
+            "ts": 1771507365
+        },
+        {
+            "u": "que debo hacer ahora",
+            "a": "Para tu negocio (Servicios y mantenimiento) te recomiendo esta ruta:\n- Tablas base: clientes, servicios, ordenes_trabajo, visitas_tecnicas, facturas, abonos, cuentas_por_cobrar, gastos, factura_items, pagos\n- Controles clave: Ingresos por servicio, Costos directos de servicio, Cartera por cliente\n- Reportes sugeridos: ordenes_por_estado, ventas_por_tecnico, cartera_vencida\n- Flujo recomendado: Crear cliente -> Crear orden de trabajo -> Cerrar orden -> Facturar orden\nSiguiente tabla recomendada: clientes.\nPaso siguiente:\n1) Crea la tabla.\n2) Crea el formulario.\n3) Prueba crear un primer registro.\nPara clientes te sugiero estos campos base:\n- nombre:texto\n- documento:texto\n- telefono:texto\n- email:texto\n- direccion:texto\n- activo:bool\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nSi estas de acuerdo, enviame una sola linea asi:\ncrear tabla clientes nombre:texto documento:texto telefono:texto email:texto direccion:texto activo:bool\nControl contable minimo sugerido:\n- Define clientes con documento y contacto.\n- Define facturas y factura_items para detalle maestro-detalle.\n- Incluye tabla de pagos/abonos para cartera.\n- Incluye gastos para control de utilidad.\nCuando la crees, te guio al siguiente paso (formulario y flujo).",
+            "ts": 1771507365
+        },
+        {
+            "u": "ayudame que campos debe tener ordenes_trabajo",
+            "a": "Para tu negocio (Servicios y mantenimiento) te recomiendo esta ruta:\n- Tablas base: clientes, servicios, ordenes_trabajo, visitas_tecnicas, facturas, abonos, cuentas_por_cobrar, gastos, factura_items, pagos\n- Controles clave: Ingresos por servicio, Costos directos de servicio, Cartera por cliente\n- Reportes sugeridos: ordenes_por_estado, ventas_por_tecnico, cartera_vencida\n- Flujo recomendado: Crear cliente -> Crear orden de trabajo -> Cerrar orden -> Facturar orden\nSiguiente tabla recomendada: clientes.\nPaso siguiente:\n1) Crea la tabla.\n2) Crea el formulario.\n3) Prueba crear un primer registro.\nPara clientes te sugiero estos campos base:\n- nombre:texto\n- documento:texto\n- telefono:texto\n- email:texto\n- direccion:texto\n- activo:bool\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nSi estas de acuerdo, enviame una sola linea asi:\ncrear tabla clientes nombre:texto documento:texto telefono:texto email:texto direccion:texto activo:bool\nControl contable minimo sugerido:\n- Define clientes con documento y contacto.\n- Define facturas y factura_items para detalle maestro-detalle.\n- Incluye tabla de pagos/abonos para cartera.\n- Incluye gastos para control de utilidad.\nCuando la crees, te guio al siguiente paso (formulario y flujo).",
+            "ts": 1771507365
+        }
+    ],
+    "summary": "hola",
+    "builder_plan": {
+        "business_type": "servicios_mantenimiento",
+        "entities": [
+            "clientes",
+            "servicios",
+            "ordenes_trabajo",
+            "visitas_tecnicas",
+            "facturas",
+            "abonos",
+            "cuentas_por_cobrar",
+            "gastos",
+            "factura_items",
+            "pagos"
+        ],
+        "first_entity": "clientes",
+        "forms": [
+            "clientes.form",
+            "ordenes_trabajo.form",
+            "facturas.form"
+        ],
+        "reports": [
+            "ordenes_por_estado",
+            "ventas_por_tecnico",
+            "cartera_vencida",
+            "utilidad_mensual"
+        ],
+        "workflows": [
+            "Crear cliente",
+            "Crear orden de trabajo",
+            "Cerrar orden",
+            "Facturar orden",
+            "Controlar pago"
+        ],
+        "accounting_focus": [
+            "Ingresos por servicio",
+            "Costos directos de servicio",
+            "Cartera por cliente",
+            "Gastos operativos"
+        ],
+        "accounting_checks": [
+            "Define clientes con documento y contacto.",
+            "Define facturas y factura_items para detalle maestro-detalle.",
+            "Incluye tabla de pagos/abonos para cartera.",
+            "Incluye gastos para control de utilidad.",
+            "Configura impuestos con codigos editables.",
+            "Activa auditoria y usuario responsable en operaciones criticas."
+        ],
+        "tax_profile": {
+            "priority_checks": [
+                "tipo_documento_cliente",
+                "responsabilidad_fiscal_cliente",
+                "impuesto_por_item",
+                "resolucion_facturacion_si_aplica",
+                "estado_envio_electronico"
+            ],
+            "documents": [
+                "factura_venta",
+                "nota_credito",
+                "nota_debito"
+            ]
+        }
+    },
+    "onboarding_step": "plan_ready"
+}

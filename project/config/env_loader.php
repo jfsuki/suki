@@ -1,7 +1,7 @@
 <?php
 // config/env_loader.php
 
-function loadEnv($path) {
+function loadEnv($path, $override = true) {
     if (!file_exists($path)) return;
 
     $lines = file($path, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
@@ -12,7 +12,7 @@ function loadEnv($path) {
         $name = trim($name);
         $value = trim($value);
 
-        if (!array_key_exists($name, $_SERVER) && !array_key_exists($name, $_ENV)) {
+        if ($override || (!array_key_exists($name, $_SERVER) && !array_key_exists($name, $_ENV))) {
             putenv(sprintf('%s=%s', $name, $value));
             $_ENV[$name] = $value;
             $_SERVER[$name] = $value;
@@ -21,4 +21,4 @@ function loadEnv($path) {
 }
 
 // Cargar el archivo .env que está una carpeta arriba de /config
-loadEnv(__DIR__ . '/../.env');
+loadEnv(__DIR__ . '/../.env', true);

@@ -1,0 +1,16 @@
+{
+    "active_task": "profile",
+    "intent": "profile",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "last_messages": [
+        {
+            "u": "mi negocio es ferreteria",
+            "a": "Listo, te voy guiando con plantilla de Ferreteria.",
+            "ts": 1771507349
+        }
+    ],
+    "summary": "mi negocio es ferreteria"
+}
