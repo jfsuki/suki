@@ -1,0 +1,15 @@
+{
+    "active_task": "create_table",
+    "intent": null,
+    "entity": "producto",
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "crear producto",
+            "a": "No existe la tabla producto. Â¿Quieres crearla? Ej: crear tabla producto nombre:texto",
+            "ts": 1771469007
+        }
+    ],
+    "summary": "crear producto"
+}

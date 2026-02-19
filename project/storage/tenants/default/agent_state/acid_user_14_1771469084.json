@@ -1,0 +1,18 @@
+{
+    "active_task": null,
+    "intent": "update",
+    "entity": "cliente",
+    "collected": {
+        "id": "1",
+        "email": "juan@mail.com"
+    },
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "actualizar cliente id=1 email=juan@mail.com",
+            "a": "OK",
+            "ts": 1771469084
+        }
+    ],
+    "summary": "actualizar cliente id=1 email=juan@mail.com"
+}

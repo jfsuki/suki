@@ -74,10 +74,6 @@ final class ChatAgent
             return $this->reply('Archivo recibido. Procesaremos OCR/Audio cuando este habilitado.', $channel, $sessionId, $userId);
         }
 
-        if ($this->isHelpIntent($text) && !$this->isCrudGuideTrigger($text)) {
-            return $this->reply($this->buildHelpMessage($mode), $channel, $sessionId, $userId, 'success');
-        }
-
         $local = $this->parseLocal($text);
         if (!empty($local['command']) && in_array($local['command'], ['RunTests', 'CreateEntity', 'CreateForm'], true)) {
             return $this->executeLocal($local, $channel, $sessionId, $userId, $mode, $tenantId);

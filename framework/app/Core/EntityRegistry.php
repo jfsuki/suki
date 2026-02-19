@@ -4,7 +4,6 @@
 namespace App\Core;
 
 use JsonException;
-use Opis\JsonSchema\Validator;
 use RuntimeException;
 use Throwable;
 
@@ -42,12 +41,13 @@ class EntityRegistry
         $useCache = $this->isCacheFresh($schemaHash, $fileHashes);
 
         $schema = $this->readJsonObject($this->schemaPath);
-        $validator = new Validator();
+        $validator = $this->buildValidator();
+        $canValidate = $validator !== null;
 
         $entities = [];
         foreach ($files as $path) {
             $payload = $this->readJsonBoth($path);
-            if (!$useCache) {
+            if (!$useCache && $canValidate) {
                 $result = $validator->validate($payload['object'], $schema);
                 if (!$result->isValid()) {
                     $error = $result->error();
@@ -63,6 +63,15 @@ class EntityRegistry
         }
 
         return $entities;
+    }
+
+    private function buildValidator(): ?object
+    {
+        if (!class_exists('\\Opis\\JsonSchema\\Validator')) {
+            return null;
+        }
+        $class = '\\Opis\\JsonSchema\\Validator';
+        return new $class();
     }
 
     public function get(string $name): array

@@ -1,31 +1,33 @@
 {
-    "active_task": "crud",
-    "intent": "create",
+    "active_task": "training",
+    "intent": "APP_CREATE",
     "entity": "cliente",
-    "collected": [],
-    "missing": [
-        "nombre"
-    ],
+    "collected": {
+        "nombre": "ana",
+        "tax_concept": "NIT",
+        "money_cop": " 123"
+    },
+    "missing": [],
     "last_messages": [
         {
-            "u": "ana",
-            "a": "",
-            "ts": 1771457766
-        },
-        {
-            "u": "ahora?",
-            "a": "",
-            "ts": 1771457771
-        },
-        {
-            "u": "a puedo hacer con este programa?",
-            "a": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\n¿Quieres crear algo nuevo o usar lo que ya tienes?",
-            "ts": 1771458507
-        },
-        {
             "u": "puedo crear producto?",
-            "a": "Me falta nombre. ¿Cuál es?",
-            "ts": 1771458522
+            "a": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "ts": 1771469069
+        },
+        {
+            "u": "quiero crear un cliente",
+            "a": "Me falta nombre. Cual es?",
+            "ts": 1771469069
+        },
+        {
+            "u": "ana",
+            "a": "OK",
+            "ts": 1771469069
+        },
+        {
+            "u": "nit 123",
+            "a": "¿Para qué tipo de negocio es (tienda, servicios, restaurante, ferretería, etc.)?",
+            "ts": 1771469069
         }
     ],
     "summary": "hola"

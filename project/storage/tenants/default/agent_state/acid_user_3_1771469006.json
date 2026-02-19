@@ -1,0 +1,15 @@
+{
+    "active_task": null,
+    "intent": "ENTITY_LIST",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "que tablas?",
+            "a": "Tablas creadas: cliente, clientes, factura. Â¿Quieres ver los campos de alguna?",
+            "ts": 1771469007
+        }
+    ],
+    "summary": "que tablas?"
+}

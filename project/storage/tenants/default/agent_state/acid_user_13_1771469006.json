@@ -1,0 +1,15 @@
+{
+    "active_task": null,
+    "intent": "list",
+    "entity": "cliente",
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "listar cliente",
+            "a": "OK",
+            "ts": 1771469007
+        }
+    ],
+    "summary": "listar cliente"
+}

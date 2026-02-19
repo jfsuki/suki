@@ -1,0 +1,15 @@
+{
+    "active_task": null,
+    "intent": "FORM_LIST",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "que pantallas tengo",
+            "a": "Formularios: cliente.form, clientes.form, cuentasxcobrar.form, fact.form. Quieres abrir alguno?",
+            "ts": 1771469084
+        }
+    ],
+    "summary": "que pantallas tengo"
+}

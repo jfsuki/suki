@@ -32,6 +32,7 @@ final class ConversationGateway
 
         $raw = trim($message);
         $training = $this->loadTrainingBase($tenantId);
+        $normalizedBase = $this->normalize($raw);
         $normalized = $this->normalizeWithTraining($raw, $training);
 
         $state = $this->loadState($tenantId, $userId);
@@ -42,6 +43,13 @@ final class ConversationGateway
         }
         $profile = $this->memory->getProfile($tenantId, $userId);
         $policy = $this->loadPolicy($tenantId);
+
+        if ($this->isPureGreeting($normalizedBase)) {
+            $reply = 'Hola, soy Cami. Dime que necesitas crear o consultar.';
+            $state = $this->updateState($state, $raw, $reply, null, null, [], null);
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('greeting', true));
+        }
 
         $trainingRoute = $this->routeTraining($normalized, $training, $profile, $tenantId, $userId, $state, $lexicon);
         if (!empty($trainingRoute)) {
@@ -66,7 +74,7 @@ final class ConversationGateway
         if ($this->isCrudGuideRequest($normalized, $state, $training)) {
             $entity = $this->detectEntity($normalized, $lexicon, $state);
             if ($entity === '') {
-                $reply = '¿De cuál lista? Ej: clientes, productos o facturas.';
+                $reply = 'De cual lista? Ej: clientes, productos o facturas.';
                 $state = $this->updateState($state, $raw, $reply, 'crud_guide', null, [], 'crud_guide');
                 $this->saveState($tenantId, $userId, $state);
                 return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('crud_guide', true));
@@ -126,7 +134,7 @@ final class ConversationGateway
             if (!empty($parsed['missing_entity'])) {
                 $entityName = (string) ($parsed['entity'] ?? '');
                 if ($mode === 'builder') {
-                    $reply = 'No existe la tabla ' . $entityName . '. ¿Quieres crearla? Ej: crear tabla ' . $entityName . ' nombre:texto';
+                    $reply = 'No existe la tabla ' . $entityName . '. Quieres crearla? Ej: crear tabla ' . $entityName . ' nombre:texto';
                     $state = $this->updateState($state, $raw, $reply, null, $entityName, [], 'create_table');
                     $this->saveState($tenantId, $userId, $state);
                     return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('missing_entity', true, $parsed));
@@ -155,6 +163,16 @@ final class ConversationGateway
         $this->saveState($tenantId, $userId, $state);
 
         return $this->result('send_to_llm', '', null, $capsule, $state, $this->telemetry('llm', false));
+    }
+
+    private function isPureGreeting(string $text): bool
+    {
+        $text = trim($text);
+        if ($text === '') {
+            return false;
+        }
+        $greetings = ['hola', 'buenas', 'buenos dias', 'buen día', 'buen dia', 'buenas tardes', 'buenas noches', 'hello', 'saludos'];
+        return in_array($text, $greetings, true);
     }
 
     private function normalize(string $text): string
@@ -205,7 +223,7 @@ final class ConversationGateway
         }
         $greetings = ['hola', 'buenas', 'buenos', 'hello', 'saludos'];
         $thanks = ['gracias', 'thank', 'ok', 'listo'];
-        $confirm = ['si', 'sí', 'confirmo', 'dale'];
+        $confirm = ['si', 'confirmo', 'dale'];
         $status = ['estado', 'estatus', 'status', 'progreso', 'avance', 'resumen del proyecto', 'estado del proyecto'];
         $buildMarkers = ['tabla', 'entidad', 'formulario', 'form'];
         $faq = ['ayuda', 'menu', 'funciones', 'que puedes', 'que haces', 'opciones'];
@@ -397,7 +415,8 @@ final class ConversationGateway
 
         $intent = $this->detectIntent($text);
         if ($intent === '') {
-            if (!empty($collected) && !empty($state['intent']) && !empty($state['entity'])) {
+            $stateIntent = (string) ($state['intent'] ?? '');
+            if (!empty($collected) && $this->isCrudIntent($stateIntent) && !empty($state['entity'])) {
                 $intent = (string) $state['intent'];
                 $entity = (string) $state['entity'];
                 $missing = $this->missingRequired($entity, $collected, $intent);
@@ -435,6 +454,11 @@ final class ConversationGateway
 
         $command = $this->buildCommand($intent, $entity, $collected);
         return ['command' => $command, 'intent' => $intent, 'entity' => $entity, 'collected' => $collected];
+    }
+
+    private function isCrudIntent(string $intent): bool
+    {
+        return in_array($intent, ['create', 'list', 'update', 'delete'], true);
     }
 
     private function detectIntent(string $text): string
@@ -516,7 +540,9 @@ final class ConversationGateway
 
     private function parseEntityFromCrudText(string $text): string
     {
+        $text = preg_replace('/^(quiero|puedo|necesito|me\\s+gustaria|deseo)\\s+/i', '', $text) ?? $text;
         $text = preg_replace('/^(crear|agregar|nuevo|listar|ver|buscar|actualizar|editar|eliminar|borrar|guardar|registrar|emitir|facturar)\\s+/i', '', $text) ?? $text;
+        $text = preg_replace('/^(un|una|el|la|los|las)\\s+/i', '', $text) ?? $text;
         $tokens = preg_split('/\\s+/', trim($text)) ?: [];
         if (empty($tokens)) {
             return '';
@@ -693,41 +719,67 @@ final class ConversationGateway
     private function askOneMissing(array $missing): string
     {
         $first = $missing[0] ?? 'dato';
-        return 'Me falta ' . $first . '. ¿Cuál es?';
+        return 'Me falta ' . $first . '. Cual es?';
     }
 
     private function buildEntityList(): string
     {
         $entities = array_map(fn($p) => basename($p, '.entity.json'), $this->catalog->entities());
         if (empty($entities)) {
-            return 'Aun no hay tablas creadas. ¿Quieres crear una?';
+            return 'Aun no hay tablas creadas. Quieres crear una?';
         }
         $list = implode(', ', array_slice($entities, 0, 6));
-        return 'Tablas creadas: ' . $list . '. ¿Quieres ver los campos de alguna?';
+        return 'Tablas creadas: ' . $list . '. Quieres ver los campos de alguna?';
     }
 
     private function buildFormList(): string
     {
         $forms = array_map(fn($p) => basename($p, '.json'), $this->catalog->forms());
         if (empty($forms)) {
-            return 'Aun no hay formularios. ¿Quieres crear uno?';
+            return 'Aun no hay formularios. Quieres crear uno?';
         }
         $list = implode(', ', array_slice($forms, 0, 6));
-        return 'Formularios: ' . $list . '. ¿Quieres abrir alguno?';
+        return 'Formularios: ' . $list . '. Quieres abrir alguno?';
     }
 
     private function buildCapabilities(array $profile = [], array $training = []): string
     {
         $help = $training['help']['app'] ?? [];
-        $examples = $help['capabilities'] ?? [
+        $capabilities = $help['capabilities'] ?? [
             'Crear tablas y formularios por chat.',
             'Guardar datos (clientes, productos, facturas).',
             'Mostrar reportes y totales.',
         ];
-        if (!empty($profile['business_type'])) {
-            $examples[] = 'Adaptarme a tu negocio (' . $profile['business_type'] . ').';
+        $entities = array_map(fn($p) => basename($p, '.entity.json'), $this->catalog->entities());
+        $forms = array_map(fn($p) => basename($p, '.json'), $this->catalog->forms());
+
+        $actions = [];
+        if (!empty($entities)) {
+            $entity = $entities[0];
+            $actions[] = 'crear ' . $entity . ' nombre=valor';
+            $actions[] = 'listar ' . $entity;
+        } else {
+            $actions[] = 'pedir al creador que agregue una tabla base';
         }
-        return "Puedo ayudarte con:\n- " . implode("\n- ", array_slice($examples, 0, 4)) . "\n¿Quieres crear algo nuevo o usar lo que ya tienes?";
+        if (!empty($forms)) {
+            $actions[] = 'abrir formulario ' . $forms[0];
+        }
+
+        if (!empty($profile['business_type'])) {
+            $capabilities[] = 'Adaptarme a tu negocio (' . $profile['business_type'] . ').';
+        }
+
+        $lines = [];
+        $lines[] = 'Puedo ayudarte con:';
+        foreach (array_slice($capabilities, 0, 4) as $item) {
+            $lines[] = '- ' . $item;
+        }
+        $lines[] = 'Opciones activas ahora:';
+        foreach (array_slice($actions, 0, 3) as $item) {
+            $lines[] = '- ' . $item;
+        }
+        $lines[] = 'Entidades activas: ' . (!empty($entities) ? implode(', ', array_slice($entities, 0, 4)) : 'sin entidades');
+        return implode("\n", $lines);
     }
 
     private function routeTraining(string $text, array $training, array $profile = [], string $tenantId = 'default', string $userId = 'anon', array $state = [], array $lexicon = []): array
@@ -795,7 +847,7 @@ final class ConversationGateway
                     $entity = $this->detectEntity($text, $lexicon, $state);
                 }
                 if ($entity === '') {
-                    return ['action' => 'ask_user', 'reply' => '¿De cuál lista? Ej: clientes, productos o facturas.', 'intent' => $intentName, 'active_task' => 'crud_guide'];
+                    return ['action' => 'ask_user', 'reply' => 'De cual lista? Ej: clientes, productos o facturas.', 'intent' => $intentName, 'active_task' => 'crud_guide'];
                 }
                 return ['action' => 'respond_local', 'reply' => $this->buildCrudGuide($entity), 'intent' => $intentName, 'entity' => $entity];
             case 'USER_PROFILE_LEARN':
@@ -927,7 +979,7 @@ final class ConversationGateway
     private function tokenizeTraining(string $text): array
     {
         $text = mb_strtolower($text, 'UTF-8');
-        $text = preg_replace('/[^a-z0-9ñáéíóúü\\s]/u', ' ', $text) ?? $text;
+        $text = preg_replace('/[^a-z0-9\\s]/u', ' ', $text) ?? $text;
         $text = preg_replace('/\\s+/', ' ', trim($text)) ?? $text;
         if ($text === '') {
             return [];
@@ -1031,10 +1083,10 @@ final class ConversationGateway
         $password = $collected['clave'] ?? $collected['password'] ?? $collected['codigo'] ?? null;
 
         if (!$user) {
-            return ['ask' => '¿Cuál es tu usuario?', 'collected' => $collected];
+            return ['ask' => 'Cual es tu usuario?', 'collected' => $collected];
         }
         if (!$password) {
-            return ['ask' => '¿Cuál es tu clave o código?', 'collected' => $collected];
+            return ['ask' => 'Cual es tu clave o codigo?', 'collected' => $collected];
         }
         return [
             'command' => [
@@ -1057,13 +1109,13 @@ final class ConversationGateway
         $password = $collected['clave'] ?? $collected['password'] ?? null;
 
         if (!$user) {
-            return ['ask' => '¿Cómo se llamará el usuario?', 'collected' => $collected];
+            return ['ask' => 'Como se llamara el usuario?', 'collected' => $collected];
         }
         if (!$role) {
-            return ['ask' => '¿Qué rol tendrá (admin, vendedor, contador)?', 'collected' => $collected];
+            return ['ask' => 'Que rol tendra (admin, vendedor, contador)?', 'collected' => $collected];
         }
         if (!$password) {
-            return ['ask' => '¿Qué clave tendrá?', 'collected' => $collected];
+            return ['ask' => 'Que clave tendra?', 'collected' => $collected];
         }
 
         return [

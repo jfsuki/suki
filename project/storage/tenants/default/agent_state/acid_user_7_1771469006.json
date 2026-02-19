@@ -1,0 +1,15 @@
+{
+    "active_task": null,
+    "intent": null,
+    "entity": "clientes",
+    "collected": [],
+    "missing": [],
+    "last_messages": [
+        {
+            "u": "crear tabla clientes nombre:texto nit:texto",
+            "a": "OK",
+            "ts": 1771469007
+        }
+    ],
+    "summary": "crear tabla clientes nombre:texto nit:texto"
+}
