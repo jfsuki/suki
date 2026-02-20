@@ -122,6 +122,67 @@ final class ProjectRegistry
         ]);
     }
 
+    public function syncEntitiesFromContracts(string $projectId, array $entityNames, string $source = 'contracts'): array
+    {
+        if ($projectId === '') {
+            return ['inserted' => 0, 'removed' => 0, 'total' => 0];
+        }
+
+        $clean = [];
+        foreach ($entityNames as $name) {
+            $name = trim((string) $name);
+            if ($name !== '') {
+                $clean[$name] = true;
+            }
+        }
+        $names = array_keys($clean);
+        sort($names);
+
+        $stmt = $this->db->prepare('SELECT entity_name FROM entities WHERE project_id = :project');
+        $stmt->execute([':project' => $projectId]);
+        $existing = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $existingMap = [];
+        foreach ($existing as $name) {
+            $n = trim((string) $name);
+            if ($n !== '') {
+                $existingMap[$n] = true;
+            }
+        }
+
+        $inserted = 0;
+        foreach ($names as $name) {
+            if (!isset($existingMap[$name])) {
+                $this->registerEntity($projectId, $name, $source);
+                $inserted++;
+            }
+        }
+
+        $removed = 0;
+        if (empty($names)) {
+            $delete = $this->db->prepare('DELETE FROM entities WHERE project_id = :project');
+            $delete->execute([':project' => $projectId]);
+            $removed = (int) $delete->rowCount();
+        } else {
+            $placeholders = [];
+            $params = [':project' => $projectId];
+            foreach ($names as $idx => $name) {
+                $key = ':n' . $idx;
+                $placeholders[] = $key;
+                $params[$key] = $name;
+            }
+            $sql = 'DELETE FROM entities WHERE project_id = :project AND entity_name NOT IN (' . implode(', ', $placeholders) . ')';
+            $delete = $this->db->prepare($sql);
+            $delete->execute($params);
+            $removed = (int) $delete->rowCount();
+        }
+
+        return [
+            'inserted' => $inserted,
+            'removed' => $removed,
+            'total' => count($names),
+        ];
+    }
+
     public function summary(string $projectId): array
     {
         $summary = [

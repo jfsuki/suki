@@ -36,6 +36,7 @@ use App\Core\InvoiceMapper;
 use App\Core\Database;
 use App\Core\QueryBuilder;
 use App\Core\ProjectRegistry;
+use App\Core\CapabilityGraph;
 
 $route = trim($_GET['route'] ?? '');
 $manifestError = null;
@@ -94,12 +95,21 @@ function setTenantContext(array $payload = []): void
         if (is_numeric($tenant)) {
             define('TENANT_ID', (int) $tenant);
         } else {
-            $hash = abs(crc32((string) $tenant));
+            $hash = stableTenantInt((string) $tenant);
             define('TENANT_ID', $hash);
             putenv('TENANT_KEY=' . $tenant);
         }
     }
     putenv('TENANT_ID=' . (defined('TENANT_ID') ? (string) TENANT_ID : (string) $tenant));
+}
+
+function stableTenantInt(string $tenantId): int
+{
+    $hash = crc32((string) $tenantId);
+    $unsigned = (int) sprintf('%u', $hash);
+    $max = 2147483647;
+    $value = $unsigned % $max;
+    return $value > 0 ? $value : 1;
 }
 
 function requestData(): array
@@ -166,6 +176,30 @@ function sanitizeKey(string $value): string
     $clean = preg_replace('/[^a-zA-Z0-9_-]/', '_', $value);
     $clean = $clean !== null ? $clean : $value;
     return $clean !== '' ? $clean : 'default';
+}
+
+function contractEntityNames(): array
+{
+    $entities = glob(PROJECT_ROOT . '/contracts/entities/*.entity.json') ?: [];
+    $names = [];
+    foreach ($entities as $path) {
+        $raw = @file_get_contents($path);
+        $data = is_string($raw) ? json_decode($raw, true) : null;
+        if (!is_array($data)) {
+            continue;
+        }
+        $name = trim((string) ($data['name'] ?? basename($path, '.entity.json')));
+        if ($name !== '') {
+            $names[$name] = true;
+        }
+    }
+    return array_keys($names);
+}
+
+function syncRegistryEntities(ProjectRegistry $registry, string $projectId): array
+{
+    $names = contractEntityNames();
+    return $registry->syncEntitiesFromContracts($projectId, $names, 'contracts');
 }
 
 function tokenizeChatMessage(string $message): array
@@ -524,18 +558,24 @@ if ($route === 'chat/help') {
         if ($projectId === '') {
             $projectId = (string) ($manifest['id'] ?? 'default');
         }
+        $sync = syncRegistryEntities($registry, $projectId);
         $summary = $registry->summary($projectId);
         $project = $registry->getProject($projectId);
+        $capabilities = (new CapabilityGraph(PROJECT_ROOT))->build($projectId, $mode === 'builder' ? 'builder' : 'app');
     } catch (\Throwable $e) {
+        $sync = null;
         $summary = null;
         $project = null;
+        $capabilities = null;
     }
     $agent = new \App\Core\ChatAgent();
-    $reply = $agent->buildHelpMessage($mode === 'builder' ? 'builder' : 'app');
+    $reply = $agent->buildHelpMessage($mode === 'builder' ? 'builder' : 'app', $projectId);
     respondJson($response, 'success', 'OK', [
         'reply' => $reply,
         'summary' => $summary,
         'project' => $project,
+        'sync' => $sync,
+        'capabilities' => $capabilities,
     ]);
     return;
 }
@@ -702,11 +742,15 @@ if ($route === 'registry/status') {
                 $_SESSION['current_project_id'] = $projectId;
             }
         }
+        $sync = syncRegistryEntities($registry, $projectId);
         $summary = $registry->summary($projectId);
         $project = $registry->getProject($projectId) ?: $manifest;
+        $capabilities = (new CapabilityGraph(PROJECT_ROOT))->build($projectId, 'app');
         respondJson($response, 'success', 'OK', [
             'project' => $project,
             'summary' => $summary,
+            'sync' => $sync,
+            'capabilities' => $capabilities,
         ]);
         return;
     } catch (\Throwable $e) {
@@ -717,6 +761,13 @@ if ($route === 'registry/status') {
 
 if ($route === 'registry/entities') {
     try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        $projectId = resolveProjectId();
+        if ($projectId === '') {
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        }
+        $sync = syncRegistryEntities($registry, $projectId);
         $entities = glob(PROJECT_ROOT . '/contracts/entities/*.entity.json') ?: [];
         $list = [];
         foreach ($entities as $path) {
@@ -760,6 +811,8 @@ if ($route === 'registry/entities') {
             ];
         }
         respondJson($response, 'success', 'OK', [
+            'project_id' => $projectId,
+            'sync' => $sync,
             'entities' => $list,
         ]);
         return;
@@ -879,6 +932,31 @@ if ($route === 'registry/projects') {
         respondJson($response, 'success', 'OK', [
             'projects' => $projects,
             'current' => $_SESSION['current_project_id'] ?? null,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'registry/capabilities') {
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        $projectId = resolveProjectId();
+        if ($projectId === '') {
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        }
+        $mode = (string) ($_GET['mode'] ?? (requestData()['mode'] ?? 'app'));
+        $mode = strtolower($mode) === 'builder' ? 'builder' : 'app';
+        $sync = syncRegistryEntities($registry, $projectId);
+        $capabilities = (new CapabilityGraph(PROJECT_ROOT))->build($projectId, $mode);
+        respondJson($response, 'success', 'OK', [
+            'project_id' => $projectId,
+            'mode' => $mode,
+            'sync' => $sync,
+            'capabilities' => $capabilities,
         ]);
         return;
     } catch (\Throwable $e) {

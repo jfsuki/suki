@@ -17,8 +17,11 @@ SUKI_TEST_BASE="http://suki.test:8080/api" powershell -File framework/scripts/ac
 5) Auto-testing chat (acid test):
 ```
 php framework/tests/chat_acid.php
+php framework/tests/chat_golden.php
+php framework/tests/chat_api_single_demo.php
 ```
 Debe devolver `failed = 0` y `training_error = "No error"`.
+`chat_golden.php` y `chat_api_single_demo.php` deben devolver `summary.ok = true`.
 Reporte CLI: `framework/tests/chat_acid_result.json`
 Reporte desde chat ("Probar sistema"): `project/storage/reports/chat_acid_default.json`
 
@@ -115,7 +118,7 @@ El bot ejecuta pruebas unitarias + acid test y actualiza el reporte en Home.
 1) Enviar: `hola`
 2) Enviar: `crear cliente nombre=Ana nit=123`
 3) Verificar archivos:
-   - `project/storage/tenants/default/agent_state/user_demo.json`
+   - `project/storage/tenants/default/agent_state/default__app__user_demo.json`
    - `project/storage/tenants/default/lexicon.json`
 4) (Opcional) Ejecutar job:
 ```

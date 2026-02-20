@@ -106,7 +106,7 @@ final class ChatAgent
         }
 
         $gateway = $this->gateway();
-        $result = $gateway->handle($tenantId, $userId, $text, $mode);
+        $result = $gateway->handle($tenantId, $userId, $text, $mode, $projectId);
         $action = $result['action'] ?? 'respond_local';
         $telemetry = $result['telemetry'] ?? [];
 
@@ -548,33 +548,38 @@ final class ChatAgent
         return $tokens;
     }
 
-    public function buildHelpMessage(string $mode = 'app'): string
+    public function buildHelpMessage(string $mode = 'app', string $projectId = ''): string
     {
-        if ($mode === 'builder') {
-            return $this->buildHelpMessageBuilder();
+        if ($projectId === '') {
+            $projectId = (string) ($_SESSION['current_project_id'] ?? '');
         }
-        return $this->buildHelpMessageApp();
+        if ($projectId === '') {
+            $registry = new ProjectRegistry();
+            $manifest = $registry->resolveProjectFromManifest();
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        }
+        if ($mode === 'builder') {
+            return $this->buildHelpMessageBuilder($projectId);
+        }
+        return $this->buildHelpMessageApp($projectId);
     }
 
-    private function buildHelpMessageApp(): string
+    private function buildHelpMessageApp(string $projectId): string
     {
         $help = $this->loadTrainingHelp();
-        $catalog = new ContractsCatalog();
-        $forms = $catalog->forms();
-        $entities = $catalog->entities();
-
-        $formNames = [];
-        foreach ($forms as $path) {
-            $data = json_decode((string) @file_get_contents($path), true);
-            $name = is_array($data) ? ($data['title'] ?? $data['name'] ?? basename($path, '.json')) : basename($path, '.json');
-            $formNames[] = $name;
-        }
-        $entityNames = [];
-        foreach ($entities as $path) {
-            $data = json_decode((string) @file_get_contents($path), true);
-            $name = is_array($data) ? ($data['label'] ?? $data['name'] ?? basename($path, '.entity.json')) : basename($path, '.entity.json');
-            $entityNames[] = $name;
-        }
+        $graph = (new CapabilityGraph())->build($projectId, 'app');
+        $formNames = array_values(array_filter(array_map(
+            static fn(array $f): string => (string) ($f['title'] ?? $f['name'] ?? ''),
+            $graph['forms'] ?? []
+        )));
+        $entityNames = array_values(array_filter(array_map(
+            static fn(array $e): string => (string) ($e['name'] ?? ''),
+            $graph['entities'] ?? []
+        )));
+        $entityLabels = array_values(array_filter(array_map(
+            static fn(array $e): string => (string) ($e['label'] ?? $e['name'] ?? ''),
+            $graph['entities'] ?? []
+        )));
 
         $stateKey = count($entityNames) === 0 ? 'empty' : 'ready';
         $lines = [];
@@ -587,7 +592,7 @@ final class ChatAgent
             $lines[] = '- ' . $ex;
         }
         $lines[] = 'Formularios activos: ' . (count($formNames) ? implode(', ', array_slice($formNames, 0, 5)) : 'sin formularios');
-        $lines[] = 'Entidades activas: ' . (count($entityNames) ? implode(', ', array_slice($entityNames, 0, 5)) : 'sin entidades');
+        $lines[] = 'Entidades activas: ' . (count($entityLabels) ? implode(', ', array_slice($entityLabels, 0, 5)) : 'sin entidades');
         $question = $help['app']['next_questions'][$stateKey] ?? '';
         if ($question !== '') {
             $lines[] = $question;
@@ -596,25 +601,22 @@ final class ChatAgent
         return implode("\n", $lines);
     }
 
-    private function buildHelpMessageBuilder(): string
+    private function buildHelpMessageBuilder(string $projectId): string
     {
         $help = $this->loadTrainingHelp();
-        $catalog = new ContractsCatalog();
-        $forms = $catalog->forms();
-        $entities = $catalog->entities();
-
-        $formNames = [];
-        foreach ($forms as $path) {
-            $data = json_decode((string) @file_get_contents($path), true);
-            $name = is_array($data) ? ($data['title'] ?? $data['name'] ?? basename($path, '.json')) : basename($path, '.json');
-            $formNames[] = $name;
-        }
-        $entityNames = [];
-        foreach ($entities as $path) {
-            $data = json_decode((string) @file_get_contents($path), true);
-            $name = is_array($data) ? ($data['label'] ?? $data['name'] ?? basename($path, '.entity.json')) : basename($path, '.entity.json');
-            $entityNames[] = $name;
-        }
+        $graph = (new CapabilityGraph())->build($projectId, 'builder');
+        $formNames = array_values(array_filter(array_map(
+            static fn(array $f): string => (string) ($f['title'] ?? $f['name'] ?? ''),
+            $graph['forms'] ?? []
+        )));
+        $entityNames = array_values(array_filter(array_map(
+            static fn(array $e): string => (string) ($e['name'] ?? ''),
+            $graph['entities'] ?? []
+        )));
+        $entityLabels = array_values(array_filter(array_map(
+            static fn(array $e): string => (string) ($e['label'] ?? $e['name'] ?? ''),
+            $graph['entities'] ?? []
+        )));
 
         $stateKey = count($entityNames) === 0 ? 'empty' : (count($formNames) === 0 ? 'no_forms' : 'ready');
         $lines = [];
@@ -627,7 +629,7 @@ final class ChatAgent
             $lines[] = '- ' . $ex;
         }
         $lines[] = 'Formularios activos: ' . (count($formNames) ? implode(', ', array_slice($formNames, 0, 5)) : 'sin formularios');
-        $lines[] = 'Entidades activas: ' . (count($entityNames) ? implode(', ', array_slice($entityNames, 0, 5)) : 'sin entidades');
+        $lines[] = 'Entidades activas: ' . (count($entityLabels) ? implode(', ', array_slice($entityLabels, 0, 5)) : 'sin entidades');
         $question = $help['builder']['next_questions'][$stateKey] ?? '';
         if ($question !== '') {
             $lines[] = $question;

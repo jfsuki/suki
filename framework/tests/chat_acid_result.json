@@ -5,7 +5,7 @@
         "total": 26,
         "training_intents": 30,
         "training_error": "No error",
-        "ran_at": "2026-02-19 19:28:43"
+        "ran_at": "2026-02-20 18:16:03"
     },
     "results": [
         {
@@ -48,7 +48,7 @@
             "id": 5,
             "message": "que tablas?",
             "action": "respond_local",
-            "reply": "Aun no hay tablas creadas. Quieres crear una?",
+            "reply": "Tablas creadas: clientes, ordenes_trabajo, productos, servicios. Quieres ver los campos de alguna?",
             "command": "",
             "ok": true,
             "error": null
@@ -57,7 +57,7 @@
             "id": 6,
             "message": "que formularios?",
             "action": "respond_local",
-            "reply": "Aun no hay formularios. Quieres crear uno?",
+            "reply": "Formularios: clientes.form, productos.form, servicios.form. Quieres abrir alguno?",
             "command": "",
             "ok": true,
             "error": null
@@ -66,7 +66,7 @@
             "id": 7,
             "message": "que opciones puedo usar ahora",
             "action": "respond_local",
-            "reply": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\nOpciones activas ahora:\n- pedir al creador que agregue una tabla base\nEntidades activas: sin entidades",
+            "reply": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\nOpciones activas ahora:\n- crear clientes nombre=valor\n- listar clientes\n- abrir formulario clientes.form\nEntidades activas: clientes, ordenes_trabajo, productos, servicios",
             "command": "",
             "ok": true,
             "error": null
@@ -75,7 +75,7 @@
             "id": 8,
             "message": "dame el estado del proyecto",
             "action": "respond_local",
-            "reply": "En esta app puedes trabajar con:\n- Listas: ninguna lista activa\n- Formularios: ningun formulario activo\nNo hay listas activas. Pide al creador agregar una tabla.",
+            "reply": "En esta app puedes trabajar con:\n- Listas: clientes, ordenes_trabajo, productos, servicios\n- Formularios: clientes.form, productos.form, servicios.form\nEjemplos: crear clientes nombre=valor, listar clientes",
             "command": "",
             "ok": true,
             "error": null
@@ -101,18 +101,18 @@
         {
             "id": 11,
             "message": "crear formulario clientes",
-            "action": "ask_user",
-            "reply": "Para crear ese formulario primero necesito la tabla base.\nVamos paso a paso.\nPaso 1: crearemos la tabla clientes.\nSe guardara esta informacion: nombre, documento, telefono, email, direccion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
-            "command": "",
+            "action": "execute_command",
+            "reply": "",
+            "command": "CreateForm",
             "ok": true,
             "error": null
         },
         {
             "id": 12,
             "message": "crear producto",
-            "action": "respond_local",
-            "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
-            "command": "",
+            "action": "execute_command",
+            "reply": "",
+            "command": "CreateRecord",
             "ok": true,
             "error": null
         },
@@ -137,36 +137,36 @@
         {
             "id": 15,
             "message": "crear cliente nombre=Juan nit=123",
-            "action": "respond_local",
-            "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
-            "command": "",
+            "action": "execute_command",
+            "reply": "",
+            "command": "CreateRecord",
             "ok": true,
             "error": null
         },
         {
             "id": 16,
             "message": "listar cliente",
-            "action": "respond_local",
-            "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
-            "command": "",
+            "action": "execute_command",
+            "reply": "",
+            "command": "QueryRecords",
             "ok": true,
             "error": null
         },
         {
             "id": 17,
             "message": "actualizar cliente id=1 email=juan@mail.com",
-            "action": "respond_local",
-            "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
-            "command": "",
+            "action": "execute_command",
+            "reply": "",
+            "command": "UpdateRecord",
             "ok": true,
             "error": null
         },
         {
             "id": 18,
             "message": "eliminar cliente id=1",
-            "action": "respond_local",
-            "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
-            "command": "",
+            "action": "execute_command",
+            "reply": "",
+            "command": "DeleteRecord",
             "ok": true,
             "error": null
         },
@@ -210,7 +210,7 @@
             "id": 23,
             "message": "que tablas hay",
             "action": "respond_local",
-            "reply": "Aun no hay tablas creadas. Quieres crear una?",
+            "reply": "Tablas creadas: clientes, ordenes_trabajo, productos, servicios. Quieres ver los campos de alguna?",
             "command": "",
             "ok": true,
             "error": null
@@ -219,7 +219,7 @@
             "id": 24,
             "message": "que pantallas tengo",
             "action": "respond_local",
-            "reply": "Aun no hay formularios. Quieres crear uno?",
+            "reply": "Formularios: clientes.form, productos.form, servicios.form. Quieres abrir alguno?",
             "command": "",
             "ok": true,
             "error": null
@@ -228,7 +228,7 @@
             "id": 25,
             "message": "que hay hecho",
             "action": "respond_local",
-            "reply": "En esta app puedes trabajar con:\n- Listas: ninguna lista activa\n- Formularios: ningun formulario activo\nNo hay listas activas. Pide al creador agregar una tabla.",
+            "reply": "En esta app puedes trabajar con:\n- Listas: clientes, ordenes_trabajo, productos, servicios\n- Formularios: clientes.form, productos.form, servicios.form\nEjemplos: crear clientes nombre=valor, listar clientes",
             "command": "",
             "ok": true,
             "error": null
@@ -237,7 +237,7 @@
             "id": 26,
             "message": "ayuda rapida",
             "action": "respond_local",
-            "reply": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\nOpciones activas ahora:\n- pedir al creador que agregue una tabla base\nEntidades activas: sin entidades",
+            "reply": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\nOpciones activas ahora:\n- crear clientes nombre=valor\n- listar clientes\n- abrir formulario clientes.form\nEntidades activas: clientes, ordenes_trabajo, productos, servicios",
             "command": "",
             "ok": true,
             "error": null

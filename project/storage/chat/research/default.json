@@ -2,14 +2,26 @@
     "topics": [
         {
             "topic": "control de venta e inventario",
-            "count": 7,
+            "count": 9,
             "status": "pending_research",
             "first_seen": "2026-02-19T19:27:32+00:00",
-            "last_seen": "2026-02-20T02:56:58+00:00",
-            "last_user": "diag_user",
+            "last_seen": "2026-02-20T18:13:27+00:00",
+            "last_user": "probe_p0b_1771611207",
             "samples": [
                 "queiro hacer un programa para control de venta e inventario",
-                "quiero crear un programa para control de venta e inventario"
+                "quiero crear un programa para control de venta e inventario",
+                "quiero hacer un programa para control de venta e inventario"
+            ]
+        },
+        {
+            "topic": "inventario",
+            "count": 3,
+            "status": "pending_research",
+            "first_seen": "2026-02-20T18:10:07+00:00",
+            "last_seen": "2026-02-20T18:16:17+00:00",
+            "last_user": "golden_user_1771611377",
+            "samples": [
+                "quiero crear una app para inventario"
             ]
         },
         {

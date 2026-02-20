@@ -2,14 +2,14 @@
     "summary": {
         "ok": true,
         "tenant_id": "default",
-        "user_id": "demo_notecnico_1771533625",
-        "session_id": "sess_demo_notecnico_1771533625",
-        "requested_entity": "demo_clientes_1771533625",
-        "created_entity": "demo_clientes_1771533625",
+        "user_id": "demo_notecnico_1771611363",
+        "session_id": "sess_demo_notecnico_1771611363",
+        "requested_entity": "demo_clientes_1771611363",
+        "created_entity": "demo_clientes_1771611363",
         "total_turns": 7,
         "passed_turns": 7,
         "failed_turns": 0,
-        "ran_at": "2026-02-19 20:40:27"
+        "ran_at": "2026-02-20 18:16:05"
     },
     "conversation": [
         {
@@ -20,37 +20,37 @@
         },
         {
             "user": "no se nada de sistemas, ayudame paso a paso",
-            "assistant": "Puedo ayudarte a crear y usar la app.\nEjemplos rapidos:\n- crear tabla clientes nombre:texto nit:texto\n- crear formulario clientes\n- crear cliente nombre=Juan nit=123\n- listar cliente\nTambien puedes pedir: estado del proyecto\nEntidades: clientes, demo_clientes_1771533595, ordenes_trabajo, productos\nFormularios: clientes.form, demo_clientes_1771533595.form, productos.form, servicios.form",
+            "assistant": "Puedo ayudarte a crear y usar la app.\nEjemplos rapidos:\n- crear tabla clientes nombre:texto nit:texto\n- crear formulario clientes\n- crear cliente nombre=Juan nit=123\n- listar cliente\nTambien puedes pedir: estado del proyecto\nEntidades: clientes, ordenes_trabajo, productos, servicios\nFormularios: clientes.form, productos.form, servicios.form",
             "status": "success",
             "ok": true
         },
         {
-            "user": "quiero crear una tabla demo_clientes_1771533625",
-            "assistant": "Vamos paso a paso.\nPaso 1: crearemos la tabla demo_clientes_1771533625.\nSe guardara esta informacion: nombre, descripcion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "user": "quiero crear una tabla demo_clientes_1771611363",
+            "assistant": "Vamos paso a paso.\nPaso 1: crearemos la tabla demo_clientes_1771611363.\nSe guardara esta informacion: nombre, descripcion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
             "status": "success",
             "ok": true
         },
         {
             "user": "que datos debe llevar?",
-            "assistant": "Vamos paso a paso.\nPaso 1: crearemos la tabla demo_clientes_1771533625.\nSe guardara esta informacion: nombre, descripcion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "assistant": "Voy a crear la tabla demo_clientes_1771611363 con estos datos: nombre, descripcion, activo.\nResponde \"si\" para crearla o \"no\" para cambiarla.",
             "status": "success",
             "ok": true
         },
         {
             "user": "si",
-            "assistant": "Tabla creada: demo_clientes_1771533625",
+            "assistant": "Tabla creada: demo_clientes_1771611363",
             "status": "success",
             "ok": true
         },
         {
-            "user": "crear formulario demo_clientes_1771533625",
-            "assistant": "Formulario creado para demo_clientes_1771533625",
+            "user": "crear formulario demo_clientes_1771611363",
+            "assistant": "Formulario creado para demo_clientes_1771611363",
             "status": "success",
             "ok": true
         },
         {
             "user": "dame estado del proyecto",
-            "assistant": "Estado del proyecto:\n- Entidades: 6\n- Formularios: 5\n- Vistas: 2\nUltimas entidades: clientes, demo_clientes_1771533595, demo_clientes_1771533625\nUltimos formularios: clientes.form, demo_clientes_1771533595.form, demo_clientes_1771533625.form",
+            "assistant": "Estado del proyecto:\n- Entidades: 5\n- Formularios: 4\n- Vistas: 2\nUltimas entidades: clientes, demo_clientes_1771611363, ordenes_trabajo\nUltimos formularios: clientes.form, demo_clientes_1771611363.form, productos.form",
             "status": "success",
             "ok": true
         }

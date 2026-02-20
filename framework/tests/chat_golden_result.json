@@ -1,0 +1,77 @@
+{
+    "summary": {
+        "ok": true,
+        "passed": 8,
+        "failed": 0,
+        "total": 8,
+        "entity": "golden_clientes_1771611377",
+        "run_id": "1771611377",
+        "ran_at": "2026-02-20 18:16:17"
+    },
+    "results": [
+        {
+            "step": 1,
+            "mode": "builder",
+            "message": "hola",
+            "reply": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "expected_contains": "Cami",
+            "ok": true
+        },
+        {
+            "step": 2,
+            "mode": "builder",
+            "message": "quiero crear una app para inventario",
+            "reply": "Perfecto. No tengo plantilla exacta para \"inventario\" todavia. Ya lo registre para investigarlo y compartirlo con todos los agentes.\nPaso 1: para empezar rapido, dime si manejas productos, servicios o ambos.",
+            "expected_contains": "Paso",
+            "ok": true
+        },
+        {
+            "step": 3,
+            "mode": "builder",
+            "message": "quiero crear una tabla golden_clientes_1771611377",
+            "reply": "Vamos paso a paso.\nPaso 1: crearemos la tabla golden_clientes_1771611377.\nSe guardara esta informacion: nombre, descripcion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "expected_contains": "Quieres que la cree",
+            "ok": true
+        },
+        {
+            "step": 4,
+            "mode": "builder",
+            "message": "si",
+            "reply": "Tabla creada: golden_clientes_1771611377",
+            "expected_contains": "Tabla creada",
+            "ok": true
+        },
+        {
+            "step": 5,
+            "mode": "builder",
+            "message": "crear formulario golden_clientes_1771611377",
+            "reply": "Formulario creado para golden_clientes_1771611377",
+            "expected_contains": "Formulario creado",
+            "ok": true
+        },
+        {
+            "step": 6,
+            "mode": "app",
+            "message": "crear golden_clientes_1771611377 nombre=Ana",
+            "reply": "Registro creado en golden_clientes_1771611377",
+            "expected_contains": "Registro creado",
+            "ok": true
+        },
+        {
+            "step": 7,
+            "mode": "app",
+            "message": "quiero crear una tabla productos",
+            "reply": "Eso se hace en el Creador de apps. Abre el chat creador para crear tablas o formularios.",
+            "expected_contains": "Creador de apps",
+            "ok": true
+        },
+        {
+            "step": 8,
+            "mode": "builder",
+            "message": "crear cliente nombre=Ana",
+            "reply": "Estas en el Creador. Aqui definimos estructura (tablas/formularios). Para registrar datos usa el chat de la app.",
+            "expected_contains": "chat de la app",
+            "ok": true
+        }
+    ]
+}

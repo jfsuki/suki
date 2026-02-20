@@ -17,6 +17,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('llm_config', fn() => $this->checkLlmConfig());
         $tests[] = $this->wrap('chat_parser', fn() => $this->checkParser());
         $tests[] = $this->wrap('gateway_local', fn() => $this->checkGateway());
+        $tests[] = $this->wrap('gateway_golden', fn() => $this->checkGatewayGolden());
 
         $summary = [
             'passed' => count(array_filter($tests, fn($t) => $t['status'] === 'pass')),
@@ -70,6 +71,29 @@ final class UnitTestRunner
         $result = $gateway->handle('default', 'test', 'hola');
         if (($result['action'] ?? '') !== 'respond_local') {
             throw new \RuntimeException('Gateway no responde saludo local.');
+        }
+    }
+
+    private function checkGatewayGolden(): void
+    {
+        $gateway = new \App\Core\Agents\ConversationGateway();
+        $user = 'golden_' . time();
+        $projectId = 'golden_proj';
+
+        $appBuild = $gateway->handle('default', $user, 'quiero crear una tabla clientes', 'app', $projectId);
+        if (($appBuild['action'] ?? '') !== 'respond_local' || stripos((string) ($appBuild['reply'] ?? ''), 'Creador de apps') === false) {
+            throw new \RuntimeException('Guard app/build no bloquea correctamente.');
+        }
+
+        $builderCrud = $gateway->handle('default', $user, 'crear cliente nombre=Ana', 'builder', $projectId);
+        if (($builderCrud['action'] ?? '') !== 'respond_local' || stripos((string) ($builderCrud['reply'] ?? ''), 'chat de la app') === false) {
+            throw new \RuntimeException('Guard builder/use no bloquea correctamente.');
+        }
+
+        $statePath = PROJECT_ROOT . '/storage/tenants/default/agent_state/'
+            . $projectId . '__builder__' . $user . '.json';
+        if (!is_file($statePath)) {
+            throw new \RuntimeException('No se creo estado por project+mode+user.');
         }
     }
 }

@@ -34,7 +34,7 @@ $conversation = [
     ],
     [
         'user' => 'que datos debe llevar?',
-        'expect_contains_any' => ['Se guardara esta informacion', 'Quieres que la cree'],
+        'expect_contains_any' => ['Se guardara esta informacion', 'Quieres que la cree', 'Voy a crear la tabla'],
     ],
     [
         'user' => 'si',

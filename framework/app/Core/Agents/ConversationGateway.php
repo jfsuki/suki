@@ -18,6 +18,8 @@ final class ConversationGateway
     private ?array $domainPlaybookCache = null;
     private ?array $accountingKnowledgeCache = null;
     private ?array $unspscCommonCache = null;
+    private string $contextProjectId = 'default';
+    private string $contextMode = 'app';
 
     public function __construct(?string $projectRoot = null)
     {
@@ -28,17 +30,20 @@ final class ConversationGateway
         $this->memory = new ChatMemoryStore($this->projectRoot);
     }
 
-    public function handle(string $tenantId, string $userId, string $message, string $mode = 'app'): array
+    public function handle(string $tenantId, string $userId, string $message, string $mode = 'app', string $projectId = 'default'): array
     {
         $tenantId = $tenantId !== '' ? $tenantId : 'default';
         $userId = $userId !== '' ? $userId : 'anon';
+        $mode = strtolower(trim($mode)) === 'builder' ? 'builder' : 'app';
+        $this->contextProjectId = $projectId !== '' ? $projectId : 'default';
+        $this->contextMode = $mode;
 
         $raw = trim($message);
         $training = $this->loadTrainingBase($tenantId);
         $normalizedBase = $this->normalize($raw);
         $normalized = $this->normalizeWithTraining($raw, $training);
 
-        $state = $this->loadState($tenantId, $userId);
+        $state = $this->loadState($tenantId, $userId, $this->contextProjectId, $mode);
         $lexicon = $this->loadLexicon($tenantId);
         $glossary = $this->memory->getGlossary($tenantId);
         if (!empty($glossary)) {
@@ -280,6 +285,12 @@ final class ConversationGateway
             $state = $this->updateState($state, $raw, $reply, null, null, [], null);
             $this->saveState($tenantId, $userId, $state);
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('build_guard', true));
+        }
+        if ($mode === 'builder' && $this->hasRuntimeCrudSignals($normalized) && !$this->hasBuildSignals($normalized)) {
+            $reply = 'Estas en el Creador. Aqui definimos estructura (tablas/formularios). Para registrar datos usa el chat de la app.';
+            $state = $this->updateState($state, $raw, $reply, null, null, [], null);
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('use_guard', true));
         }
 
         if ($mode === 'builder') {
@@ -2250,7 +2261,18 @@ final class ConversationGateway
         return false;
     }
 
-    private function parseEntityFromCrudText(string $text): string
+    
+    private function hasRuntimeCrudSignals(string $text): bool
+    {
+        if ($this->hasFieldPairs($text) && preg_match('/\b(crear|registrar|guardar|agregar)\b/u', $text) === 1) {
+            return true;
+        }
+        if (preg_match('/\b(listar|ver|mostrar|buscar|actualizar|editar|eliminar|borrar)\b/u', $text) === 1) {
+            return true;
+        }
+        return false;
+    }
+private function parseEntityFromCrudText(string $text): string
     {
         $text = preg_replace('/^(quiero|puedo|necesito|me\\s+gustaria|deseo)\\s+/i', '', $text) ?? $text;
         $text = preg_replace('/^(crear|agregar|nuevo|listar|lista|mostrar|muestrame|dame|ver|buscar|actualizar|editar|eliminar|borrar|guardar|registrar|emitir|facturar)\\s+/i', '', $text) ?? $text;
@@ -3295,10 +3317,10 @@ final class ConversationGateway
         return $state;
     }
 
-    private function loadState(string $tenantId, string $userId): array
+    private function loadState(string $tenantId, string $userId, string $projectId = 'default', string $mode = 'app'): array
     {
-        $path = $this->tenantPath($tenantId) . '/agent_state/' . $this->safe($userId) . '.json';
-        return $this->readJson($path, [
+        $path = $this->statePath($tenantId, $projectId, $mode, $userId);
+        $default = [
             'active_task' => null,
             'intent' => null,
             'entity' => null,
@@ -3309,12 +3331,25 @@ final class ConversationGateway
             'unknown_business_notice_sent' => false,
             'last_messages' => [],
             'summary' => null,
-        ]);
+        ];
+
+        if (is_file($path)) {
+            return $this->readJson($path, $default);
+        }
+
+        $legacyPath = $this->legacyStatePath($tenantId, $userId);
+        if (is_file($legacyPath)) {
+            $legacy = $this->readJson($legacyPath, $default);
+            $this->writeJson($path, $legacy);
+            return $legacy;
+        }
+
+        return $this->readJson($path, $default);
     }
 
     private function saveState(string $tenantId, string $userId, array $state): void
     {
-        $path = $this->tenantPath($tenantId) . '/agent_state/' . $this->safe($userId) . '.json';
+        $path = $this->statePath($tenantId, $this->contextProjectId, $this->contextMode, $userId);
         $this->writeJson($path, $state);
     }
 
@@ -3532,6 +3567,17 @@ final class ConversationGateway
         $all = array_merge($entities, $base, $business, $byOperation);
         $all = array_values(array_filter(array_unique(array_map(static fn($v) => (string) $v, $all))));
         return $all;
+    }
+
+    private function statePath(string $tenantId, string $projectId, string $mode, string $userId): string
+    {
+        $key = $this->safe($projectId) . '__' . $this->safe($mode) . '__' . $this->safe($userId);
+        return $this->tenantPath($tenantId) . '/agent_state/' . $key . '.json';
+    }
+
+    private function legacyStatePath(string $tenantId, string $userId): string
+    {
+        return $this->tenantPath($tenantId) . '/agent_state/' . $this->safe($userId) . '.json';
     }
 
     private function tenantPath(string $tenantId): string

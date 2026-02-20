@@ -151,3 +151,39 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Estado de pruebas tras correccion:
   - `framework/tests/run.php`: 7 pass, 0 fail
   - `AcidChatRunner`: 26 pass, 0 fail (tests actualizados al comportamiento actual)
+
+## Checkpoint (2026-02-20, matriz de brechas y cierre sin vacios)
+- Se consolido matriz tecnica con evidencia real en:
+  - `framework/docs/IMPLEMENTATION_GAP_MATRIX_2026_02_20.md`
+- Hallazgo clave:
+  - El cuello de botella principal ya no es CRUD/DB, es coherencia del asistente (router + ayuda + estado por proyecto/modo).
+- Regla operativa reforzada:
+  - primero diagnostico y cobertura de test conversacional,
+  - luego implementacion incremental,
+  - despues verificacion acida con casos reales de usuario no tecnico.
+- Criterio de decision obligatorio:
+  - si la capacidad no existe en registry real -> no inventar,
+  - si la entidad no existe -> guiar a crearla en modo builder,
+  - si hay ambiguedad -> 1 pregunta minima antes de ejecutar.
+
+## Checkpoint (2026-02-20, ejecucion bloque P0)
+- P0 ejecutado en backend conversacional y API:
+  - `tenant_id` estable en API (`stableTenantInt`) para evitar overflow.
+  - nuevo endpoint canonico `GET /api/registry/capabilities` (entidades, formularios, acciones por modo).
+  - sincronizacion `registry <-> contracts` aplicada en:
+    - `chat/help`
+    - `registry/status`
+    - `registry/entities`
+  - migracion de estado conversacional a llave fuerte:
+    - `tenant + project + mode + user` en `storage/tenants/*/agent_state/*`.
+    - fallback automatico a estado legacy por usuario.
+  - guardas build/use reforzadas:
+    - app no sugiere crear estructura.
+    - builder no ejecuta CRUD de negocio.
+  - pruebas "golden conversation" agregadas:
+    - `framework/tests/chat_golden.php`
+- Validacion post-P0:
+  - `tests/run.php`: 8 pass, 0 fail
+  - `tests/chat_acid.php`: 26 pass, 0 fail
+  - `tests/chat_api_single_demo.php`: 7/7 OK
+  - `tests/chat_golden.php`: 8/8 OK
