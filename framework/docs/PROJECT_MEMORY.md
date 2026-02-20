@@ -134,3 +134,20 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
   - siempre cierra con validacion obligatoria en clasificador oficial
 - Builder fortalece diseno para facturacion electronica:
   - en tablas de productos/servicios sugiere `codigo_unspsc:texto` automaticamente.
+
+## Checkpoint (2026-02-20, correcciones de flujo conversacional y runtime)
+- Falla principal identificada: no era solo IA, era logica de flujo + runtime:
+  - bloqueo en onboarding builder (repetia paso 1 sin aclaracion)
+  - preguntas de capacidad (`puedo crear ...?`) se ejecutaban como CRUD
+  - `tenant_id` hash podia salir del rango `INT` y romper inserts (`SQLSTATE 22003`)
+- Correcciones aplicadas:
+  - onboarding builder ahora acepta respuesta corta `servicios/productos/ambos` y avanza de forma deterministica
+  - durante confirmacion pendiente, el usuario puede cambiar entidad objetivo (ej. de `marcas` a `clientes`) sin atascarse
+  - deteccion de entidad case-insensitive y parser de tabla con stopwords para evitar entidades basura
+  - guard de preguntas CRUD en modo app: si es pregunta sin datos (`?`), responde guia en vez de ejecutar
+  - normalizacion de rol (`Administrador` -> `admin`, `Vendedora` -> `seller`)
+  - `tenant_id` estable dentro de rango `INT` para evitar overflow
+  - mensajes SQL humanizados (credenciales vs tabla faltante vs tenant invalido)
+- Estado de pruebas tras correccion:
+  - `framework/tests/run.php`: 7 pass, 0 fail
+  - `AcidChatRunner`: 26 pass, 0 fail (tests actualizados al comportamiento actual)

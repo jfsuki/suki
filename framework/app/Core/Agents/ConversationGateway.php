@@ -92,6 +92,20 @@ final class ConversationGateway
                 $state['collected'] = [];
                 $state['entity'] = null;
             } else {
+                if ((str_contains($normalizedBase, 'crear') || str_contains($normalizedBase, 'hacer')) && (str_contains($normalizedBase, 'tabla') || str_contains($normalizedBase, 'entidad'))) {
+                    $parsedOverride = $this->parseTableDefinition($normalizedBase);
+                    $newEntity = $this->normalizeEntityForSchema((string) ($parsedOverride['entity'] ?? ''));
+                    $currentEntity = $this->normalizeEntityForSchema((string) ($state['builder_pending_command']['entity'] ?? ''));
+                    if ($newEntity !== '' && $newEntity !== $currentEntity) {
+                        $proposal = $this->buildCreateTableProposal($newEntity, $profile);
+                        $state['builder_pending_command'] = $proposal['command'];
+                        $state['entity'] = $newEntity;
+                        $reply = 'Listo, cambio la tabla propuesta a ' . $newEntity . '.' . "\n" . $proposal['reply'];
+                        $state = $this->updateState($state, $raw, $reply, 'create', $newEntity, [], 'create_table');
+                        $this->saveState($tenantId, $userId, $state);
+                        return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                    }
+                }
                 if ($this->isEntityListQuestion($normalizedBase)) {
                     $reply = $this->buildEntityList() . "\n" . $this->buildPendingPreviewReply($state['builder_pending_command']);
                     $state = $this->updateState($state, $raw, $reply, 'create', (string) ($state['entity'] ?? 'clientes'), [], 'create_table');
@@ -114,6 +128,12 @@ final class ConversationGateway
                 }
                 if ($this->isClarificationRequest($normalizedBase)) {
                     $reply = $this->buildPendingClarificationReply($state['builder_pending_command']);
+                    $state = $this->updateState($state, $raw, $reply, 'create', (string) ($state['entity'] ?? 'clientes'), [], 'create_table');
+                    $this->saveState($tenantId, $userId, $state);
+                    return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                }
+                if ($this->isFieldHelpQuestion($normalizedBase)) {
+                    $reply = $this->buildPendingPreviewReply($state['builder_pending_command']);
                     $state = $this->updateState($state, $raw, $reply, 'create', (string) ($state['entity'] ?? 'clientes'), [], 'create_table');
                     $this->saveState($tenantId, $userId, $state);
                     return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
@@ -295,6 +315,15 @@ final class ConversationGateway
         }
 
         $shouldCrud = $classification === 'crud' || (($state['active_task'] ?? '') === 'crud') || !empty($state['missing']);
+        if (
+            $mode === 'app'
+            && $classification === 'crud'
+            && $this->isQuestionLike($normalized)
+            && !$this->hasFieldPairs($normalized)
+            && empty($state['missing'])
+        ) {
+            $shouldCrud = false;
+        }
         if ($shouldCrud) {
             $parsed = $this->parseCrud($normalized, $lexicon, $state, $mode);
             if (!empty($parsed['missing_entity'])) {
@@ -977,6 +1006,20 @@ final class ConversationGateway
         }
 
         $business = $this->detectBusinessType($text);
+        if ($business === '' && (string) ($localState['onboarding_step'] ?? '') === 'business_type') {
+            $scopeChoice = $this->detectBusinessScopeChoice($text);
+            if ($scopeChoice !== '') {
+                $scopeMap = [
+                    'servicios' => 'servicios_mantenimiento',
+                    'productos' => 'retail_tienda',
+                    'ambos' => 'ferreteria',
+                ];
+                $business = (string) ($scopeMap[$scopeChoice] ?? '');
+                if ($business !== '') {
+                    $localProfile['business_scope'] = $scopeChoice;
+                }
+            }
+        }
         if ($business !== '') {
             $localProfile['business_type'] = $business;
             unset($localProfile['business_candidate']);
@@ -1012,6 +1055,16 @@ final class ConversationGateway
             $localState['onboarding_step'] = 'business_type';
             $greet = $owner !== '' ? 'Perfecto, ' . $owner . '. ' : 'Perfecto. ';
             $alreadyNotified = (bool) ($localState['unknown_business_notice_sent'] ?? false);
+            $isOnboardingQuestion = $isOnboarding
+                && ($this->isQuestionLike($text) || $this->isEntityListQuestion($text) || $this->isClarificationRequest($text))
+                && !$this->isBuilderActionMessage($text)
+                && !$businessHint;
+            if ($isOnboardingQuestion) {
+                $reply = 'Te explico facil: primero elijo el tipo de negocio para recomendar tablas correctas.' . "\n"
+                    . 'Responde una opcion: servicios, productos o ambos.' . "\n"
+                    . 'Si vendes y tambien atiendes servicios, responde: ambos.';
+                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+            }
             if ($businessCandidate !== '' && !$alreadyNotified) {
                 $reply = $greet
                     . 'No tengo plantilla exacta para "' . $businessCandidate . '" todavia. '
@@ -1175,6 +1228,20 @@ final class ConversationGateway
             }
         }
         return false;
+    }
+
+    private function detectBusinessScopeChoice(string $text): string
+    {
+        if (preg_match('/\b(ambos|mixto|mixta|productos\\s+y\\s+servicios|servicios\\s+y\\s+productos)\b/u', $text) === 1) {
+            return 'ambos';
+        }
+        if (preg_match('/\b(servicios|servicio)\b/u', $text) === 1) {
+            return 'servicios';
+        }
+        if (preg_match('/\b(productos|producto)\b/u', $text) === 1) {
+            return 'productos';
+        }
+        return '';
     }
 
     private function isQuestionLike(string $text): bool
@@ -1616,7 +1683,7 @@ final class ConversationGateway
 
     private function isFieldHelpQuestion(string $text): bool
     {
-        $patterns = ['campo', 'campos', 'que debe tener', 'que campos', 'debe llevar', 'que debe llevar', 'q debe', 'que lleva', 'ayudame', 'ayuda'];
+        $patterns = ['campo', 'campos', 'que debe tener', 'cual debe tener', 'cuales debe tener', 'que campos', 'debe llevar', 'que debe llevar', 'q debe', 'que lleva', 'ayudame', 'ayuda'];
         foreach ($patterns as $pattern) {
             if (str_contains($text, $pattern)) {
                 return true;
@@ -1946,6 +2013,11 @@ final class ConversationGateway
         $entity = '';
         $fields = [];
         $entityTokens = [];
+        $stopWords = [
+            'de', 'del', 'la', 'el', 'los', 'las', 'que', 'q', 'cual', 'como', 'debe', 'llevar', 'eso',
+            'tabla', 'entidad', 'crear', 'programa', 'app', 'aplicacion', 'sistema', 'quiero', 'puedo',
+            'necesito', 'ayudame', 'paso', 'sigue', 'ahora', 'explicame', 'explica', 'por', 'favor',
+        ];
 
         foreach ($tokens as $token) {
             if (str_contains($token, ':') || str_contains($token, '=')) {
@@ -1957,7 +2029,8 @@ final class ConversationGateway
                 $fields[] = ['name' => $name, 'type' => $type];
                 continue;
             }
-            if (in_array($token, ['de', 'del', 'la', 'el', 'los', 'las'], true)) {
+            $token = mb_strtolower(trim($token), 'UTF-8');
+            if (in_array($token, $stopWords, true)) {
                 continue;
             }
             if (!preg_match('/^[a-zA-Z0-9_\\x{00C0}-\\x{017F}-]+$/u', $token)) {
@@ -2092,6 +2165,8 @@ final class ConversationGateway
 
     private function detectEntity(string $text, array $lexicon, array $state): string
     {
+        $text = trim($text);
+        $textLower = mb_strtolower($text, 'UTF-8');
         $aliases = $lexicon['entity_aliases'] ?? [];
         $aliasKeys = array_keys($aliases);
         usort($aliasKeys, static fn($a, $b) => mb_strlen((string) $b, 'UTF-8') <=> mb_strlen((string) $a, 'UTF-8'));
@@ -2100,7 +2175,8 @@ final class ConversationGateway
             if ($entity === '') {
                 continue;
             }
-            if (preg_match('/\b' . preg_quote((string) $alias, '/') . '\b/u', $text) === 1) {
+            $aliasLower = mb_strtolower((string) $alias, 'UTF-8');
+            if ($aliasLower !== '' && preg_match('/\b' . preg_quote($aliasLower, '/') . '\b/u', $textLower) === 1) {
                 return $entity;
             }
         }
@@ -2114,20 +2190,22 @@ final class ConversationGateway
         }
         usort($entityNames, static fn($a, $b) => mb_strlen($b, 'UTF-8') <=> mb_strlen($a, 'UTF-8'));
         foreach ($entityNames as $name) {
-            if (preg_match('/\b' . preg_quote($name, '/') . '\b/u', $text) === 1) {
+            $nameLower = mb_strtolower($name, 'UTF-8');
+            if ($nameLower !== '' && preg_match('/\b' . preg_quote($nameLower, '/') . '\b/u', $textLower) === 1) {
                 return $name;
             }
         }
 
         $entities = $this->catalog->entities();
         foreach ($entities as $path) {
-            $name = basename($path, '.entity.json');
-            if ($name !== '' && str_contains($text, $name)) {
+            $name = (string) basename($path, '.entity.json');
+            $nameLower = mb_strtolower($name, 'UTF-8');
+            if ($nameLower !== '' && str_contains($textLower, $nameLower)) {
                 return $name;
             }
-            if ($name !== '' && str_ends_with($name, 's')) {
-                $singular = substr($name, 0, -1);
-                if ($singular !== '' && str_contains($text, $singular)) {
+            if ($nameLower !== '' && str_ends_with($nameLower, 's')) {
+                $singular = substr($nameLower, 0, -1);
+                if ($singular !== '' && str_contains($textLower, $singular)) {
                     return $name;
                 }
             }

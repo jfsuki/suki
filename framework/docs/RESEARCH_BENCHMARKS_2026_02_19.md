@@ -4,6 +4,8 @@ Goal: keep the builder/chat logic aligned with current product patterns used by 
 
 ## References reviewed
 - Emergent help center: `https://help.emergent.sh/`
+- Insforge (AI app/site builder patterns): `https://insforge.dev/`
+- Insforge feature overview (AI website/app generation): `https://www.aibase.com/tool/24454`
 - Microsoft Power Apps (create app from data): `https://learn.microsoft.com/power-apps/`
 - Microsoft Learn (Dataverse canvas app): `https://learn.microsoft.com/en-us/power-apps/maker/canvas-apps/data-platform-create-app-scratch`
 - Google AppSheet (data-first app creation): `https://support.google.com/appsheet/`
@@ -20,6 +22,7 @@ Goal: keep the builder/chat logic aligned with current product patterns used by 
 - Real-registry answers: chat only offers actions that exist in current app contracts.
 - Dependency guardrails: invoice/work-order/lot flows enforce prerequisite entities.
 - Tenant-first memory: per-user state + shared tenant research queue.
+- Prompt-to-product onboarding: from Insforge/Emergent style, start with business goal and then guide the first concrete object.
 
 ## Gaps still open
 - Full visual drag-drop canvas parity (builder UX still incremental).

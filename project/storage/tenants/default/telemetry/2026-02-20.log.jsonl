@@ -1,0 +1,59 @@
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771555836}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"queiro hacer un programa para control de venta e inventario","mode":"builder","ts":1771555836}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"q tablas?","mode":"builder","ts":1771555836}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cual es esa tabla","mode":"builder","ts":1771555836}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no entiendo explicame","mode":"builder","ts":1771555836}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771555875}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"queiro hacer un programa para control de venta e inventario","mode":"builder","ts":1771555875}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"q tablas?","mode":"builder","ts":1771555875}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cual es esa tabla","mode":"builder","ts":1771555875}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no entiendo explicame","mode":"builder","ts":1771555875}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771556109}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"queiro hacer un programa para control de venta e inventario","mode":"builder","ts":1771556109}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"q tablas?","mode":"builder","ts":1771556109}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cual es esa tabla","mode":"builder","ts":1771556109}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no entiendo explicame","mode":"builder","ts":1771556109}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"ambos","mode":"builder","ts":1771556109}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"q tablas","mode":"builder","ts":1771556109}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771556109}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771556218}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"queiro hacer un programa para control de venta e inventario","mode":"builder","ts":1771556218}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"q tablas?","mode":"builder","ts":1771556218}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"ambos","mode":"builder","ts":1771556218}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"q tablas?","mode":"builder","ts":1771556218}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771556218}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771556261}
+{"classification":"capabilities","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que opciones tienes activas","mode":"app","ts":1771556261}
+{"classification":"crud","resolved_locally":true,"intent":"list","entity":"clientes","missing":[],"message":"dame una lista de clientes","mode":"app","ts":1771556261}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771556456}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear una app","mode":"builder","ts":1771556456}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"ambos","mode":"builder","ts":1771556456}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"q tablas?","mode":"builder","ts":1771556456}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no entiendo explicame","mode":"builder","ts":1771556456}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"pruebas_chat","missing":[],"message":"crear pruebas_chat nombre=alpha activo=si","mode":"app","ts":1771557044}
+{"classification":"crud","resolved_locally":true,"intent":"list","entity":"pruebas_chat","missing":[],"message":"listar pruebas_chat","mode":"app","ts":1771557044}
+{"classification":"crud","resolved_locally":true,"intent":"list","entity":"pruebas_chat","missing":[],"message":"listar pruebas_chat","mode":"app","ts":1771557055}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771557129}
+{"classification":"capabilities","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que has hecho y que puedo hacer","mode":"app","ts":1771557129}
+{"classification":"question_local","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"y sobre la app?","mode":"app","ts":1771557129}
+{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"a puedo hacer con este programa?","mode":"app","ts":1771557129}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"productos","missing":[],"message":"puedo crear producto?","mode":"app","ts":1771557129}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"productos","missing":[],"message":"puedo crear producto?","mode":"app","ts":1771557181}
+{"classification":"question_local","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"puedo crear producto?","mode":"app","ts":1771557285}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":[],"message":"crear clientes nombre=ana documento=123 telefono=300 email=a@mail.com direccion=x activo=si","mode":"app","ts":1771557297}
+{"classification":"crud","resolved_locally":true,"intent":"list","entity":"clientes","missing":[],"message":"listar clientes","mode":"app","ts":1771557297}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771557309}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear una app","mode":"builder","ts":1771557309}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que vas a crear?","mode":"builder","ts":1771557309}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"ambos","mode":"builder","ts":1771557309}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"clientes","missing":[],"message":"ayudame a crear la tabla para los clientes","mode":"builder","ts":1771557309}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cuales debe tener?","mode":"builder","ts":1771557309}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771557309}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear una app","mode":"builder","ts":1771557344}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"ambos","mode":"builder","ts":1771557344}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"ayudame a crear la tabla para los clientes","mode":"builder","ts":1771557344}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cuales debe tener?","mode":"builder","ts":1771557344}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear una app","mode":"builder","ts":1771557437}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"ambos","mode":"builder","ts":1771557437}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"ayudame a crear la tabla para los clientes","mode":"builder","ts":1771557437}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cuales debe tener?","mode":"builder","ts":1771557437}

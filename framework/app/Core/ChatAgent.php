@@ -55,6 +55,7 @@ final class ChatAgent
         if ($role === '') {
             $role = (string) (getenv('DEFAULT_ROLE') ?: 'admin');
         }
+        $role = $this->normalizeRole($role);
         $mode = strtolower((string) ($payload['mode'] ?? 'app'));
         $projectId = (string) ($payload['project_id'] ?? '');
         $registry = new ProjectRegistry();
@@ -67,7 +68,7 @@ final class ChatAgent
                 define('TENANT_ID', (int) $tenantId);
                 putenv('TENANT_ID=' . $tenantId);
             } else {
-                $hash = abs(crc32((string) $tenantId));
+                $hash = $this->stableTenantInt($tenantId);
                 define('TENANT_ID', $hash);
                 putenv('TENANT_ID=' . $hash);
                 putenv('TENANT_KEY=' . $tenantId);
@@ -124,9 +125,7 @@ final class ChatAgent
                 $reply = $this->executeCommandPayload((array) $result['command'], $channel, $sessionId, $userId, $mode);
             } catch (\Throwable $e) {
                 $rawError = (string) $e->getMessage();
-                $human = str_contains($rawError, 'SQLSTATE')
-                    ? 'No pude ejecutar porque la base de datos no esta conectada o las credenciales son invalidas.'
-                    : 'No pude ejecutar ese paso. Revisa permisos o datos.';
+                $human = $this->humanizeSqlError($rawError);
                 $reply = $this->reply('No pude ejecutar ese paso. Revisa permisos o datos.', $channel, $sessionId, $userId, 'error', [
                     'reply' => $human,
                     'error' => $rawError,
@@ -874,6 +873,52 @@ final class ChatAgent
                 'user_id' => $userId,
             ], $data),
         ];
+    }
+
+    private function normalizeRole(string $role): string
+    {
+        $role = mb_strtolower(trim($role), 'UTF-8');
+        $map = [
+            'administrador' => 'admin',
+            'admin' => 'admin',
+            'dueno' => 'admin',
+            'dueño' => 'admin',
+            'owner' => 'admin',
+            'vendedora' => 'seller',
+            'vendedor' => 'seller',
+            'seller' => 'seller',
+            'contadora' => 'accountant',
+            'contador' => 'accountant',
+            'accountant' => 'accountant',
+        ];
+        return $map[$role] ?? ($role !== '' ? $role : 'admin');
+    }
+
+    private function stableTenantInt(string $tenantId): int
+    {
+        $hash = crc32((string) $tenantId);
+        $unsigned = (int) sprintf('%u', $hash);
+        // keep inside signed INT range used by MySQL int columns
+        $max = 2147483647;
+        $value = $unsigned % $max;
+        return $value > 0 ? $value : 1;
+    }
+
+    private function humanizeSqlError(string $rawError): string
+    {
+        if (!str_contains($rawError, 'SQLSTATE')) {
+            return 'No pude ejecutar ese paso. Revisa permisos o datos.';
+        }
+        if (str_contains($rawError, '[1045]')) {
+            return 'No pude conectar a la base de datos. Revisa usuario y clave de DB.';
+        }
+        if (str_contains($rawError, 'Out of range value for column') && str_contains($rawError, 'tenant_id')) {
+            return 'Configuracion de tenant invalida. El identificador de empresa supero el limite permitido.';
+        }
+        if (str_contains($rawError, 'Base table or view not found')) {
+            return 'La tabla aun no existe en DB. Crea o migra esa tabla desde el Creador.';
+        }
+        return 'No pude ejecutar por un error SQL. Revisa estructura de tablas y credenciales.';
     }
 
     private function command(): CommandLayer

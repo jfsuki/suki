@@ -1,22 +1,27 @@
 <?php
 // framework/config/llm.php
 
+$hasGroq = trim((string) getenv('GROQ_API_KEY')) !== '';
+$hasGemini = trim((string) getenv('GEMINI_API_KEY')) !== '';
+$hasOpenRouter = trim((string) getenv('OPENROUTER_API_KEY')) !== '';
+$hasClaude = trim((string) getenv('CLAUDE_API_KEY')) !== '';
+
 return [
     'providers' => [
         'groq' => [
-            'enabled' => true,
+            'enabled' => $hasGroq,
             'class' => \App\Core\LLM\Providers\GroqProvider::class,
         ],
         'gemini' => [
-            'enabled' => true,
+            'enabled' => $hasGemini,
             'class' => \App\Core\LLM\Providers\GeminiProvider::class,
         ],
         'openrouter' => [
-            'enabled' => false,
+            'enabled' => $hasOpenRouter,
             'class' => \App\Core\LLM\Providers\OpenRouterProvider::class,
         ],
         'claude' => [
-            'enabled' => false,
+            'enabled' => $hasClaude,
             'class' => \App\Core\LLM\Providers\ClaudeProvider::class,
         ],
     ],
