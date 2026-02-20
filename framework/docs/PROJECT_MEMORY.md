@@ -55,6 +55,7 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Knowledge base externa reforzada (sin hardcode):
   - `framework/contracts/agents/domain_playbooks.json` con perfiles de negocio, entidades sugeridas y reportes
   - `framework/contracts/agents/accounting_tax_knowledge_co.json` con base contable/tributaria operativa y checklists
+  - `framework/contracts/agents/unspsc_co_common.json` con codigos UNSPSC comunes (CO), aliases comerciales y recomendaciones por tipo de negocio
   - merge de entidades contables minimas por tipo de negocio en onboarding
   - cobertura ampliada universal: ERP/CRM/contable, salud, iglesia/fundacion, restaurante, retail, manufactura, taller, ecommerce, constructora, educacion, hoteleria, agro
   - protocolo para dominios desconocidos: si no hay plantilla exacta, se registra cola de investigacion y el chat continua con preguntas minimas
@@ -121,3 +122,15 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
   - plantillas de entidades por industria
   - controles operativos por vertical
   - checklists para cierre y control tributario operativo
+
+## Checkpoint (2026-02-19, UNSPSC para facturacion electronica)
+- Se agrego base de conocimiento `framework/contracts/agents/unspsc_co_common.json`:
+  - codigos comunes + nombre + aliases (nombre comercial)
+  - recomendaciones por tipo de negocio (ferreteria, servicios, retail, etc.)
+  - fuentes oficiales Colombia Compra (clasificador + resumen UNSPSC)
+- ConversationGateway ahora responde preguntas de UNSPSC sin LLM:
+  - detecta consultas de `unspsc`, `clasificador`, `codigo producto/servicio`
+  - sugiere codigos segun texto y/o tipo de negocio
+  - siempre cierra con validacion obligatoria en clasificador oficial
+- Builder fortalece diseno para facturacion electronica:
+  - en tablas de productos/servicios sugiere `codigo_unspsc:texto` automaticamente.

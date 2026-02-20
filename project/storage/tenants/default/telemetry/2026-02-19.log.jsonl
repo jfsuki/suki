@@ -14,3 +14,37 @@
 {"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no sabes lo q voy hacer","mode":"builder","ts":1771519585}
 {"classification":"build","resolved_locally":true,"intent":null,"entity":"sabes","missing":[],"message":"sabes sobre presidente petro?","mode":"builder","ts":1771519620}
 {"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no sabes nada","mode":"builder","ts":1771519630}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771528652}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"sabes","missing":[],"message":"queiro hacer un programa para control de venta e inventario","mode":"builder","ts":1771528670}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"sabes","missing":[],"message":"q tablas?","mode":"builder","ts":1771528683}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"sabes","missing":[],"message":"cual es esa tabla","mode":"builder","ts":1771528693}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no entiendo explicame","mode":"builder","ts":1771528715}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771533497}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para control de venta e inventario","mode":"builder","ts":1771533497}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"productos","mode":"builder","ts":1771533497}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771533497}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771533498}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771533498}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771533595}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771533595}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771533595","missing":[],"message":"quiero crear una tabla demo_clientes_1771533595","mode":"builder","ts":1771533595}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771533595","missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771533596}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771533596}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771533596}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771533626}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771533626}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771533625","missing":[],"message":"quiero crear una tabla demo_clientes_1771533625","mode":"builder","ts":1771533626}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771533625","missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771533626}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771533627}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771533627}
+{"classification":"unspsc_help","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"necesito codigo unspsc para tornillos y ferreteria","mode":"builder","ts":1771535109}
+{"classification":"unspsc_help","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cual codigo unspsc uso para toner de impresora","mode":"app","ts":1771535109}
+{"classification":"unspsc_help","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"clasificador de bienes y servicios para cemento","mode":"builder","ts":1771535109}
+{"classification":"unspsc_help","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"necesito codigo unspsc para tornillos y ferreteria","mode":"builder","ts":1771535158}
+{"classification":"unspsc_help","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cual codigo unspsc uso para toner de impresora","mode":"app","ts":1771535158}
+{"classification":"unspsc_help","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"clasificador de bienes y servicios para cemento","mode":"builder","ts":1771535158}
+{"classification":"unspsc_help","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dame codigos unspsc comunes para ferreteria","mode":"builder","ts":1771535158}
+{"classification":"unspsc_help","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"necesito codigo unspsc para tornillos y ferreteria","mode":"builder","ts":1771535188}
+{"classification":"unspsc_help","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cual codigo unspsc uso para toner de impresora","mode":"app","ts":1771535188}
+{"classification":"unspsc_help","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dame codigos unspsc comunes para ferreteria","mode":"builder","ts":1771535188}
+{"classification":"unspsc_help","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"necesito codigo unspsc para tornillos y ferreteria","mode":"builder","ts":1771535212}

@@ -1,0 +1,83 @@
+{
+    "type": "entity",
+    "name": "servicios",
+    "label": "Servicios",
+    "version": "1.0",
+    "table": {
+        "name": "servicios",
+        "primaryKey": "id",
+        "timestamps": true,
+        "softDelete": false,
+        "tenantScoped": true
+    },
+    "fields": [
+        {
+            "name": "id",
+            "type": "int",
+            "primary": true,
+            "source": "system"
+        },
+        {
+            "name": "codigo",
+            "type": "string",
+            "label": "Codigo",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "nombre",
+            "type": "string",
+            "label": "Nombre",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "categoria",
+            "type": "string",
+            "label": "Categoria",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "precio_base",
+            "type": "decimal",
+            "label": "Precio_base",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "impuesto_codigo",
+            "type": "string",
+            "label": "Impuesto_codigo",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "activo",
+            "type": "bool",
+            "label": "Activo",
+            "required": false,
+            "source": "form"
+        }
+    ],
+    "grids": [],
+    "relations": [],
+    "rules": [],
+    "permissions": {
+        "read": [
+            "admin",
+            "seller"
+        ],
+        "create": [
+            "admin",
+            "seller"
+        ],
+        "update": [
+            "admin",
+            "seller"
+        ],
+        "delete": [
+            "admin"
+        ]
+    }
+}

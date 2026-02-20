@@ -1,30 +1,30 @@
 {
-    "active_task": "create_table",
-    "intent": "create",
-    "entity": "sabes",
+    "active_task": "builder_onboarding",
+    "intent": "builder_onboarding",
+    "entity": null,
     "collected": [],
     "missing": [],
     "requested_slot": null,
     "last_messages": [
         {
-            "u": "que vas a crear?",
-            "a": "Para continuar, responde \"si\" para crearla o \"no\" para cambiar nombre/campos.",
-            "ts": 1771519578
+            "u": "queiro hacer un programa para control de venta e inventario",
+            "a": "Perfecto. No tengo plantilla exacta para \"control de venta e inventario\" todavia. Ya lo registre para investigarlo y compartirlo con todos los agentes.\nPaso 1: para empezar rapido, dime si manejas productos, servicios o ambos.",
+            "ts": 1771529338
         },
         {
-            "u": "no sabes lo q voy hacer",
-            "a": "Perfecto. Cambiamos la tabla a sabes.\nAhora dime que datos quieres guardar. Ejemplo: nombre:texto documento:texto telefono:texto",
-            "ts": 1771519585
+            "u": "q tablas?",
+            "a": "Perfecto. Vamos paso a paso para crear tu app.\nPaso 1: responde solo una opcion: servicios, productos o ambos.",
+            "ts": 1771529338
         },
         {
-            "u": "sabes sobre presidente petro?",
-            "a": "Vamos paso a paso.\nPaso 1: crearemos la tabla sabes.\nSe guardara esta informacion: nombre, descripcion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
-            "ts": 1771519620
+            "u": "cual es esa tabla",
+            "a": "Perfecto. Vamos paso a paso para crear tu app.\nPaso 1: responde solo una opcion: servicios, productos o ambos.",
+            "ts": 1771529338
         },
         {
-            "u": "no sabes nada",
-            "a": "Perfecto. Cambiamos la tabla a sabes.\nAhora dime que datos quieres guardar. Ejemplo: nombre:texto documento:texto telefono:texto",
-            "ts": 1771519630
+            "u": "no entiendo explicame",
+            "a": "Perfecto. Vamos paso a paso para crear tu app.\nPaso 1: responde solo una opcion: servicios, productos o ambos.",
+            "ts": 1771529338
         }
     ],
     "summary": "hola",
@@ -79,5 +79,6 @@
             ]
         }
     },
-    "onboarding_step": "plan_ready"
+    "onboarding_step": "business_type",
+    "unknown_business_notice_sent": true
 }

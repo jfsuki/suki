@@ -1,0 +1,82 @@
+{
+    "meta": {
+        "name": "unspsc_co_common",
+        "version": "0.1.0",
+        "updated_at": "2026-02-19",
+        "scope": "Common UNSPSC seed for builder/app assistant guidance in Colombia.",
+        "source_urls": [
+            "https://operaciones.colombiacompra.gov.co/clasificador-de-bienes-y-servicios",
+            "https://www.colombiacompra.gov.co/sites/cce_public/files/cce_documents/unspsc_14_080801_resumen_2.pdf",
+            "https://www.colombiacompra.gov.co/sites/cce_public/files/cce_documents/unspsc_14_080801_resumen_4.pdf"
+        ],
+        "warning": "This is a guidance seed. Final code selection must be validated in the official classifier for each item/service."
+    },
+    "notes": [
+        "Use the most specific UNSPSC code available for each line item.",
+        "Commercial names are aliases; legal validation is always against the official classifier.",
+        "For electronic invoicing, store the code at product/service level and copy it into invoice lines."
+    ],
+    "common_codes": [
+        { "code": "14111500", "name_es": "Productos de papel", "aliases": ["papel", "resma", "papeleria"], "business_tags": ["retail_tienda", "colegio_academia", "servicios_mantenimiento"] },
+        { "code": "14111700", "name_es": "Productos de papel higienico", "aliases": ["papel higienico", "toallas de papel"], "business_tags": ["retail_tienda", "restaurante_cafeteria", "hotel_turismo"] },
+        { "code": "14111800", "name_es": "Texturas, papeles o peliculas no impresas", "aliases": ["papel especial", "pelicula"], "business_tags": ["retail_tienda", "corte_laser"] },
+
+        { "code": "24111500", "name_es": "Bolsas", "aliases": ["bolsas", "bolsa empaque"], "business_tags": ["retail_tienda", "restaurante_cafeteria", "ecommerce_marketplace"] },
+        { "code": "24121500", "name_es": "Cajas, bolsas y cajones para empaquetado", "aliases": ["cajas", "empaque", "embalaje"], "business_tags": ["retail_tienda", "distribuidora_mayorista", "ecommerce_marketplace"] },
+        { "code": "24111600", "name_es": "Contenedores", "aliases": ["contenedor", "recipiente"], "business_tags": ["agropecuario", "manufactura_pyme"] },
+        { "code": "24141500", "name_es": "Suministros para seguridad y proteccion", "aliases": ["proteccion", "seguridad industrial", "epp"], "business_tags": ["constructora_obras", "servicios_mantenimiento", "manufactura_pyme"] },
+
+        { "code": "26111700", "name_es": "Baterias recargables", "aliases": ["bateria recargable", "pila recargable"], "business_tags": ["ferreteria", "retail_tienda", "taller_automotriz"] },
+        { "code": "26111800", "name_es": "Baterias no recargables", "aliases": ["pila", "bateria desechable"], "business_tags": ["ferreteria", "retail_tienda"] },
+
+        { "code": "27111500", "name_es": "Herramientas de corte", "aliases": ["corte", "cuchilla", "broca de corte"], "business_tags": ["ferreteria", "taller_automotriz", "corte_laser"] },
+        { "code": "27112100", "name_es": "Herramientas de sujecion y ajuste", "aliases": ["llave", "prensa", "sujecion"], "business_tags": ["ferreteria", "taller_automotriz"] },
+        { "code": "27112700", "name_es": "Herramientas mecanicas", "aliases": ["herramienta mecanica", "kit mecanico"], "business_tags": ["ferreteria", "taller_automotriz"] },
+        { "code": "27112900", "name_es": "Herramientas de prensado", "aliases": ["prensado", "prensa"], "business_tags": ["ferreteria", "manufactura_pyme"] },
+        { "code": "27113200", "name_es": "Juegos de herramientas", "aliases": ["juego de herramientas", "set herramientas"], "business_tags": ["ferreteria", "taller_automotriz"] },
+        { "code": "27121700", "name_es": "Maquinaria y equipo de soldadura", "aliases": ["soldadura", "equipo de soldar"], "business_tags": ["ferreteria", "manufactura_pyme", "servicios_mantenimiento"] },
+
+        { "code": "30103600", "name_es": "Productos estructurales", "aliases": ["perfil estructural", "estructura"], "business_tags": ["constructora_obras", "ferreteria"] },
+        { "code": "30111600", "name_es": "Cemento, cal y yeso", "aliases": ["cemento", "yeso", "cal"], "business_tags": ["constructora_obras", "ferreteria"] },
+
+        { "code": "31151500", "name_es": "Cuerda, cadena, cable, alambre y correa", "aliases": ["cadena", "alambre", "cable", "correa"], "business_tags": ["ferreteria", "constructora_obras", "taller_automotriz"] },
+        { "code": "31161600", "name_es": "Ferreteria de montaje", "aliases": ["montaje", "herrajes de montaje"], "business_tags": ["ferreteria"] },
+        { "code": "31162000", "name_es": "Clavos", "aliases": ["clavo", "puntilla"], "business_tags": ["ferreteria", "constructora_obras"] },
+        { "code": "31162100", "name_es": "Sujetadores de alambre", "aliases": ["sujetador", "grapa de alambre"], "business_tags": ["ferreteria"] },
+        { "code": "31162400", "name_es": "Fijadores varios", "aliases": ["fijador", "anclaje", "tornilleria", "tornillo", "tuerca", "arandela"], "business_tags": ["ferreteria", "constructora_obras"] },
+        { "code": "31162800", "name_es": "Ferreteria en general", "aliases": ["ferreteria general", "herrajes"], "business_tags": ["ferreteria"] },
+        { "code": "31201500", "name_es": "Adhesivos", "aliases": ["pegante", "adhesivo", "silicona"], "business_tags": ["ferreteria", "retail_tienda", "servicios_mantenimiento"] },
+        { "code": "31201600", "name_es": "Otros adhesivos y selladores", "aliases": ["sellador", "resina", "adhesivo especial"], "business_tags": ["ferreteria", "constructora_obras"] },
+
+        { "code": "43211700", "name_es": "Dispositivos de entrada de datos de computador", "aliases": ["teclado", "mouse", "lector"], "business_tags": ["retail_tienda", "colegio_academia"] },
+        { "code": "43212100", "name_es": "Impresoras de computador", "aliases": ["impresora", "multifuncional"], "business_tags": ["retail_tienda", "consultoria_profesional", "colegio_academia"] },
+        { "code": "44103100", "name_es": "Suministros para impresora, fax y fotocopiadora", "aliases": ["toner", "cartucho", "tinta"], "business_tags": ["retail_tienda", "consultoria_profesional"] },
+
+        { "code": "44121600", "name_es": "Suministros de escritorio", "aliases": ["lapicero", "marcador", "cinta", "oficina"], "business_tags": ["retail_tienda", "consultoria_profesional", "colegio_academia"] },
+        { "code": "45121500", "name_es": "Camaras", "aliases": ["camara", "camara fotografica"], "business_tags": ["retail_tienda", "ecommerce_marketplace"] },
+        { "code": "45121600", "name_es": "Accesorios para camaras", "aliases": ["accesorio camara", "tripoide"], "business_tags": ["retail_tienda"] },
+        { "code": "45122100", "name_es": "Equipo de grabacion audiovisual", "aliases": ["grabacion", "audio visual"], "business_tags": ["retail_tienda", "colegio_academia"] },
+
+        { "code": "55101500", "name_es": "Publicaciones impresas", "aliases": ["libro", "revista", "material impreso"], "business_tags": ["colegio_academia", "iglesia_fundacion"] },
+        { "code": "55101600", "name_es": "Publicaciones electronicas", "aliases": ["ebook", "publicacion digital"], "business_tags": ["colegio_academia", "consultoria_profesional"] },
+        { "code": "55121700", "name_es": "Senalizacion", "aliases": ["senalizacion", "aviso", "letrero"], "business_tags": ["constructora_obras", "retail_tienda"] },
+        { "code": "55121900", "name_es": "Senalizacion y accesorios", "aliases": ["senal", "placa"], "business_tags": ["constructora_obras", "retail_tienda"] },
+
+        { "code": "56101500", "name_es": "Muebles", "aliases": ["mueble", "mobiliario"], "business_tags": ["retail_tienda", "hotel_turismo", "colegio_academia"] },
+        { "code": "56101700", "name_es": "Muebles de oficina", "aliases": ["escritorio", "archivo", "silla oficina"], "business_tags": ["consultoria_profesional", "colegio_academia"] },
+        { "code": "56112100", "name_es": "Asientos", "aliases": ["silla", "banca"], "business_tags": ["restaurante_cafeteria", "colegio_academia", "hotel_turismo"] },
+        { "code": "56121400", "name_es": "Mobiliario de cafeteria y restaurante", "aliases": ["mesa restaurante", "silla restaurante"], "business_tags": ["restaurante_cafeteria", "hotel_turismo"] },
+        { "code": "56122000", "name_es": "Muebles de laboratorio", "aliases": ["mueble laboratorio", "meson laboratorio"], "business_tags": ["clinica_medica", "farmacia_naturista"] }
+    ],
+    "business_type_recommendations": {
+        "default": ["14111500", "24121500", "31162800", "43212100", "44121600"],
+        "ferreteria": ["31162800", "31162000", "31162400", "31201500", "27113200", "30111600"],
+        "servicios_mantenimiento": ["27112700", "27112100", "27111500", "27121700", "31151500", "24141500"],
+        "retail_tienda": ["14111500", "24121500", "43212100", "44103100", "44121600", "55121700"],
+        "restaurante_cafeteria": ["24111500", "24121500", "56121400", "56112100", "14111700"],
+        "clinica_medica": ["56122000", "24141500", "45122100", "14111700"],
+        "colegio_academia": ["14111500", "55101500", "55101600", "56101700", "43211700", "43212100"],
+        "constructora_obras": ["30103600", "30111600", "31162000", "31162400", "24141500"],
+        "taller_automotriz": ["27112700", "27113200", "26111700", "31151500", "31201600"]
+    }
+}

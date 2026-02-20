@@ -1,0 +1,90 @@
+{
+    "type": "entity",
+    "name": "productos",
+    "label": "Productos",
+    "version": "1.0",
+    "table": {
+        "name": "productos",
+        "primaryKey": "id",
+        "timestamps": true,
+        "softDelete": false,
+        "tenantScoped": true
+    },
+    "fields": [
+        {
+            "name": "id",
+            "type": "int",
+            "primary": true,
+            "source": "system"
+        },
+        {
+            "name": "codigo",
+            "type": "string",
+            "label": "Codigo",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "nombre",
+            "type": "string",
+            "label": "Nombre",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "categoria_id",
+            "type": "decimal",
+            "label": "Categoria_id",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "precio_compra",
+            "type": "decimal",
+            "label": "Precio_compra",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "precio_venta",
+            "type": "decimal",
+            "label": "Precio_venta",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "stock_actual",
+            "type": "decimal",
+            "label": "Stock_actual",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "activo",
+            "type": "bool",
+            "label": "Activo",
+            "required": false,
+            "source": "form"
+        }
+    ],
+    "grids": [],
+    "relations": [],
+    "rules": [],
+    "permissions": {
+        "read": [
+            "admin",
+            "seller"
+        ],
+        "create": [
+            "admin",
+            "seller"
+        ],
+        "update": [
+            "admin",
+            "seller"
+        ],
+        "delete": [
+            "admin"
+        ]
+    }
+}

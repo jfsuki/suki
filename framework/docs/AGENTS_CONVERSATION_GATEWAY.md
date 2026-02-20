@@ -72,6 +72,17 @@ Uso: cuando el usuario pide un tipo de app que no tiene plantilla exacta, se reg
 - En **modo app**: si el usuario pide crear app/programa/tablas, el agente lo redirige al chat creador.
 - En **modo builder**: si falta plantilla de negocio, el agente registra tema de investigacion y sigue con una pregunta minima.
 
+## UNSPSC (Colombia Compra)
+- Base local:
+```
+framework/contracts/agents/unspsc_co_common.json
+```
+- Uso en chat:
+  - Detecta preguntas: `unspsc`, `clasificador`, `codigo producto/servicio`.
+  - Sugiere codigos comunes por coincidencia de texto (alias comercial) o por tipo de negocio.
+  - Refuerza campo `codigo_unspsc` en tablas de `productos/servicios`.
+  - Regla: siempre validar el codigo final en el clasificador oficial antes de facturar.
+
 ## Ruta tecnica guiada (builder)
 El agente puede explicar por chat una ruta profesional de construccion:
 - logica de programacion (validaciones, prerequisitos, 1 pregunta minima)

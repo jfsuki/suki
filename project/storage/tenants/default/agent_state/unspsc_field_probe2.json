@@ -1,0 +1,111 @@
+{
+    "active_task": "create_table",
+    "intent": "builder_onboarding",
+    "entity": "categorias",
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": {
+        "command": "CreateEntity",
+        "entity": "categorias",
+        "fields": [
+            {
+                "name": "nombre",
+                "type": "texto"
+            },
+            {
+                "name": "descripcion",
+                "type": "texto"
+            },
+            {
+                "name": "activo",
+                "type": "bool"
+            }
+        ]
+    },
+    "last_messages": [
+        {
+            "u": "quiero crear app para tienda",
+            "a": "Perfecto. Paso 2: como manejas pagos? contado, credito o mixto.",
+            "ts": 1771535248
+        },
+        {
+            "u": "productos",
+            "a": "Perfecto. Paso 2: como manejas pagos? contado, credito o mixto.",
+            "ts": 1771535248
+        },
+        {
+            "u": "mixto",
+            "a": "Ruta para Tienda retail:\n- Tablas base: clientes, productos, categorias, tallas_colores, facturas, devoluciones\n- Primer paso: crear tabla categorias.\nVamos paso a paso.\nPaso 1: crearemos la tabla categorias.\nSe guardara esta informacion: nombre, descripcion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771535248
+        },
+        {
+            "u": "crear tabla productos",
+            "a": "Ruta para Tienda retail:\n- Tablas base: clientes, productos, categorias, tallas_colores, facturas, devoluciones\n- Primer paso: crear tabla categorias.\nVamos paso a paso.\nPaso 1: crearemos la tabla categorias.\nSe guardara esta informacion: nombre, descripcion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771535248
+        }
+    ],
+    "summary": "quiero crear app para tienda",
+    "onboarding_step": "plan_ready",
+    "builder_plan": {
+        "business_type": "retail_tienda",
+        "operation_model": "mixto",
+        "entities": [
+            "clientes",
+            "productos",
+            "categorias",
+            "tallas_colores",
+            "facturas",
+            "devoluciones",
+            "gastos",
+            "factura_items",
+            "pagos",
+            "cuentas_por_cobrar",
+            "abonos"
+        ],
+        "first_entity": "clientes",
+        "forms": [
+            "productos.form",
+            "facturas.form"
+        ],
+        "reports": [
+            "ventas_por_categoria",
+            "rotacion",
+            "margen"
+        ],
+        "workflows": [
+            "Crear cliente",
+            "Crear producto o servicio",
+            "Registrar factura",
+            "Registrar pago o abono",
+            "Revisar cartera"
+        ],
+        "accounting_focus": [
+            "Inventario",
+            "Ventas",
+            "Devoluciones"
+        ],
+        "accounting_checks": [
+            "Define clientes con documento y contacto.",
+            "Define facturas y factura_items para detalle maestro-detalle.",
+            "Incluye tabla de pagos/abonos para cartera.",
+            "Incluye gastos para control de utilidad.",
+            "Configura impuestos con codigos editables.",
+            "Activa auditoria y usuario responsable en operaciones criticas."
+        ],
+        "tax_profile": {
+            "priority_checks": [
+                "tipo_documento_cliente",
+                "responsabilidad_fiscal_cliente",
+                "impuesto_por_item",
+                "resolucion_facturacion_si_aplica",
+                "estado_envio_electronico"
+            ],
+            "documents": [
+                "factura_venta",
+                "nota_credito",
+                "nota_debito"
+            ]
+        }
+    }
+}

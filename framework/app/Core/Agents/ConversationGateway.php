@@ -17,6 +17,7 @@ final class ConversationGateway
     private array $trainingBaseCache = [];
     private ?array $domainPlaybookCache = null;
     private ?array $accountingKnowledgeCache = null;
+    private ?array $unspscCommonCache = null;
 
     public function __construct(?string $projectRoot = null)
     {
@@ -53,6 +54,15 @@ final class ConversationGateway
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('greeting', true));
         }
 
+        if ($mode === 'builder' && $this->shouldResetBuilderFlow($normalizedBase, $state)) {
+            unset($state['builder_pending_command']);
+            $state['active_task'] = 'builder_onboarding';
+            $state['entity'] = null;
+            $state['collected'] = [];
+            $state['missing'] = [];
+            $state['requested_slot'] = null;
+        }
+
         if ($this->isOutOfScopeQuestion($normalizedBase, $mode)) {
             if ($mode === 'builder') {
                 unset($state['builder_pending_command']);
@@ -66,6 +76,13 @@ final class ConversationGateway
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('scope_guard', true));
         }
 
+        if ($this->isUnspscQuestion($normalizedBase)) {
+            $reply = $this->buildUnspscReply($normalizedBase, $profile, $mode);
+            $state = $this->updateState($state, $raw, $reply, 'unspsc_help', null, [], $state['active_task'] ?? null);
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('unspsc_help', true));
+        }
+
         if ($mode === 'builder' && !empty($state['builder_pending_command']) && is_array($state['builder_pending_command'])) {
             if ($this->isBuilderOnboardingTrigger($normalizedBase)) {
                 unset($state['builder_pending_command']);
@@ -75,6 +92,12 @@ final class ConversationGateway
                 $state['collected'] = [];
                 $state['entity'] = null;
             } else {
+                if ($this->isEntityListQuestion($normalizedBase)) {
+                    $reply = $this->buildEntityList() . "\n" . $this->buildPendingPreviewReply($state['builder_pending_command']);
+                    $state = $this->updateState($state, $raw, $reply, 'create', (string) ($state['entity'] ?? 'clientes'), [], 'create_table');
+                    $this->saveState($tenantId, $userId, $state);
+                    return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                }
                 if ($this->isPendingPreviewQuestion($normalizedBase)) {
                     $reply = $this->buildPendingPreviewReply($state['builder_pending_command']);
                     $state = $this->updateState($state, $raw, $reply, 'create', (string) ($state['entity'] ?? 'clientes'), [], 'create_table');
@@ -86,6 +109,12 @@ final class ConversationGateway
                     $reply = 'Te entiendo. Vamos a ordenar esto.' . "\n"
                         . 'Dime en una frase que programa quieres crear para tu negocio.';
                     $state = $this->updateState($state, $raw, $reply, 'builder_onboarding', null, [], 'builder_onboarding');
+                    $this->saveState($tenantId, $userId, $state);
+                    return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                }
+                if ($this->isClarificationRequest($normalizedBase)) {
+                    $reply = $this->buildPendingClarificationReply($state['builder_pending_command']);
+                    $state = $this->updateState($state, $raw, $reply, 'create', (string) ($state['entity'] ?? 'clientes'), [], 'create_table');
                     $this->saveState($tenantId, $userId, $state);
                     return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
                 }
@@ -126,7 +155,7 @@ final class ConversationGateway
         if (
             $mode === 'builder'
             && ($state['active_task'] ?? '') === 'create_table'
-            && str_contains($normalized, 'crear')
+            && $this->isBuilderOnboardingTrigger($normalized)
             && !str_contains($normalized, ':')
             && !str_contains($normalized, '=')
         ) {
@@ -315,7 +344,7 @@ final class ConversationGateway
         if ($text === '') {
             return false;
         }
-        $greetings = ['hola', 'buenas', 'buenos dias', 'buen día', 'buen dia', 'buenas tardes', 'buenas noches', 'hello', 'saludos'];
+        $greetings = ['hola', 'buenas', 'buenos dias', 'buen dÃ­a', 'buen dia', 'buenas tardes', 'buenas noches', 'hello', 'saludos'];
         return in_array($text, $greetings, true);
     }
 
@@ -360,6 +389,86 @@ final class ConversationGateway
             }
         }
         return false;
+    }
+
+    private function isUnspscQuestion(string $text): bool
+    {
+        $patterns = [
+            'unspsc',
+            'clasificador de bienes',
+            'clasificador de bienes y servicios',
+            'colombia compra',
+            'codigo dian',
+            'codigo producto',
+            'codigo de producto',
+            'codigo servicio',
+            'codigo de servicio',
+            'codigo de factura electronica',
+            'codigo de facturacion electronica',
+        ];
+        foreach ($patterns as $pattern) {
+            if (str_contains($text, $pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function buildUnspscReply(string $text, array $profile = [], string $mode = 'app'): string
+    {
+        $knowledge = $this->loadUnspscCommon();
+        if (empty($knowledge)) {
+            return 'Puedo ayudarte con codigos UNSPSC, pero la base local no esta cargada.' . "\n"
+                . 'Usa el clasificador oficial de Colombia Compra y te guio a guardarlo en tu app.';
+        }
+
+        $matches = $this->matchUnspscItems($text, $knowledge);
+        $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
+        if ($businessType === '') {
+            $businessType = $this->detectBusinessType($text);
+        }
+        $topScore = !empty($matches) ? (int) ($matches[0]['_score'] ?? 0) : 0;
+        $useDirectMatches = !empty($matches) && $topScore >= 6;
+        $lines = [];
+        $lines[] = 'Para facturacion electronica usa codigo UNSPSC por producto/servicio.';
+
+        if ($useDirectMatches) {
+            $displayMatches = array_values(array_filter(
+                $matches,
+                static fn(array $item): bool => ((int) ($item['_score'] ?? 0)) >= 20
+            ));
+            if (empty($displayMatches)) {
+                $displayMatches = $matches;
+            }
+            $lines[] = 'Coincidencias sugeridas:';
+            foreach (array_slice($displayMatches, 0, 4) as $item) {
+                $code = (string) ($item['code'] ?? '');
+                $name = (string) ($item['name_es'] ?? '');
+                $alias = is_array($item['aliases'] ?? null) ? $item['aliases'] : [];
+                $aliasText = !empty($alias) ? ' | alias: ' . implode(', ', array_slice($alias, 0, 2)) : '';
+                $lines[] = '- ' . $code . ' - ' . $name . $aliasText;
+            }
+        } else {
+            $recommended = $this->recommendedUnspscByBusiness($businessType, $knowledge);
+            if (!empty($recommended)) {
+                $label = $businessType !== '' ? $businessType : 'tu negocio';
+                $lines[] = 'Codigos comunes para ' . str_replace('_', ' ', $label) . ':';
+                foreach (array_slice($recommended, 0, 4) as $item) {
+                    $lines[] = '- ' . (string) ($item['code'] ?? '') . ' - ' . (string) ($item['name_es'] ?? '');
+                }
+            } else {
+                $lines[] = 'Dime el nombre comercial del item (ej: tornillo galvanizado 1/4) y te sugiero codigo.';
+            }
+        }
+
+        $lines[] = 'Paso final: valida el codigo exacto en el clasificador oficial antes de emitir.';
+        if ($mode === 'builder') {
+            $lines[] = 'Tip builder: agrega campo codigo_unspsc:texto en productos y servicios.';
+        } else {
+            $lines[] = 'Tip app: si falta el campo codigo_unspsc, pidelo al creador de la app.';
+        }
+
+        return implode("\n", $lines);
     }
 
     private function isOutOfScopeQuestion(string $text, string $mode): bool
@@ -424,7 +533,7 @@ final class ConversationGateway
 
     private function isPendingPreviewQuestion(string $text): bool
     {
-        $patterns = ['que vas a crear', 'que se va a crear', 'que vas a hacer', 'que hara', 'que va a crear'];
+        $patterns = ['que vas a crear', 'que se va a crear', 'que vas a hacer', 'que hara', 'que va a crear', 'cual es esa tabla', 'que tabla es esa'];
         foreach ($patterns as $pattern) {
             if (str_contains($text, $pattern)) {
                 return true;
@@ -436,6 +545,17 @@ final class ConversationGateway
     private function isFrustrationMessage(string $text): bool
     {
         $patterns = ['no sabes', 'no entiendes', 'no entendiste', 'estas mal', 'eso no', 'no era eso'];
+        foreach ($patterns as $pattern) {
+            if (str_contains($text, $pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function isClarificationRequest(string $text): bool
+    {
+        $patterns = ['no entiendo', 'explicame', 'explica', 'aclarame', 'aclara', 'no me quedo claro'];
         foreach ($patterns as $pattern) {
             if (str_contains($text, $pattern)) {
                 return true;
@@ -468,6 +588,26 @@ final class ConversationGateway
         }
         return 'Tengo una accion pendiente para continuar.' . "\n"
             . 'Responde "si" para ejecutarla o "no" para cambiarla.';
+    }
+
+    private function buildPendingClarificationReply(array $command): string
+    {
+        $commandName = (string) ($command['command'] ?? '');
+        if ($commandName === 'CreateEntity') {
+            $entity = (string) ($command['entity'] ?? 'tabla');
+            return 'Te explico facil:' . "\n"
+                . '- Voy a crear la tabla ' . $entity . ' para guardar esos datos.' . "\n"
+                . '- Si estas de acuerdo responde "si".' . "\n"
+                . '- Si quieres cambiar datos responde "no".';
+        }
+        if ($commandName === 'CreateForm') {
+            $entity = (string) ($command['entity'] ?? 'tabla');
+            return 'Te explico facil:' . "\n"
+                . '- Voy a crear el formulario para la tabla ' . $entity . '.' . "\n"
+                . '- Responde "si" para seguir o "no" para cambiar.';
+        }
+        return 'Te explico facil: tengo una accion pendiente.' . "\n"
+            . 'Responde "si" para seguir o "no" para cambiar.';
     }
 
     private function buildSoftwareBlueprintReply(array $profile = []): string
@@ -552,6 +692,8 @@ final class ConversationGateway
         // Normalize very short slang tokens (q/k) to avoid missing intents.
         $text = preg_replace('/\\bq\\b/u', 'que', $text) ?? $text;
         $text = preg_replace('/\\bk\\b/u', 'que', $text) ?? $text;
+        $text = preg_replace('/\\bqueiro\\b/u', 'quiero', $text) ?? $text;
+        $text = preg_replace('/\\bqiero\\b/u', 'quiero', $text) ?? $text;
         $text = preg_replace('/\s+/', ' ', trim($text)) ?? $text;
         return $text;
     }
@@ -759,6 +901,14 @@ final class ConversationGateway
 
         if (($state['active_task'] ?? '') === 'create_table') {
             $currentEntity = (string) ($state['entity'] ?? '');
+            if ($this->isEntityListQuestion($text)) {
+                $reply = $this->buildEntityList();
+                if ($currentEntity !== '') {
+                    $proposal = $this->buildCreateTableProposal($currentEntity, $profile);
+                    return ['ask' => $reply . "\n" . $proposal['reply'], 'active_task' => 'create_table', 'entity' => $currentEntity, 'pending_command' => $proposal['command']];
+                }
+                return ['ask' => $reply, 'active_task' => 'create_table'];
+            }
             if ($this->isQuestionLike($text) && !$this->hasFieldPairs($text) && !str_contains($text, 'tabla') && !str_contains($text, 'entidad')) {
                 if ($currentEntity !== '') {
                     $proposal = $this->buildCreateTableProposal($currentEntity, $profile);
@@ -851,6 +1001,11 @@ final class ConversationGateway
 
         $owner = (string) ($localProfile['owner_name'] ?? '');
         $businessType = (string) ($localProfile['business_type'] ?? '');
+        if (in_array($businessType, ['mixto', 'contado', 'credito'], true)) {
+            $businessType = '';
+            unset($localProfile['business_type']);
+            $this->memory->saveProfile($tenantId, $userId, $localProfile);
+        }
         $businessCandidate = trim((string) ($localProfile['business_candidate'] ?? ''));
         if ($businessType === '') {
             $localState['active_task'] = 'builder_onboarding';
@@ -950,9 +1105,15 @@ final class ConversationGateway
             'crear una app',
             'crear app',
             'crear aplicacion',
+            'hacer un programa',
+            'hacer una app',
+            'hacer una aplicacion',
             'quiero crear un programa',
             'quiero crear una app',
             'quiero crear app',
+            'quiero hacer un programa',
+            'quiero hacer una app',
+            'quiero hacer app',
             'que debo hacer ahora',
             'paso sigue',
             'ruta de trabajo',
@@ -965,6 +1126,23 @@ final class ConversationGateway
             }
         }
         return false;
+    }
+
+    private function shouldResetBuilderFlow(string $text, array $state): bool
+    {
+        $activeTask = (string) ($state['active_task'] ?? '');
+        if (!in_array($activeTask, ['create_table', 'create_form', 'crud'], true)) {
+            return false;
+        }
+        if ($this->hasFieldPairs($text)) {
+            return false;
+        }
+        if ($this->isBuilderOnboardingTrigger($text)) {
+            return true;
+        }
+        $mentionsProgram = preg_match('/\b(programa|app|aplicacion|sistema)\b/u', $text) === 1;
+        $mentionsBuild = preg_match('/\b(hacer|crear|control|negocio)\b/u', $text) === 1;
+        return $mentionsProgram && $mentionsBuild;
     }
 
     private function isNextStepQuestion(string $text): bool
@@ -1021,12 +1199,12 @@ final class ConversationGateway
     private function isAffirmativeReply(string $text): bool
     {
         $yes = ['si', 'sí', 'ok', 'dale', 'confirmo', 'hagalo', 'hazlo', 'de una', 'claro', 'correcto'];
-        $text = trim($text);
+        $text = trim(preg_replace('/[!?.,;]+/u', '', $text) ?? $text);
         if ($text === '') {
             return false;
         }
         foreach ($yes as $candidate) {
-            if ($text === $candidate || str_contains($text, $candidate)) {
+            if ($text === $candidate) {
                 return true;
             }
         }
@@ -1035,13 +1213,13 @@ final class ConversationGateway
 
     private function isNegativeReply(string $text): bool
     {
-        $no = ['no', 'todavia no', 'aun no', 'ahora no', 'mejor no', 'detente'];
-        $text = trim($text);
+        $no = ['no', 'todavia no', 'aun no', 'ahora no', 'mejor no', 'detente', 'cancelar', 'cambiar'];
+        $text = trim(preg_replace('/[!?.,;]+/u', '', $text) ?? $text);
         if ($text === '') {
             return false;
         }
         foreach ($no as $candidate) {
-            if ($text === $candidate || str_contains($text, $candidate)) {
+            if ($text === $candidate) {
                 return true;
             }
         }
@@ -1477,10 +1655,13 @@ final class ConversationGateway
             $fieldNames[] = explode(':', $field, 2)[0] ?? $field;
         }
         $preview = implode(', ', array_slice($fieldNames, 0, 6));
+        $unspscHint = $this->entityShouldHaveUnspsc($entity)
+            ? ' Incluiremos codigo_unspsc para facturacion electronica.'
+            : '';
 
         $reply = 'Vamos paso a paso.' . "\n"
             . 'Paso 1: crearemos la tabla ' . $entity . '.' . "\n"
-            . 'Se guardara esta informacion: ' . $preview . '.' . "\n"
+            . 'Se guardara esta informacion: ' . $preview . '.' . $unspscHint . "\n"
             . 'Quieres que la cree por ti ahora? Responde: si o no.';
 
         return [
@@ -1705,7 +1886,37 @@ final class ConversationGateway
             ];
             $suggested = $fallback[$entity] ?? ['nombre:texto', 'descripcion:texto', 'activo:bool'];
         }
+        if ($this->entityShouldHaveUnspsc($entity)) {
+            $hasUnspsc = false;
+            foreach ($suggested as $field) {
+                $fieldId = strtolower((string) explode(':', (string) $field, 2)[0]);
+                if (in_array($fieldId, ['codigo_unspsc', 'unspsc_codigo', 'unspsc'], true)) {
+                    $hasUnspsc = true;
+                    break;
+                }
+            }
+            if (!$hasUnspsc) {
+                $suggested[] = 'codigo_unspsc:texto';
+            }
+        }
         return array_values($suggested);
+    }
+
+    private function entityShouldHaveUnspsc(string $entity): bool
+    {
+        $entity = strtolower(trim($entity));
+        $entities = [
+            'productos',
+            'producto',
+            'servicios',
+            'servicio',
+            'repuestos',
+            'materiales',
+            'insumos',
+            'factura_items',
+            'detalle_factura',
+        ];
+        return in_array($entity, $entities, true);
     }
 
     private function suggestedFieldsToCommand(array $suggested): array
@@ -1949,7 +2160,7 @@ final class ConversationGateway
 
     private function hasBuildSignals(string $text): bool
     {
-        if (preg_match('/\b(crear|construir|armar|disenar|diseñar|hacer)\b.{0,30}\b(app|aplicacion|programa|software)\b/u', $text) === 1) {
+        if (preg_match('/\b(crear|construir|armar|disenar|diseÃ±ar|hacer)\b.{0,30}\b(app|aplicacion|programa|software)\b/u', $text) === 1) {
             return true;
         }
         $markers = ['tabla', 'entidad', 'formulario', 'form', 'campo', 'columnas'];
@@ -2225,6 +2436,7 @@ final class ConversationGateway
                 'Guiarte paso a paso sin tecnicismos.',
                 'Sugerir campos segun tu tipo de negocio.',
                 'Aplicar base contable y tributaria minima para que tu app sea operable.',
+                'Sugerir codigo UNSPSC para productos y servicios (facturacion electronica).',
             ];
             if ($businessType !== '') {
                 $capabilities[] = 'Ruta activa para tu negocio: ' . $businessLabel . '.';
@@ -2274,6 +2486,7 @@ final class ConversationGateway
             'Crear y consultar datos por chat.',
             'Guiarte paso a paso sin tecnicismos.',
             'Mostrar reportes y totales cuando los pidas.',
+            'Sugerir codigo UNSPSC para productos y servicios.',
         ];
         $actions = [];
         if (!empty($entities)) {
@@ -2573,6 +2786,17 @@ final class ConversationGateway
             'que registros',
             'guardados',
         ];
+        foreach ($patterns as $pattern) {
+            if (str_contains($text, $pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function isEntityListQuestion(string $text): bool
+    {
+        $patterns = ['q tablas', 'que tablas', 'tabla?', 'tablas?', 'que entidades', 'q entidades'];
         foreach ($patterns as $pattern) {
             if (str_contains($text, $pattern)) {
                 return true;
@@ -3095,6 +3319,114 @@ final class ConversationGateway
         return $this->accountingKnowledgeCache;
     }
 
+    private function loadUnspscCommon(): array
+    {
+        if ($this->unspscCommonCache !== null) {
+            return $this->unspscCommonCache;
+        }
+        $frameworkRoot = defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__, 3);
+        $path = $frameworkRoot . '/contracts/agents/unspsc_co_common.json';
+        if (!is_file($path)) {
+            $this->unspscCommonCache = [];
+            return [];
+        }
+        $raw = file_get_contents($path);
+        if ($raw === false || $raw === '') {
+            $this->unspscCommonCache = [];
+            return [];
+        }
+        $raw = ltrim($raw, "\xEF\xBB\xBF");
+        $decoded = json_decode($raw, true);
+        $this->unspscCommonCache = is_array($decoded) ? $decoded : [];
+        return $this->unspscCommonCache;
+    }
+
+    private function matchUnspscItems(string $text, array $knowledge): array
+    {
+        $items = is_array($knowledge['common_codes'] ?? null) ? $knowledge['common_codes'] : [];
+        if (empty($items)) {
+            return [];
+        }
+        $matches = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $score = 0;
+            $lexicalMatch = false;
+            $code = (string) ($item['code'] ?? '');
+            $name = $this->normalize((string) ($item['name_es'] ?? ''));
+            if ($code !== '' && str_contains($text, $code)) {
+                $score += 100;
+                $lexicalMatch = true;
+            }
+            if ($name !== '' && str_contains($text, $name)) {
+                $score += 40;
+                $lexicalMatch = true;
+            }
+            $aliases = is_array($item['aliases'] ?? null) ? $item['aliases'] : [];
+            foreach ($aliases as $alias) {
+                $aliasNorm = $this->normalize((string) $alias);
+                if ($aliasNorm !== '' && str_contains($text, $aliasNorm)) {
+                    $score += 25;
+                    $lexicalMatch = true;
+                }
+            }
+            $tags = is_array($item['business_tags'] ?? null) ? $item['business_tags'] : [];
+            foreach ($tags as $tag) {
+                $tagNorm = $this->normalize(str_replace('_', ' ', (string) $tag));
+                if ($tagNorm !== '' && str_contains($text, $tagNorm)) {
+                    $score += $lexicalMatch ? 3 : 1;
+                }
+            }
+            if ($score > 0) {
+                $item['_score'] = $score;
+                $matches[] = $item;
+            }
+        }
+
+        usort(
+            $matches,
+            static fn(array $a, array $b): int => ((int) ($b['_score'] ?? 0)) <=> ((int) ($a['_score'] ?? 0))
+        );
+        return $matches;
+    }
+
+    private function recommendedUnspscByBusiness(string $businessType, array $knowledge): array
+    {
+        $reco = is_array($knowledge['business_type_recommendations'] ?? null) ? $knowledge['business_type_recommendations'] : [];
+        $codes = [];
+        if ($businessType !== '' && is_array($reco[$businessType] ?? null)) {
+            $codes = (array) $reco[$businessType];
+        }
+        if (empty($codes) && is_array($reco['default'] ?? null)) {
+            $codes = (array) $reco['default'];
+        }
+        if (empty($codes)) {
+            return [];
+        }
+
+        $items = is_array($knowledge['common_codes'] ?? null) ? $knowledge['common_codes'] : [];
+        $byCode = [];
+        foreach ($items as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $code = (string) ($item['code'] ?? '');
+            if ($code !== '') {
+                $byCode[$code] = $item;
+            }
+        }
+        $result = [];
+        foreach ($codes as $code) {
+            $code = (string) $code;
+            if ($code !== '' && isset($byCode[$code])) {
+                $result[] = $byCode[$code];
+            }
+        }
+        return $result;
+    }
+
     private function mergeAccountingEntities(array $entities, string $businessType, array $accounting, string $operationModel = 'mixto'): array
     {
         $businessType = $this->normalizeBusinessType($businessType);
@@ -3168,3 +3500,5 @@ final class ConversationGateway
         return trim($value, '_');
     }
 }
+
+
