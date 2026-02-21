@@ -1,8 +1,12 @@
 {
     "active_task": null,
-    "intent": null,
+    "intent": "USER_CREATE",
     "entity": null,
-    "collected": [],
+    "collected": {
+        "usuario": "ana",
+        "rol": "vendedor",
+        "clave": "1234"
+    },
     "missing": [],
     "requested_slot": null,
     "builder_pending_command": null,
@@ -10,7 +14,18 @@
     "builder_completed_entities": [],
     "builder_completed_forms": [],
     "unknown_business_notice_sent": false,
-    "last_action": null,
+    "last_action": {
+        "command": "AuthCreateUser",
+        "entity": "",
+        "data": [],
+        "filters": [],
+        "result": {
+            "count": 0
+        },
+        "user_message": "crear usuario usuario=ana rol=vendedor clave=1234",
+        "assistant_reply": "OK",
+        "at": "2026-02-21T13:53:19+00:00"
+    },
     "dialog": {
         "mode": "app",
         "current_step_id": "first_record",
@@ -45,25 +60,10 @@
     },
     "last_messages": [
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681710
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681715
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681993
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "u": "crear usuario usuario=ana rol=vendedor clave=1234",
+            "a": "OK",
             "ts": 1771681999
         }
     ],
-    "summary": "hola"
+    "summary": "crear usuario usuario=ana rol=vendedor clave=1234"
 }

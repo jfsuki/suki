@@ -1,0 +1,54 @@
+{
+    "active_task": "builder_onboarding",
+    "intent": "builder_onboarding",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "pending_loop_counter": 0,
+    "builder_completed_entities": [],
+    "builder_completed_forms": [],
+    "last_action": null,
+    "dialog": {
+        "mode": "builder",
+        "current_step_id": "validation",
+        "current_step_label": "Flujo base completo",
+        "checklist": [
+            {
+                "id": "business_context",
+                "label": "Definir negocio y objetivo",
+                "done": true,
+                "next": "Dime tu tipo de negocio para iniciar."
+            },
+            {
+                "id": "data_model",
+                "label": "Crear primera tabla",
+                "done": true,
+                "next": "Creemos la primera tabla base (clientes/pacientes/proveedores)."
+            },
+            {
+                "id": "forms",
+                "label": "Crear primer formulario",
+                "done": true,
+                "next": "Ahora creo el formulario principal para operar esa tabla."
+            },
+            {
+                "id": "validation",
+                "label": "Probar flujo base",
+                "done": true,
+                "next": "Haz una prueba corta para validar que el flujo funciona."
+            }
+        ],
+        "updated_at": "2026-02-21T13:53:19+00:00"
+    },
+    "last_messages": [
+        {
+            "u": "crear producto",
+            "a": "Perfecto. Paso 2: como manejas pagos? contado, credito o mixto.",
+            "ts": 1771681999
+        }
+    ],
+    "summary": "crear producto",
+    "onboarding_step": "operation_model"
+}

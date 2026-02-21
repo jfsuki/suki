@@ -1,0 +1,81 @@
+{
+    "active_task": "builder_onboarding",
+    "intent": "mode_switch_app",
+    "entity": "golden_clientes_1771681999",
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "pending_loop_counter": 0,
+    "builder_completed_entities": {
+        "golden_clientes_1771681999": "2026-02-21T13:53:19+00:00"
+    },
+    "builder_completed_forms": [],
+    "unknown_business_notice_sent": true,
+    "last_action": {
+        "command": "CreateEntity",
+        "entity": "golden_clientes_1771681999",
+        "data": [],
+        "filters": [],
+        "result": [],
+        "user_message": "si",
+        "assistant_reply": "",
+        "at": "2026-02-21T13:53:19+00:00"
+    },
+    "dialog": {
+        "mode": "builder",
+        "current_step_id": "business_context",
+        "current_step_label": "Definir negocio y objetivo",
+        "checklist": [
+            {
+                "id": "business_context",
+                "label": "Definir negocio y objetivo",
+                "done": false,
+                "next": "Dime tu tipo de negocio para iniciar."
+            },
+            {
+                "id": "data_model",
+                "label": "Crear primera tabla",
+                "done": true,
+                "next": "Creemos la primera tabla base (clientes/pacientes/proveedores)."
+            },
+            {
+                "id": "forms",
+                "label": "Crear primer formulario",
+                "done": true,
+                "next": "Ahora creo el formulario principal para operar esa tabla."
+            },
+            {
+                "id": "validation",
+                "label": "Probar flujo base",
+                "done": true,
+                "next": "Haz una prueba corta para validar que el flujo funciona."
+            }
+        ],
+        "updated_at": "2026-02-21T13:53:19+00:00"
+    },
+    "last_messages": [
+        {
+            "u": "quiero crear una app para inventario",
+            "a": "Perfecto. No tengo plantilla exacta para \"inventario\" todavia. Ya lo registre para investigarlo y compartirlo con todos los agentes.\nPaso 1: para empezar rapido, dime si manejas productos, servicios o ambos.",
+            "ts": 1771681999
+        },
+        {
+            "u": "quiero crear una tabla golden_clientes_1771681999",
+            "a": "Vamos paso a paso.\nPaso 1: crearemos la tabla golden_clientes_1771681999.\nCampos principales: nombre, descripcion, activo.\nSe guardara esta informacion: nombre, descripcion, activo.\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771681999
+        },
+        {
+            "u": "si",
+            "a": "OK",
+            "ts": 1771681999
+        },
+        {
+            "u": "crear cliente nombre=Ana",
+            "a": "Estas en el Creador. Aqui definimos estructura. Para registrar datos usa el chat de la app.",
+            "ts": 1771681999
+        }
+    ],
+    "summary": "hola",
+    "onboarding_step": "plan_ready"
+}

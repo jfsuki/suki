@@ -1,8 +1,10 @@
 {
     "active_task": null,
-    "intent": null,
-    "entity": null,
-    "collected": [],
+    "intent": "mode_switch_builder",
+    "entity": "golden_clientes_1771681999",
+    "collected": {
+        "nombre": "ana"
+    },
     "missing": [],
     "requested_slot": null,
     "builder_pending_command": null,
@@ -10,11 +12,26 @@
     "builder_completed_entities": [],
     "builder_completed_forms": [],
     "unknown_business_notice_sent": false,
-    "last_action": null,
+    "last_action": {
+        "command": "CreateRecord",
+        "entity": "golden_clientes_1771681999",
+        "data": {
+            "nombre": "ana"
+        },
+        "filters": {
+            "nombre": "ana"
+        },
+        "result": {
+            "id": 1
+        },
+        "user_message": "crear golden_clientes_1771681999 nombre=Ana",
+        "assistant_reply": "",
+        "at": "2026-02-21T13:53:19+00:00"
+    },
     "dialog": {
         "mode": "app",
-        "current_step_id": "first_record",
-        "current_step_label": "Crear primer registro",
+        "current_step_id": "query_data",
+        "current_step_label": "Consultar informacion",
         "checklist": [
             {
                 "id": "app_ready",
@@ -25,7 +42,7 @@
             {
                 "id": "first_record",
                 "label": "Crear primer registro",
-                "done": false,
+                "done": true,
                 "next": "Registremos el primer dato real."
             },
             {
@@ -45,25 +62,15 @@
     },
     "last_messages": [
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681710
+            "u": "crear golden_clientes_1771681999 nombre=Ana",
+            "a": "OK",
+            "ts": 1771681999
         },
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681715
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681993
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "u": "quiero crear una tabla productos",
+            "a": "Eso se hace en el Creador de apps. Abre el chat creador para crear tablas o formularios.",
             "ts": 1771681999
         }
     ],
-    "summary": "hola"
+    "summary": "crear golden_clientes_1771681999 nombre=Ana"
 }

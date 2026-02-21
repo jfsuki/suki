@@ -1,0 +1,106 @@
+{
+    "active_task": "create_table",
+    "intent": "create",
+    "entity": "pacientes",
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": {
+        "command": "CreateEntity",
+        "entity": "pacientes",
+        "fields": [
+            {
+                "name": "nombre",
+                "type": "texto"
+            },
+            {
+                "name": "especie",
+                "type": "texto"
+            },
+            {
+                "name": "raza",
+                "type": "texto"
+            },
+            {
+                "name": "sexo",
+                "type": "texto"
+            },
+            {
+                "name": "fecha_nacimiento",
+                "type": "fecha"
+            },
+            {
+                "name": "dueno_id",
+                "type": "numero"
+            },
+            {
+                "name": "activo",
+                "type": "bool"
+            }
+        ],
+        "_tx": {
+            "signature": "f6088e161b7775b8af736170d7343dab492f30c7",
+            "created_at": "2026-02-21T13:53:19+00:00"
+        }
+    },
+    "pending_loop_counter": 0,
+    "builder_completed_entities": [],
+    "builder_completed_forms": [],
+    "last_action": null,
+    "dialog": {
+        "mode": "builder",
+        "current_step_id": "validation",
+        "current_step_label": "Flujo base completo",
+        "checklist": [
+            {
+                "id": "business_context",
+                "label": "Definir negocio y objetivo",
+                "done": true,
+                "next": "Dime tu tipo de negocio para iniciar."
+            },
+            {
+                "id": "data_model",
+                "label": "Crear primera tabla",
+                "done": true,
+                "next": "Creemos la primera tabla base (clientes/pacientes/proveedores)."
+            },
+            {
+                "id": "forms",
+                "label": "Crear primer formulario",
+                "done": true,
+                "next": "Ahora creo el formulario principal para operar esa tabla."
+            },
+            {
+                "id": "validation",
+                "label": "Probar flujo base",
+                "done": true,
+                "next": "Haz una prueba corta para validar que el flujo funciona."
+            }
+        ],
+        "updated_at": "2026-02-21T13:53:19+00:00"
+    },
+    "last_messages": [
+        {
+            "u": "mixto",
+            "a": "Paso 3: que necesitas controlar primero en tu negocio?\nEjemplos: citas, ordenes de trabajo, inventario, facturacion, pagos.",
+            "ts": 1771681999
+        },
+        {
+            "u": "si crea la tabla pacientes",
+            "a": "Vamos paso a paso.\nPaso 1: crearemos la tabla pacientes.\nCampos principales: nombre, especie, raza, sexo.\nCampos adicionales sugeridos: fecha_nacimiento, dueno_id, activo.\nSe guardara esta informacion: nombre, especie, raza, sexo, fecha_nacimiento, dueno_id.\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771681999
+        },
+        {
+            "u": "cuales campos vas a crear",
+            "a": "Voy a crear la tabla pacientes con estos datos: nombre, especie, raza, sexo, fecha_nacimiento, dueno_id, activo.\nResponde \"si\" para crearla o \"no\" para cambiarla.",
+            "ts": 1771681999
+        },
+        {
+            "u": "no entendi",
+            "a": "Te explico facil:\n- Voy a crear la tabla pacientes para guardar esos datos.\n- Si estas de acuerdo responde \"si\".\n- Si quieres cambiar datos responde \"no\".\n- Si quieres ver campos sugeridos, escribe: \"cuales campos me sugieres\".",
+            "ts": 1771681999
+        }
+    ],
+    "summary": "quiero crear un programa para veterinaria",
+    "onboarding_step": "needs_scope"
+}

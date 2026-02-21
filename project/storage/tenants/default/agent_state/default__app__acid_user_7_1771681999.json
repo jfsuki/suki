@@ -1,6 +1,6 @@
 {
     "active_task": null,
-    "intent": null,
+    "intent": "APP_CAPABILITIES",
     "entity": null,
     "collected": [],
     "missing": [],
@@ -45,25 +45,10 @@
     },
     "last_messages": [
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681710
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681715
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681993
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "u": "que opciones puedo usar ahora",
+            "a": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\nOpciones activas ahora:\n- crear golden_clientes_1771681715 nombre=valor\n- listar golden_clientes_1771681715\n- abrir formulario golden_clientes_1771681715.form\nEntidades activas: golden_clientes_1771681715",
             "ts": 1771681999
         }
     ],
-    "summary": "hola"
+    "summary": "que opciones puedo usar ahora"
 }

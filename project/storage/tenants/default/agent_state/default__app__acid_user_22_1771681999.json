@@ -45,25 +45,10 @@
     },
     "last_messages": [
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681710
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681715
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681993
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "u": "actualizar cliente id=1 email=juan@mail.com",
+            "a": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
             "ts": 1771681999
         }
     ],
-    "summary": "hola"
+    "summary": "actualizar cliente id=1 email=juan@mail.com"
 }
