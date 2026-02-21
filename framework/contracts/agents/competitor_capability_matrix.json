@@ -1,0 +1,45 @@
+{
+  "updated_at": "2026-02-21",
+  "reference_contract": "CompetitorCapabilityMatrix.contract.json",
+  "companies": [
+    {
+      "vendor": "Alegra",
+      "channels": ["web_app", "help_center", "in_app_support"],
+      "conversation_model": "guided_support_faq",
+      "execution_model": "assistant_guidance_only",
+      "api_autonomy": {
+        "public_api_available": true,
+        "chat_executes_api_actions_directly": false
+      },
+      "context_persistence": "limited_for_support",
+      "strengths": [
+        "strong invoicing/accounting product fit",
+        "stable API for invoices/customers/items",
+        "good operational support guidance"
+      ],
+      "limits": [
+        "free-text instructions are not reliably executed end-to-end",
+        "chat flow is mainly support-oriented, not autonomous action-oriented",
+        "limited cross-system orchestration from chatbot layer"
+      ],
+      "opportunity_for_suki": [
+        "upgrade from support chatbot to action agent using canonical Intent->Action->Adapter flow",
+        "execute real operations from chat with mandatory confirmation + audit",
+        "provide multichannel operation (WhatsApp/Telegram/web) with same core logic",
+        "enable tenant-level sandbox/production switching and connector governance"
+      ],
+      "target_level_for_suki": "L4"
+    }
+  ],
+  "suki_positioning": {
+    "current_level": "L3",
+    "target_level": "L4",
+    "must_have_capabilities": [
+      "strict state transition control (anti-loop + transactional confirmation)",
+      "canonical adapter architecture for external APIs",
+      "registry-driven help and real capability disclosure",
+      "multitenant action isolation + audit by default"
+    ]
+  }
+}
+

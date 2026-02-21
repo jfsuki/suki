@@ -209,3 +209,19 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Hallazgo pendiente:
   - `php framework/tests/chat_acid.php` sigue en 23 pass / 11 fail (regresion previa no resuelta en este bloque).
   - `framework/docs/smoke.ps1` requiere contratos/forms de demo (`fact.form.json`, etc.), por eso falla en baseline limpio.
+
+## Checkpoint (2026-02-21, oportunidad competitiva Alegra vs agentes autonomos)
+- Analisis consolidado:
+  - Alegra chatbot actual: soporte guiado + FAQ + navegacion.
+  - Alegra API: si permite crear clientes/facturas/items, pero el chatbot no orquesta de forma autonoma instrucciones complejas.
+  - Oportunidad SUKI: convertir "soporte guiado" en "ejecucion real por chat" con confirmacion, auditoria y conectores.
+- Definicion de nivel de agente:
+  - SUKI actual: L3 (assistant con ejecucion parcial).
+  - objetivo: L4 (agente autonomo multicanal con orquestacion multi-sistema).
+- Contrato de referencia agregado:
+  - `framework/contracts/agents/CompetitorCapabilityMatrix.contract.json`
+  - `framework/contracts/agents/competitor_capability_matrix.json`
+- Reglas para capacidades de agente (ya incorporadas en rumbo):
+  - no prometer capacidades no activas en registry real,
+  - toda accion externa via flujo canonico `Intent -> Action -> Adapter -> Resultado`,
+  - sandbox/produccion por tenant y auditoria obligatoria por accion.

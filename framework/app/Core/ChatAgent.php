@@ -288,6 +288,12 @@ final class ChatAgent
             if ($entityName === '') {
                 return $this->reply('Necesito el nombre de la tabla.', $channel, $sessionId, $userId, 'error');
             }
+            if ($this->entityExists($entityName)) {
+                return $this->reply('La tabla ' . $entityName . ' ya existe. No la voy a duplicar.', $channel, $sessionId, $userId, 'success', [
+                    'entity' => ['name' => $entityName],
+                    'already_exists' => true,
+                ]);
+            }
             $entity = $this->builder->build($entityName, $parsed['fields'] ?? []);
             $this->writer->writeEntity($entity);
             try {
@@ -312,6 +318,12 @@ final class ChatAgent
             $entityName = (string) ($parsed['entity'] ?? '');
             if ($entityName === '') {
                 return $this->reply('Necesito la entidad para el formulario.', $channel, $sessionId, $userId, 'error');
+            }
+            if ($this->formExistsForEntity($entityName)) {
+                return $this->reply('El formulario de ' . $entityName . ' ya existe. No lo voy a duplicar.', $channel, $sessionId, $userId, 'success', [
+                    'form' => ['name' => $entityName . '.form'],
+                    'already_exists' => true,
+                ]);
             }
             $entity = $this->entities->get($entityName);
             $form = $this->wizard->buildFromEntity($entity);
@@ -1076,6 +1088,12 @@ final class ChatAgent
                 if ($entity === '') {
                     return $this->reply('Necesito el nombre de la tabla.', $channel, $sessionId, $userId, 'error');
                 }
+                if ($this->entityExists($entity)) {
+                    return $this->reply('La tabla ' . $entity . ' ya existe. No la voy a duplicar.', $channel, $sessionId, $userId, 'success', [
+                        'entity' => ['name' => $entity],
+                        'already_exists' => true,
+                    ]);
+                }
                 $entityPayload = $this->builder->build($entity, $command['fields'] ?? []);
                 $this->writer->writeEntity($entityPayload);
                 $this->migrator()->migrateEntity($entityPayload, true);
@@ -1094,6 +1112,12 @@ final class ChatAgent
                 }
                 if ($entity === '') {
                     return $this->reply('Necesito la entidad para el formulario.', $channel, $sessionId, $userId, 'error');
+                }
+                if ($this->formExistsForEntity($entity)) {
+                    return $this->reply('El formulario de ' . $entity . ' ya existe. No lo voy a duplicar.', $channel, $sessionId, $userId, 'success', [
+                        'form' => ['name' => $entity . '.form'],
+                        'already_exists' => true,
+                    ]);
                 }
                 $entityData = $this->entities->get($entity);
                 $form = $this->wizard->buildFromEntity($entityData);
@@ -1168,6 +1192,16 @@ final class ChatAgent
         } catch (\Throwable $e) {
             return false;
         }
+    }
+
+    private function formExistsForEntity(string $entity): bool
+    {
+        $entity = strtolower(trim($entity));
+        if ($entity === '') {
+            return false;
+        }
+        $path = PROJECT_ROOT . '/contracts/forms/' . $entity . '.form.json';
+        return is_file($path);
     }
 
     private function storeMemory(string $sessionId, string $userText, string $replyText): void

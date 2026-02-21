@@ -1,0 +1,29 @@
+{
+  "type": "competitor_capability_matrix",
+  "version": "1.0",
+  "required_fields": [
+    "vendor",
+    "channels",
+    "conversation_model",
+    "execution_model",
+    "api_autonomy",
+    "context_persistence",
+    "limits",
+    "opportunity_for_suki"
+  ],
+  "levels": {
+    "L1": "faq_guided_chatbot",
+    "L2": "nlp_intent_bot",
+    "L3": "action_assistant",
+    "L4": "autonomous_multi_system_agent"
+  },
+  "scoring_dimensions": [
+    "support_coverage",
+    "natural_language_flexibility",
+    "action_execution_depth",
+    "multi_system_orchestration",
+    "auditability",
+    "multichannel_readiness"
+  ]
+}
+

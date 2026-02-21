@@ -21,6 +21,7 @@ final class ConversationGateway
     private ?array $accountingKnowledgeCache = null;
     private ?array $unspscCommonCache = null;
     private ?array $countryOverridesCache = null;
+    private array $latamLexiconCache = [];
     private string $contextProjectId = 'default';
     private string $contextMode = 'app';
     private string $contextProfileUser = 'anon';
@@ -56,13 +57,13 @@ final class ConversationGateway
         }
         $profile = $this->memory->getProfile($tenantId, $this->contextProfileUser);
         $state = $this->syncDialogState($state, $mode, $profile);
-        $normalized = $this->normalizeWithTraining($raw, $training, $tenantId, $profile);
+        $normalized = $this->normalizeWithTraining($raw, $training, $tenantId, $profile, $mode);
         $policy = $this->loadPolicy($tenantId);
         $confusionBase = $this->loadConfusionBase();
 
         if ($this->isPureGreeting($normalizedBase)) {
             if ($mode === 'builder') {
-                unset($state['builder_pending_command']);
+                $this->clearBuilderPendingCommand($state);
                 $state['active_task'] = 'builder_onboarding';
                 $state['missing'] = [];
                 $state['requested_slot'] = null;
@@ -74,7 +75,7 @@ final class ConversationGateway
         }
 
         if ($mode === 'builder' && $this->shouldRestartBuilderOnboarding($normalizedBase, $state)) {
-            unset($state['builder_pending_command']);
+            $this->clearBuilderPendingCommand($state);
             $state['active_task'] = 'builder_onboarding';
             $state['entity'] = null;
             $state['collected'] = [];
@@ -83,7 +84,7 @@ final class ConversationGateway
         }
 
         if ($mode === 'builder' && $this->shouldResetBuilderFlow($normalizedBase, $state)) {
-            unset($state['builder_pending_command']);
+            $this->clearBuilderPendingCommand($state);
             $state['active_task'] = 'builder_onboarding';
             $state['entity'] = null;
             $state['collected'] = [];
@@ -93,7 +94,7 @@ final class ConversationGateway
 
         if ($this->isOutOfScopeQuestion($normalizedBase, $mode)) {
             if ($mode === 'builder') {
-                unset($state['builder_pending_command']);
+                $this->clearBuilderPendingCommand($state);
                 $state['active_task'] = 'builder_onboarding';
                 $state['missing'] = [];
                 $state['requested_slot'] = null;
@@ -120,7 +121,7 @@ final class ConversationGateway
 
         if ($mode === 'builder' && !empty($state['builder_pending_command']) && is_array($state['builder_pending_command'])) {
             if ($this->isBuilderOnboardingTrigger($normalizedBase)) {
-                unset($state['builder_pending_command']);
+                $this->clearBuilderPendingCommand($state);
                 $state['active_task'] = 'builder_onboarding';
                 $state['missing'] = [];
                 $state['requested_slot'] = null;
@@ -144,7 +145,7 @@ final class ConversationGateway
                     if ($newEntity !== '' && $newEntity !== $currentEntity) {
                         $proposal = $this->buildCreateTableProposal($newEntity, $profile);
                         $resolvedEntity = (string) ($proposal['entity'] ?? $newEntity);
-                        $state['builder_pending_command'] = $proposal['command'];
+                        $this->setBuilderPendingCommand($state, (array) $proposal['command']);
                         $state['entity'] = $resolvedEntity;
                         $reply = 'Listo, cambio la tabla propuesta a ' . $resolvedEntity . '.' . "\n" . $proposal['reply'];
                         $state = $this->updateState($state, $raw, $reply, 'create', $resolvedEntity, [], 'create_table');
@@ -153,7 +154,7 @@ final class ConversationGateway
                     }
                 }
                 if ($this->isFrustrationMessage($normalizedBase)) {
-                    unset($state['builder_pending_command']);
+                    $this->clearBuilderPendingCommand($state);
                     $reply = 'Te entiendo. Vamos a ordenar esto.' . "\n"
                         . 'Dime en una frase que programa quieres crear para tu negocio.';
                     $state = $this->updateState($state, $raw, $reply, 'builder_onboarding', null, [], 'builder_onboarding');
@@ -197,14 +198,15 @@ final class ConversationGateway
                     $commandName = (string) ($command['command'] ?? '');
                     $commandEntity = $this->normalizeEntityForSchema((string) ($command['entity'] ?? ''));
                     if ($commandName === 'CreateEntity' && $commandEntity !== '' && $this->entityExists($commandEntity)) {
-                        unset($state['builder_pending_command']);
+                        $this->markBuilderCompletedEntity($state, $commandEntity);
+                        $this->clearBuilderPendingCommand($state);
                         $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
                         $proposal = null;
                         if ($businessType !== '' && is_array($state['builder_plan'] ?? null)) {
-                            $proposal = $this->buildNextStepProposal($businessType, (array) $state['builder_plan'], $profile, (string) ($profile['owner_name'] ?? ''));
+                            $proposal = $this->buildNextStepProposal($businessType, (array) $state['builder_plan'], $profile, (string) ($profile['owner_name'] ?? ''), $state);
                         }
                         if (is_array($proposal) && !empty($proposal['command'])) {
-                            $state['builder_pending_command'] = $proposal['command'];
+                            $this->setBuilderPendingCommand($state, (array) $proposal['command']);
                             $state['entity'] = $proposal['entity'] ?? $state['entity'] ?? null;
                             $reply = 'La tabla ' . $commandEntity . ' ya existe, no la vuelvo a crear.' . "\n" . (string) ($proposal['reply'] ?? '');
                             $activeTask = (string) ($proposal['active_task'] ?? 'create_table');
@@ -219,12 +221,45 @@ final class ConversationGateway
                         $this->saveState($tenantId, $userId, $state);
                         return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
                     }
-                    unset($state['builder_pending_command']);
+                    if ($commandName === 'CreateForm' && $commandEntity !== '' && $this->formExistsForEntity($commandEntity)) {
+                        $this->markBuilderCompletedForm($state, $commandEntity . '.form');
+                        $this->clearBuilderPendingCommand($state);
+                        $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
+                        $proposal = null;
+                        if ($businessType !== '' && is_array($state['builder_plan'] ?? null)) {
+                            $proposal = $this->buildNextStepProposal($businessType, (array) $state['builder_plan'], $profile, (string) ($profile['owner_name'] ?? ''), $state);
+                        }
+                        if (is_array($proposal) && !empty($proposal['command']) && is_array($proposal['command'])) {
+                            $this->setBuilderPendingCommand($state, (array) $proposal['command']);
+                            $state['entity'] = $proposal['entity'] ?? $state['entity'] ?? null;
+                            $reply = 'El formulario ' . $commandEntity . '.form ya existe, no lo vuelvo a crear.' . "\n" . (string) ($proposal['reply'] ?? '');
+                            $activeTask = (string) ($proposal['active_task'] ?? 'create_table');
+                            $state = $this->updateState($state, $raw, $reply, 'builder_next_step', (string) ($state['entity'] ?? null), [], $activeTask);
+                            $this->saveState($tenantId, $userId, $state);
+                            return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                        }
+                        $reply = 'El formulario ' . $commandEntity . '.form ya existe, no lo vuelvo a crear.' . "\n"
+                            . $this->buildBuilderPlanProgressReply($state, $profile, false);
+                        $state = $this->updateState($state, $raw, $reply, 'builder_progress', $commandEntity, [], 'builder_onboarding');
+                        $this->saveState($tenantId, $userId, $state);
+                        return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                    }
+                    $this->clearBuilderPendingCommand($state);
                     $state = $this->updateState($state, $raw, 'OK', 'create', (string) ($command['entity'] ?? ($state['entity'] ?? null)), [], '', []);
                     $this->saveState($tenantId, $userId, $state);
                     return $this->result('execute_command', '', $command, null, $state, $this->telemetry('builder_confirm', true));
                 }
                 if ($this->isNegativeReply($normalizedBase)) {
+                    $commandName = (string) (($state['builder_pending_command']['command'] ?? ''));
+                    if ($commandName === 'CreateForm') {
+                        $entityName = $this->normalizeEntityForSchema((string) ($state['builder_pending_command']['entity'] ?? ($state['entity'] ?? '')));
+                        $this->clearBuilderPendingCommand($state);
+                        $reply = 'Listo, no creo el formulario ' . ($entityName !== '' ? ($entityName . '.form') : 'pendiente') . '.' . "\n"
+                            . 'Dime si seguimos con la siguiente tabla o si quieres otro formulario.';
+                        $state = $this->updateState($state, $raw, $reply, 'builder_next_step', $entityName !== '' ? $entityName : null, [], 'builder_onboarding');
+                        $this->saveState($tenantId, $userId, $state);
+                        return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                    }
                     $entity = (string) ($state['entity'] ?? 'clientes');
                     $entityFromText = $this->detectEntityKeywordInText($normalizedBase);
                     if ($entityFromText === '' && preg_match('/\b(tabla|entidad)\b/u', $normalizedBase) === 1) {
@@ -234,7 +269,7 @@ final class ConversationGateway
                         $entity = $this->normalizeEntityForSchema($entityFromText);
                     }
                     $entity = $this->adaptEntityToBusinessContext($entity, $profile, $normalizedBase);
-                    unset($state['builder_pending_command']);
+                    $this->clearBuilderPendingCommand($state);
                     $reply = 'Perfecto. Cambiamos la tabla a ' . $entity . '.'
                         . "\n"
                         . 'Ahora dime que datos quieres guardar. Ejemplo: nombre:texto documento:texto telefono:texto';
@@ -247,6 +282,10 @@ final class ConversationGateway
                         $reply = $this->buildPendingClarificationReply($state['builder_pending_command']);
                     } else {
                         $reply = 'Para continuar, responde "si" para crearla o "no" para cambiar nombre/campos.';
+                    }
+                    $loops = $this->incrementPendingLoopCounter($state);
+                    if ($loops >= 3) {
+                        $reply = $this->buildHardPendingLoopReply($state);
                     }
                     $state = $this->updateState($state, $raw, $reply, 'create', (string) ($state['entity'] ?? 'clientes'), [], 'create_table');
                     $this->saveState($tenantId, $userId, $state);
@@ -280,7 +319,7 @@ final class ConversationGateway
                 $confusionRoute['active_task'] ?? ($state['active_task'] ?? null)
             );
             if (!empty($confusionRoute['pending_command']) && is_array($confusionRoute['pending_command'])) {
-                $state['builder_pending_command'] = $confusionRoute['pending_command'];
+                $this->setBuilderPendingCommand($state, (array) $confusionRoute['pending_command']);
             }
             if (!empty($confusionRoute['state_patch']) && is_array($confusionRoute['state_patch'])) {
                 foreach ($confusionRoute['state_patch'] as $k => $v) {
@@ -414,13 +453,13 @@ final class ConversationGateway
             if (!empty($build['ask'])) {
                 $state = $this->updateState($state, $raw, $build['ask'], null, $build['entity'] ?? null, $build['collected'] ?? [], $build['active_task'] ?? 'build');
                 if (!empty($build['pending_command']) && is_array($build['pending_command'])) {
-                    $state['builder_pending_command'] = $build['pending_command'];
+                    $this->setBuilderPendingCommand($state, (array) $build['pending_command']);
                 }
                 $this->saveState($tenantId, $userId, $state);
                 return $this->result('ask_user', $build['ask'], null, null, $state, $this->telemetry('build', true, $build));
             }
             if (!empty($build['command'])) {
-                unset($state['builder_pending_command']);
+                $this->clearBuilderPendingCommand($state);
                 $state = $this->updateState($state, $raw, 'OK', null, $build['entity'] ?? null, $build['collected'] ?? [], '');
                 $this->saveState($tenantId, $userId, $state);
                 return $this->result('execute_command', '', $build['command'], null, $state, $this->telemetry('build', true, $build));
@@ -528,6 +567,27 @@ final class ConversationGateway
             'assistant_reply' => $assistantReply,
             'at' => date('c'),
         ];
+        $commandName = (string) ($command['command'] ?? '');
+        if ($mode === 'builder') {
+            if ($commandName === 'CreateEntity' && $entity !== '') {
+                $this->markBuilderCompletedEntity($state, $entity);
+                $pendingEntity = $this->normalizeEntityForSchema((string) ($state['builder_pending_command']['entity'] ?? ''));
+                if ($pendingEntity === '' || $pendingEntity === $entity) {
+                    $this->clearBuilderPendingCommand($state);
+                }
+                $state['active_task'] = 'builder_onboarding';
+                $state['onboarding_step'] = 'plan_ready';
+            }
+            if ($commandName === 'CreateForm') {
+                $formEntity = $entity !== '' ? $entity : $this->normalizeEntityForSchema((string) ($command['entity'] ?? ''));
+                if ($formEntity !== '') {
+                    $this->markBuilderCompletedForm($state, $formEntity . '.form');
+                }
+                $this->clearBuilderPendingCommand($state);
+                $state['active_task'] = 'builder_onboarding';
+                $state['onboarding_step'] = 'plan_ready';
+            }
+        }
         $this->contextProjectId = $projectId;
         $this->contextMode = $mode;
         $this->contextProfileUser = $this->profileUserKey($userId);
@@ -821,6 +881,84 @@ final class ConversationGateway
             . 'Responde "si" para seguir o "no" para cambiar.';
     }
 
+    private function setBuilderPendingCommand(array &$state, array $command): void
+    {
+        $command['_tx'] = [
+            'signature' => $this->pendingSignature($command),
+            'created_at' => date('c'),
+        ];
+        $state['builder_pending_command'] = $command;
+        $state['pending_loop_counter'] = 0;
+    }
+
+    private function clearBuilderPendingCommand(array &$state): void
+    {
+        $state['builder_pending_command'] = null;
+        $state['pending_loop_counter'] = 0;
+    }
+
+    private function pendingSignature(array $command): string
+    {
+        $base = [
+            'command' => (string) ($command['command'] ?? ''),
+            'entity' => (string) ($command['entity'] ?? ''),
+            'fields' => is_array($command['fields'] ?? null) ? $command['fields'] : [],
+        ];
+        $json = json_encode($base, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($json === false) {
+            $json = (string) microtime(true);
+        }
+        return sha1($json);
+    }
+
+    private function incrementPendingLoopCounter(array &$state): int
+    {
+        $current = (int) ($state['pending_loop_counter'] ?? 0);
+        $current++;
+        $state['pending_loop_counter'] = $current;
+        return $current;
+    }
+
+    private function markBuilderCompletedEntity(array &$state, string $entity): void
+    {
+        $entity = $this->normalizeEntityForSchema($entity);
+        if ($entity === '') {
+            return;
+        }
+        $completed = is_array($state['builder_completed_entities'] ?? null) ? $state['builder_completed_entities'] : [];
+        $completed[$entity] = date('c');
+        $state['builder_completed_entities'] = $completed;
+    }
+
+    private function markBuilderCompletedForm(array &$state, string $formName): void
+    {
+        $formName = strtolower(trim($formName));
+        if ($formName === '') {
+            return;
+        }
+        if (!str_ends_with($formName, '.form')) {
+            $formName .= '.form';
+        }
+        $completed = is_array($state['builder_completed_forms'] ?? null) ? $state['builder_completed_forms'] : [];
+        $completed[$formName] = date('c');
+        $state['builder_completed_forms'] = $completed;
+    }
+
+    private function buildHardPendingLoopReply(array $state): string
+    {
+        $pending = is_array($state['builder_pending_command'] ?? null) ? (array) $state['builder_pending_command'] : [];
+        if (empty($pending)) {
+            return 'No tengo accion pendiente. Dime el siguiente paso que quieres crear.';
+        }
+
+        return 'Para no enredarnos, te resumo la accion pendiente:' . "\n"
+            . $this->buildPendingPreviewReply($pending) . "\n"
+            . 'Responde solo una opcion:' . "\n"
+            . '- si (ejecutar)' . "\n"
+            . '- no (cambiar tabla/campos)' . "\n"
+            . '- mostrar avance (ver estado actual)';
+    }
+
     private function buildSoftwareBlueprintReply(array $profile = []): string
     {
         $playbook = $this->loadDomainPlaybook();
@@ -878,7 +1016,7 @@ final class ConversationGateway
         return $text;
     }
 
-    private function normalizeWithTraining(string $text, array $training, string $tenantId = 'default', array $profile = []): string
+    private function normalizeWithTraining(string $text, array $training, string $tenantId = 'default', array $profile = [], string $mode = 'app'): string
     {
         $text = $this->normalize($text);
         if (empty($training)) {
@@ -905,6 +1043,9 @@ final class ConversationGateway
         $text = preg_replace('/\\bk\\b/u', 'que', $text) ?? $text;
         $text = preg_replace('/\\bqueiro\\b/u', 'quiero', $text) ?? $text;
         $text = preg_replace('/\\bqiero\\b/u', 'quiero', $text) ?? $text;
+
+        $latamLexicon = $this->loadLatamLexiconPack($tenantId);
+        $text = $this->applyLatamLexiconPack($text, $latamLexicon, $mode);
 
         $countryCode = $this->resolveCountryCode($profile, $text);
         $countryOverrides = $this->loadCountryOverrides($tenantId);
@@ -939,11 +1080,112 @@ final class ConversationGateway
             if ($alias === '' || $target === '') {
                 continue;
             }
+            if ($this->shouldSkipAmbiguousSynonym($alias, $target, $text, $mode)) {
+                continue;
+            }
             $text = preg_replace('/\\b' . preg_quote($alias, '/') . '\\b/u', $target, $text) ?? $text;
         }
 
         $text = preg_replace('/\s+/', ' ', trim($text)) ?? $text;
         return $text;
+    }
+
+    private function loadLatamLexiconPack(string $tenantId = 'default'): array
+    {
+        $frameworkRoot = defined('FRAMEWORK_ROOT') ? FRAMEWORK_ROOT : dirname(__DIR__, 3);
+        $basePath = $frameworkRoot . '/contracts/agents/latam_es_col_conversation_lexicon.json';
+        $tenantPath = $this->projectRoot . '/storage/tenants/' . $this->safe($tenantId) . '/latam_lexicon_overrides.json';
+        $baseMtime = is_file($basePath) ? (int) @filemtime($basePath) : 0;
+        $tenantMtime = is_file($tenantPath) ? (int) @filemtime($tenantPath) : 0;
+        $cacheKey = $this->safe($tenantId);
+
+        if (isset($this->latamLexiconCache[$cacheKey])) {
+            $cached = $this->latamLexiconCache[$cacheKey];
+            if (($cached['base_mtime'] ?? 0) === $baseMtime && ($cached['tenant_mtime'] ?? 0) === $tenantMtime) {
+                return is_array($cached['data'] ?? null) ? $cached['data'] : [];
+            }
+        }
+
+        $base = $this->readJson($basePath, []);
+        $tenant = is_file($tenantPath) ? $this->readJson($tenantPath, []) : [];
+        $merged = [
+            'phrase_rules' => array_merge(
+                is_array($base['phrase_rules'] ?? null) ? $base['phrase_rules'] : [],
+                is_array($tenant['phrase_rules'] ?? null) ? $tenant['phrase_rules'] : []
+            ),
+            'synonyms' => array_merge(
+                is_array($base['synonyms'] ?? null) ? $base['synonyms'] : [],
+                is_array($tenant['synonyms'] ?? null) ? $tenant['synonyms'] : []
+            ),
+            'stop_tokens' => array_values(array_unique(array_merge(
+                is_array($base['stop_tokens'] ?? null) ? $base['stop_tokens'] : [],
+                is_array($tenant['stop_tokens'] ?? null) ? $tenant['stop_tokens'] : []
+            ))),
+        ];
+
+        $this->latamLexiconCache[$cacheKey] = [
+            'data' => $merged,
+            'base_mtime' => $baseMtime,
+            'tenant_mtime' => $tenantMtime,
+        ];
+
+        return $merged;
+    }
+
+    private function applyLatamLexiconPack(string $text, array $pack, string $mode = 'app'): string
+    {
+        $phraseRules = is_array($pack['phrase_rules'] ?? null) ? $pack['phrase_rules'] : [];
+        foreach ($phraseRules as $rule) {
+            if (!is_array($rule)) {
+                continue;
+            }
+            $match = $this->normalize((string) ($rule['match'] ?? ''));
+            $replace = $this->normalize((string) ($rule['replace'] ?? ''));
+            if ($match === '') {
+                continue;
+            }
+            $text = str_replace($match, $replace, $text);
+        }
+
+        $synonyms = is_array($pack['synonyms'] ?? null) ? $pack['synonyms'] : [];
+        foreach ($synonyms as $alias => $target) {
+            $alias = $this->normalize((string) $alias);
+            $target = $this->normalize((string) $target);
+            if ($alias === '' || $target === '') {
+                continue;
+            }
+            if ($this->shouldSkipAmbiguousSynonym($alias, $target, $text, $mode)) {
+                continue;
+            }
+            $text = preg_replace('/\\b' . preg_quote($alias, '/') . '\\b/u', $target, $text) ?? $text;
+        }
+
+        $stopTokens = is_array($pack['stop_tokens'] ?? null) ? $pack['stop_tokens'] : [];
+        foreach ($stopTokens as $token) {
+            $token = $this->normalize((string) $token);
+            if ($token === '') {
+                continue;
+            }
+            $text = preg_replace('/\\b' . preg_quote($token, '/') . '\\b/u', ' ', $text) ?? $text;
+        }
+
+        return preg_replace('/\s+/', ' ', trim($text)) ?? $text;
+    }
+
+    private function shouldSkipAmbiguousSynonym(string $alias, string $target, string $text, string $mode): bool
+    {
+        if ($mode === 'builder') {
+            return false;
+        }
+        if ($alias === 'lista' && $target === 'tabla') {
+            if (preg_match('/\b(lista(r)?|mostrar|ver|buscar|dame)\b/u', $text) === 1) {
+                return true;
+            }
+            if (preg_match('/\blista\s+de\b/u', $text) === 1) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function classify(string $text): string
@@ -1038,7 +1280,7 @@ final class ConversationGateway
             return $this->buildProjectStatus();
         }
 
-        $progress = $this->computeBuilderPlanProgress($plan);
+        $progress = $this->computeBuilderPlanProgress($plan, $state);
         $done = $progress['done_entities'];
         $missing = $progress['missing_entities'];
         $planEntities = $progress['plan_entities'];
@@ -1176,6 +1418,9 @@ final class ConversationGateway
                 if ($entityHint === '') {
                     return ['ask' => 'Como se llama la tabla? Ej: clientes nombre:texto nit:texto', 'active_task' => 'create_table'];
                 }
+                if ($this->entityExists($entityHint)) {
+                    return $this->buildExistingEntityNextStep($entityHint, $state, $profile);
+                }
                 $dependencyGuide = $this->buildDependencyGuidanceForBuilder($entityHint, $profile);
                 if (!empty($dependencyGuide)) {
                     return $dependencyGuide;
@@ -1192,6 +1437,9 @@ final class ConversationGateway
             $parsed['entity'] = $this->adaptEntityToBusinessContext((string) ($parsed['entity'] ?? ''), $profile, $text);
             if ($parsed['entity'] === '') {
                 return ['ask' => 'Como se llama la tabla? Ej: clientes nombre:texto nit:texto', 'active_task' => 'create_table'];
+            }
+            if ($this->entityExists((string) $parsed['entity'])) {
+                return $this->buildExistingEntityNextStep((string) $parsed['entity'], $state, $profile);
             }
             $dependencyGuide = $this->buildDependencyGuidanceForBuilder($parsed['entity'], $profile);
             if (!empty($dependencyGuide)) {
@@ -1289,6 +1537,9 @@ final class ConversationGateway
             if ($parsed['entity'] === '') {
                 return ['ask' => 'Necesito el nombre de la tabla. Ej: clientes nombre:texto nit:texto', 'active_task' => 'create_table'];
             }
+            if ($this->entityExists((string) $parsed['entity'])) {
+                return $this->buildExistingEntityNextStep((string) $parsed['entity'], $state, $profile);
+            }
             $dependencyGuide = $this->buildDependencyGuidanceForBuilder($parsed['entity'], $profile);
             if (!empty($dependencyGuide)) {
                 return $dependencyGuide;
@@ -1315,6 +1566,60 @@ final class ConversationGateway
         }
 
         return [];
+    }
+
+    private function buildExistingEntityNextStep(string $entity, array $state, array $profile = []): array
+    {
+        $entity = $this->normalizeEntityForSchema($entity);
+        if ($entity === '') {
+            return ['ask' => 'La tabla ya existe. Dime otra tabla para continuar.', 'active_task' => 'builder_onboarding'];
+        }
+
+        if (!$this->formExistsForEntity($entity)) {
+            return [
+                'ask' => 'La tabla ' . $entity . ' ya existe. No la vuelvo a crear.' . "\n"
+                    . 'Siguiente paso recomendado: crear formulario ' . $entity . '.form.' . "\n"
+                    . 'Quieres que lo cree por ti ahora? Responde: si o no.',
+                'active_task' => 'create_form',
+                'entity' => $entity,
+                'pending_command' => [
+                    'command' => 'CreateForm',
+                    'entity' => $entity,
+                ],
+            ];
+        }
+
+        $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
+        if ($businessType !== '' && is_array($state['builder_plan'] ?? null)) {
+            $proposal = $this->buildNextStepProposal(
+                $businessType,
+                (array) $state['builder_plan'],
+                $profile,
+                (string) ($profile['owner_name'] ?? ''),
+                $state
+            );
+            if (!empty($proposal['command']) && is_array($proposal['command'])) {
+                return [
+                    'ask' => 'La tabla ' . $entity . ' ya existe. No la vuelvo a crear.' . "\n" . (string) ($proposal['reply'] ?? ''),
+                    'active_task' => (string) ($proposal['active_task'] ?? 'create_table'),
+                    'entity' => (string) ($proposal['entity'] ?? $entity),
+                    'pending_command' => (array) $proposal['command'],
+                ];
+            }
+            return [
+                'ask' => 'La tabla ' . $entity . ' ya existe. No la vuelvo a crear.' . "\n"
+                    . (string) ($proposal['reply'] ?? $this->buildBuilderPlanProgressReply($state, $profile, false)),
+                'active_task' => (string) ($proposal['active_task'] ?? 'builder_onboarding'),
+                'entity' => $entity,
+            ];
+        }
+
+        return [
+            'ask' => 'La tabla ' . $entity . ' ya existe. No la vuelvo a crear.' . "\n"
+                . $this->buildBuilderPlanProgressReply($state, $profile, false),
+            'active_task' => 'builder_onboarding',
+            'entity' => $entity,
+        ];
     }
 
     private function handleBuilderOnboarding(string $text, array $state, array $profile, string $tenantId, string $userId): ?array
@@ -1432,6 +1737,11 @@ final class ConversationGateway
             && !$this->isNegativeReply($text);
 
         if ($currentStep === 'needs_scope' && $canCaptureAnswer) {
+            if ($this->isOnboardingMetaAnswer($text)) {
+                $reply = 'En este paso necesito que me digas que quieres controlar primero.' . "\n"
+                    . 'Ejemplo: ' . $this->buildNeedsScopeExample($businessType, $localProfile) . '.';
+                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+            }
             $localProfile['needs_scope'] = $this->sanitizeRequirementText($text);
             $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
         }
@@ -1444,6 +1754,11 @@ final class ConversationGateway
         }
 
         if ($currentStep === 'documents_scope' && $canCaptureAnswer) {
+            if ($this->isOnboardingMetaAnswer($text)) {
+                $reply = 'En este paso necesito los documentos que vas a usar.' . "\n"
+                    . 'Ejemplo: ' . $this->buildDocumentsScopeExample($businessType, $localProfile) . '.';
+                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+            }
             $localProfile['documents_scope'] = $this->sanitizeRequirementText($text);
             $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
         }
@@ -1526,7 +1841,7 @@ final class ConversationGateway
                 $entityHint = (string) ($plan['first_entity'] ?? 'clientes');
             }
             $proposal = $this->buildCreateTableProposal($entityHint, $localProfile);
-            $localState['builder_pending_command'] = $proposal['command'];
+            $this->setBuilderPendingCommand($localState, (array) $proposal['command']);
             $localState['entity'] = $entityHint;
             $localState['active_task'] = 'create_table';
             return ['action' => 'ask_user', 'reply' => $proposal['reply'], 'state' => $localState];
@@ -1545,15 +1860,15 @@ final class ConversationGateway
                 && !$this->hasFieldPairs($text)
             )
         ) {
-            $proposal = $this->buildNextStepProposal($businessType, $plan, $localProfile, $owner);
+            $proposal = $this->buildNextStepProposal($businessType, $plan, $localProfile, $owner, $localState);
             if (!empty($proposal['command']) && is_array($proposal['command'])) {
-                $localState['builder_pending_command'] = $proposal['command'];
+                $this->setBuilderPendingCommand($localState, (array) $proposal['command']);
                 $localState['entity'] = $proposal['entity'] ?? null;
                 $localState['active_task'] = (string) ($proposal['active_task'] ?? 'create_table');
                 return ['action' => 'ask_user', 'reply' => (string) ($proposal['reply'] ?? ''), 'state' => $localState];
             }
 
-            unset($localState['builder_pending_command']);
+            $this->clearBuilderPendingCommand($localState);
             $localState['active_task'] = (string) ($proposal['active_task'] ?? 'builder_onboarding');
             return ['action' => 'respond_local', 'reply' => (string) ($proposal['reply'] ?? $this->buildBuilderPlanProgressReply($localState, $localProfile, false)), 'state' => $localState];
         }
@@ -1733,10 +2048,7 @@ final class ConversationGateway
         if ($text === '') {
             return false;
         }
-        if (preg_match('/^(si|sí|ok|dale|confirmo|hagalo|hazlo|de una|claro|correcto)\b/u', $text) === 1) {
-            return true;
-        }
-        return false;
+        return preg_match('/^(si|s\x{00ed}|ok|dale|confirmo|hagalo|hazlo|de una|claro|correcto)\s*$/u', $text) === 1;
     }
 
     private function isNegativeReply(string $text): bool
@@ -1748,10 +2060,7 @@ final class ConversationGateway
         if ($this->isPendingPreviewQuestion($text) || $this->isClarificationRequest($text) || $this->isFieldHelpQuestion($text) || $this->isBuilderProgressQuestion($text)) {
             return false;
         }
-        if (preg_match('/^(no|todavia no|aun no|ahora no|mejor no|detente|cancelar|cambiar)\b/u', $text) === 1) {
-            return true;
-        }
-        return false;
+        return preg_match('/^(no|todavia no|aun no|ahora no|mejor no|detente|cancelar|cambiar)\s*$/u', $text) === 1;
     }
 
     private function extractPersonName(string $text): string
@@ -2147,6 +2456,76 @@ final class ConversationGateway
         return implode("\n", $lines);
     }
 
+    private function isOnboardingMetaAnswer(string $text): bool
+    {
+        $normalized = trim($text);
+        if ($normalized === '') {
+            return true;
+        }
+
+        $patterns = [
+            'si',
+            'si dale',
+            'dale',
+            'ok',
+            'listo',
+            'siguiente paso',
+            'paso sigue',
+            'que sigue',
+            'q sigue',
+            'que mas sigue',
+            'q mas sigue',
+            'que mas falta',
+            'q mas falta',
+            'no entiendo',
+            'explicame',
+            'ayudame',
+            'alto',
+        ];
+        foreach ($patterns as $pattern) {
+            if ($normalized === $pattern || str_contains($normalized, $pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function buildNeedsScopeExample(string $businessType, array $profile = []): string
+    {
+        $domain = $this->findDomainProfile($businessType);
+        $examples = is_array($domain['scope_examples'] ?? null) ? $domain['scope_examples'] : [];
+        if (!empty($examples)) {
+            return (string) $examples[0];
+        }
+
+        $operation = (string) ($profile['operation_model'] ?? '');
+        if ($operation === 'contado') {
+            return 'ventas del dia e inventario';
+        }
+        if ($operation === 'credito') {
+            return 'ordenes de trabajo y cartera';
+        }
+        return 'citas y facturacion';
+    }
+
+    private function buildDocumentsScopeExample(string $businessType, array $profile = []): string
+    {
+        $domain = $this->findDomainProfile($businessType);
+        $examples = is_array($domain['document_examples'] ?? null) ? $domain['document_examples'] : [];
+        if (!empty($examples)) {
+            return (string) $examples[0];
+        }
+
+        $operation = (string) ($profile['operation_model'] ?? '');
+        if ($operation === 'contado') {
+            return 'factura y recibo de caja';
+        }
+        if ($operation === 'credito') {
+            return 'factura y recibo de abono';
+        }
+        return 'factura, orden de trabajo y recibo de pago';
+    }
+
     private function sanitizeRequirementText(string $text): string
     {
         $text = trim($text);
@@ -2276,13 +2655,13 @@ final class ConversationGateway
         ];
     }
 
-    private function buildNextStepProposal(string $businessType, array $plan, array $profile = [], string $owner = ''): array
+    private function buildNextStepProposal(string $businessType, array $plan, array $profile = [], string $owner = '', array $state = []): array
     {
         $businessType = $this->normalizeBusinessType($businessType);
         $domainProfile = $this->findDomainProfile($businessType);
         $businessLabel = (string) ($domainProfile['label'] ?? $businessType);
 
-        $progress = $this->computeBuilderPlanProgress($plan);
+        $progress = $this->computeBuilderPlanProgress($plan, $state);
         $planEntities = $progress['plan_entities'];
         $doneEntities = $progress['done_entities'];
         $missingEntities = $progress['missing_entities'];
@@ -2335,7 +2714,7 @@ final class ConversationGateway
         ];
     }
 
-    private function computeBuilderPlanProgress(array $plan): array
+    private function computeBuilderPlanProgress(array $plan, array $state = []): array
     {
         $planEntities = array_values(array_filter(array_map(
             fn($v) => $this->normalizeEntityForSchema((string) $v),
@@ -2349,10 +2728,34 @@ final class ConversationGateway
             fn($p) => $this->normalizeEntityForSchema((string) basename((string) $p, '.entity.json')),
             $this->catalog->entities()
         );
+        $completedEntitiesFromState = [];
+        if (is_array($state['builder_completed_entities'] ?? null)) {
+            foreach ((array) $state['builder_completed_entities'] as $name => $ts) {
+                $normalizedName = $this->normalizeEntityForSchema((string) $name);
+                if ($normalizedName !== '') {
+                    $completedEntitiesFromState[] = $normalizedName;
+                }
+            }
+        }
+        if (!empty($completedEntitiesFromState)) {
+            $existingEntities = array_values(array_unique(array_merge($existingEntities, $completedEntitiesFromState)));
+        }
         $existingForms = array_map(
             fn($p) => strtolower((string) basename((string) $p, '.json')),
             $this->catalog->forms()
         );
+        $completedFormsFromState = [];
+        if (is_array($state['builder_completed_forms'] ?? null)) {
+            foreach ((array) $state['builder_completed_forms'] as $name => $ts) {
+                $candidate = strtolower(trim((string) $name));
+                if ($candidate !== '') {
+                    $completedFormsFromState[] = str_ends_with($candidate, '.form') ? $candidate : ($candidate . '.form');
+                }
+            }
+        }
+        if (!empty($completedFormsFromState)) {
+            $existingForms = array_values(array_unique(array_merge($existingForms, $completedFormsFromState)));
+        }
 
         $doneEntities = [];
         $missingEntities = [];
@@ -2870,6 +3273,16 @@ final class ConversationGateway
             }
         }
         return false;
+    }
+
+    private function formExistsForEntity(string $entity): bool
+    {
+        $entity = $this->normalizeEntityForSchema($entity);
+        if ($entity === '') {
+            return false;
+        }
+        $path = $this->projectRoot . '/contracts/forms/' . $entity . '.form.json';
+        return is_file($path);
     }
 
     private function hasBuildSignals(string $text): bool
@@ -3722,7 +4135,7 @@ private function parseEntityFromCrudText(string $text): string
         if ($isStepQuestion && empty($pending) && ($state['active_task'] ?? '') === 'builder_onboarding' && !$this->hasBuildSignals($text)) {
             $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
             if ($businessType !== '' && is_array($state['builder_plan'] ?? null)) {
-                $proposal = $this->buildNextStepProposal($businessType, (array) $state['builder_plan'], $profile, (string) ($profile['owner_name'] ?? ''));
+                $proposal = $this->buildNextStepProposal($businessType, (array) $state['builder_plan'], $profile, (string) ($profile['owner_name'] ?? ''), $state);
                 if (empty($proposal['command']) || !is_array($proposal['command'])) {
                     return [
                         'action' => 'respond_local',
@@ -4379,6 +4792,9 @@ private function parseEntityFromCrudText(string $text): string
             'missing' => [],
             'requested_slot' => null,
             'builder_pending_command' => null,
+            'pending_loop_counter' => 0,
+            'builder_completed_entities' => [],
+            'builder_completed_forms' => [],
             'unknown_business_notice_sent' => false,
             'last_action' => null,
             'dialog' => null,

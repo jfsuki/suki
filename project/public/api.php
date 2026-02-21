@@ -29,6 +29,7 @@ use App\Core\IntegrationRegistry;
 use App\Core\IntegrationValidator;
 use App\Core\IntegrationStore;
 use App\Core\IntegrationMigrator;
+use App\Core\IntegrationActionOrchestrator;
 use App\Core\AlanubeClient;
 use App\Core\InvoiceRegistry;
 use App\Core\InvoiceValidator;
@@ -1234,6 +1235,39 @@ if ($route === 'llm/health') {
         'providers' => $result
     ]);
     return;
+}
+
+if ($route === 'integrations/action') {
+    $payload = requestData();
+    setTenantContext($payload);
+    $tenantId = (string) ($payload['tenant_id'] ?? $_GET['tenant_id'] ?? getenv('TENANT_KEY') ?? getenv('TENANT_ID') ?? 'default');
+    $environment = (string) ($payload['environment'] ?? $_GET['environment'] ?? '');
+    $projectId = resolveProjectId($payload);
+
+    try {
+        $orchestrator = new IntegrationActionOrchestrator();
+        $result = $orchestrator->execute($payload, [
+            'tenant_id' => $tenantId,
+            'environment' => $environment,
+            'project_id' => $projectId,
+            'actor_id' => (string) ($_SESSION['user_id'] ?? ''),
+            'actor_label' => (string) ($_SESSION['user_name'] ?? ''),
+        ]);
+
+        $statusCode = (int) ($result['status'] ?? 200);
+        $ok = $statusCode >= 200 && $statusCode < 300;
+        respondJson(
+            $response,
+            $ok ? 'success' : 'error',
+            $ok ? 'Accion de integracion ejecutada' : 'Integracion respondio error',
+            $result,
+            $ok ? 200 : 502
+        );
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
 }
 
 if ($route === 'integrations/alanube/test') {

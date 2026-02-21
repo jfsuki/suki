@@ -15,6 +15,16 @@ Enable apps to integrate external providers (e-invoicing, payments, ERP) and exe
 - Job Queue: async tasks, retries, dead-letter.
 - Audit + Logs: every process run and integration call is traceable.
 
+## Canonical runtime flow (implemented)
+- `Intent -> Action -> Adapter API -> Result`
+- Single endpoint:
+  - `POST /api/integrations/action`
+- Orchestrator:
+  - resolves tenant + integration + environment,
+  - normalizes action (`emit_document`, `get_status`, `cancel_document`, `test_connection`),
+  - dispatches to adapter (`Alanube`, `Alegra`, `Generic`),
+  - writes audit record (`audit_log`) for every action.
+
 ## App Manifest Contract (planned)
 New contract file:
 - project/contracts/app.manifest.json
@@ -83,6 +93,16 @@ Permitir que las apps integren proveedores externos (facturacion electronica, pa
 - Capa conversacional: intents, recoleccion de datos, confirmaciones, acciones seguras.
 - Job Queue: tareas async, reintentos, dead-letter.
 - Auditoria + Logs: trazabilidad completa.
+
+## Flujo canonico de ejecucion (implementado)
+- `Intent -> Action -> Adapter API -> Resultado`
+- Endpoint unico:
+  - `POST /api/integrations/action`
+- Orquestador:
+  - resuelve tenant + integracion + ambiente,
+  - normaliza accion (`emit_document`, `get_status`, `cancel_document`, `test_connection`),
+  - despacha al adapter (`Alanube`, `Alegra`, `Generic`),
+  - guarda auditoria obligatoria (`audit_log`) por accion.
 
 ## Contrato App Manifest (planeado)
 Archivo nuevo:

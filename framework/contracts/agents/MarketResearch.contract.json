@@ -24,7 +24,9 @@
   "competitor_landscape": {
     "vendors": "array",
     "strengths": "array",
-    "gaps": "array"
+    "gaps": "array",
+    "execution_gap_support_vs_action": "array",
+    "api_orchestration_opportunities": "array"
   },
   "customer_expectations": {
     "top_pains": "array",
