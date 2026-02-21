@@ -4,9 +4,9 @@
         "passed": 8,
         "failed": 0,
         "total": 8,
-        "entity": "golden_clientes_1771681341",
-        "run_id": "1771681341",
-        "ran_at": "2026-02-21 13:42:21"
+        "entity": "golden_clientes_1771681715",
+        "run_id": "1771681715",
+        "ran_at": "2026-02-21 13:48:36"
     },
     "results": [
         {
@@ -28,8 +28,8 @@
         {
             "step": 3,
             "mode": "builder",
-            "message": "quiero crear una tabla golden_clientes_1771681341",
-            "reply": "Vamos paso a paso.\nPaso 1: crearemos la tabla golden_clientes_1771681341.\nCampos principales: nombre, descripcion, activo.\nSe guardara esta informacion: nombre, descripcion, activo.\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "message": "quiero crear una tabla golden_clientes_1771681715",
+            "reply": "Vamos paso a paso.\nPaso 1: crearemos la tabla golden_clientes_1771681715.\nCampos principales: nombre, descripcion, activo.\nSe guardara esta informacion: nombre, descripcion, activo.\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nQuieres que la cree por ti ahora? Responde: si o no.",
             "expected_contains": "Quieres que la cree",
             "ok": true
         },
@@ -37,23 +37,23 @@
             "step": 4,
             "mode": "builder",
             "message": "si",
-            "reply": "Tabla creada: golden_clientes_1771681341",
+            "reply": "Tabla creada: golden_clientes_1771681715",
             "expected_contains": "Tabla creada",
             "ok": true
         },
         {
             "step": 5,
             "mode": "builder",
-            "message": "crear formulario golden_clientes_1771681341",
-            "reply": "Formulario creado para golden_clientes_1771681341",
+            "message": "crear formulario golden_clientes_1771681715",
+            "reply": "Formulario creado para golden_clientes_1771681715",
             "expected_contains": "Formulario creado",
             "ok": true
         },
         {
             "step": 6,
             "mode": "app",
-            "message": "crear golden_clientes_1771681341 nombre=Ana",
-            "reply": "Registro creado en golden_clientes_1771681341",
+            "message": "crear golden_clientes_1771681715 nombre=Ana",
+            "reply": "Registro creado en golden_clientes_1771681715",
             "expected_contains": "Registro creado",
             "ok": true
         },

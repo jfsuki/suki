@@ -45,25 +45,20 @@
     },
     "last_messages": [
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771680393
+            "u": "crear cliente",
+            "a": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "ts": 1771681715
         },
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681339
+            "u": "Ana",
+            "a": "Solo puedo responder con datos reales de esta app. Dime una accion concreta: listar cliente, crear cliente nombre=Ana, o estado de la app.",
+            "ts": 1771681715
         },
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681710
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "u": "que guardaste",
+            "a": "Aun no he guardado nada en esta sesion. Si quieres, te guio para crear el primer registro.",
             "ts": 1771681715
         }
     ],
-    "summary": "hola"
+    "summary": "crear cliente"
 }

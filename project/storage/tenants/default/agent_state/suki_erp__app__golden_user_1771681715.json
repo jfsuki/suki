@@ -1,8 +1,10 @@
 {
     "active_task": null,
-    "intent": null,
-    "entity": null,
-    "collected": [],
+    "intent": "mode_switch_builder",
+    "entity": "golden_clientes_1771681715",
+    "collected": {
+        "nombre": "ana"
+    },
     "missing": [],
     "requested_slot": null,
     "builder_pending_command": null,
@@ -10,22 +12,37 @@
     "builder_completed_entities": [],
     "builder_completed_forms": [],
     "unknown_business_notice_sent": false,
-    "last_action": null,
+    "last_action": {
+        "command": "CreateRecord",
+        "entity": "golden_clientes_1771681715",
+        "data": {
+            "nombre": "ana"
+        },
+        "filters": {
+            "nombre": "ana"
+        },
+        "result": {
+            "id": 1
+        },
+        "user_message": "crear golden_clientes_1771681715 nombre=Ana",
+        "assistant_reply": "",
+        "at": "2026-02-21T13:48:36+00:00"
+    },
     "dialog": {
         "mode": "app",
-        "current_step_id": "app_ready",
-        "current_step_label": "Validar tablas activas",
+        "current_step_id": "query_data",
+        "current_step_label": "Consultar informacion",
         "checklist": [
             {
                 "id": "app_ready",
                 "label": "Validar tablas activas",
-                "done": false,
+                "done": true,
                 "next": "Reviso que haya tablas y te digo que puedes usar."
             },
             {
                 "id": "first_record",
                 "label": "Crear primer registro",
-                "done": false,
+                "done": true,
                 "next": "Registremos el primer dato real."
             },
             {
@@ -41,29 +58,19 @@
                 "next": "Luego actualizamos o eliminamos un registro de prueba."
             }
         ],
-        "updated_at": "2026-02-21T13:48:35+00:00"
+        "updated_at": "2026-02-21T13:48:36+00:00"
     },
     "last_messages": [
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771680393
+            "u": "crear golden_clientes_1771681715 nombre=Ana",
+            "a": "OK",
+            "ts": 1771681716
         },
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681339
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681710
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681715
+            "u": "quiero crear una tabla productos",
+            "a": "Eso se hace en el Creador de apps. Abre el chat creador para crear tablas o formularios.",
+            "ts": 1771681716
         }
     ],
-    "summary": "hola"
+    "summary": "crear golden_clientes_1771681715 nombre=Ana"
 }

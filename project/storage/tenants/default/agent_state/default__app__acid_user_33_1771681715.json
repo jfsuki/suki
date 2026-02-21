@@ -1,6 +1,6 @@
 {
     "active_task": null,
-    "intent": null,
+    "intent": "PROJECT_STATUS",
     "entity": null,
     "collected": [],
     "missing": [],
@@ -45,25 +45,10 @@
     },
     "last_messages": [
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771680393
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681339
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681710
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "u": "que hay hecho",
+            "a": "En esta app puedes trabajar con:\n- Listas: ninguna lista activa\n- Formularios: ningun formulario activo\nNo hay listas activas. Pide al creador agregar una tabla.",
             "ts": 1771681715
         }
     ],
-    "summary": "hola"
+    "summary": "que hay hecho"
 }

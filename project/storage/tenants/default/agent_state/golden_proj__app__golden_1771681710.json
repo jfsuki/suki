@@ -1,6 +1,6 @@
 {
     "active_task": null,
-    "intent": null,
+    "intent": "mode_switch_builder",
     "entity": null,
     "collected": [],
     "missing": [],
@@ -41,29 +41,14 @@
                 "next": "Luego actualizamos o eliminamos un registro de prueba."
             }
         ],
-        "updated_at": "2026-02-21T13:48:35+00:00"
+        "updated_at": "2026-02-21T13:48:30+00:00"
     },
     "last_messages": [
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771680393
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681339
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "u": "quiero crear una tabla clientes",
+            "a": "Eso se hace en el Creador de apps. Abre el chat creador para crear tablas o formularios.",
             "ts": 1771681710
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681715
         }
     ],
-    "summary": "hola"
+    "summary": "quiero crear una tabla clientes"
 }

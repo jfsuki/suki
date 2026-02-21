@@ -1,7 +1,7 @@
 {
     "active_task": null,
-    "intent": null,
-    "entity": null,
+    "intent": "CRUD_GUIDE",
+    "entity": "cliente",
     "collected": [],
     "missing": [],
     "requested_slot": null,
@@ -45,25 +45,10 @@
     },
     "last_messages": [
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771680393
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681339
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681710
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "u": "explicame como creo un cliente",
+            "a": "Para crear un registro en cliente, escribe:\n- crear cliente nombre=valor nit=valor\nPara verlos: listar cliente\nPara actualizar: actualizar cliente id=1 campo=valor\nPara eliminar: eliminar cliente id=1",
             "ts": 1771681715
         }
     ],
-    "summary": "hola"
+    "summary": "explicame como creo un cliente"
 }

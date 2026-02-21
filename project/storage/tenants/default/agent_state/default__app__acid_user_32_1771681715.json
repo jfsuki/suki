@@ -1,6 +1,6 @@
 {
     "active_task": null,
-    "intent": null,
+    "intent": "FORM_LIST",
     "entity": null,
     "collected": [],
     "missing": [],
@@ -45,25 +45,10 @@
     },
     "last_messages": [
         {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771680393
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681339
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
-            "ts": 1771681710
-        },
-        {
-            "u": "hola",
-            "a": "Hola, soy Cami. Dime que necesitas crear o consultar.",
+            "u": "que pantallas tengo",
+            "a": "Aun no hay formularios. Quieres crear uno?",
             "ts": 1771681715
         }
     ],
-    "summary": "hola"
+    "summary": "que pantallas tengo"
 }
