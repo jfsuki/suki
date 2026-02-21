@@ -15,11 +15,11 @@
         },
         {
             "topic": "inventario",
-            "count": 3,
+            "count": 6,
             "status": "pending_research",
             "first_seen": "2026-02-20T18:10:07+00:00",
-            "last_seen": "2026-02-20T18:16:17+00:00",
-            "last_user": "golden_user_1771611377",
+            "last_seen": "2026-02-21T02:56:19+00:00",
+            "last_user": "golden_user_1771642579",
             "samples": [
                 "quiero crear una app para inventario"
             ]

@@ -146,11 +146,11 @@ final class DashboardEngine
 
     private function sumMainColumn(array $entity, string $column): float
     {
-        $table = (string) ($entity['table']['name'] ?? '');
-        if ($table === '' || $column === '') {
+        $logicalTable = (string) ($entity['table']['name'] ?? '');
+        if ($logicalTable === '' || $column === '') {
             return 0.0;
         }
-        $table = $this->sanitizeIdentifier($table);
+        $table = $this->sanitizeIdentifier(TableNamespace::resolve($logicalTable));
         $column = $this->sanitizeIdentifier($column);
         $sql = "SELECT SUM({$column}) as total FROM {$table}";
         $params = [];
@@ -167,7 +167,8 @@ final class DashboardEngine
         if (!$grid) {
             return 0.0;
         }
-        $table = $this->sanitizeIdentifier((string) ($grid['table'] ?? ''));
+        $gridLogicalTable = (string) ($grid['table'] ?? (($entity['table']['name'] ?? '') . '__' . $gridName));
+        $table = $this->sanitizeIdentifier(TableNamespace::resolve($gridLogicalTable));
         $column = $this->sanitizeIdentifier($column);
         $sql = "SELECT SUM({$column}) as total FROM {$table}";
         $params = [];
@@ -184,7 +185,8 @@ final class DashboardEngine
         if (!$grid || $field === '') {
             return [];
         }
-        $table = $this->sanitizeIdentifier((string) ($grid['table'] ?? ''));
+        $gridLogicalTable = (string) ($grid['table'] ?? (($entity['table']['name'] ?? '') . '__' . $gridName));
+        $table = $this->sanitizeIdentifier(TableNamespace::resolve($gridLogicalTable));
         $field = $this->sanitizeIdentifier($field);
 
         $sql = "SELECT {$field} as val FROM {$table}";

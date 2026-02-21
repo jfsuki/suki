@@ -28,6 +28,9 @@
 1) Migration diff/alter (pending)
 2) Security hardening (CSRF/IDOR/rate limit) (pending)
 3) Metadata contracts in DB + versioning (pending)
+4) DB anti-colapso guardrails (in progress)
+5) DB health monitoring diario (in progress)
+6) Namespace -> canonical migration plan (done doc / pending execution)
 
 ## Definition of Done (DoD)
 - Backward compatible
@@ -56,3 +59,8 @@
 - [ ] Migration diff/alter
 - [ ] Security hardening
 - [ ] Metadata contracts in DB
+- [x] Namespace por proyecto (DB_NAMESPACE_BY_PROJECT)
+- [x] Guardrail de tablas por proyecto (EntityMigrator)
+- [x] Script de salud DB (framework/tests/db_health.php)
+- [ ] Automatizar db_health (cron diario)
+- [ ] Ejecutar migracion gradual a modelo canonico (tenant_id + app_id)

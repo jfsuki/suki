@@ -121,8 +121,21 @@ final class ChatAgent
         }
 
         if ($action === 'execute_command' && !empty($result['command'])) {
+            $commandPayload = (array) $result['command'];
             try {
-                $reply = $this->executeCommandPayload((array) $result['command'], $channel, $sessionId, $userId, $mode);
+                $reply = $this->executeCommandPayload($commandPayload, $channel, $sessionId, $userId, $mode);
+                if (($reply['status'] ?? '') === 'success') {
+                    $this->gateway()->rememberExecution(
+                        $tenantId,
+                        $userId,
+                        $projectId,
+                        $mode,
+                        $commandPayload,
+                        (array) ($reply['data'] ?? []),
+                        $text,
+                        (string) ($reply['reply'] ?? '')
+                    );
+                }
             } catch (\Throwable $e) {
                 $rawError = (string) $e->getMessage();
                 $human = $this->humanizeSqlError($rawError);

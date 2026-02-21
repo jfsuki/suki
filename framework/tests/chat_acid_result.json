@@ -1,11 +1,15 @@
 {
     "summary": {
-        "passed": 26,
+        "passed": 34,
         "failed": 0,
-        "total": 26,
+        "total": 34,
         "training_intents": 30,
         "training_error": "No error",
-        "ran_at": "2026-02-20 18:16:03"
+        "ran_at": "2026-02-21 03:05:55",
+        "confusion_cases_total": 3,
+        "confusion_cases_passed": 3,
+        "confusion_cases_failed": 0,
+        "confusion_error": "none"
     },
     "results": [
         {
@@ -48,7 +52,7 @@
             "id": 5,
             "message": "que tablas?",
             "action": "respond_local",
-            "reply": "Tablas creadas: clientes, ordenes_trabajo, productos, servicios. Quieres ver los campos de alguna?",
+            "reply": "Eso se hace en el Creador de apps. Abre el chat creador para crear tablas o formularios.",
             "command": "",
             "ok": true,
             "error": null
@@ -57,7 +61,7 @@
             "id": 6,
             "message": "que formularios?",
             "action": "respond_local",
-            "reply": "Formularios: clientes.form, productos.form, servicios.form. Quieres abrir alguno?",
+            "reply": "Eso se hace en el Creador de apps. Abre el chat creador para crear tablas o formularios.",
             "command": "",
             "ok": true,
             "error": null
@@ -66,7 +70,7 @@
             "id": 7,
             "message": "que opciones puedo usar ahora",
             "action": "respond_local",
-            "reply": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\nOpciones activas ahora:\n- crear clientes nombre=valor\n- listar clientes\n- abrir formulario clientes.form\nEntidades activas: clientes, ordenes_trabajo, productos, servicios",
+            "reply": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\nOpciones activas ahora:\n- pedir al creador que agregue una tabla base\nEntidades activas: sin entidades",
             "command": "",
             "ok": true,
             "error": null
@@ -75,7 +79,7 @@
             "id": 8,
             "message": "dame el estado del proyecto",
             "action": "respond_local",
-            "reply": "En esta app puedes trabajar con:\n- Listas: clientes, ordenes_trabajo, productos, servicios\n- Formularios: clientes.form, productos.form, servicios.form\nEjemplos: crear clientes nombre=valor, listar clientes",
+            "reply": "En esta app puedes trabajar con:\n- Listas: ninguna lista activa\n- Formularios: ningun formulario activo\nNo hay listas activas. Pide al creador agregar una tabla.",
             "command": "",
             "ok": true,
             "error": null
@@ -93,7 +97,7 @@
             "id": 10,
             "message": "crear tabla clientes",
             "action": "ask_user",
-            "reply": "Vamos paso a paso.\nPaso 1: crearemos la tabla clientes.\nSe guardara esta informacion: nombre, documento, telefono, email, direccion, activo.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "reply": "Vamos paso a paso.\nPaso 1: crearemos la tabla clientes.\nCampos principales: nombre, documento, telefono, email.\nCampos adicionales sugeridos: direccion, activo.\nSe guardara esta informacion: nombre, documento, telefono, email, direccion, activo.\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nQuieres que la cree por ti ahora? Responde: si o no.",
             "command": "",
             "ok": true,
             "error": null
@@ -101,18 +105,18 @@
         {
             "id": 11,
             "message": "crear formulario clientes",
-            "action": "execute_command",
-            "reply": "",
-            "command": "CreateForm",
+            "action": "ask_user",
+            "reply": "Para crear ese formulario primero necesito la tabla base.\nVamos paso a paso.\nPaso 1: crearemos la tabla clientes.\nCampos principales: nombre, documento, telefono, email.\nCampos adicionales sugeridos: direccion, activo.\nSe guardara esta informacion: nombre, documento, telefono, email, direccion, activo.\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "command": "",
             "ok": true,
             "error": null
         },
         {
             "id": 12,
             "message": "crear producto",
-            "action": "execute_command",
-            "reply": "",
-            "command": "CreateRecord",
+            "action": "respond_local",
+            "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "command": "",
             "ok": true,
             "error": null
         },
@@ -136,42 +140,114 @@
         },
         {
             "id": 15,
-            "message": "crear cliente nombre=Juan nit=123",
-            "action": "execute_command",
-            "reply": "",
-            "command": "CreateRecord",
+            "message": "quiero crear un programa para mi veterinaria",
+            "action": "ask_user",
+            "reply": "Perfecto. Paso 2: como manejas pagos? contado, credito o mixto.",
+            "command": "",
             "ok": true,
             "error": null
         },
         {
             "id": 16,
-            "message": "listar cliente",
-            "action": "execute_command",
-            "reply": "",
-            "command": "QueryRecords",
+            "message": "mixto",
+            "action": "ask_user",
+            "reply": "Paso 3: que necesitas controlar primero en tu negocio?\nEjemplos: citas, ordenes de trabajo, inventario, facturacion, pagos.",
+            "command": "",
             "ok": true,
             "error": null
         },
         {
             "id": 17,
-            "message": "actualizar cliente id=1 email=juan@mail.com",
-            "action": "execute_command",
-            "reply": "",
-            "command": "UpdateRecord",
+            "message": "si crea la tabla pacientes",
+            "action": "ask_user",
+            "reply": "Vamos paso a paso.\nPaso 1: crearemos la tabla pacientes.\nCampos principales: nombre, especie, raza, sexo.\nCampos adicionales sugeridos: fecha_nacimiento, dueno_id, activo.\nSe guardara esta informacion: nombre, especie, raza, sexo, fecha_nacimiento, dueno_id.\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "command": "",
             "ok": true,
             "error": null
         },
         {
             "id": 18,
-            "message": "eliminar cliente id=1",
+            "message": "si",
             "action": "execute_command",
             "reply": "",
-            "command": "DeleteRecord",
+            "command": "CreateEntity",
             "ok": true,
             "error": null
         },
         {
             "id": 19,
+            "message": "crear cliente nombre=Juan nit=123",
+            "action": "respond_local",
+            "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "command": "",
+            "ok": true,
+            "error": null
+        },
+        {
+            "id": 20,
+            "message": "listar cliente",
+            "action": "respond_local",
+            "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "command": "",
+            "ok": true,
+            "error": null
+        },
+        {
+            "id": 21,
+            "message": "dame una lista de clientes",
+            "action": "respond_local",
+            "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "command": "",
+            "ok": true,
+            "error": null
+        },
+        {
+            "id": 22,
+            "message": "actualizar cliente id=1 email=juan@mail.com",
+            "action": "respond_local",
+            "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "command": "",
+            "ok": true,
+            "error": null
+        },
+        {
+            "id": 23,
+            "message": "eliminar cliente id=1",
+            "action": "respond_local",
+            "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "command": "",
+            "ok": true,
+            "error": null
+        },
+        {
+            "id": 24,
+            "message": "crear cliente",
+            "action": "respond_local",
+            "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "command": "",
+            "ok": true,
+            "error": null
+        },
+        {
+            "id": 25,
+            "message": "Ana",
+            "action": "respond_local",
+            "reply": "Solo puedo responder con datos reales de esta app. Dime una accion concreta: listar cliente, crear cliente nombre=Ana, o estado de la app.",
+            "command": "",
+            "ok": true,
+            "error": null
+        },
+        {
+            "id": 26,
+            "message": "que guardaste",
+            "action": "respond_local",
+            "reply": "Aun no he guardado nada en esta sesion. Si quieres, te guio para crear el primer registro.",
+            "command": "",
+            "ok": true,
+            "error": null
+        },
+        {
+            "id": 27,
             "message": "mi negocio es ferreteria",
             "action": "respond_local",
             "reply": "Listo, te voy guiando con plantilla de Ferreteria.",
@@ -180,7 +256,7 @@
             "error": null
         },
         {
-            "id": 20,
+            "id": 28,
             "message": "guarda estas expresiones para despues",
             "action": "respond_local",
             "reply": "Listo, lo guardo para entenderte mejor.",
@@ -189,7 +265,7 @@
             "error": null
         },
         {
-            "id": 21,
+            "id": 29,
             "message": "crear usuario usuario=ana rol=vendedor clave=1234",
             "action": "execute_command",
             "reply": "",
@@ -198,7 +274,7 @@
             "error": null
         },
         {
-            "id": 22,
+            "id": 30,
             "message": "iniciar sesion usuario=ana clave=1234",
             "action": "execute_command",
             "reply": "",
@@ -207,40 +283,123 @@
             "error": null
         },
         {
-            "id": 23,
+            "id": 31,
             "message": "que tablas hay",
             "action": "respond_local",
-            "reply": "Tablas creadas: clientes, ordenes_trabajo, productos, servicios. Quieres ver los campos de alguna?",
+            "reply": "Eso se hace en el Creador de apps. Abre el chat creador para crear tablas o formularios.",
             "command": "",
             "ok": true,
             "error": null
         },
         {
-            "id": 24,
+            "id": 32,
             "message": "que pantallas tengo",
             "action": "respond_local",
-            "reply": "Formularios: clientes.form, productos.form, servicios.form. Quieres abrir alguno?",
+            "reply": "Aun no hay formularios. Quieres crear uno?",
             "command": "",
             "ok": true,
             "error": null
         },
         {
-            "id": 25,
+            "id": 33,
             "message": "que hay hecho",
             "action": "respond_local",
-            "reply": "En esta app puedes trabajar con:\n- Listas: clientes, ordenes_trabajo, productos, servicios\n- Formularios: clientes.form, productos.form, servicios.form\nEjemplos: crear clientes nombre=valor, listar clientes",
+            "reply": "En esta app puedes trabajar con:\n- Listas: ninguna lista activa\n- Formularios: ningun formulario activo\nNo hay listas activas. Pide al creador agregar una tabla.",
             "command": "",
             "ok": true,
             "error": null
         },
         {
-            "id": 26,
+            "id": 34,
             "message": "ayuda rapida",
             "action": "respond_local",
-            "reply": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\nOpciones activas ahora:\n- crear clientes nombre=valor\n- listar clientes\n- abrir formulario clientes.form\nEntidades activas: clientes, ordenes_trabajo, productos, servicios",
+            "reply": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\n- Sugerir codigo UNSPSC para productos y servicios.\nOpciones activas ahora:\n- pedir al creador que agregue una tabla base\nEntidades activas: sin entidades",
             "command": "",
             "ok": true,
             "error": null
+        }
+    ],
+    "confusion_cases": [
+        {
+            "name": "pending_no_entity_corruption",
+            "ok": true,
+            "trace": [
+                {
+                    "user": "quiero crear un programa para veterinaria",
+                    "action": "ask_user",
+                    "reply": "Perfecto. Paso 2: como manejas pagos? contado, credito o mixto.",
+                    "entity": "",
+                    "pending_entity": ""
+                },
+                {
+                    "user": "mixto",
+                    "action": "ask_user",
+                    "reply": "Paso 3: que necesitas controlar primero en tu negocio?\nEjemplos: citas, ordenes de trabajo, inventario, facturacion, pagos.",
+                    "entity": "",
+                    "pending_entity": ""
+                },
+                {
+                    "user": "si crea la tabla pacientes",
+                    "action": "ask_user",
+                    "reply": "Vamos paso a paso.\nPaso 1: crearemos la tabla pacientes.\nCampos principales: nombre, especie, raza, sexo.\nCampos adicionales sugeridos: fecha_nacimiento, dueno_id, activo.\nSe guardara esta informacion: nombre, especie, raza, sexo, fecha_nacimiento, dueno_id.\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nQuieres que la cree por ti ahora? Responde: si o no.",
+                    "entity": "pacientes",
+                    "pending_entity": "pacientes"
+                },
+                {
+                    "user": "cuales campos vas a crear",
+                    "action": "ask_user",
+                    "reply": "Voy a crear la tabla pacientes con estos datos: nombre, especie, raza, sexo, fecha_nacimiento, dueno_id, activo.\nResponde \"si\" para crearla o \"no\" para cambiarla.",
+                    "entity": "pacientes",
+                    "pending_entity": "pacientes"
+                },
+                {
+                    "user": "no entendi",
+                    "action": "ask_user",
+                    "reply": "Te explico facil:\n- Voy a crear la tabla pacientes para guardar esos datos.\n- Si estas de acuerdo responde \"si\".\n- Si quieres cambiar datos responde \"no\".\n- Si quieres ver campos sugeridos, escribe: \"cuales campos me sugieres\".",
+                    "entity": "pacientes",
+                    "pending_entity": "pacientes"
+                }
+            ]
+        },
+        {
+            "name": "app_missing_entity_guard",
+            "ok": true,
+            "trace": [
+                {
+                    "user": "crear laboratorio nombre=taladro",
+                    "action": "respond_local",
+                    "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+                    "entity": "",
+                    "pending_entity": ""
+                },
+                {
+                    "user": "que guardaste",
+                    "action": "respond_local",
+                    "reply": "Aun no he guardado nada en esta sesion. Si quieres, te guio para crear el primer registro.",
+                    "entity": "",
+                    "pending_entity": ""
+                }
+            ]
+        },
+        {
+            "name": "slot_single_question",
+            "ok": true,
+            "trace": [
+                {
+                    "user": "crear cliente",
+                    "action": "respond_local",
+                    "reply": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+                    "entity": "",
+                    "pending_entity": ""
+                },
+                {
+                    "user": "ana",
+                    "action": "respond_local",
+                    "reply": "Solo puedo responder con datos reales de esta app. Dime una accion concreta: listar cliente, crear cliente nombre=Ana, o estado de la app.",
+                    "entity": "",
+                    "pending_entity": ""
+                }
+            ]
         }
     ]
 }

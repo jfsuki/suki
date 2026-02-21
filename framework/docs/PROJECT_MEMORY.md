@@ -187,3 +187,25 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
   - `tests/chat_acid.php`: 26 pass, 0 fail
   - `tests/chat_api_single_demo.php`: 7/7 OK
   - `tests/chat_golden.php`: 8/8 OK
+
+## Checkpoint (2026-02-21, portafolio agentes + anti-colapso DB)
+- Estrategia de portafolio formalizada:
+  - `framework/docs/AGENTS_PORTFOLIO_STRATEGY.md`
+  - objetivo: operar apps propias + sistemas de terceros via API oficial.
+- Anti-colapso en DB compartida:
+  - namespace fisico por proyecto activo (`DB_NAMESPACE_BY_PROJECT=1`).
+  - guardrail de tablas por proyecto (`DB_MAX_TABLES_PER_PROJECT`) en `EntityMigrator`.
+  - resolucion de tablas aplicada en migrador/CRUD/dashboard/query builder.
+- Plan de evolucion de hosting y migracion a modelo canonico:
+  - `framework/docs/HOSTING_MIGRATION_PLAN.md`.
+  - enfoque: shared -> VPS -> tablas canonicas con `tenant_id + app_id`.
+
+## Checkpoint (2026-02-21, testing post-namespace)
+- Pruebas ejecutadas:
+  - `php framework/tests/run.php` -> 8 pass, 0 fail.
+  - `php framework/tests/chat_golden.php` -> 8 pass, 0 fail.
+  - `php framework/tests/chat_api_single_demo.php` -> 7/7 OK.
+  - `php framework/tests/db_health.php` -> OK, sin warnings en baseline limpio.
+- Hallazgo pendiente:
+  - `php framework/tests/chat_acid.php` sigue en 23 pass / 11 fail (regresion previa no resuelta en este bloque).
+  - `framework/docs/smoke.ps1` requiere contratos/forms de demo (`fact.form.json`, etc.), por eso falla en baseline limpio.

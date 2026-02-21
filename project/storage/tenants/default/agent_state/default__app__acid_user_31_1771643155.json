@@ -1,0 +1,19 @@
+{
+    "active_task": null,
+    "intent": "mode_switch_builder",
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "unknown_business_notice_sent": false,
+    "last_action": null,
+    "last_messages": [
+        {
+            "u": "que tablas hay",
+            "a": "Eso se hace en el Creador de apps. Abre el chat creador para crear tablas o formularios.",
+            "ts": 1771643155
+        }
+    ],
+    "summary": "que tablas hay"
+}

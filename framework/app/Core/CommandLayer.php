@@ -326,11 +326,12 @@ class CommandLayer
                 continue;
             }
 
-            $table = (string) ($gridDef['table'] ?? '');
+            $gridTableLogical = (string) ($gridDef['table'] ?? '');
             $fk = (string) ($gridDef['relation']['fk'] ?? ($entity['table']['name'] ?? '') . '_id');
-            if ($table === '' || $fk === '') {
+            if ($gridTableLogical === '' || $fk === '') {
                 continue;
             }
+            $table = TableNamespace::resolve($gridTableLogical);
 
             $fields = $gridFields[$gridName] ?? [];
             $allowed = array_keys($fields);
@@ -393,11 +394,12 @@ class CommandLayer
                 continue;
             }
 
-            $table = (string) ($gridDef['table'] ?? '');
+            $gridTableLogical = (string) ($gridDef['table'] ?? '');
             $fk = (string) ($gridDef['relation']['fk'] ?? ($entity['table']['name'] ?? '') . '_id');
-            if ($table === '' || $fk === '') {
+            if ($gridTableLogical === '' || $fk === '') {
                 continue;
             }
+            $table = TableNamespace::resolve($gridTableLogical);
 
             $allowed = [$fk];
             if ($tenantScoped) {
@@ -424,11 +426,12 @@ class CommandLayer
 
         foreach (($entity['grids'] ?? []) as $gridDef) {
             $gridName = (string) ($gridDef['name'] ?? '');
-            $table = (string) ($gridDef['table'] ?? '');
+            $gridTableLogical = (string) ($gridDef['table'] ?? '');
             $fk = (string) ($gridDef['relation']['fk'] ?? ($entity['table']['name'] ?? '') . '_id');
-            if ($gridName === '' || $table === '' || $fk === '') {
+            if ($gridName === '' || $gridTableLogical === '' || $fk === '') {
                 continue;
             }
+            $table = TableNamespace::resolve($gridTableLogical);
 
             $fields = $gridFields[$gridName] ?? [];
             $allowed = array_keys($fields);

@@ -32,6 +32,13 @@ A “mother” DB layer:
 - DB_DRIVER, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS, DB_CHARSET
 - DB_PATH (solo sqlite)
 - TENANT_ID (opcional para pruebas locales)
+- DB_NAMESPACE_BY_PROJECT=1 (opcional, crea tablas fisicas por proyecto: p_<hash>__tabla)
+
+Table namespace mode (shared hosting):
+- Use only for isolation in low/medium scale.
+- Keep tenant_id + indexes even with namespaced tables.
+- Not recommended for millions of apps in one DB (too many tables, metadata locks, open table cache pressure).
+- For very large scale: shared canonical tables + app_id/tenant_id columns, then shard by tenant.
 
 Security:
 - Prevent SQL injection via bindings
@@ -75,6 +82,13 @@ Capa “madre”:
 - DB_DRIVER, DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS, DB_CHARSET
 - DB_PATH (solo sqlite)
 - TENANT_ID (opcional para pruebas locales)
+- DB_NAMESPACE_BY_PROJECT=1 (opcional, crea tablas fisicas por proyecto: p_<hash>__tabla)
+
+Modo namespace por proyecto (hosting compartido):
+- Sirve para aislar en escala baja/media.
+- Mantener tenant_id + indices incluso con tablas namespaced.
+- No recomendado para millones de apps en una sola BD (demasiadas tablas, metadata locks, presion en cache de tablas abiertas).
+- Para escala alta: tablas canonicas compartidas + columnas app_id/tenant_id, y sharding por tenant.
 
 Seguridad:
 - evita SQLi con bindings

@@ -1,0 +1,34 @@
+{
+    "active_task": null,
+    "intent": "USER_CREATE",
+    "entity": null,
+    "collected": {
+        "usuario": "ana",
+        "rol": "vendedor",
+        "clave": "1234"
+    },
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "unknown_business_notice_sent": false,
+    "last_action": {
+        "command": "AuthCreateUser",
+        "entity": "",
+        "data": [],
+        "filters": [],
+        "result": {
+            "count": 0
+        },
+        "user_message": "crear usuario usuario=ana rol=vendedor clave=1234",
+        "assistant_reply": "OK",
+        "at": "2026-02-21T03:05:55+00:00"
+    },
+    "last_messages": [
+        {
+            "u": "crear usuario usuario=ana rol=vendedor clave=1234",
+            "a": "OK",
+            "ts": 1771643155
+        }
+    ],
+    "summary": "crear usuario usuario=ana rol=vendedor clave=1234"
+}

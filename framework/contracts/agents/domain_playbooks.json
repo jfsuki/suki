@@ -1,14 +1,15 @@
 {
     "meta": {
         "name": "domain_playbooks",
-        "version": "0.3.3",
-        "updated_at": "2026-02-19",
+        "version": "0.3.6",
+        "updated_at": "2026-02-20",
         "goal": "Universal business playbooks to create ERP/CRM/accounting and operational mini-apps by conversation.",
         "notes": [
             "Operational guidance only. Legal decisions require accountant validation.",
             "Builder asks one minimal question at a time.",
             "Agent must validate real entities/forms from registry before promising actions.",
-            "Coverage expanded for ERP, CRM, accounting, medical, church, commerce and SAP-side mini-apps."
+            "Coverage expanded for ERP, CRM, accounting, medical, church, commerce and SAP-side mini-apps.",
+            "v0.3.6: +perfil spa_bienestar y aliases de estetica/spa para onboarding."
         ]
     },
     "discovery": {
@@ -1164,6 +1165,79 @@
                     "capacidad:numero",
                     "tarifa_noche:decimal",
                     "estado:texto"
+                ]
+            }
+        },
+        {
+            "key": "spa_bienestar",
+            "label": "Spa y bienestar",
+            "aliases": [
+                "spa",
+                "estetica",
+                "estética",
+                "belleza",
+                "centro estetico",
+                "centro de estetica",
+                "tratamientos",
+                "facial",
+                "depilacion",
+                "masajes"
+            ],
+            "entities": [
+                "pacientes",
+                "citas",
+                "tratamientos",
+                "profesionales",
+                "paquetes",
+                "facturas",
+                "pagos",
+                "historial_tratamientos",
+                "inventario_insumos",
+                "gastos"
+            ],
+            "forms": [
+                "pacientes.form",
+                "citas.form",
+                "tratamientos.form",
+                "facturas.form"
+            ],
+            "reports": [
+                "agenda_diaria",
+                "ingresos_por_servicio",
+                "historial_por_paciente",
+                "comisiones_por_profesional"
+            ],
+            "accounting_focus": [
+                "Ingresos por tratamientos",
+                "Control de cartera por paciente",
+                "Control de gastos operativos e insumos"
+            ],
+            "suggestions": {
+                "pacientes_fields": [
+                    "nombre:texto",
+                    "documento:texto",
+                    "telefono:texto",
+                    "email:texto",
+                    "fecha_nacimiento:fecha",
+                    "activo:bool"
+                ],
+                "citas_fields": [
+                    "fecha:fecha",
+                    "hora:texto",
+                    "paciente_id:numero",
+                    "profesional_id:numero",
+                    "tratamiento_id:numero",
+                    "estado:texto",
+                    "valor_estimado:decimal"
+                ],
+                "tratamientos_fields": [
+                    "codigo:texto",
+                    "nombre:texto",
+                    "categoria:texto",
+                    "duracion_minutos:numero",
+                    "precio:decimal",
+                    "activo:bool",
+                    "codigo_unspsc:texto"
                 ]
             }
         },

@@ -46,18 +46,21 @@ class EntityMigrator
         }
 
         $checksum = hash('sha256', json_encode($entity, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE));
-        $current = $this->store->getChecksum($name);
+        $migrationKey = TableNamespace::migrationKey($name);
+        $current = $this->store->getChecksum($migrationKey);
+        $this->assertProjectTableLimit($entity);
 
         $sqls = $this->buildCreateSql($entity);
         if ($apply) {
             foreach ($sqls as $sql) {
                 $this->db->exec($sql);
             }
-            $this->store->upsert($name, $checksum);
+            $this->store->upsert($migrationKey, $checksum);
         }
 
         return [
             'entity' => $name,
+            'migration_key' => $migrationKey,
             'applied' => $apply ? ($current !== $checksum) : false,
             'checksum' => $checksum,
             'sql' => $sqls,
@@ -66,11 +69,12 @@ class EntityMigrator
 
     private function buildCreateSql(array $entity): array
     {
-        $table = (string) ($entity['table']['name'] ?? '');
-        if ($table === '') {
+        $logicalTable = (string) ($entity['table']['name'] ?? '');
+        if ($logicalTable === '') {
             throw new RuntimeException('Entidad sin table.name.');
         }
-        $table = $this->sanitizeIdentifier($table);
+        $logicalTable = $this->sanitizeIdentifier($logicalTable);
+        $table = $this->sanitizeIdentifier(TableNamespace::resolve($logicalTable));
 
         $primaryKey = (string) ($entity['table']['primaryKey'] ?? 'id');
         $timestamps = (bool) ($entity['table']['timestamps'] ?? false);
@@ -132,9 +136,9 @@ class EntityMigrator
             if ($gridName === '') {
                 continue;
             }
-            $gridTable = (string) ($grid['table'] ?? "{$table}__{$gridName}");
-            $fk = (string) ($grid['relation']['fk'] ?? "{$table}_id");
-            $gridTable = $this->sanitizeIdentifier($gridTable);
+            $gridTableLogical = (string) ($grid['table'] ?? "{$logicalTable}__{$gridName}");
+            $fk = (string) ($grid['relation']['fk'] ?? "{$logicalTable}_id");
+            $gridTable = $this->sanitizeIdentifier(TableNamespace::resolve($gridTableLogical));
             $fk = $this->sanitizeIdentifier($fk);
 
             $gridColumns = [];
@@ -216,5 +220,77 @@ class EntityMigrator
             throw new RuntimeException("Identificador invalido: {$name}");
         }
         return $name;
+    }
+
+    private function assertProjectTableLimit(array $entity): void
+    {
+        if (!TableNamespace::enabled()) {
+            return;
+        }
+
+        $limit = (int) (getenv('DB_MAX_TABLES_PER_PROJECT') ?: 0);
+        if ($limit <= 0) {
+            return;
+        }
+
+        $driver = (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver !== 'mysql') {
+            return;
+        }
+
+        $logicalTable = (string) ($entity['table']['name'] ?? '');
+        if ($logicalTable === '') {
+            return;
+        }
+        $targetTable = TableNamespace::resolve($logicalTable);
+        if ($this->tableExists($targetTable)) {
+            return;
+        }
+
+        $prefix = TableNamespace::projectPrefix();
+        $stmt = $this->db->prepare(
+            'SELECT COUNT(*) AS total
+             FROM information_schema.tables
+             WHERE table_schema = DATABASE()
+               AND table_name LIKE :prefix'
+        );
+        $stmt->bindValue(':prefix', $prefix . '%');
+        $stmt->execute();
+        $total = (int) ($stmt->fetchColumn() ?: 0);
+        if ($total >= $limit) {
+            throw new RuntimeException(
+                "Limite de tablas por proyecto alcanzado ({$limit}). " .
+                "Consolida entidades o migra a un plan superior."
+            );
+        }
+    }
+
+    private function tableExists(string $table): bool
+    {
+        $table = $this->sanitizeIdentifier($table);
+        $driver = (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+        if ($driver === 'mysql') {
+            $stmt = $this->db->prepare(
+                'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :table'
+            );
+            $stmt->bindValue(':table', $table);
+            $stmt->execute();
+            return ((int) $stmt->fetchColumn()) > 0;
+        }
+
+        if ($driver === 'sqlite') {
+            $stmt = $this->db->prepare("SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name = :table");
+            $stmt->bindValue(':table', $table);
+            $stmt->execute();
+            return ((int) $stmt->fetchColumn()) > 0;
+        }
+
+        try {
+            $this->db->query("SELECT 1 FROM {$table} LIMIT 1");
+            return true;
+        } catch (\Throwable $e) {
+            return false;
+        }
     }
 }

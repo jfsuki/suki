@@ -1,0 +1,252 @@
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si ayudame a crear esa pacientes que seria las mascotas, y cliente seria el dueño de la mascota quien hace el pago","mode":"builder","ts":1771634378}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"pacientes","missing":[],"message":"si crea la tabla pacientes","mode":"builder","ts":1771634414}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cuales me sugieres","mode":"builder","ts":1771634428}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no, cuales campos vas a crear?","mode":"builder","ts":1771634449}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no entendi que debo hacer","mode":"builder","ts":1771634465}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635090}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771635090}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771635090","missing":[],"message":"quiero crear una tabla demo_clientes_1771635090","mode":"builder","ts":1771635091}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771635091}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771635091}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771635092}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635106}
+{"classification":"capabilities","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dime q puedo hacer aca","mode":"builder","ts":1771635106}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero un programa para mi veterinaria","mode":"builder","ts":1771635106}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771635107}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635121}
+{"classification":"capabilities","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dime q puedo hacer aca","mode":"builder","ts":1771635121}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero un programa para mi veterinaria","mode":"builder","ts":1771635121}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771635121}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si ayudame a crear esa pacientes que seria las mascotas, y cliente seria el dueno de la mascota quien hace el pago","mode":"builder","ts":1771635122}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea la tabla pacientes","mode":"builder","ts":1771635122}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cuales me sugieres","mode":"builder","ts":1771635122}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no, cuales campos vas a crear?","mode":"builder","ts":1771635122}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no entendi que debo hacer","mode":"builder","ts":1771635122}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635323}
+{"classification":"capabilities","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dime q puedo hacer aca","mode":"builder","ts":1771635324}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero un programa para mi veterinaria","mode":"builder","ts":1771635324}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771635324}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si ayudame a crear esa pacientes que seria las mascotas, y cliente seria el dueno de la mascota quien hace el pago","mode":"builder","ts":1771635324}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea la tabla pacientes","mode":"builder","ts":1771635324}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cuales me sugieres","mode":"builder","ts":1771635325}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no, cuales campos vas a crear?","mode":"builder","ts":1771635325}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no entendi que debo hacer","mode":"builder","ts":1771635325}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635377}
+{"classification":"capabilities","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dime q puedo hacer aca","mode":"builder","ts":1771635377}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero un programa para mi veterinaria","mode":"builder","ts":1771635377}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771635377}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si ayudame a crear esa pacientes que seria las mascotas, y cliente seria el dueno de la mascota quien hace el pago","mode":"builder","ts":1771635378}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea la tabla pacientes","mode":"builder","ts":1771635378}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cuales me sugieres","mode":"builder","ts":1771635378}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no, cuales campos vas a crear?","mode":"builder","ts":1771635378}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no entendi que debo hacer","mode":"builder","ts":1771635379}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635434}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero un programa para mi veterinaria","mode":"builder","ts":1771635435}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771635435}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea la tabla pacientes","mode":"builder","ts":1771635435}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cuales me sugieres","mode":"builder","ts":1771635435}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no, cuales campos vas a crear?","mode":"builder","ts":1771635435}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635514}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero un programa para mi veterinaria","mode":"builder","ts":1771635514}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771635514}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea la tabla pacientes","mode":"builder","ts":1771635514}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cuales me sugieres","mode":"builder","ts":1771635515}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no, cuales campos vas a crear?","mode":"builder","ts":1771635515}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635528}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero un programa para mi veterinaria","mode":"builder","ts":1771635528}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771635528}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea la tabla pacientes","mode":"builder","ts":1771635529}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771635529}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635558}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771635559}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771635558","missing":[],"message":"quiero crear una tabla demo_clientes_1771635558","mode":"builder","ts":1771635559}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771635559}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771635559}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771635559}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635630}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771635630}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771635629","missing":[],"message":"quiero crear una tabla demo_clientes_1771635629","mode":"builder","ts":1771635630}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771635630}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771635630}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771635631}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635776}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero un programa para mi veterinaria","mode":"builder","ts":1771635776}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771635777}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si ayudame a crear esa pacientes que seria las mascotas, y cliente seria el dueno de la mascota quien hace el pago","mode":"builder","ts":1771635777}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635792}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero un programa para mi veterinaria","mode":"builder","ts":1771635792}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771635793}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si ayudame a crear esa pacientes que seria las mascotas, y cliente seria el dueno de la mascota quien hace el pago","mode":"builder","ts":1771635793}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea la tabla pacientes","mode":"builder","ts":1771635793}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cuales me sugieres","mode":"builder","ts":1771635793}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no, cuales campos vas a crear?","mode":"builder","ts":1771635793}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no entendi que debo hacer","mode":"builder","ts":1771635793}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635961}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero un programa para mi veterinaria","mode":"builder","ts":1771635961}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771635961}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si ayudame a crear esa pacientes que seria las mascotas, y cliente seria el dueno de la mascota quien hace el pago","mode":"builder","ts":1771635961}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea la tabla pacientes","mode":"builder","ts":1771635962}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cuales me sugieres","mode":"builder","ts":1771635962}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no, cuales campos vas a crear?","mode":"builder","ts":1771635962}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no entendi que debo hacer","mode":"builder","ts":1771635962}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771635982}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771635982}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771635982","missing":[],"message":"quiero crear una tabla demo_clientes_1771635982","mode":"builder","ts":1771635982}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771635982}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771635983}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771635983}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771637120}
+{"classification":"confusion_router","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771637120}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771637120","missing":[],"message":"quiero crear una tabla demo_clientes_1771637120","mode":"builder","ts":1771637121}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771637121}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771637121}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771637122}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771638344}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi veterinaria","mode":"builder","ts":1771638357}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"contado","mode":"builder","ts":1771638369}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea el programa por mi","mode":"builder","ts":1771638421}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"solo esa?","mode":"builder","ts":1771638429}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que paso sigue?","mode":"builder","ts":1771638439}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dale . q sigue?","mode":"builder","ts":1771638451}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"listo q mas debe tener?","mode":"builder","ts":1771638464}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si el siguente paso","mode":"builder","ts":1771638474}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771638477}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"listo","mode":"builder","ts":1771638484}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"q mas falta","mode":"builder","ts":1771638492}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si dale","mode":"builder","ts":1771638496}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771638500}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"pero ya no habias creado esa tabla?","mode":"builder","ts":1771638511}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771638514}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771638517}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"alto","mode":"builder","ts":1771638522}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"muestrame q has hecho","mode":"builder","ts":1771638527}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no q me muestres lo q has hecho","mode":"builder","ts":1771638535}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771639178}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi veterinaria","mode":"builder","ts":1771639178}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"contado","mode":"builder","ts":1771639178}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea el programa por mi","mode":"builder","ts":1771639178}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que paso sigue?","mode":"builder","ts":1771639178}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dale . q sigue?","mode":"builder","ts":1771639178}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"listo q mas debe tener?","mode":"builder","ts":1771639178}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si el siguente paso","mode":"builder","ts":1771639178}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639179}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"listo","mode":"builder","ts":1771639179}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"q mas falta","mode":"builder","ts":1771639179}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si dale","mode":"builder","ts":1771639179}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639179}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"pero ya no habias creado esa tabla?","mode":"builder","ts":1771639179}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639179}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639179}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"alto","mode":"builder","ts":1771639179}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"muestrame q has hecho","mode":"builder","ts":1771639179}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no q me muestres lo q has hecho","mode":"builder","ts":1771639179}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771639428}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi veterinaria","mode":"builder","ts":1771639428}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"contado","mode":"builder","ts":1771639428}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea el programa por mi","mode":"builder","ts":1771639428}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que paso sigue?","mode":"builder","ts":1771639428}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dale . q sigue?","mode":"builder","ts":1771639428}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"listo q mas debe tener?","mode":"builder","ts":1771639428}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si el siguente paso","mode":"builder","ts":1771639428}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639428}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"listo","mode":"builder","ts":1771639428}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"q mas falta","mode":"builder","ts":1771639428}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si dale","mode":"builder","ts":1771639428}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639428}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"pero ya no habias creado esa tabla?","mode":"builder","ts":1771639428}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639428}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639428}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"alto","mode":"builder","ts":1771639428}
+{"classification":"confusion_router","resolved_locally":true,"intent":"builder_progress","entity":null,"missing":[],"message":"muestrame q has hecho","mode":"builder","ts":1771639428}
+{"classification":"confusion_router","resolved_locally":true,"intent":"builder_progress","entity":null,"missing":[],"message":"no q me muestres lo q has hecho","mode":"builder","ts":1771639428}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771639559}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi veterinaria","mode":"builder","ts":1771639559}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"contado","mode":"builder","ts":1771639559}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea el programa por mi","mode":"builder","ts":1771639559}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que paso sigue?","mode":"builder","ts":1771639559}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dale . q sigue?","mode":"builder","ts":1771639559}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"listo q mas debe tener?","mode":"builder","ts":1771639559}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si el siguente paso","mode":"builder","ts":1771639559}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639559}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"listo","mode":"builder","ts":1771639559}
+{"classification":"confusion_router","resolved_locally":true,"intent":"builder_progress","entity":null,"missing":[],"message":"q mas falta","mode":"builder","ts":1771639559}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si dale","mode":"builder","ts":1771639559}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639559}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"pero ya no habias creado esa tabla?","mode":"builder","ts":1771639559}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639559}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639559}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"alto","mode":"builder","ts":1771639559}
+{"classification":"confusion_router","resolved_locally":true,"intent":"builder_progress","entity":null,"missing":[],"message":"muestrame q has hecho","mode":"builder","ts":1771639559}
+{"classification":"confusion_router","resolved_locally":true,"intent":"builder_progress","entity":null,"missing":[],"message":"no q me muestres lo q has hecho","mode":"builder","ts":1771639559}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771639853}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi veterinaria","mode":"builder","ts":1771639853}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"contado","mode":"builder","ts":1771639853}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"crea","missing":[],"message":"si crea el programa por mi","mode":"builder","ts":1771639853}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que paso sigue?","mode":"builder","ts":1771639853}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"pacientes","missing":[],"message":"si crea la tabla pacientes","mode":"builder","ts":1771639853}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639853}
+{"classification":"confusion_router","resolved_locally":true,"intent":"builder_progress","entity":null,"missing":[],"message":"muestrame q has hecho","mode":"builder","ts":1771639853}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771639905}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi veterinaria","mode":"builder","ts":1771639905}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"contado","mode":"builder","ts":1771639905}
+{"classification":"builder_fallback","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea el programa por mi","mode":"builder","ts":1771639905}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que paso sigue?","mode":"builder","ts":1771639905}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"pacientes","missing":[],"message":"si crea la tabla pacientes","mode":"builder","ts":1771639905}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639905}
+{"classification":"confusion_router","resolved_locally":true,"intent":"builder_progress","entity":null,"missing":[],"message":"muestrame q has hecho","mode":"builder","ts":1771639905}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771639928}
+{"classification":"confusion_router","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771639928}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771639928","missing":[],"message":"quiero crear una tabla demo_clientes_1771639928","mode":"builder","ts":1771639928}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771639929}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771639929}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771639929}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771640314}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi veterinaria","mode":"builder","ts":1771640314}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"contado","mode":"builder","ts":1771640314}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero controlar citas, pacientes e historia clinica","mode":"builder","ts":1771640314}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"factura, orden de trabajo e historia clinica","mode":"builder","ts":1771640314}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771640314}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que paso sigue","mode":"builder","ts":1771640314}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si crea la tabla pacientes","mode":"builder","ts":1771640314}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771640314}
+{"classification":"confusion_router","resolved_locally":true,"intent":"builder_progress","entity":null,"missing":[],"message":"muestrame q has hecho","mode":"builder","ts":1771640314}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771640393}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi veterinaria","mode":"builder","ts":1771640393}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"contado","mode":"builder","ts":1771640393}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero controlar citas, pacientes e historia clinica","mode":"builder","ts":1771640393}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"factura, orden de trabajo e historia clinica","mode":"builder","ts":1771640393}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771640393}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que paso sigue","mode":"builder","ts":1771640393}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771640393}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771640452}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi veterinaria","mode":"builder","ts":1771640452}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"contado","mode":"builder","ts":1771640452}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero controlar citas y pacientes","mode":"builder","ts":1771640452}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"factura e historia clinica","mode":"builder","ts":1771640452}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771640452}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771642248}
+{"classification":"confusion_router","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771642249}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771642248","missing":[],"message":"quiero crear una tabla demo_clientes_1771642248","mode":"builder","ts":1771642249}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771642249}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771642249}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771642250}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771642262}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear una app para inventario","mode":"builder","ts":1771642262}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"golden_clientes_1771642262","missing":[],"message":"quiero crear una tabla golden_clientes_1771642262","mode":"builder","ts":1771642262}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771642262}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"golden_clientes_1771642262","missing":[],"message":"crear golden_clientes_1771642262 nombre=Ana","mode":"app","ts":1771642262}
+{"classification":"confusion_router","resolved_locally":true,"intent":"mode_switch_builder","entity":null,"missing":[],"message":"quiero crear una tabla productos","mode":"app","ts":1771642262}
+{"classification":"confusion_router","resolved_locally":true,"intent":"mode_switch_app","entity":null,"missing":[],"message":"crear cliente nombre=Ana","mode":"builder","ts":1771642262}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771642577}
+{"classification":"confusion_router","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771642578}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771642577","missing":[],"message":"quiero crear una tabla demo_clientes_1771642577","mode":"builder","ts":1771642578}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771642578}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771642578}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771642579}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771642579}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear una app para inventario","mode":"builder","ts":1771642579}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"golden_clientes_1771642579","missing":[],"message":"quiero crear una tabla golden_clientes_1771642579","mode":"builder","ts":1771642579}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771642579}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"golden_clientes_1771642579","missing":[],"message":"crear golden_clientes_1771642579 nombre=Ana","mode":"app","ts":1771642579}
+{"classification":"confusion_router","resolved_locally":true,"intent":"mode_switch_builder","entity":null,"missing":[],"message":"quiero crear una tabla productos","mode":"app","ts":1771642579}
+{"classification":"confusion_router","resolved_locally":true,"intent":"mode_switch_app","entity":null,"missing":[],"message":"crear cliente nombre=Ana","mode":"builder","ts":1771642579}

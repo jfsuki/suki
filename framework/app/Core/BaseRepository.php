@@ -11,6 +11,7 @@ class BaseRepository
     protected PDO $db;
     protected array $entity;
     protected string $table;
+    protected string $logicalTable;
     protected string $primaryKey;
     protected bool $timestamps;
     protected bool $tenantScoped;
@@ -25,14 +26,15 @@ class BaseRepository
         }
 
         $this->entity = $entity;
-        $this->table = (string) ($entity['table']['name'] ?? '');
+        $this->logicalTable = (string) ($entity['table']['name'] ?? '');
+        $this->table = TableNamespace::resolve($this->logicalTable);
         $this->primaryKey = (string) ($entity['table']['primaryKey'] ?? 'id');
         $this->timestamps = (bool) ($entity['table']['timestamps'] ?? false);
         $this->tenantScoped = (bool) ($entity['table']['tenantScoped'] ?? false);
         $this->softDelete = (bool) ($entity['table']['softDelete'] ?? false);
         $this->tenantId = $tenantId ?? TenantContext::getTenantId();
 
-        if ($this->table === '') {
+        if ($this->logicalTable === '') {
             throw new InvalidArgumentException('Tabla de entidad requerida.');
         }
 

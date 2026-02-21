@@ -26,7 +26,7 @@ $conversation = [
     ],
     [
         'user' => 'no se nada de sistemas, ayudame paso a paso',
-        'expect_contains_any' => ['Puedo ayudarte', 'Paso 1', 'crear tabla'],
+        'expect_contains_any' => ['Puedo ayudarte', 'Paso 1', 'crear tabla', 'Responde una opcion', 'tipo de negocio'],
     ],
     [
         'user' => 'quiero crear una tabla ' . $entityName,
@@ -223,6 +223,19 @@ if (!$keepArtifacts && $createdEntity !== '') {
         if (is_file($path)) {
             @unlink($path);
         }
+    }
+    try {
+        require_once dirname(__DIR__) . '/app/autoload.php';
+        $pdo = \App\Core\Database::connection();
+        foreach ([$createdEntity, $createdEntity . 's'] as $table) {
+            $safe = preg_replace('/[^a-zA-Z0-9_]/', '', $table) ?: '';
+            if ($safe === '') {
+                continue;
+            }
+            $pdo->exec('DROP TABLE IF EXISTS `' . $safe . '`');
+        }
+    } catch (\Throwable $e) {
+        // ignore cleanup DB errors in demo script
     }
 }
 

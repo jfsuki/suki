@@ -21,7 +21,7 @@ class QueryBuilder
     public function __construct(PDO $db, string $table)
     {
         $this->db = $db;
-        $this->table = $this->sanitizeIdentifier($table);
+        $this->table = $this->sanitizeIdentifier(TableNamespace::resolve($table));
     }
 
     public function setAllowedColumns(array $columns): self

@@ -116,3 +116,105 @@
 {"classification":"crud","resolved_locally":true,"intent":"create","entity":"golden_clientes_1771611377","missing":[],"message":"crear golden_clientes_1771611377 nombre=Ana","mode":"app","ts":1771611377}
 {"classification":"build_guard","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear una tabla productos","mode":"app","ts":1771611377}
 {"classification":"use_guard","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"crear cliente nombre=Ana","mode":"builder","ts":1771611377}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"app","ts":1771623020}
+{"classification":"capabilities","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola q puedo hacer en este programa","mode":"app","ts":1771623023}
+{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que opcines puedo usar","mode":"app","ts":1771623030}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dime el menu de este programa","mode":"app","ts":1771623045}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":[],"message":"quiero crear un cliente","mode":"app","ts":1771623057}
+{"classification":"question_local","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que registraste?","mode":"app","ts":1771623067}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":[],"message":"crear cliente","mode":"app","ts":1771623075}
+{"classification":"question_local","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que guardaste","mode":"app","ts":1771623081}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771623120}
+{"classification":"capabilities","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que puedo hacer aca","mode":"builder","ts":1771623125}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi spa, donde guarde mis pacientes, cree citas, y lleve historial de servicios y su tratamientos","mode":"builder","ts":1771623176}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"orden de trabajo o cita? consulta?","mode":"builder","ts":1771623193}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"´pero q vas a crear ? no sabes lo q quiero aun","mode":"builder","ts":1771623210}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi spa, donde guarde mis pacientes, cree citas, y lleve historial de servicios y su tratamientos","mode":"builder","ts":1771623222}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771624401}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771624401}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771624400","missing":[],"message":"quiero crear una tabla demo_clientes_1771624400","mode":"builder","ts":1771624401}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771624401}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771624401}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771624402}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771624412}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear una app para inventario","mode":"builder","ts":1771624412}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"golden_clientes_1771624412","missing":[],"message":"quiero crear una tabla golden_clientes_1771624412","mode":"builder","ts":1771624412}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771624412}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"golden_clientes_1771624412","missing":[],"message":"crear golden_clientes_1771624412 nombre=Ana","mode":"app","ts":1771624413}
+{"classification":"build_guard","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear una tabla productos","mode":"app","ts":1771624413}
+{"classification":"use_guard","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"crear cliente nombre=Ana","mode":"builder","ts":1771624413}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":["nombre"],"message":"crear cliente","mode":"app","ts":1771624429}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":[],"message":"ana","mode":"app","ts":1771624429}
+{"classification":"last_action","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que guardaste","mode":"app","ts":1771624429}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771624430}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi spa, donde guarde mis pacientes, cree citas, y lleve historial de servicios y sus tratamientos","mode":"builder","ts":1771624430}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771624430}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"ayudame a crear la tabla para los clientes","mode":"builder","ts":1771624430}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"q debe llevar eso?","mode":"builder","ts":1771624430}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":["nombre"],"message":"crear cliente","mode":"app","ts":1771624456}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":[],"message":"ana","mode":"app","ts":1771624456}
+{"classification":"last_action","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que guardaste","mode":"app","ts":1771624456}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771624456}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi spa, donde guarde mis pacientes, cree citas, y lleve historial de servicios y sus tratamientos","mode":"builder","ts":1771624456}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771624456}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"ayudame a crear la tabla para los clientes","mode":"builder","ts":1771624456}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"q debe llevar eso?","mode":"builder","ts":1771624456}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771624565}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi spa, donde guarde mis pacientes, cree citas, y lleve historial de servicios y sus tratamientos","mode":"builder","ts":1771624565}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771624565}
+{"classification":"capabilities","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola q puedo hacer en este programa","mode":"app","ts":1771624665}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":["nombre"],"message":"quiero crear un cliente","mode":"app","ts":1771624665}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":[],"message":"ana","mode":"app","ts":1771624665}
+{"classification":"last_action","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que guardaste","mode":"app","ts":1771624665}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771624665}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi spa, donde guarde mis pacientes, cree citas, y lleve historial de servicios y tratamientos","mode":"builder","ts":1771624665}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771624665}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"ayudame q campos debe tener pacientes","mode":"builder","ts":1771624665}
+{"classification":"capabilities","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola q puedo hacer en este programa","mode":"app","ts":1771624766}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771624797}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771624797}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771624797","missing":[],"message":"quiero crear una tabla demo_clientes_1771624797","mode":"builder","ts":1771624797}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771624797}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771624798}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771624798}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771624832}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771624832}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771624832","missing":[],"message":"quiero crear una tabla demo_clientes_1771624832","mode":"builder","ts":1771624832}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771624833}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771624833}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771624833}
+{"classification":"capabilities","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola q puedo hacer en este programa","mode":"app","ts":1771624938}
+{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que opcines puedo usar","mode":"app","ts":1771624938}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dime el menu de este programa","mode":"app","ts":1771624938}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":["nombre"],"message":"quiero crear un cliente","mode":"app","ts":1771624938}
+{"classification":"last_action","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que registraste?","mode":"app","ts":1771624938}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":[],"message":"crear cliente","mode":"app","ts":1771624938}
+{"classification":"last_action","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que guardaste","mode":"app","ts":1771624938}
+{"classification":"capabilities","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola q puedo hacer en este programa","mode":"app","ts":1771625002}
+{"classification":"training","resolved_locally":true,"intent":"APP_CAPABILITIES","entity":null,"missing":[],"message":"que opcines puedo usar","mode":"app","ts":1771625002}
+{"classification":"faq","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dime el menu de este programa","mode":"app","ts":1771625002}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":["nombre"],"message":"quiero crear un cliente","mode":"app","ts":1771625002}
+{"classification":"last_action","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que registraste?","mode":"app","ts":1771625002}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":["nombre"],"message":"crear cliente","mode":"app","ts":1771625002}
+{"classification":"crud","resolved_locally":true,"intent":"create","entity":"clientes","missing":[],"message":"ana","mode":"app","ts":1771625003}
+{"classification":"last_action","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que guardaste","mode":"app","ts":1771625003}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771625021}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi spa, donde guarde mis pacientes, cree citas, y lleve historial de servicios y su tratamientos","mode":"builder","ts":1771625021}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771625021}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"cual seria el primer paso?","mode":"builder","ts":1771625021}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"ayudame a crear la tabla para los clientes","mode":"builder","ts":1771625021}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"q debe llevar eso?","mode":"builder","ts":1771625021}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"pero q vas a crear ? no sabes lo q quiero aun","mode":"builder","ts":1771625021}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero crear un programa para mi spa","mode":"builder","ts":1771625066}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771625066}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"pero q vas a crear ? no sabes lo q quiero aun","mode":"builder","ts":1771625066}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771625079}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"no se nada de sistemas, ayudame paso a paso","mode":"builder","ts":1771625079}
+{"classification":"build","resolved_locally":true,"intent":null,"entity":"demo_clientes_1771625079","missing":[],"message":"quiero crear una tabla demo_clientes_1771625079","mode":"builder","ts":1771625079}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"que datos debe llevar?","mode":"builder","ts":1771625080}
+{"classification":"builder_confirm","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"si","mode":"builder","ts":1771625080}
+{"classification":"training","resolved_locally":true,"intent":"PROJECT_STATUS","entity":null,"missing":[],"message":"dame estado del proyecto","mode":"builder","ts":1771625080}
+{"classification":"greeting","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"hola","mode":"builder","ts":1771627208}
+{"classification":"capabilities","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"dime q puedo hacer aca","mode":"builder","ts":1771627215}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"quiero un programa para mi veterinaria","mode":"builder","ts":1771627238}
+{"classification":"builder_onboarding","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"mixto","mode":"builder","ts":1771627252}

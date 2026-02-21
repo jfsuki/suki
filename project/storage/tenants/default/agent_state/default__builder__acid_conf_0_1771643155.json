@@ -1,0 +1,67 @@
+{
+    "active_task": "create_table",
+    "intent": "create",
+    "entity": "pacientes",
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": {
+        "command": "CreateEntity",
+        "entity": "pacientes",
+        "fields": [
+            {
+                "name": "nombre",
+                "type": "texto"
+            },
+            {
+                "name": "especie",
+                "type": "texto"
+            },
+            {
+                "name": "raza",
+                "type": "texto"
+            },
+            {
+                "name": "sexo",
+                "type": "texto"
+            },
+            {
+                "name": "fecha_nacimiento",
+                "type": "fecha"
+            },
+            {
+                "name": "dueno_id",
+                "type": "numero"
+            },
+            {
+                "name": "activo",
+                "type": "bool"
+            }
+        ]
+    },
+    "last_action": null,
+    "last_messages": [
+        {
+            "u": "mixto",
+            "a": "Paso 3: que necesitas controlar primero en tu negocio?\nEjemplos: citas, ordenes de trabajo, inventario, facturacion, pagos.",
+            "ts": 1771643155
+        },
+        {
+            "u": "si crea la tabla pacientes",
+            "a": "Vamos paso a paso.\nPaso 1: crearemos la tabla pacientes.\nCampos principales: nombre, especie, raza, sexo.\nCampos adicionales sugeridos: fecha_nacimiento, dueno_id, activo.\nSe guardara esta informacion: nombre, especie, raza, sexo, fecha_nacimiento, dueno_id.\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771643155
+        },
+        {
+            "u": "cuales campos vas a crear",
+            "a": "Voy a crear la tabla pacientes con estos datos: nombre, especie, raza, sexo, fecha_nacimiento, dueno_id, activo.\nResponde \"si\" para crearla o \"no\" para cambiarla.",
+            "ts": 1771643155
+        },
+        {
+            "u": "no entendi",
+            "a": "Te explico facil:\n- Voy a crear la tabla pacientes para guardar esos datos.\n- Si estas de acuerdo responde \"si\".\n- Si quieres cambiar datos responde \"no\".\n- Si quieres ver campos sugeridos, escribe: \"cuales campos me sugieres\".",
+            "ts": 1771643155
+        }
+    ],
+    "summary": "quiero crear un programa para veterinaria",
+    "onboarding_step": "needs_scope"
+}

@@ -1,0 +1,238 @@
+{
+  "meta": {
+    "name": "conversation_confusion_base",
+    "version": "1.0.0",
+    "language": "es-CO",
+    "goal": "Reducir respuestas fuera de contexto y errores de interpretacion en chat BUILD y APP",
+    "updated": "2026-02-21"
+  },
+  "rules": {
+    "non_entity_tokens": [
+      "si",
+      "no",
+      "ok",
+      "listo",
+      "cual",
+      "cuales",
+      "que",
+      "como",
+      "paso",
+      "ahora",
+      "hacer",
+      "crear",
+      "explicame",
+      "ayudame"
+    ],
+    "question_priority_over_create": true,
+    "always_validate_entity_exists_before_crud": true,
+    "if_mode_app_and_entity_missing": "inform_creator_required",
+    "if_mode_builder_and_entity_missing": "offer_create_table_wizard"
+  },
+  "confusion_sets": [
+    {
+      "id": "ASK_CAPABILITIES",
+      "description": "Usuario pregunta que puede hacer",
+      "examples": [
+        "que puedo hacer",
+        "que opciones hay",
+        "que opciones tengo",
+        "como funciona",
+        "ayuda",
+        "menu"
+      ],
+      "expected_action": "respond_capabilities_by_mode",
+      "must_not": [
+        "create_entity",
+        "execute_crud"
+      ]
+    },
+    {
+      "id": "ASK_NEXT_STEP",
+      "description": "Usuario pide guia del siguiente paso",
+      "examples": [
+        "que hago ahora",
+        "cual es el siguiente paso",
+        "no entendi",
+        "explicame paso a paso",
+        "me ayudas",
+        "que has hecho",
+        "muestrame que has hecho",
+        "q falta",
+        "q mas falta",
+        "que mas falta"
+      ],
+      "expected_action": "respond_next_step_from_state",
+      "must_not": [
+        "infer_new_entity_name"
+      ]
+    },
+    {
+      "id": "PENDING_CONFIRMATION_CLARIFY",
+      "description": "Hay accion pendiente y usuario pide aclaracion",
+      "examples": [
+        "que vas a crear",
+        "cuales campos vas a crear",
+        "que se va a guardar",
+        "cual es esa tabla"
+      ],
+      "expected_action": "show_pending_preview",
+      "must_not": [
+        "replace_entity_with_question_words"
+      ]
+    },
+    {
+      "id": "PENDING_CONFIRMATION_CHANGE_ENTITY",
+      "description": "Usuario cambia entidad pendiente",
+      "examples": [
+        "si crea la tabla pacientes",
+        "mejor crea productos",
+        "no esa no, que sea servicios",
+        "cambia a clientes"
+      ],
+      "expected_action": "replace_pending_entity_and_reconfirm",
+      "must_not": [
+        "execute_old_pending_without_reconfirm"
+      ]
+    },
+    {
+      "id": "OFF_TOPIC_GUARD",
+      "description": "Tema externo al sistema",
+      "examples": [
+        "sabes del presidente",
+        "que opinas de futbol",
+        "dame noticias",
+        "hablame del clima"
+      ],
+      "expected_action": "scope_guard_reply",
+      "must_not": [
+        "start_create_flow",
+        "start_crud_flow"
+      ]
+    },
+    {
+      "id": "MODE_MIXUP_APP_ASKS_BUILD",
+      "description": "Usuario de APP pide tareas de creador",
+      "examples": [
+        "crear tabla clientes",
+        "crear formulario facturas",
+        "agrega un campo nuevo"
+      ],
+      "expected_action": "tell_switch_to_builder",
+      "must_not": [
+        "execute_build_in_app_mode"
+      ]
+    },
+    {
+      "id": "MODE_MIXUP_BUILDER_ASKS_RUNTIME",
+      "description": "Usuario de BUILDER quiere registrar datos",
+      "examples": [
+        "crear cliente nombre=ana",
+        "listar clientes",
+        "actualizar cliente id=1"
+      ],
+      "expected_action": "tell_switch_to_app",
+      "must_not": [
+        "execute_runtime_in_builder_mode"
+      ]
+    },
+    {
+      "id": "APP_ENTITY_MISSING",
+      "description": "APP intenta CRUD en entidad inexistente",
+      "examples": [
+        "crear producto nombre=taladro",
+        "listar pagos",
+        "crear factura cliente=ana"
+      ],
+      "expected_action": "inform_creator_required",
+      "must_not": [
+        "fake_success",
+        "ask_for_random_slot_without_entity"
+      ]
+    },
+    {
+      "id": "APP_SLOT_FILLING_MINIMAL",
+      "description": "Pedir solo un dato faltante",
+      "examples": [
+        "crear cliente",
+        "crear paciente",
+        "crear proveedor"
+      ],
+      "expected_action": "ask_single_critical_slot",
+      "must_not": [
+        "ask_many_questions_at_once"
+      ]
+    },
+    {
+      "id": "LAST_ACTION_TRACE",
+      "description": "Usuario pregunta que se guardo",
+      "examples": [
+        "que guardaste",
+        "que registraste",
+        "que hiciste"
+      ],
+      "expected_action": "reply_with_last_action",
+      "must_not": [
+        "project_status_dump"
+      ]
+    }
+  ],
+  "guided_prompts": {
+    "builder": {
+      "start": [
+        "Vamos paso a paso. Primero define tu tipo de negocio.",
+        "Te guio sin terminos tecnicos: negocio, tablas, formularios y prueba."
+      ],
+      "confirm_template": "Voy a crear {entity} con: {fields}. Confirmas? (si/no)",
+      "clarify_template": "Te explico simple: esto guarda {purpose}. Si estas de acuerdo responde si."
+    },
+    "app": {
+      "start": [
+        "Estoy en modo uso de app: aqui registras, consultas, actualizas y eliminas datos.",
+        "Te guio paso a paso con una sola pregunta por vez."
+      ],
+      "missing_entity_template": "Esa opcion no esta disponible en esta app. Pide al creador agregar la tabla {entity}.",
+      "slot_template": "Perfecto. Me falta {slot}. Dime solo ese dato."
+    }
+  },
+  "acid_conversation_cases": [
+    {
+      "name": "pending_no_entity_corruption",
+      "mode": "builder",
+      "turns": [
+        "quiero crear un programa para veterinaria",
+        "mixto",
+        "si crea la tabla pacientes",
+        "cuales campos vas a crear",
+        "no entendi"
+      ],
+      "pass_if": [
+        "never_entity_equals_no_or_cuales",
+        "reply_contains_pending_entity_pacientes"
+      ]
+    },
+    {
+      "name": "app_missing_entity_guard",
+      "mode": "app",
+      "turns": [
+        "crear laboratorio nombre=taladro",
+        "que guardaste"
+      ],
+      "pass_if": [
+        "first_reply_informs_creator_required",
+        "second_reply_no_fake_create"
+      ]
+    },
+    {
+      "name": "slot_single_question",
+      "mode": "app",
+      "turns": [
+        "crear cliente",
+        "ana"
+      ],
+      "pass_if": [
+        "first_reply_asks_one_slot",
+        "second_turn_executes_create_or_asks_next_slot"
+      ]
+    }
+  ]
+}

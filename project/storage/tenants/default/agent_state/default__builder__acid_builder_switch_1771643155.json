@@ -1,0 +1,44 @@
+{
+    "active_task": null,
+    "intent": "create",
+    "entity": "pacientes",
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "last_action": {
+        "command": "CreateEntity",
+        "entity": "pacientes",
+        "data": [],
+        "filters": [],
+        "result": {
+            "count": 0
+        },
+        "user_message": "si",
+        "assistant_reply": "OK",
+        "at": "2026-02-21T03:05:55+00:00"
+    },
+    "last_messages": [
+        {
+            "u": "quiero crear un programa para mi veterinaria",
+            "a": "Perfecto. Paso 2: como manejas pagos? contado, credito o mixto.",
+            "ts": 1771643155
+        },
+        {
+            "u": "mixto",
+            "a": "Paso 3: que necesitas controlar primero en tu negocio?\nEjemplos: citas, ordenes de trabajo, inventario, facturacion, pagos.",
+            "ts": 1771643155
+        },
+        {
+            "u": "si crea la tabla pacientes",
+            "a": "Vamos paso a paso.\nPaso 1: crearemos la tabla pacientes.\nCampos principales: nombre, especie, raza, sexo.\nCampos adicionales sugeridos: fecha_nacimiento, dueno_id, activo.\nSe guardara esta informacion: nombre, especie, raza, sexo, fecha_nacimiento, dueno_id.\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771643155
+        },
+        {
+            "u": "si",
+            "a": "OK",
+            "ts": 1771643155
+        }
+    ],
+    "summary": "quiero crear un programa para mi veterinaria",
+    "onboarding_step": "needs_scope"
+}

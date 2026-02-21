@@ -1,0 +1,29 @@
+{
+    "active_task": null,
+    "intent": null,
+    "entity": null,
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "unknown_business_notice_sent": false,
+    "last_action": null,
+    "last_messages": [
+        {
+            "u": "crear cliente",
+            "a": "Esa tabla no existe en esta app. Debe ser agregada por el creador.",
+            "ts": 1771643155
+        },
+        {
+            "u": "Ana",
+            "a": "Solo puedo responder con datos reales de esta app. Dime una accion concreta: listar cliente, crear cliente nombre=Ana, o estado de la app.",
+            "ts": 1771643155
+        },
+        {
+            "u": "que guardaste",
+            "a": "Aun no he guardado nada en esta sesion. Si quieres, te guio para crear el primer registro.",
+            "ts": 1771643155
+        }
+    ],
+    "summary": "crear cliente"
+}
