@@ -1,0 +1,89 @@
+{
+    "active_task": "create_table",
+    "intent": null,
+    "entity": "clientes",
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": {
+        "command": "CreateEntity",
+        "entity": "clientes",
+        "fields": [
+            {
+                "name": "nombre",
+                "type": "texto"
+            },
+            {
+                "name": "documento",
+                "type": "texto"
+            },
+            {
+                "name": "telefono",
+                "type": "texto"
+            },
+            {
+                "name": "email",
+                "type": "texto"
+            },
+            {
+                "name": "direccion",
+                "type": "texto"
+            },
+            {
+                "name": "activo",
+                "type": "bool"
+            }
+        ],
+        "_tx": {
+            "signature": "a50db5e0fabfc003ad325b739e1130ce9fcb7308",
+            "created_at": "2026-02-21T20:45:10+00:00"
+        }
+    },
+    "pending_loop_counter": 0,
+    "builder_calc_prompt": null,
+    "builder_formula_notes": [],
+    "builder_completed_entities": [],
+    "builder_completed_forms": [],
+    "unknown_business_notice_sent": false,
+    "last_action": null,
+    "dialog": {
+        "mode": "builder",
+        "current_step_id": "business_context",
+        "current_step_label": "Definir negocio y objetivo",
+        "checklist": [
+            {
+                "id": "business_context",
+                "label": "Definir negocio y objetivo",
+                "done": false,
+                "next": "Dime tu tipo de negocio para iniciar."
+            },
+            {
+                "id": "data_model",
+                "label": "Crear primera tabla",
+                "done": false,
+                "next": "Creemos la primera tabla base (clientes/pacientes/proveedores)."
+            },
+            {
+                "id": "forms",
+                "label": "Crear primer formulario",
+                "done": false,
+                "next": "Ahora creo el formulario principal para operar esa tabla."
+            },
+            {
+                "id": "validation",
+                "label": "Probar flujo base",
+                "done": false,
+                "next": "Haz una prueba corta para validar que el flujo funciona."
+            }
+        ],
+        "updated_at": "2026-02-21T20:45:10+00:00"
+    },
+    "last_messages": [
+        {
+            "u": "crear formulario clientes",
+            "a": "Para crear ese formulario primero necesito la tabla base.\nVamos paso a paso.\nPaso 1: crearemos la tabla clientes.\nCampos principales: nombre, documento, telefono, email.\nCampos adicionales sugeridos: direccion, activo.\nSe guardara esta informacion: nombre, documento, telefono, email, direccion, activo.\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771706710
+        }
+    ],
+    "summary": "crear formulario clientes"
+}

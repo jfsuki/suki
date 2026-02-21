@@ -1,0 +1,89 @@
+{
+    "active_task": "builder_onboarding",
+    "intent": "builder_formula_confirm",
+    "entity": "golden_clientes_1771706690",
+    "collected": [],
+    "missing": [],
+    "requested_slot": null,
+    "builder_pending_command": null,
+    "pending_loop_counter": 0,
+    "builder_calc_prompt": {
+        "entity": "golden_clientes_1771706690",
+        "phase": "confirm",
+        "next_command": [],
+        "done": 0,
+        "total": 0
+    },
+    "builder_formula_notes": [],
+    "builder_completed_entities": {
+        "golden_clientes_1771706690": "2026-02-21T20:44:50+00:00"
+    },
+    "builder_completed_forms": [],
+    "unknown_business_notice_sent": true,
+    "last_action": {
+        "command": "CreateEntity",
+        "entity": "golden_clientes_1771706690",
+        "data": [],
+        "filters": [],
+        "result": [],
+        "user_message": "si",
+        "assistant_reply": "",
+        "at": "2026-02-21T20:44:50+00:00"
+    },
+    "dialog": {
+        "mode": "builder",
+        "current_step_id": "business_context",
+        "current_step_label": "Definir negocio y objetivo",
+        "checklist": [
+            {
+                "id": "business_context",
+                "label": "Definir negocio y objetivo",
+                "done": false,
+                "next": "Dime tu tipo de negocio para iniciar."
+            },
+            {
+                "id": "data_model",
+                "label": "Crear primera tabla",
+                "done": true,
+                "next": "Creemos la primera tabla base (clientes/pacientes/proveedores)."
+            },
+            {
+                "id": "forms",
+                "label": "Crear primer formulario",
+                "done": false,
+                "next": "Ahora creo el formulario principal para operar esa tabla."
+            },
+            {
+                "id": "validation",
+                "label": "Probar flujo base",
+                "done": true,
+                "next": "Haz una prueba corta para validar que el flujo funciona."
+            }
+        ],
+        "updated_at": "2026-02-21T20:44:50+00:00"
+    },
+    "last_messages": [
+        {
+            "u": "quiero crear una tabla golden_clientes_1771706690",
+            "a": "Vamos paso a paso.\nPaso 1: crearemos la tabla golden_clientes_1771706690.\nCampos principales: nombre, descripcion, activo.\nSe guardara esta informacion: nombre, descripcion, activo.\nTipos rapidos: texto=palabras, numero=entero, decimal=con decimales, fecha=AAAA-MM-DD, bool=si/no.\nQuieres que la cree por ti ahora? Responde: si o no.",
+            "ts": 1771706690
+        },
+        {
+            "u": "si",
+            "a": "OK",
+            "ts": 1771706690
+        },
+        {
+            "u": "crear formulario golden_clientes_1771706690",
+            "a": "Campo calculado = dato que se calcula solo.\nEjemplos:\n- total=subtotal+iva\n- saldo=total-abono\nResponde \"si\" si quieres agregarlo o \"no\" para seguir.",
+            "ts": 1771706690
+        },
+        {
+            "u": "crear cliente nombre=Ana",
+            "a": "Antes de continuar necesito una confirmacion corta:\n- si (agregar campo calculado)\n- no (seguir al siguiente paso)",
+            "ts": 1771706690
+        }
+    ],
+    "summary": "hola",
+    "onboarding_step": "plan_ready"
+}

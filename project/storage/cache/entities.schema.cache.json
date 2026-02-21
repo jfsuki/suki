@@ -1,4 +1,7 @@
 {
     "schema": "8ac8b6223b9cf1e5a32d27e236622e46e9fbd95c7d2a90b858dbb0ab3ff5be24",
-    "files": []
+    "files": {
+        "C:\\laragon\\www\\suki/project/contracts/entities/golden_clientes_1771706690.entity.json": "fbfec791a46f8ab876ce88c3e53fee4f69d34978605a82fe0d47ffe792137b7d",
+        "C:\\laragon\\www\\suki/project/contracts/entities/golden_clientes_1771706711.entity.json": "040e97ed0562485f1aaf3f3d76a59aaf899eecdd65ba5abeef58b3af279a31ae"
+    }
 }

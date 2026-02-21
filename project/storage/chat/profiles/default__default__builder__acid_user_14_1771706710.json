@@ -1,0 +1,7 @@
+{
+    "business_type": "retail_tienda",
+    "needs_scope_items": [
+        "productos"
+    ],
+    "needs_scope": "productos"
+}
