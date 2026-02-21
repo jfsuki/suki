@@ -63,6 +63,46 @@ final class ChatAgent
         if ($projectId === '') {
             $projectId = $manifest['id'] ?? 'default';
         }
+        $sessionBinding = $registry->getSession($sessionId);
+        if (is_array($sessionBinding)) {
+            $boundUser = trim((string) ($sessionBinding['user_id'] ?? ''));
+            $boundProject = trim((string) ($sessionBinding['project_id'] ?? ''));
+            $boundTenant = trim((string) ($sessionBinding['tenant_id'] ?? ''));
+
+            if ($boundUser !== '' && $boundUser !== $userId) {
+                return $this->reply(
+                    'Esta sesion pertenece a otro usuario. Crea una sesion nueva para continuar.',
+                    $channel,
+                    $sessionId,
+                    $userId,
+                    'error',
+                    ['session_id' => $sessionId, 'bound_user' => $boundUser]
+                );
+            }
+            if ($boundProject !== '' && $projectId !== '' && $boundProject !== $projectId) {
+                return $this->reply(
+                    'Esta sesion ya esta enlazada a otro proyecto. Crea una sesion nueva para cambiar proyecto.',
+                    $channel,
+                    $sessionId,
+                    $userId,
+                    'error',
+                    ['session_id' => $sessionId, 'bound_project' => $boundProject]
+                );
+            }
+            if ($boundTenant !== '' && $boundTenant !== $tenantId) {
+                return $this->reply(
+                    'Esta sesion pertenece a otro tenant. Crea una sesion nueva para evitar mezclar datos.',
+                    $channel,
+                    $sessionId,
+                    $userId,
+                    'error',
+                    ['session_id' => $sessionId, 'bound_tenant' => $boundTenant]
+                );
+            }
+            if ($boundProject !== '') {
+                $projectId = $boundProject;
+            }
+        }
         if (!defined('TENANT_ID')) {
             if (is_numeric($tenantId)) {
                 define('TENANT_ID', (int) $tenantId);
@@ -91,7 +131,7 @@ final class ChatAgent
         }
 
         $local = $this->parseLocal($text);
-        if (!empty($local['command']) && in_array($local['command'], ['RunTests', 'CreateEntity', 'CreateForm', 'LLMUsage'], true)) {
+        if (!empty($local['command']) && in_array($local['command'], ['RunTests', 'LLMUsage'], true)) {
             try {
                 return $this->executeLocal($local, $channel, $sessionId, $userId, $mode, $tenantId);
             } catch (\Throwable $e) {
@@ -141,6 +181,18 @@ final class ChatAgent
                         $text,
                         (string) ($reply['reply'] ?? '')
                     );
+                    $followup = $this->gateway()->postExecutionFollowup(
+                        $tenantId,
+                        $userId,
+                        $projectId,
+                        $mode,
+                        $commandPayload,
+                        (array) ($reply['data'] ?? [])
+                    );
+                    if ($followup !== '') {
+                        $current = trim((string) ($reply['data']['reply'] ?? ''));
+                        $reply['data']['reply'] = trim($current . "\n" . $followup);
+                    }
                 }
             } catch (\Throwable $e) {
                 $rawError = (string) $e->getMessage();

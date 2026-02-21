@@ -6,6 +6,7 @@ namespace App\Core\Agents;
 use App\Core\ContractsCatalog;
 use App\Core\ChatMemoryStore;
 use App\Core\EntityRegistry;
+use App\Core\ProjectRegistry;
 use RuntimeException;
 
 final class ConversationGateway
@@ -25,6 +26,9 @@ final class ConversationGateway
     private string $contextProjectId = 'default';
     private string $contextMode = 'app';
     private string $contextProfileUser = 'anon';
+    private ?ProjectRegistry $projectRegistry = null;
+    private ?array $scopedEntityNamesCache = null;
+    private ?array $scopedFormNamesCache = null;
 
     public function __construct(?string $projectRoot = null)
     {
@@ -44,6 +48,8 @@ final class ConversationGateway
         $this->contextProjectId = $projectId !== '' ? $projectId : 'default';
         $this->contextMode = $mode;
         $this->contextProfileUser = $this->profileUserKey($userId);
+        $this->scopedEntityNamesCache = null;
+        $this->scopedFormNamesCache = null;
 
         $raw = trim($message);
         $training = $this->loadTrainingBase($tenantId);
@@ -85,6 +91,7 @@ final class ConversationGateway
 
         if ($mode === 'builder' && $this->shouldResetBuilderFlow($normalizedBase, $state)) {
             $this->clearBuilderPendingCommand($state);
+            $state['builder_calc_prompt'] = null;
             $state['active_task'] = 'builder_onboarding';
             $state['entity'] = null;
             $state['collected'] = [];
@@ -95,6 +102,7 @@ final class ConversationGateway
         if ($this->isOutOfScopeQuestion($normalizedBase, $mode)) {
             if ($mode === 'builder') {
                 $this->clearBuilderPendingCommand($state);
+                $state['builder_calc_prompt'] = null;
                 $state['active_task'] = 'builder_onboarding';
                 $state['missing'] = [];
                 $state['requested_slot'] = null;
@@ -117,6 +125,19 @@ final class ConversationGateway
             $state = $this->updateState($state, $raw, $reply, 'dialog_checklist', null, [], $state['active_task'] ?? null);
             $this->saveState($tenantId, $userId, $state);
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('dialog_checklist', true));
+        }
+
+        $calcPromptRoute = $this->handleBuilderCalculatedPrompt(
+            $normalizedBase,
+            $raw,
+            $state,
+            $profile,
+            $tenantId,
+            $userId,
+            $mode
+        );
+        if (!empty($calcPromptRoute)) {
+            return $calcPromptRoute;
         }
 
         if ($mode === 'builder' && !empty($state['builder_pending_command']) && is_array($state['builder_pending_command'])) {
@@ -278,7 +299,9 @@ final class ConversationGateway
                     return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
                 }
                 if (!$this->hasFieldPairs($normalizedBase) && !$this->isFieldHelpQuestion($normalizedBase) && !str_contains($normalizedBase, 'tabla')) {
-                    if ($this->isQuestionLike($normalizedBase)) {
+                    if ($this->isNextStepQuestion($normalizedBase)) {
+                        $reply = 'Estoy pendiente de esta accion:' . "\n" . $this->buildPendingPreviewReply($state['builder_pending_command']);
+                    } elseif ($this->isQuestionLike($normalizedBase)) {
                         $reply = $this->buildPendingClarificationReply($state['builder_pending_command']);
                     } else {
                         $reply = 'Para continuar, responde "si" para crearla o "no" para cambiar nombre/campos.';
@@ -594,6 +617,302 @@ final class ConversationGateway
         $this->saveState($tenantId, $userId, $state);
     }
 
+    public function postExecutionFollowup(
+        string $tenantId,
+        string $userId,
+        string $projectId,
+        string $mode,
+        array $command,
+        array $resultData = []
+    ): string {
+        $mode = strtolower(trim($mode)) === 'builder' ? 'builder' : 'app';
+        if ($mode !== 'builder') {
+            return '';
+        }
+
+        $tenantId = $tenantId !== '' ? $tenantId : 'default';
+        $userId = $userId !== '' ? $userId : 'anon';
+        $projectId = $projectId !== '' ? $projectId : 'default';
+
+        $this->contextProjectId = $projectId;
+        $this->contextMode = $mode;
+        $this->contextProfileUser = $this->profileUserKey($userId);
+
+        $state = $this->loadState($tenantId, $userId, $projectId, $mode);
+        $profile = $this->memory->getProfile($tenantId, $this->profileUserKey($userId));
+        $commandName = (string) ($command['command'] ?? '');
+        $entity = $this->normalizeEntityForSchema((string) ($command['entity'] ?? ''));
+
+        if ($commandName === 'CreateEntity' && $entity !== '') {
+            $alreadyExists = (bool) ($resultData['already_exists'] ?? false);
+            $plan = is_array($state['builder_plan'] ?? null) ? (array) $state['builder_plan'] : [];
+            $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
+            $nextProposal = null;
+            if ($businessType !== '' && !empty($plan)) {
+                $nextProposal = $this->buildNextStepProposal(
+                    $businessType,
+                    $plan,
+                    $profile,
+                    (string) ($profile['owner_name'] ?? ''),
+                    $state
+                );
+            }
+
+            $progress = $this->computeBuilderPlanProgress($plan, $state);
+            $done = count((array) ($progress['done_entities'] ?? []));
+            $total = count((array) ($progress['plan_entities'] ?? []));
+            $nextCommand = is_array($nextProposal['command'] ?? null) ? (array) $nextProposal['command'] : [];
+            $nextEntity = $this->normalizeEntityForSchema((string) ($nextProposal['entity'] ?? ($nextCommand['entity'] ?? '')));
+            $nextLabel = $nextEntity !== '' ? $nextEntity : ($nextCommand['command'] ?? '');
+
+            if ($alreadyExists) {
+                if (!empty($nextCommand)) {
+                    $this->setBuilderPendingCommand($state, $nextCommand);
+                    $state['active_task'] = ((string) ($nextCommand['command'] ?? '') === 'CreateForm') ? 'create_form' : 'create_table';
+                    $state['entity'] = $nextEntity !== '' ? $nextEntity : ($state['entity'] ?? null);
+                    $this->saveState($tenantId, $userId, $state);
+
+                    $lines = [];
+                    if ($total > 0) {
+                        $lines[] = 'Avance: ' . $done . '/' . $total . ' tablas.';
+                    }
+                    $lines[] = 'Seguimos con: ' . ($nextLabel !== '' ? $nextLabel : 'siguiente paso') . '.';
+                    $lines[] = $this->buildPendingPreviewReply($nextCommand);
+                    return implode("\n", $lines);
+                }
+                return $this->buildBuilderPlanProgressReply($state, $profile, false);
+            }
+
+            $state['builder_calc_prompt'] = [
+                'entity' => $entity,
+                'phase' => 'confirm',
+                'next_command' => $nextCommand,
+                'done' => $done,
+                'total' => $total,
+            ];
+            $this->saveState($tenantId, $userId, $state);
+
+            $lines = [];
+            if ($total > 0) {
+                $lines[] = 'Avance: tabla ' . $done . ' de ' . $total . ' creada.';
+            }
+            if ($nextLabel !== '') {
+                $lines[] = 'Siguiente sugerida: ' . $nextLabel . '.';
+            }
+            $lines[] = 'Antes de seguir: esta tabla tiene campos calculados? (si/no)';
+            $lines[] = 'Ejemplo: total=subtotal+iva';
+            return implode("\n", $lines);
+        }
+
+        if ($commandName === 'CreateForm') {
+            return $this->buildBuilderPlanProgressReply($state, $profile, false);
+        }
+
+        return '';
+    }
+
+    private function handleBuilderCalculatedPrompt(
+        string $text,
+        string $raw,
+        array &$state,
+        array $profile,
+        string $tenantId,
+        string $userId,
+        string $mode
+    ): ?array {
+        if ($mode !== 'builder') {
+            return null;
+        }
+        $prompt = is_array($state['builder_calc_prompt'] ?? null) ? (array) $state['builder_calc_prompt'] : [];
+        if (empty($prompt)) {
+            return null;
+        }
+
+        $entity = $this->normalizeEntityForSchema((string) ($prompt['entity'] ?? ''));
+        $phase = strtolower((string) ($prompt['phase'] ?? 'confirm'));
+
+        if ($phase === 'capture') {
+            if ($this->isNegativeReply($text) || $this->isNextStepQuestion($text)) {
+                $state['builder_calc_prompt'] = null;
+                $resume = $this->resumeAfterCalculatedPrompt($state, $prompt, $profile);
+                $reply = 'Listo, esta tabla queda sin campos calculados.' . "\n" . $resume;
+                $state = $this->updateState($state, $raw, $reply, 'builder_formula_skip', $entity !== '' ? $entity : null, [], $state['active_task'] ?? 'builder_onboarding');
+                $this->saveState($tenantId, $userId, $state);
+                return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_formula', true));
+            }
+
+            $formulaRows = $this->parseCalculatedExpressions($raw);
+            if (empty($formulaRows)) {
+                $reply = 'Escribe la formula en una sola linea. Ejemplo: total=subtotal+iva' . "\n"
+                    . 'Si no necesitas formula, responde: no.';
+                $state = $this->updateState($state, $raw, $reply, 'builder_formula_capture', $entity !== '' ? $entity : null, [], 'builder_onboarding');
+                $this->saveState($tenantId, $userId, $state);
+                return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_formula', true));
+            }
+
+            $saved = $this->appendBuilderFormulaNotes($state, $entity, $formulaRows);
+            $state['builder_calc_prompt'] = null;
+            $resume = $this->resumeAfterCalculatedPrompt($state, $prompt, $profile);
+            $reply = 'Perfecto. Guarde ' . count($saved) . ' campo(s) calculado(s) para ' . ($entity !== '' ? $entity : 'esta tabla') . ':' . "\n";
+            foreach ($saved as $row) {
+                $reply .= '- ' . $row['field'] . ' = ' . $row['expression'] . "\n";
+            }
+            $reply .= $resume;
+            $state = $this->updateState($state, $raw, $reply, 'builder_formula_saved', $entity !== '' ? $entity : null, [], $state['active_task'] ?? 'builder_onboarding');
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('ask_user', trim($reply), null, null, $state, $this->telemetry('builder_formula', true));
+        }
+
+        if ($this->isClarificationRequest($text) || $this->isFieldHelpQuestion($text) || str_contains($text, 'que es') || str_contains($text, 'formula')) {
+            $reply = 'Campo calculado = dato que se calcula solo.' . "\n"
+                . 'Ejemplos:' . "\n"
+                . '- total=subtotal+iva' . "\n"
+                . '- saldo=total-abono' . "\n"
+                . 'Responde "si" si quieres agregarlo o "no" para seguir.';
+            $state = $this->updateState($state, $raw, $reply, 'builder_formula_help', $entity !== '' ? $entity : null, [], 'builder_onboarding');
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_formula', true));
+        }
+
+        if ($this->isNegativeReply($text) || $this->isNextStepQuestion($text)) {
+            $state['builder_calc_prompt'] = null;
+            $resume = $this->resumeAfterCalculatedPrompt($state, $prompt, $profile);
+            $reply = 'Perfecto, seguimos sin campos calculados en ' . ($entity !== '' ? $entity : 'esta tabla') . '.' . "\n" . $resume;
+            $state = $this->updateState($state, $raw, $reply, 'builder_formula_skip', $entity !== '' ? $entity : null, [], $state['active_task'] ?? 'builder_onboarding');
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_formula', true));
+        }
+
+        $formulaRows = $this->parseCalculatedExpressions($raw);
+        if (!empty($formulaRows)) {
+            $saved = $this->appendBuilderFormulaNotes($state, $entity, $formulaRows);
+            $state['builder_calc_prompt'] = null;
+            $resume = $this->resumeAfterCalculatedPrompt($state, $prompt, $profile);
+            $reply = 'Perfecto. Guarde ' . count($saved) . ' campo(s) calculado(s):' . "\n";
+            foreach ($saved as $row) {
+                $reply .= '- ' . $row['field'] . ' = ' . $row['expression'] . "\n";
+            }
+            $reply .= $resume;
+            $state = $this->updateState($state, $raw, trim($reply), 'builder_formula_saved', $entity !== '' ? $entity : null, [], $state['active_task'] ?? 'builder_onboarding');
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('ask_user', trim($reply), null, null, $state, $this->telemetry('builder_formula', true));
+        }
+
+        if ($this->isAffirmativeReply($text)) {
+            $prompt['phase'] = 'capture';
+            $state['builder_calc_prompt'] = $prompt;
+            $reply = 'Listo. Escribe la formula en una linea.' . "\n"
+                . 'Ejemplo: total=subtotal+iva' . "\n"
+                . 'Si quieres omitir, responde: no.';
+            $state = $this->updateState($state, $raw, $reply, 'builder_formula_capture', $entity !== '' ? $entity : null, [], 'builder_onboarding');
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_formula', true));
+        }
+
+        $reply = 'Antes de continuar necesito una confirmacion corta:' . "\n"
+            . '- si (agregar campo calculado)' . "\n"
+            . '- no (seguir al siguiente paso)';
+        $state = $this->updateState($state, $raw, $reply, 'builder_formula_confirm', $entity !== '' ? $entity : null, [], 'builder_onboarding');
+        $this->saveState($tenantId, $userId, $state);
+        return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_formula', true));
+    }
+
+    private function resumeAfterCalculatedPrompt(array &$state, array $prompt, array $profile): string
+    {
+        $nextCommand = is_array($prompt['next_command'] ?? null) ? (array) $prompt['next_command'] : [];
+        $done = (int) ($prompt['done'] ?? 0);
+        $total = (int) ($prompt['total'] ?? 0);
+
+        if (!empty($nextCommand)) {
+            $this->setBuilderPendingCommand($state, $nextCommand);
+            $state['active_task'] = ((string) ($nextCommand['command'] ?? '') === 'CreateForm') ? 'create_form' : 'create_table';
+            $state['entity'] = $this->normalizeEntityForSchema((string) ($nextCommand['entity'] ?? ($state['entity'] ?? '')));
+            $lines = [];
+            if ($total > 0) {
+                $lines[] = 'Avance actual: ' . $done . '/' . $total . ' tablas.';
+            }
+            $lines[] = 'Siguiente paso listo:';
+            $lines[] = $this->buildPendingPreviewReply($nextCommand);
+            return implode("\n", $lines);
+        }
+
+        $state['active_task'] = 'builder_onboarding';
+        $this->clearBuilderPendingCommand($state);
+        if ($total > 0) {
+            return 'Avance actual: ' . $done . '/' . $total . ' tablas.' . "\n"
+                . $this->buildBuilderPlanProgressReply($state, $profile, false);
+        }
+        return $this->buildBuilderPlanProgressReply($state, $profile, false);
+    }
+
+    private function appendBuilderFormulaNotes(array &$state, string $entity, array $formulaRows): array
+    {
+        $entity = $this->normalizeEntityForSchema($entity);
+        $saved = [];
+        $notes = is_array($state['builder_formula_notes'] ?? null) ? (array) $state['builder_formula_notes'] : [];
+        $bucket = is_array($notes[$entity] ?? null) ? (array) $notes[$entity] : [];
+        foreach ($formulaRows as $row) {
+            $field = $this->normalizeEntityForSchema((string) ($row['field'] ?? ''));
+            $expression = trim((string) ($row['expression'] ?? ''));
+            if ($field === '' || $expression === '') {
+                continue;
+            }
+            $signature = sha1($field . '|' . $expression);
+            $exists = false;
+            foreach ($bucket as $item) {
+                if (!is_array($item)) {
+                    continue;
+                }
+                if (($item['signature'] ?? '') === $signature) {
+                    $exists = true;
+                    break;
+                }
+            }
+            if ($exists) {
+                continue;
+            }
+            $entry = [
+                'field' => $field,
+                'expression' => $expression,
+                'signature' => $signature,
+                'created_at' => date('c'),
+            ];
+            $bucket[] = $entry;
+            $saved[] = $entry;
+        }
+        $notes[$entity] = array_slice($bucket, -30);
+        $state['builder_formula_notes'] = $notes;
+        return $saved;
+    }
+
+    private function parseCalculatedExpressions(string $text): array
+    {
+        $rows = [];
+        if ($text === '') {
+            return $rows;
+        }
+
+        if (preg_match_all('/([a-zA-Z_][a-zA-Z0-9_]*)\s*=\s*([a-zA-Z0-9_+\-*\/().\s]+)/u', $text, $matches, PREG_SET_ORDER)) {
+            foreach ($matches as $match) {
+                $field = $this->normalizeEntityForSchema((string) ($match[1] ?? ''));
+                $expression = trim((string) ($match[2] ?? ''));
+                $expression = preg_replace('/\s+/', ' ', $expression) ?? $expression;
+                $expression = preg_replace('/[^a-zA-Z0-9_+\-*\/(). ]/', '', $expression) ?? $expression;
+                if ($field === '' || $expression === '') {
+                    continue;
+                }
+                if (preg_match('/[+\-*\/()]/', $expression) !== 1 && !str_contains($expression, '_')) {
+                    continue;
+                }
+                $rows[] = [
+                    'field' => $field,
+                    'expression' => trim($expression),
+                ];
+            }
+        }
+        return $rows;
+    }
+
     private function isPureGreeting(string $text): bool
     {
         $text = trim($text);
@@ -740,8 +1059,8 @@ final class ConversationGateway
             'cliente', 'clientes', 'producto', 'productos', 'servicio', 'servicios', 'factura', 'facturas',
             'crear', 'listar', 'actualizar', 'eliminar', 'guardar', 'registrar',
         ];
-        foreach ($this->catalog->entities() as $entityPath) {
-            $name = strtolower((string) basename($entityPath, '.entity.json'));
+        foreach ($this->scopedEntityNames() as $entityName) {
+            $name = strtolower((string) $entityName);
             if ($name !== '') {
                 $scopeKeywords[] = $name;
                 if (str_ends_with($name, 's')) {
@@ -1252,16 +1571,13 @@ final class ConversationGateway
 
     private function buildProjectStatus(): string
     {
-        $entities = $this->catalog->entities();
-        $forms = $this->catalog->forms();
+        $entityNames = $this->scopedEntityNames();
+        $formNames = $this->scopedFormNames();
         $viewsPath = $this->projectRoot . '/views';
         $views = [];
         if (is_dir($viewsPath)) {
             $views = array_values(array_filter(scandir($viewsPath) ?: [], fn($f) => is_string($f) && !in_array($f, ['.', '..'], true)));
         }
-
-        $entityNames = array_map(fn($p) => basename($p, '.entity.json'), $entities);
-        $formNames = array_map(fn($p) => basename($p, '.json'), $forms);
 
         $lines = [];
         $lines[] = 'Estado del proyecto:';
@@ -1316,8 +1632,8 @@ final class ConversationGateway
 
     private function buildHelp(): string
     {
-        $entities = array_map(fn($p) => basename($p, '.entity.json'), $this->catalog->entities());
-        $forms = array_map(fn($p) => basename($p, '.json'), $this->catalog->forms());
+        $entities = $this->scopedEntityNames();
+        $forms = $this->scopedFormNames();
 
         $lines = [];
         $lines[] = 'Puedo ayudarte a crear y usar la app.';
@@ -1334,8 +1650,8 @@ final class ConversationGateway
 
     private function buildAppStatus(): string
     {
-        $entities = array_map(fn($p) => basename($p, '.entity.json'), $this->catalog->entities());
-        $forms = array_map(fn($p) => basename($p, '.json'), $this->catalog->forms());
+        $entities = $this->scopedEntityNames();
+        $forms = $this->scopedFormNames();
         $lines = [];
         $lines[] = 'En esta app puedes trabajar con:';
         $lines[] = '- Listas: ' . (count($entities) ? implode(', ', array_slice($entities, 0, 5)) : 'ninguna lista activa');
@@ -1355,8 +1671,8 @@ final class ConversationGateway
             $state,
             $mode,
             $profile,
-            count($this->catalog->entities()),
-            count($this->catalog->forms())
+            count($this->scopedEntityNames()),
+            count($this->scopedFormNames())
         );
     }
 
@@ -1724,26 +2040,74 @@ final class ConversationGateway
         }
 
         if (empty($localProfile['operation_model'])) {
+            $captured = [];
+            $needsDraft = $this->extractNeedItems($text, $businessType);
+            if (!empty($needsDraft)) {
+                $currentNeeds = [];
+                if (is_array($localProfile['needs_scope_items'] ?? null)) {
+                    $currentNeeds = array_values((array) $localProfile['needs_scope_items']);
+                } elseif (!empty($localProfile['needs_scope'])) {
+                    $currentNeeds = array_map('trim', explode(',', (string) $localProfile['needs_scope']));
+                }
+                $mergedNeeds = $this->mergeScopeLabels($currentNeeds, $needsDraft);
+                $localProfile['needs_scope_items'] = $mergedNeeds;
+                $localProfile['needs_scope'] = implode(', ', $mergedNeeds);
+                $captured[] = 'control del negocio';
+            }
+            $docsDraft = $this->extractDocumentItems($text);
+            if (!empty($docsDraft)) {
+                $currentDocs = [];
+                if (is_array($localProfile['documents_scope_items'] ?? null)) {
+                    $currentDocs = array_values((array) $localProfile['documents_scope_items']);
+                } elseif (!empty($localProfile['documents_scope'])) {
+                    $currentDocs = array_map('trim', explode(',', (string) $localProfile['documents_scope']));
+                }
+                $mergedDocs = $this->mergeScopeLabels($currentDocs, $docsDraft);
+                $localProfile['documents_scope_items'] = $mergedDocs;
+                $localProfile['documents_scope'] = implode(', ', $mergedDocs);
+                $captured[] = 'documentos';
+            }
+            if (!empty($captured)) {
+                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+            }
             $localState['active_task'] = 'builder_onboarding';
             $localState['onboarding_step'] = 'operation_model';
             $reply = 'Perfecto. Paso 2: como manejas pagos? contado, credito o mixto.';
+            if (!empty($captured)) {
+                $reply = 'Ya tome nota de ' . implode(' y ', $captured) . '.' . "\n" . $reply;
+            }
             return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
         }
 
         $currentStep = (string) ($localState['onboarding_step'] ?? '');
+        $needsItemsDetected = $currentStep === 'needs_scope' ? $this->extractNeedItems($text, $businessType) : [];
+        $documentsItemsDetected = $currentStep === 'documents_scope' ? $this->extractDocumentItems($text) : [];
         $canCaptureAnswer = !$this->isQuestionLike($text)
             && !$this->isBuilderActionMessage($text)
             && !$this->isAffirmativeReply($text)
             && !$this->isNegativeReply($text);
+        if (!empty($needsItemsDetected) || !empty($documentsItemsDetected)) {
+            $canCaptureAnswer = true;
+        }
 
         if ($currentStep === 'needs_scope' && $canCaptureAnswer) {
-            if ($this->isOnboardingMetaAnswer($text)) {
+            $needsItems = !empty($needsItemsDetected) ? $needsItemsDetected : $this->extractNeedItems($text, $businessType);
+            if ($this->isReferenceToPreviousScope($text) && !empty($localProfile['needs_scope'])) {
+                $localProfile['needs_scope'] = (string) $localProfile['needs_scope'];
+                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+            } elseif ($this->isOnboardingMetaAnswer($text) && empty($needsItems)) {
                 $reply = 'En este paso necesito que me digas que quieres controlar primero.' . "\n"
                     . 'Ejemplo: ' . $this->buildNeedsScopeExample($businessType, $localProfile) . '.';
                 return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+            } elseif (!empty($needsItems)) {
+                $localProfile['needs_scope_items'] = $needsItems;
+                $localProfile['needs_scope'] = implode(', ', $needsItems);
+                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+            } else {
+                $localProfile['needs_scope'] = $this->sanitizeRequirementText($text);
+                unset($localProfile['needs_scope_items']);
+                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
             }
-            $localProfile['needs_scope'] = $this->sanitizeRequirementText($text);
-            $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
         }
         if (empty($localProfile['needs_scope'])) {
             $localState['active_task'] = 'builder_onboarding';
@@ -1754,13 +2118,23 @@ final class ConversationGateway
         }
 
         if ($currentStep === 'documents_scope' && $canCaptureAnswer) {
-            if ($this->isOnboardingMetaAnswer($text)) {
+            $documentItems = !empty($documentsItemsDetected) ? $documentsItemsDetected : $this->extractDocumentItems($text);
+            if ($this->isReferenceToPreviousScope($text) && !empty($localProfile['documents_scope'])) {
+                $localProfile['documents_scope'] = (string) $localProfile['documents_scope'];
+                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+            } elseif ($this->isOnboardingMetaAnswer($text) && empty($documentItems)) {
                 $reply = 'En este paso necesito los documentos que vas a usar.' . "\n"
                     . 'Ejemplo: ' . $this->buildDocumentsScopeExample($businessType, $localProfile) . '.';
                 return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+            } elseif (!empty($documentItems)) {
+                $localProfile['documents_scope_items'] = $documentItems;
+                $localProfile['documents_scope'] = implode(', ', $documentItems);
+                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+            } else {
+                $localProfile['documents_scope'] = $this->sanitizeRequirementText($text);
+                unset($localProfile['documents_scope_items']);
+                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
             }
-            $localProfile['documents_scope'] = $this->sanitizeRequirementText($text);
-            $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
         }
         if (empty($localProfile['documents_scope'])) {
             $localState['active_task'] = 'builder_onboarding';
@@ -1776,13 +2150,67 @@ final class ConversationGateway
         $onboardingStep = (string) ($localState['onboarding_step'] ?? '');
 
         if ($onboardingStep === 'confirm_scope') {
+            if (!$this->isAffirmativeReply($text) && !$this->isNegativeReply($text)) {
+                $adjusted = false;
+                $needsAdjust = $this->extractNeedItems($text, $businessType);
+                $documentsAdjust = $this->extractDocumentItems($text);
+                $allowNeedsAdjust = preg_match('/\b(controlar|controles|flujo|proceso|procesos|operacion|operaciones)\b/u', $text) === 1;
+                if (!empty($needsAdjust) && ($allowNeedsAdjust || empty($documentsAdjust))) {
+                    $currentNeeds = [];
+                    if (is_array($localProfile['needs_scope_items'] ?? null)) {
+                        $currentNeeds = array_values((array) $localProfile['needs_scope_items']);
+                    } elseif (!empty($localProfile['needs_scope'])) {
+                        $currentNeeds = array_map('trim', explode(',', (string) $localProfile['needs_scope']));
+                    }
+                    $mergedNeeds = $this->mergeScopeLabels($currentNeeds, $needsAdjust);
+                    $localProfile['needs_scope_items'] = $mergedNeeds;
+                    $localProfile['needs_scope'] = implode(', ', $mergedNeeds);
+                    $adjusted = true;
+                }
+                $documentsExclude = $this->extractDocumentExclusions($text);
+                if (!empty($documentsAdjust) || !empty($documentsExclude)) {
+                    $currentDocs = [];
+                    if (is_array($localProfile['documents_scope_items'] ?? null)) {
+                        $currentDocs = array_values((array) $localProfile['documents_scope_items']);
+                    } elseif (!empty($localProfile['documents_scope'])) {
+                        $currentDocs = array_map('trim', explode(',', (string) $localProfile['documents_scope']));
+                    }
+                    $normalizedCurrent = [];
+                    foreach ($currentDocs as $item) {
+                        $label = trim((string) $item);
+                        if ($label !== '') {
+                            $normalizedCurrent[$this->normalize($label)] = $label;
+                        }
+                    }
+                    foreach ($documentsExclude as $doc) {
+                        unset($normalizedCurrent[$this->normalize((string) $doc)]);
+                    }
+                    foreach ($documentsAdjust as $doc) {
+                        $key = $this->normalize((string) $doc);
+                        if ($key !== '' && !isset($normalizedCurrent[$key])) {
+                            $normalizedCurrent[$key] = (string) $doc;
+                        }
+                    }
+                    $mergedDocs = array_values(array_filter(array_map('trim', array_values($normalizedCurrent))));
+                    if (!empty($mergedDocs)) {
+                        $localProfile['documents_scope_items'] = $mergedDocs;
+                        $localProfile['documents_scope'] = implode(', ', $mergedDocs);
+                    }
+                    $adjusted = true;
+                }
+                if ($adjusted) {
+                    $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                    unset($localState['analysis_approved']);
+                    $reply = $this->buildRequirementsSummaryReply($businessType, $localProfile, $plan);
+                    return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+                }
+            }
             if ($this->isNegativeReply($text)) {
-                unset($localProfile['needs_scope'], $localProfile['documents_scope']);
                 $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
                 $localState['onboarding_step'] = 'needs_scope';
                 unset($localState['analysis_approved']);
                 $reply = 'Listo, ajustamos el alcance.' . "\n"
-                    . 'Dime otra vez que necesitas controlar primero.';
+                    . 'Dime que quieres cambiar primero (control del negocio o documentos).';
                 return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
             }
             if ($this->isAffirmativeReply($text)) {
@@ -1946,7 +2374,28 @@ final class ConversationGateway
 
     private function isNextStepQuestion(string $text): bool
     {
-        $patterns = ['que debo hacer', 'paso sigue', 'siguiente paso', 'que hago ahora', 'como sigo', 'que mas sigue', 'q mas sigue', 'que mas falta', 'q mas falta', 'q mas debe tener'];
+        $patterns = [
+            'que debo hacer',
+            'paso sigue',
+            'siguiente paso',
+            'que hago ahora',
+            'como sigo',
+            'que mas sigue',
+            'q mas sigue',
+            'que mas falta',
+            'q mas falta',
+            'q mas debe tener',
+            'que sigue ahora',
+            'q sigue ahora',
+            'ahora que otra',
+            'ahora q otra',
+            'que otra',
+            'q otra',
+            'que otra vas hacer',
+            'q otra vas hacer',
+            'que otra sigue',
+            'q otra sigue',
+        ];
         foreach ($patterns as $pattern) {
             if (str_contains($text, $pattern)) {
                 return true;
@@ -2048,7 +2497,7 @@ final class ConversationGateway
         if ($text === '') {
             return false;
         }
-        return preg_match('/^(si|s\x{00ed}|ok|dale|confirmo|hagalo|hazlo|de una|claro|correcto)\s*$/u', $text) === 1;
+        return preg_match('/^(si|s\x{00ed}|ok|dale|confirmo|hagalo|hazlo|de una|claro|correcto|procede|empieza|inicia|hagale|h[áa]gale|si hagale|si hagale amigo|si amigo|listo|perfecto|perfecto dale|hagale pues)\s*$/u', $text) === 1;
     }
 
     private function isNegativeReply(string $text): bool
@@ -2203,7 +2652,7 @@ final class ConversationGateway
 
     private function detectOperationModel(string $text): string
     {
-        if (str_contains($text, 'mixto') || str_contains($text, 'misto') || str_contains($text, 'ambos') || str_contains($text, 'contado y credito') || str_contains($text, 'credito y contado')) {
+        if (str_contains($text, 'mixto') || str_contains($text, 'misto') || str_contains($text, 'contado y credito') || str_contains($text, 'credito y contado')) {
             return 'mixto';
         }
         if (str_contains($text, 'credito') || str_contains($text, 'a credito') || str_contains($text, 'cartera')) {
@@ -2391,8 +2840,8 @@ final class ConversationGateway
         $domainProfile = $this->findDomainProfile($businessType);
         $businessLabel = (string) ($domainProfile['label'] ?? $businessType);
         $planEntities = (array) ($plan['entities'] ?? []);
-        $existingEntities = array_map(fn($p) => basename($p, '.entity.json'), $this->catalog->entities());
-        $forms = array_map(fn($p) => basename($p, '.json'), $this->catalog->forms());
+        $existingEntities = $this->scopedEntityNames();
+        $forms = $this->scopedFormNames();
         $suggestedReports = (array) ($plan['reports'] ?? []);
         $suggestedWorkflows = (array) ($plan['workflows'] ?? []);
         $accountingFocus = (array) ($plan['accounting_focus'] ?? []);
@@ -2490,6 +2939,40 @@ final class ConversationGateway
         return false;
     }
 
+    private function isReferenceToPreviousScope(string $text): bool
+    {
+        $patterns = [
+            'lo que ya te mencione',
+            'lo q ya te mencione',
+            'lo mismo',
+            'igual que antes',
+            'igual que te dije',
+            'como te dije',
+            'ya te dije',
+            'ya lo mencione',
+            'como lo anterior',
+        ];
+        foreach ($patterns as $pattern) {
+            if (str_contains($text, $pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function mergeScopeLabels(array $current, array $incoming): array
+    {
+        $merged = [];
+        foreach (array_merge($current, $incoming) as $label) {
+            $value = trim((string) $label);
+            if ($value === '') {
+                continue;
+            }
+            $merged[$this->normalize($value)] = $value;
+        }
+        return array_values($merged);
+    }
+
     private function buildNeedsScopeExample(string $businessType, array $profile = []): string
     {
         $domain = $this->findDomainProfile($businessType);
@@ -2540,12 +3023,205 @@ final class ConversationGateway
         return $text;
     }
 
+    private function extractNeedItems(string $text, string $businessType = ''): array
+    {
+        $map = [
+            'citas' => ['cita', 'citas', 'agenda', 'agendar', 'reservas', 'reserva'],
+            'historia_clinica' => ['historia clinica', 'historias clinicas', 'historia médica', 'historias médicas', 'historia medica', 'historias medicas', 'evolucion clinica'],
+            'inventario' => ['inventario', 'stock', 'existencias'],
+            'medicamentos' => ['medicamento', 'medicamentos', 'farmacia'],
+            'medico_turno' => ['medico en turno', 'medicos en turno', 'doctor en turno', 'doctores en turno', 'turno medico', 'turnos medicos'],
+            'pacientes' => ['paciente', 'pacientes', 'mascota', 'mascotas', 'animalito', 'animalitos'],
+            'duenos' => ['dueño', 'dueno', 'dueños', 'duenos', 'propietario', 'propietarios'],
+            'facturacion' => ['factura', 'facturacion', 'facturar', 'cobro', 'cobros'],
+            'pagos' => ['pago', 'pagos', 'abono', 'abonos', 'caja', 'recaudo'],
+            'ordenes_trabajo' => ['orden de trabajo', 'ordenes de trabajo', 'servicio tecnico'],
+            'servicios' => ['servicio', 'servicios', 'tratamiento', 'tratamientos'],
+            'productos' => ['producto', 'productos', 'articulo', 'articulos'],
+            'laboratorio_examenes' => ['muestra medica', 'muestras medicas', 'muestra de laboratorio', 'examen', 'examenes', 'laboratorio', 'analitica'],
+            'gastos' => ['gasto', 'gastos', 'egreso', 'egresos', 'costos', 'costo'],
+        ];
+        $labels = [
+            'citas' => 'citas',
+            'historia_clinica' => 'historia clinica',
+            'inventario' => 'inventario',
+            'medicamentos' => 'medicamentos',
+            'medico_turno' => 'medico en turno',
+            'pacientes' => 'pacientes',
+            'duenos' => 'dueños',
+            'facturacion' => 'facturacion',
+            'pagos' => 'pagos',
+            'ordenes_trabajo' => 'ordenes de trabajo',
+            'servicios' => 'servicios/tratamientos',
+            'productos' => 'productos',
+            'laboratorio_examenes' => 'muestras/examenes',
+            'gastos' => 'gastos/costos',
+        ];
+
+        $found = [];
+        foreach ($map as $key => $aliases) {
+            foreach ($aliases as $alias) {
+                $alias = $this->normalize((string) $alias);
+                if ($alias === '') {
+                    continue;
+                }
+                if (str_contains($text, $alias)) {
+                    if ($this->isNegativeMention($text, $alias)) {
+                        unset($found[$key]);
+                        continue;
+                    }
+                    $found[$key] = $labels[$key] ?? $key;
+                    break;
+                }
+            }
+        }
+
+        if (empty($found)) {
+            return [];
+        }
+
+        $ordered = [];
+        foreach (array_keys($map) as $key) {
+            if (isset($found[$key])) {
+                $ordered[] = $found[$key];
+            }
+        }
+        return array_values(array_unique($ordered));
+    }
+
+    private function extractDocumentItems(string $text): array
+    {
+        $map = [
+            'factura' => ['factura', 'facturacion', 'factura electronica'],
+            'historia_clinica' => ['historia clinica', 'historia medica', 'evolucion clinica'],
+            'orden_trabajo' => ['orden de trabajo', 'orden trabajo', 'orden de trabaja'],
+            'cotizacion' => ['cotizacion', 'presupuesto', 'propuesta'],
+            'recibo_pago' => ['recibo de pago', 'recibo pago', 'comprobante de pago', 'comprobante pago', 'pago', 'pagos', 'abono', 'abonos'],
+            'receta' => ['receta', 'recetas', 'formula medica', 'formula'],
+            'remision' => ['remision', 'remisiones', 'entrega'],
+            'control_impreso' => ['control impreso', 'la que le imprimo', 'imprimo para control', 'impresa para control'],
+            'inventario' => ['inventario', 'kardex'],
+        ];
+        $labels = [
+            'factura' => 'factura',
+            'historia_clinica' => 'historia clinica',
+            'orden_trabajo' => 'orden de trabajo',
+            'cotizacion' => 'cotizacion',
+            'recibo_pago' => 'recibo de pago',
+            'receta' => 'receta',
+            'remision' => 'remision',
+            'control_impreso' => 'control impreso',
+            'inventario' => 'inventario',
+        ];
+
+        $found = [];
+        foreach ($map as $key => $aliases) {
+            foreach ($aliases as $alias) {
+                $alias = $this->normalize((string) $alias);
+                if ($alias === '') {
+                    continue;
+                }
+                if (str_contains($text, $alias)) {
+                    if ($this->isNegativeMention($text, $alias)) {
+                        unset($found[$key]);
+                        continue;
+                    }
+                    $found[$key] = $labels[$key] ?? $key;
+                    break;
+                }
+            }
+        }
+
+        if (empty($found)) {
+            return [];
+        }
+
+        $ordered = [];
+        foreach (array_keys($map) as $key) {
+            if (isset($found[$key])) {
+                $ordered[] = $found[$key];
+            }
+        }
+        return array_values(array_unique($ordered));
+    }
+
+    private function extractDocumentExclusions(string $text): array
+    {
+        $map = [
+            'factura' => ['factura', 'facturacion', 'factura electronica'],
+            'historia_clinica' => ['historia clinica', 'historia medica', 'evolucion clinica'],
+            'orden_trabajo' => ['orden de trabajo', 'orden trabajo'],
+            'cotizacion' => ['cotizacion', 'presupuesto', 'propuesta'],
+            'recibo_pago' => ['recibo de pago', 'recibo pago', 'comprobante de pago', 'comprobante pago'],
+            'remision' => ['remision', 'remisiones', 'entrega'],
+            'control_impreso' => ['control impreso', 'la que le imprimo', 'imprimo para control', 'impresa para control'],
+            'inventario' => ['inventario', 'kardex'],
+        ];
+        $labels = [
+            'factura' => 'factura',
+            'historia_clinica' => 'historia clinica',
+            'orden_trabajo' => 'orden de trabajo',
+            'cotizacion' => 'cotizacion',
+            'recibo_pago' => 'recibo de pago',
+            'remision' => 'remision',
+            'control_impreso' => 'control impreso',
+            'inventario' => 'inventario',
+        ];
+        $excluded = [];
+        foreach ($map as $key => $aliases) {
+            foreach ($aliases as $alias) {
+                $alias = $this->normalize((string) $alias);
+                if ($alias === '') {
+                    continue;
+                }
+                if ($this->isNegativeMention($text, $alias)) {
+                    $excluded[$key] = $labels[$key] ?? $key;
+                    break;
+                }
+            }
+        }
+        if (empty($excluded)) {
+            return [];
+        }
+        $ordered = [];
+        foreach (array_keys($map) as $key) {
+            if (isset($excluded[$key])) {
+                $ordered[] = $excluded[$key];
+            }
+        }
+        return $ordered;
+    }
+
+    private function isNegativeMention(string $text, string $alias): bool
+    {
+        $alias = preg_quote($alias, '/');
+        $patterns = [
+            '/\bno\s+' . $alias . '\b/u',
+            '/\b' . $alias . '\s+no\b/u',
+            '/\bsin\s+' . $alias . '\b/u',
+            '/\b' . $alias . '\s+no\s+quiero\b/u',
+            '/\b' . $alias . '\s+no\s+necesito\b/u',
+        ];
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $text) === 1) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private function buildRequirementsSummaryReply(string $businessType, array $profile, array $plan): string
     {
         $domain = $this->findDomainProfile($businessType);
         $label = (string) ($domain['label'] ?? $businessType);
         $needs = (string) ($profile['needs_scope'] ?? '');
+        if (is_array($profile['needs_scope_items'] ?? null) && !empty($profile['needs_scope_items'])) {
+            $needs = implode(', ', array_values((array) $profile['needs_scope_items']));
+        }
         $documents = (string) ($profile['documents_scope'] ?? '');
+        if (is_array($profile['documents_scope_items'] ?? null) && !empty($profile['documents_scope_items'])) {
+            $documents = implode(', ', array_values((array) $profile['documents_scope_items']));
+        }
         $operation = (string) ($profile['operation_model'] ?? 'mixto');
         $entities = is_array($plan['entities'] ?? null) ? array_values(array_filter((array) $plan['entities'])) : [];
 
@@ -2725,8 +3401,8 @@ final class ConversationGateway
             is_array($plan['forms'] ?? null) ? $plan['forms'] : []
         )));
         $existingEntities = array_map(
-            fn($p) => $this->normalizeEntityForSchema((string) basename((string) $p, '.entity.json')),
-            $this->catalog->entities()
+            fn($name) => $this->normalizeEntityForSchema((string) $name),
+            $this->scopedEntityNames()
         );
         $completedEntitiesFromState = [];
         if (is_array($state['builder_completed_entities'] ?? null)) {
@@ -2741,8 +3417,8 @@ final class ConversationGateway
             $existingEntities = array_values(array_unique(array_merge($existingEntities, $completedEntitiesFromState)));
         }
         $existingForms = array_map(
-            fn($p) => strtolower((string) basename((string) $p, '.json')),
-            $this->catalog->forms()
+            fn($name) => strtolower((string) $name),
+            $this->scopedFormNames()
         );
         $completedFormsFromState = [];
         if (is_array($state['builder_completed_forms'] ?? null)) {
@@ -3220,13 +3896,7 @@ final class ConversationGateway
             }
         }
 
-        $entityNames = [];
-        foreach ($this->catalog->entities() as $path) {
-            $name = basename($path, '.entity.json');
-            if ($name !== '') {
-                $entityNames[] = $name;
-            }
-        }
+        $entityNames = $this->scopedEntityNames();
         usort($entityNames, static fn($a, $b) => mb_strlen($b, 'UTF-8') <=> mb_strlen($a, 'UTF-8'));
         foreach ($entityNames as $name) {
             $nameLower = mb_strtolower($name, 'UTF-8');
@@ -3235,9 +3905,8 @@ final class ConversationGateway
             }
         }
 
-        $entities = $this->catalog->entities();
-        foreach ($entities as $path) {
-            $name = (string) basename($path, '.entity.json');
+        foreach ($entityNames as $name) {
+            $name = (string) $name;
             $nameLower = mb_strtolower($name, 'UTF-8');
             if ($nameLower !== '' && str_contains($textLower, $nameLower)) {
                 return $name;
@@ -3265,9 +3934,8 @@ final class ConversationGateway
             strtolower(rtrim($target, 's')),
             strtolower($target . 's'),
         ])));
-        $entities = $this->catalog->entities();
-        foreach ($entities as $path) {
-            $name = strtolower((string) basename($path, '.entity.json'));
+        foreach ($this->scopedEntityNames() as $entityName) {
+            $name = strtolower((string) $entityName);
             if (in_array($name, $variants, true)) {
                 return true;
             }
@@ -3281,8 +3949,14 @@ final class ConversationGateway
         if ($entity === '') {
             return false;
         }
-        $path = $this->projectRoot . '/contracts/forms/' . $entity . '.form.json';
-        return is_file($path);
+        $target = strtolower($entity . '.form');
+        foreach ($this->scopedFormNames() as $formName) {
+            $normalized = strtolower((string) $formName);
+            if ($normalized === $target || $normalized === strtolower($entity)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function hasBuildSignals(string $text): bool
@@ -3583,7 +4257,7 @@ private function parseEntityFromCrudText(string $text): string
 
     private function buildEntityList(): string
     {
-        $entities = array_map(fn($p) => basename($p, '.entity.json'), $this->catalog->entities());
+        $entities = $this->scopedEntityNames();
         if (empty($entities)) {
             return 'Aun no hay tablas creadas. Quieres crear una?';
         }
@@ -3593,7 +4267,7 @@ private function parseEntityFromCrudText(string $text): string
 
     private function buildFormList(): string
     {
-        $forms = array_map(fn($p) => basename($p, '.json'), $this->catalog->forms());
+        $forms = $this->scopedFormNames();
         if (empty($forms)) {
             return 'Aun no hay formularios. Quieres crear uno?';
         }
@@ -3603,8 +4277,8 @@ private function parseEntityFromCrudText(string $text): string
 
     private function buildCapabilities(array $profile = [], array $training = [], string $mode = 'app'): string
     {
-        $entities = array_map(fn($p) => basename($p, '.entity.json'), $this->catalog->entities());
-        $forms = array_map(fn($p) => basename($p, '.json'), $this->catalog->forms());
+        $entities = $this->scopedEntityNames();
+        $forms = $this->scopedFormNames();
 
         if ($mode === 'builder') {
             $help = $training['help']['builder'] ?? [];
@@ -3616,6 +4290,7 @@ private function parseEntityFromCrudText(string $text): string
                 'Crear la estructura de tu app por chat (tablas, formularios y flujo).',
                 'Guiarte paso a paso sin tecnicismos.',
                 'Sugerir campos segun tu tipo de negocio.',
+                'Definir campos calculados y totales para tus formularios.',
                 'Aplicar base contable y tributaria minima para que tu app sea operable.',
                 'Sugerir codigo UNSPSC para productos y servicios (facturacion electronica).',
             ];
@@ -3638,8 +4313,8 @@ private function parseEntityFromCrudText(string $text): string
                 $actions[] = 'crear formulario ' . $entities[0];
             } else {
                 $actions[] = 'estado del proyecto';
+                $actions[] = 'siguiente paso';
                 $actions[] = 'crear tabla ordenes_trabajo numero:texto fecha:fecha estado:texto';
-                $actions[] = 'crear formulario ordenes_trabajo';
             }
 
             $lines = [];
@@ -3657,6 +4332,7 @@ private function parseEntityFromCrudText(string $text): string
             foreach (array_slice($actions, 0, 3) as $item) {
                 $lines[] = '- ' . $item;
             }
+            $lines[] = 'Opciones del editor visual que puedo dejarte listas por chat: campos calculados, totales, listas y documentos.';
             $lines[] = 'Tablas actuales: ' . (!empty($entities) ? implode(', ', array_slice($entities, 0, 5)) : 'sin tablas');
             $lines[] = 'Formularios actuales: ' . (!empty($forms) ? implode(', ', array_slice($forms, 0, 5)) : 'sin formularios');
             return implode("\n", $lines);
@@ -4234,7 +4910,7 @@ private function parseEntityFromCrudText(string $text): string
     private function tokenizeTraining(string $text): array
     {
         $text = mb_strtolower($text, 'UTF-8');
-        $text = preg_replace('/[^a-z0-9\\s]/u', ' ', $text) ?? $text;
+        $text = preg_replace('/[^\\p{L}\\p{N}\\s]/u', ' ', $text) ?? $text;
         $text = preg_replace('/\\s+/', ' ', trim($text)) ?? $text;
         if ($text === '') {
             return [];
@@ -4793,6 +5469,8 @@ private function parseEntityFromCrudText(string $text): string
             'requested_slot' => null,
             'builder_pending_command' => null,
             'pending_loop_counter' => 0,
+            'builder_calc_prompt' => null,
+            'builder_formula_notes' => [],
             'builder_completed_entities' => [],
             'builder_completed_forms' => [],
             'unknown_business_notice_sent' => false,
@@ -5038,6 +5716,114 @@ private function parseEntityFromCrudText(string $text): string
         $all = array_merge($entities, $base, $business, $byOperation);
         $all = array_values(array_filter(array_unique(array_map(static fn($v) => (string) $v, $all))));
         return $all;
+    }
+
+    private function projectRegistry(): ?ProjectRegistry
+    {
+        if ($this->projectRegistry instanceof ProjectRegistry) {
+            return $this->projectRegistry;
+        }
+        try {
+            $this->projectRegistry = new ProjectRegistry();
+            return $this->projectRegistry;
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function scopedEntityNames(): array
+    {
+        if (is_array($this->scopedEntityNamesCache)) {
+            return $this->scopedEntityNamesCache;
+        }
+
+        $names = [];
+        $registry = $this->projectRegistry();
+        if ($registry instanceof ProjectRegistry) {
+            try {
+                $names = $registry->listEntityNames($this->contextProjectId);
+            } catch (\Throwable $e) {
+                $names = [];
+            }
+
+            if (empty($names)) {
+                $hasAnyRegistryEntity = true;
+                try {
+                    $hasAnyRegistryEntity = $registry->hasAnyEntities();
+                } catch (\Throwable $e) {
+                    $hasAnyRegistryEntity = true;
+                }
+                if (!$hasAnyRegistryEntity) {
+                    $names = array_map(
+                        static fn($path): string => basename((string) $path, '.entity.json'),
+                        $this->catalog->entities()
+                    );
+                }
+            }
+        } else {
+            $names = array_map(
+                static fn($path): string => basename((string) $path, '.entity.json'),
+                $this->catalog->entities()
+            );
+        }
+
+        $clean = [];
+        foreach ($names as $name) {
+            $value = trim((string) $name);
+            if ($value !== '') {
+                $clean[$value] = true;
+            }
+        }
+
+        $result = array_keys($clean);
+        sort($result, SORT_STRING);
+        $this->scopedEntityNamesCache = $result;
+        return $result;
+    }
+
+    private function scopedFormNames(): array
+    {
+        if (is_array($this->scopedFormNamesCache)) {
+            return $this->scopedFormNamesCache;
+        }
+
+        $entitySet = [];
+        foreach ($this->scopedEntityNames() as $entity) {
+            $normalized = $this->normalizeEntityForSchema((string) $entity);
+            if ($normalized !== '') {
+                $entitySet[$normalized] = true;
+            }
+        }
+
+        $forms = [];
+        foreach ($this->catalog->forms() as $path) {
+            $name = basename((string) $path, '.json');
+            if ($name === '') {
+                continue;
+            }
+
+            $formEntity = '';
+            $raw = @file_get_contents((string) $path);
+            if (is_string($raw) && $raw !== '') {
+                $decoded = json_decode($raw, true);
+                if (is_array($decoded)) {
+                    $formEntity = $this->normalizeEntityForSchema((string) ($decoded['entity'] ?? ''));
+                }
+            }
+            if ($formEntity === '') {
+                $candidate = preg_replace('/\.form$/i', '', $name);
+                $formEntity = $this->normalizeEntityForSchema((string) $candidate);
+            }
+
+            if (!empty($entitySet) && $formEntity !== '' && isset($entitySet[$formEntity])) {
+                $forms[$name] = true;
+            }
+        }
+
+        $result = array_keys($forms);
+        sort($result, SORT_STRING);
+        $this->scopedFormNamesCache = $result;
+        return $result;
     }
 
     private function statePath(string $tenantId, string $projectId, string $mode, string $userId): string

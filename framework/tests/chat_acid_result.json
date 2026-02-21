@@ -5,7 +5,7 @@
         "total": 34,
         "training_intents": 30,
         "training_error": "No error",
-        "ran_at": "2026-02-21 13:53:19",
+        "ran_at": "2026-02-21 20:12:49",
         "confusion_cases_total": 3,
         "confusion_cases_passed": 3,
         "confusion_cases_failed": 0,
@@ -70,7 +70,7 @@
             "id": 7,
             "message": "que opciones puedo usar ahora",
             "action": "respond_local",
-            "reply": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\nOpciones activas ahora:\n- crear golden_clientes_1771681715 nombre=valor\n- listar golden_clientes_1771681715\n- abrir formulario golden_clientes_1771681715.form\nEntidades activas: golden_clientes_1771681715",
+            "reply": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\nOpciones activas ahora:\n- pedir al creador que agregue una tabla base\nEntidades activas: sin entidades",
             "command": "",
             "ok": true,
             "error": null
@@ -79,7 +79,7 @@
             "id": 8,
             "message": "dame el estado del proyecto",
             "action": "respond_local",
-            "reply": "En esta app puedes trabajar con:\n- Listas: golden_clientes_1771681715\n- Formularios: golden_clientes_1771681715.form\nEjemplos: crear golden_clientes_1771681715 nombre=valor, listar golden_clientes_1771681715",
+            "reply": "En esta app puedes trabajar con:\n- Listas: ninguna lista activa\n- Formularios: ningun formulario activo\nNo hay listas activas. Pide al creador agregar una tabla.",
             "command": "",
             "ok": true,
             "error": null
@@ -133,7 +133,7 @@
             "id": 14,
             "message": "crear producto",
             "action": "ask_user",
-            "reply": "Perfecto. Paso 2: como manejas pagos? contado, credito o mixto.",
+            "reply": "Ya tome nota de control del negocio.\nPerfecto. Paso 2: como manejas pagos? contado, credito o mixto.",
             "command": "",
             "ok": true,
             "error": null
@@ -295,7 +295,7 @@
             "id": 32,
             "message": "que pantallas tengo",
             "action": "respond_local",
-            "reply": "Formularios: golden_clientes_1771681715.form. Quieres abrir alguno?",
+            "reply": "Aun no hay formularios. Quieres crear uno?",
             "command": "",
             "ok": true,
             "error": null
@@ -304,7 +304,7 @@
             "id": 33,
             "message": "que hay hecho",
             "action": "respond_local",
-            "reply": "En esta app puedes trabajar con:\n- Listas: golden_clientes_1771681715\n- Formularios: golden_clientes_1771681715.form\nEjemplos: crear golden_clientes_1771681715 nombre=valor, listar golden_clientes_1771681715",
+            "reply": "En esta app puedes trabajar con:\n- Listas: ninguna lista activa\n- Formularios: ningun formulario activo\nNo hay listas activas. Pide al creador agregar una tabla.",
             "command": "",
             "ok": true,
             "error": null
@@ -313,7 +313,7 @@
             "id": 34,
             "message": "ayuda rapida",
             "action": "respond_local",
-            "reply": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\n- Sugerir codigo UNSPSC para productos y servicios.\nOpciones activas ahora:\n- crear golden_clientes_1771681715 nombre=valor\n- listar golden_clientes_1771681715\n- abrir formulario golden_clientes_1771681715.form\nEntidades activas: golden_clientes_1771681715",
+            "reply": "Puedo ayudarte con:\n- Crear y consultar datos por chat.\n- Guiarte paso a paso sin tecnicismos.\n- Mostrar reportes y totales cuando los pidas.\n- Sugerir codigo UNSPSC para productos y servicios.\nOpciones activas ahora:\n- pedir al creador que agregue una tabla base\nEntidades activas: sin entidades",
             "command": "",
             "ok": true,
             "error": null

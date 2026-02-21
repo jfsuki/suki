@@ -116,6 +116,28 @@ try {
 
 try {
     $registry = new ProjectRegistry();
+    $registryDbPath = $projectRoot . '/storage/meta/project_registry.sqlite';
+    if (is_file($registryDbPath)) {
+        try {
+            $rdb = new PDO('sqlite:' . $registryDbPath);
+            $rdb->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+            $patterns = ['demo_%', 'golden_%', 'acid_%', 'tmp_%', 'test_%'];
+            foreach ($patterns as $pattern) {
+                $rdb->prepare('DELETE FROM chat_sessions WHERE session_id LIKE :pattern')->execute([':pattern' => $pattern]);
+                $rdb->prepare('DELETE FROM users WHERE id LIKE :pattern')->execute([':pattern' => $pattern]);
+                $rdb->prepare('DELETE FROM project_users WHERE user_id LIKE :pattern')->execute([':pattern' => $pattern]);
+                $rdb->prepare('DELETE FROM entities WHERE entity_name LIKE :pattern')->execute([':pattern' => $pattern]);
+                $rdb->prepare('DELETE FROM auth_users WHERE id LIKE :pattern')->execute([':pattern' => $pattern]);
+                $rdb->prepare('DELETE FROM deploys WHERE project_id LIKE :pattern')->execute([':pattern' => $pattern]);
+                $rdb->prepare('DELETE FROM projects WHERE id LIKE :pattern')->execute([':pattern' => $pattern]);
+            }
+            // clean known test session prefixes not covered by leading pattern.
+            $rdb->exec("DELETE FROM chat_sessions WHERE session_id LIKE 'golden_session_%' OR session_id LIKE 'acid_%'");
+        } catch (Throwable $cleanupError) {
+            $summary['registry_db_cleanup_error'] = $cleanupError->getMessage();
+        }
+    }
+
     $manifest = $registry->resolveProjectFromManifest();
     $projectId = (string) ($manifest['id'] ?? 'default');
     $catalog = new ContractsCatalog($projectRoot);

@@ -6,16 +6,22 @@ namespace App\Core;
 final class CapabilityGraph
 {
     private ContractsCatalog $catalog;
+    private ?ProjectRegistry $registry;
 
     public function __construct(?string $projectRoot = null)
     {
         $this->catalog = new ContractsCatalog($projectRoot);
+        try {
+            $this->registry = new ProjectRegistry();
+        } catch (\Throwable $e) {
+            $this->registry = null;
+        }
     }
 
     public function build(string $projectId, string $mode = 'app'): array
     {
-        $entities = $this->loadEntities();
-        $forms = $this->loadForms();
+        $entities = $this->loadEntities($projectId);
+        $forms = $this->loadForms($entities);
 
         $entityNames = array_map(static fn(array $e): string => (string) ($e['name'] ?? ''), $entities);
         $actions = $this->buildActions($mode, $entityNames);
@@ -29,8 +35,29 @@ final class CapabilityGraph
         ];
     }
 
-    private function loadEntities(): array
+    private function loadEntities(string $projectId): array
     {
+        $allowed = [];
+        $strictProjectScope = false;
+        if ($this->registry instanceof ProjectRegistry) {
+            try {
+                $allowed = $this->registry->listEntityNames($projectId);
+                $strictProjectScope = $this->registry->hasAnyEntities();
+                if (empty($allowed) && !$strictProjectScope) {
+                    $allowed = [];
+                }
+            } catch (\Throwable $e) {
+                $allowed = [];
+            }
+        }
+        $allowSet = [];
+        foreach ($allowed as $name) {
+            $value = trim((string) $name);
+            if ($value !== '') {
+                $allowSet[$value] = true;
+            }
+        }
+
         $list = [];
         foreach ($this->catalog->entities() as $path) {
             $raw = @file_get_contents($path);
@@ -40,6 +67,9 @@ final class CapabilityGraph
             }
             $name = (string) ($data['name'] ?? basename($path, '.entity.json'));
             if ($name === '') {
+                continue;
+            }
+            if ($strictProjectScope && !isset($allowSet[$name])) {
                 continue;
             }
             $label = (string) ($data['label'] ?? $name);
@@ -68,8 +98,19 @@ final class CapabilityGraph
         return $list;
     }
 
-    private function loadForms(): array
+    private function loadForms(array $entities): array
     {
+        $entitySet = [];
+        foreach ($entities as $entity) {
+            if (!is_array($entity)) {
+                continue;
+            }
+            $name = trim((string) ($entity['name'] ?? ''));
+            if ($name !== '') {
+                $entitySet[$name] = true;
+            }
+        }
+
         $list = [];
         foreach ($this->catalog->forms() as $path) {
             $raw = @file_get_contents($path);
@@ -81,10 +122,17 @@ final class CapabilityGraph
             if ($name === '') {
                 continue;
             }
+            $entity = (string) ($data['entity'] ?? '');
+            if ($entity === '' && str_ends_with(strtolower($name), '.form')) {
+                $entity = (string) preg_replace('/\.form$/i', '', $name);
+            }
+            if (!empty($entitySet) && $entity !== '' && !isset($entitySet[$entity])) {
+                continue;
+            }
             $list[] = [
                 'name' => $name,
                 'title' => (string) ($data['title'] ?? $name),
-                'entity' => (string) ($data['entity'] ?? ''),
+                'entity' => $entity,
             ];
         }
         return $list;
@@ -117,4 +165,3 @@ final class CapabilityGraph
         return $actions;
     }
 }
-

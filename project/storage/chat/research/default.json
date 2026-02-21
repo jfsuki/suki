@@ -2,11 +2,11 @@
     "topics": [
         {
             "topic": "inventario",
-            "count": 16,
+            "count": 18,
             "status": "pending_research",
             "first_seen": "2026-02-20T18:10:07+00:00",
-            "last_seen": "2026-02-21T13:53:19+00:00",
-            "last_user": "golden_user_1771681999",
+            "last_seen": "2026-02-21T18:27:03+00:00",
+            "last_user": "golden_user_1771698423",
             "samples": [
                 "quiero crear una app para inventario"
             ]
@@ -22,6 +22,17 @@
                 "queiro hacer un programa para control de venta e inventario",
                 "quiero crear un programa para control de venta e inventario",
                 "quiero hacer un programa para control de venta e inventario"
+            ]
+        },
+        {
+            "topic": "mi empresa",
+            "count": 5,
+            "status": "pending_research",
+            "first_seen": "2026-02-21T18:55:38+00:00",
+            "last_seen": "2026-02-21T19:06:52+00:00",
+            "last_user": "u_flow_test",
+            "samples": [
+                "quiero crear un programa para mi empresa"
             ]
         },
         {

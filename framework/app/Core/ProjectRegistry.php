@@ -109,6 +109,17 @@ final class ProjectRegistry
         ]);
     }
 
+    public function getSession(string $sessionId): ?array
+    {
+        if ($sessionId === '') {
+            return null;
+        }
+        $stmt = $this->db->prepare('SELECT session_id, user_id, project_id, tenant_id, channel, last_message_at FROM chat_sessions WHERE session_id = :id');
+        $stmt->execute([':id' => $sessionId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
     public function registerEntity(string $projectId, string $entityName, string $source = 'chat'): void
     {
         if ($projectId === '' || $entityName === '') return;
@@ -204,6 +215,34 @@ final class ProjectRegistry
         $summary['sessions'] = (int) $stmt->fetchColumn();
 
         return $summary;
+    }
+
+    public function listEntityNames(string $projectId): array
+    {
+        if ($projectId === '') {
+            return [];
+        }
+        $stmt = $this->db->prepare('SELECT entity_name FROM entities WHERE project_id = :project ORDER BY entity_name ASC');
+        $stmt->execute([':project' => $projectId]);
+        $rows = $stmt->fetchAll(PDO::FETCH_COLUMN) ?: [];
+        $names = [];
+        foreach ($rows as $name) {
+            $value = trim((string) $name);
+            if ($value !== '') {
+                $names[$value] = true;
+            }
+        }
+        return array_keys($names);
+    }
+
+    public function hasAnyEntities(): bool
+    {
+        $stmt = $this->db->query('SELECT 1 FROM entities LIMIT 1');
+        if (!$stmt) {
+            return false;
+        }
+        $row = $stmt->fetch(PDO::FETCH_NUM);
+        return $row !== false;
     }
 
     public function listUsers(string $projectId): array
