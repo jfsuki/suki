@@ -37,6 +37,7 @@ use App\Core\Database;
 use App\Core\QueryBuilder;
 use App\Core\ProjectRegistry;
 use App\Core\CapabilityGraph;
+use App\Core\Agents\ConversationQualityDashboard;
 
 $route = trim($_GET['route'] ?? '');
 $manifestError = null;
@@ -616,6 +617,23 @@ if ($route === 'chat/acid-report') {
     return;
 }
 
+if ($route === 'chat/quality') {
+    $payload = requestData();
+    $tenantId = (string) ($payload['tenant_id'] ?? $_GET['tenant_id'] ?? getenv('TENANT_KEY') ?? getenv('TENANT_ID') ?? 'default');
+    $tenantId = $tenantId !== '' ? $tenantId : 'default';
+    $days = (int) ($payload['days'] ?? $_GET['days'] ?? 7);
+    try {
+        $quality = new ConversationQualityDashboard(PROJECT_ROOT);
+        $report = $quality->build($tenantId, $days);
+        respondJson($response, 'success', 'Calidad conversacional', [
+            'report' => $report,
+        ]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
 if ($route === 'wizard/form-from-entity') {
     $payload = requestData();
     $entityName = (string) ($payload['entity'] ?? $_GET['entity'] ?? '');
@@ -746,11 +764,14 @@ if ($route === 'registry/status') {
         $summary = $registry->summary($projectId);
         $project = $registry->getProject($projectId) ?: $manifest;
         $capabilities = (new CapabilityGraph(PROJECT_ROOT))->build($projectId, 'app');
+        $tenantId = (string) (getenv('TENANT_KEY') ?: getenv('TENANT_ID') ?: 'default');
+        $quality = (new ConversationQualityDashboard(PROJECT_ROOT))->build($tenantId, 7);
         respondJson($response, 'success', 'OK', [
             'project' => $project,
             'summary' => $summary,
             'sync' => $sync,
             'capabilities' => $capabilities,
+            'chat_quality' => $quality['summary'] ?? [],
         ]);
         return;
     } catch (\Throwable $e) {

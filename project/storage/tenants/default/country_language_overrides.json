@@ -1,0 +1,50 @@
+{
+    "global": {
+        "typo_rules": [],
+        "synonyms": []
+    },
+    "countries": {
+        "CO": {
+            "typo_rules": [
+                {
+                    "match": "pacientes",
+                    "replace": "paciente"
+                },
+                {
+                    "match": "paso",
+                    "replace": "pago"
+                },
+                {
+                    "match": "clientes",
+                    "replace": "cliente"
+                },
+                {
+                    "match": "citas",
+                    "replace": "cita"
+                },
+                {
+                    "match": "tablas",
+                    "replace": "tabla"
+                },
+                {
+                    "match": "productos",
+                    "replace": "producto"
+                },
+                {
+                    "match": "servicios",
+                    "replace": "servicio"
+                },
+                {
+                    "match": "facturar",
+                    "replace": "factura"
+                },
+                {
+                    "match": "misto",
+                    "replace": "mixto"
+                }
+            ],
+            "synonyms": []
+        }
+    },
+    "updated": "2026-02-21"
+}

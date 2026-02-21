@@ -218,6 +218,11 @@
                 <input type="text" id="apiBase" value="" placeholder="(vacio = mismo host)" />
             </div>
             <div class="status" id="statusText">Lista para construir</div>
+            <div class="status" id="qualityText" style="margin-top:8px;background:#eef2ff;color:#1d4ed8;">Calidad conversacional: cargando...</div>
+            <div class="input-row">
+                <button class="secondary" id="refreshQuality">Actualizar calidad</button>
+            </div>
+            <div class="meta" id="qualityMeta"></div>
         </div>
     </div>
 
@@ -235,6 +240,8 @@
         const sendFileEl = document.getElementById('sendFile');
         const roleEl = document.getElementById('role');
         const statusEl = document.getElementById('statusText');
+        const qualityTextEl = document.getElementById('qualityText');
+        const qualityMetaEl = document.getElementById('qualityMeta');
         const tenantIdEl = document.getElementById('tenantId');
         const projectIdEl = document.getElementById('projectId');
         const chipsEl = document.getElementById('quickChips');
@@ -315,6 +322,29 @@
                 }
             } catch (e) {
                 // ignore
+            }
+        }
+
+        async function loadQuality() {
+            const tenantId = tenantIdEl.value.trim() || 'default';
+            try {
+                const res = await fetch(apiBase() + '/api/chat/quality?tenant_id=' + encodeURIComponent(tenantId) + '&days=7');
+                const json = await res.json();
+                const report = json.data && json.data.report ? json.data.report : null;
+                if (!report || !report.summary) {
+                    qualityTextEl.textContent = 'Calidad conversacional: sin datos';
+                    qualityMetaEl.textContent = '';
+                    return;
+                }
+                const s = report.summary;
+                qualityTextEl.textContent = `Calidad: ${s.success_rate}% exito | ${s.unresolved_intents} no resueltas`;
+                const top = Array.isArray(report.unresolved_top) ? report.unresolved_top.slice(0, 3) : [];
+                qualityMetaEl.textContent = top.length
+                    ? ('Pendientes frecuentes: ' + top.map(x => `"${x.message}" (${x.count})`).join(' | '))
+                    : 'Sin pendientes frecuentes.';
+            } catch (e) {
+                qualityTextEl.textContent = 'Calidad conversacional: error';
+                qualityMetaEl.textContent = '';
             }
         }
 
@@ -482,9 +512,12 @@
             el.addEventListener('change', saveSettings);
         });
         apiBaseEl.addEventListener('change', loadQuickChips);
+        tenantIdEl.addEventListener('change', loadQuality);
+        document.getElementById('refreshQuality').addEventListener('click', loadQuality);
 
         loadSettings();
         addSession('sess_demo');
+        loadQuality();
     </script>
 </body>
 </html>

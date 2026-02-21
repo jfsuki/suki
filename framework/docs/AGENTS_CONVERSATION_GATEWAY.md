@@ -1,51 +1,59 @@
-# Conversation Gateway (PHP) - Arquitectura y Uso
+﻿# Conversation Gateway (PHP) - Arquitectura y Uso
 
 Objetivo: resolver conversaciones con costo minimo. Local-first, y LLM solo si es necesario.
 
 ## Flujo
 1) ConversationGateway clasifica el mensaje (saludo/faq/crud).
-2) Si se resuelve localmente → responde y ejecuta Command Layer.
-3) Si no se puede → construye Context Capsule minimo.
+2) Si se resuelve localmente, responde y ejecuta Command Layer.
+3) Si no se puede, construye Context Capsule minimo.
 4) LLMRouter elige proveedor (Groq/Gemini/OpenRouter/Claude).
-5) Respuesta JSON → Command Layer o respuesta humana.
+5) Respuesta JSON pasa a Command Layer o a respuesta humana.
+
+## Mejoras P0/P1/P2 (2026-02-21)
+- P0 Dialogo por estados: `DialogStateEngine` para modo `builder` y `app` con checklist vivo.
+  - Triggers: "paso actual", "checklist", "en que vamos", "que falta", "que sigue".
+  - El estado se sincroniza en cada guardado y despues de ejecuciones reales (`rememberExecution`).
+- P1 Entrenamiento por logs + pais:
+  - `AgentNurtureJob` nutre `training_overrides.json` y `country_language_overrides.json` por tenant.
+  - Aprende aliases de campo, typos frecuentes y variantes locales desde telemetry real.
+  - `ConversationGateway` aplica normalizacion por pais en `normalizeWithTraining(...)`.
+- P2 Dashboard de calidad conversacional:
+  - Nuevo agregador `ConversationQualityDashboard`.
+  - Nuevo endpoint: `POST/GET /api/chat/quality?tenant_id=default&days=7`.
+  - UI de chat (`chat_builder.html` y `chat_app.html`) muestra exito, no resueltas, repreguntas y top pendientes.
 
 ## Archivos principales
 - `app/Core/Agents/ConversationGateway.php`
+- `app/Core/Agents/DialogStateEngine.php`
 - `app/Core/Agents/Telemetry.php`
+- `app/Core/Agents/ConversationQualityDashboard.php`
 - `app/Jobs/AgentNurtureJob.php`
 - `app/Core/LLM/LLMRouter.php`
 - `app/Core/LLM/Providers/*`
 
 ## Base conversacional (JSON)
-Se consolidó y conectó al router local:
+Se consolido y conecto al router local:
 ```
 framework/contracts/agents/conversation_training_base.json
 ```
-Contiene intents, entidades, typos, memoria activa y smoke tests.  
-El gateway usa esta base para clasificar intents como **estado del proyecto**, **tablas**, **formularios** y **qué puedo hacer** sin llamar a IA.
-
-## Auto‑nutrición (telemetry → training_overrides)
-El job `AgentNurtureJob` analiza telemetry reciente y genera:
-```
-project/storage/tenants/{tenantId}/training_overrides.json
-```
-Estas utterances se mezclan con el training base sin reescribirlo.
+Contiene intents, entidades, typos, memoria activa y smoke tests.
 
 ## Memoria por tenant
 Ruta:
 ```
 project/storage/tenants/{tenantId}/
-  agent_state/{userId}.json
+  agent_state/{project}__{mode}__{user}.json
   lexicon.json
   dialog_policy.json
+  training_overrides.json
+  country_language_overrides.json
   telemetry/YYYY-MM-DD.log.jsonl
 ```
 
-Memoria compartida entre agentes (por tenant):
+Memoria compartida:
 ```
 project/storage/chat/research/{tenantId}.json
 ```
-Uso: cuando el usuario pide un tipo de app que no tiene plantilla exacta, se registra el caso para investigacion y se reutiliza en futuras conversaciones.
 
 ## Context Capsule minimo
 ```
@@ -69,25 +77,15 @@ Uso: cuando el usuario pide un tipo de app que no tiene plantilla exacta, se reg
 - probar sistema
 
 ## Guardrails de modo
-- En **modo app**: si el usuario pide crear app/programa/tablas, el agente lo redirige al chat creador.
-- En **modo builder**: si falta plantilla de negocio, el agente registra tema de investigacion y sigue con una pregunta minima.
+- En modo app: si el usuario pide crear app/programa/tablas, redirige al chat creador.
+- En modo builder: si falta plantilla de negocio, registra tema de investigacion y sigue con pregunta minima.
 
 ## UNSPSC (Colombia Compra)
 - Base local:
 ```
 framework/contracts/agents/unspsc_co_common.json
 ```
-- Uso en chat:
-  - Detecta preguntas: `unspsc`, `clasificador`, `codigo producto/servicio`.
-  - Sugiere codigos comunes por coincidencia de texto (alias comercial) o por tipo de negocio.
-  - Refuerza campo `codigo_unspsc` en tablas de `productos/servicios`.
-  - Regla: siempre validar el codigo final en el clasificador oficial antes de facturar.
-
-## Ruta tecnica guiada (builder)
-El agente puede explicar por chat una ruta profesional de construccion:
-- logica de programacion (validaciones, prerequisitos, 1 pregunta minima)
-- arquitectura de base de datos (tenant_id, indices, maestro-detalle)
-- secuencia de entrega (tablas -> formularios -> pruebas -> reportes)
+- Uso: detecta preguntas de clasificador y sugiere codigos comunes por negocio.
 
 ## Job de nutricion
 Ejecuta `AgentNurtureJob` para sumar aliases:
@@ -95,13 +93,12 @@ Ejecuta `AgentNurtureJob` para sumar aliases:
 php -r "require 'framework/app/autoload.php'; (new App\\Jobs\\AgentNurtureJob())->run('default');"
 ```
 
+Salida:
+- `added`: aliases nuevos en lexicon.
+- `added_utterances`: utterances nuevas para intents.
+- `added_country_rules`: reglas nuevas por pais (typos/sinonimos).
+
 ## Notas de ahorro tokens
 - Local-first siempre.
 - Contexto minimo (no historial completo).
 - Cache de resultados frecuentes.
-
-## Prompts y entrenamiento (resumen)
-- **Agent Training Prompt**: JSON-first, cambios incrementales, cero tecnicismos, IA solo fallback.
-- **ConversationTrainer**: mejora intents/utterances/sinónimos sin reescribir; agrega pruebas smoke.
-- **Memory Active Profile**: mantener objetivo, contexto del proyecto y preferencias del usuario; 1 pregunta mínima.
-- **Auto‑training flow**: usa telemetry para nutrir lexicon/utterances y reducir llamadas LLM.

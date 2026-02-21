@@ -14,11 +14,13 @@ final class ConversationGateway
     private EntityRegistry $entities;
     private ContractsCatalog $catalog;
     private ChatMemoryStore $memory;
+    private DialogStateEngine $dialogState;
     private array $trainingBaseCache = [];
     private ?array $confusionBaseCache = null;
     private ?array $domainPlaybookCache = null;
     private ?array $accountingKnowledgeCache = null;
     private ?array $unspscCommonCache = null;
+    private ?array $countryOverridesCache = null;
     private string $contextProjectId = 'default';
     private string $contextMode = 'app';
     private string $contextProfileUser = 'anon';
@@ -30,6 +32,7 @@ final class ConversationGateway
         $this->entities = new EntityRegistry();
         $this->catalog = new ContractsCatalog($this->projectRoot);
         $this->memory = new ChatMemoryStore($this->projectRoot);
+        $this->dialogState = new DialogStateEngine();
     }
 
     public function handle(string $tenantId, string $userId, string $message, string $mode = 'app', string $projectId = 'default'): array
@@ -44,7 +47,6 @@ final class ConversationGateway
         $raw = trim($message);
         $training = $this->loadTrainingBase($tenantId);
         $normalizedBase = $this->normalize($raw);
-        $normalized = $this->normalizeWithTraining($raw, $training);
 
         $state = $this->loadState($tenantId, $userId, $this->contextProjectId, $mode);
         $lexicon = $this->loadLexicon($tenantId);
@@ -53,6 +55,8 @@ final class ConversationGateway
             $lexicon = $this->mergeLexicon($lexicon, $glossary);
         }
         $profile = $this->memory->getProfile($tenantId, $this->contextProfileUser);
+        $state = $this->syncDialogState($state, $mode, $profile);
+        $normalized = $this->normalizeWithTraining($raw, $training, $tenantId, $profile);
         $policy = $this->loadPolicy($tenantId);
         $confusionBase = $this->loadConfusionBase();
 
@@ -105,6 +109,13 @@ final class ConversationGateway
             $state = $this->updateState($state, $raw, $reply, 'unspsc_help', null, [], $state['active_task'] ?? null);
             $this->saveState($tenantId, $userId, $state);
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('unspsc_help', true));
+        }
+
+        if ($this->isDialogChecklistQuestion($normalizedBase)) {
+            $reply = $this->buildDialogChecklistReply($state, $mode, $profile);
+            $state = $this->updateState($state, $raw, $reply, 'dialog_checklist', null, [], $state['active_task'] ?? null);
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('dialog_checklist', true));
         }
 
         if ($mode === 'builder' && !empty($state['builder_pending_command']) && is_array($state['builder_pending_command'])) {
@@ -517,9 +528,10 @@ final class ConversationGateway
             'assistant_reply' => $assistantReply,
             'at' => date('c'),
         ];
-
-        $path = $this->statePath($tenantId, $projectId, $mode, $userId);
-        $this->writeJson($path, $state);
+        $this->contextProjectId = $projectId;
+        $this->contextMode = $mode;
+        $this->contextProfileUser = $this->profileUserKey($userId);
+        $this->saveState($tenantId, $userId, $state);
     }
 
     private function isPureGreeting(string $text): bool
@@ -866,7 +878,7 @@ final class ConversationGateway
         return $text;
     }
 
-    private function normalizeWithTraining(string $text, array $training): string
+    private function normalizeWithTraining(string $text, array $training, string $tenantId = 'default', array $profile = []): string
     {
         $text = $this->normalize($text);
         if (empty($training)) {
@@ -893,6 +905,43 @@ final class ConversationGateway
         $text = preg_replace('/\\bk\\b/u', 'que', $text) ?? $text;
         $text = preg_replace('/\\bqueiro\\b/u', 'quiero', $text) ?? $text;
         $text = preg_replace('/\\bqiero\\b/u', 'quiero', $text) ?? $text;
+
+        $countryCode = $this->resolveCountryCode($profile, $text);
+        $countryOverrides = $this->loadCountryOverrides($tenantId);
+        $globalRules = is_array($countryOverrides['global']['typo_rules'] ?? null)
+            ? $countryOverrides['global']['typo_rules']
+            : [];
+        $countryRules = is_array($countryOverrides['countries'][$countryCode]['typo_rules'] ?? null)
+            ? $countryOverrides['countries'][$countryCode]['typo_rules']
+            : [];
+        $allRules = array_merge($globalRules, $countryRules);
+        foreach ($allRules as $rule) {
+            if (!is_array($rule)) {
+                continue;
+            }
+            $match = $this->normalize((string) ($rule['match'] ?? ''));
+            $replace = $this->normalize((string) ($rule['replace'] ?? ''));
+            if ($match === '') {
+                continue;
+            }
+            $text = preg_replace('/\\b' . preg_quote($match, '/') . '\\b/u', $replace, $text) ?? $text;
+        }
+
+        $globalSynonyms = is_array($countryOverrides['global']['synonyms'] ?? null)
+            ? $countryOverrides['global']['synonyms']
+            : [];
+        $countrySynonyms = is_array($countryOverrides['countries'][$countryCode]['synonyms'] ?? null)
+            ? $countryOverrides['countries'][$countryCode]['synonyms']
+            : [];
+        foreach (array_merge($globalSynonyms, $countrySynonyms) as $alias => $target) {
+            $alias = $this->normalize((string) $alias);
+            $target = $this->normalize((string) $target);
+            if ($alias === '' || $target === '') {
+                continue;
+            }
+            $text = preg_replace('/\\b' . preg_quote($alias, '/') . '\\b/u', $target, $text) ?? $text;
+        }
+
         $text = preg_replace('/\s+/', ' ', trim($text)) ?? $text;
         return $text;
     }
@@ -1056,6 +1105,59 @@ final class ConversationGateway
             $lines[] = 'No hay listas activas. Pide al creador agregar una tabla.';
         }
         return implode("\n", $lines);
+    }
+
+    private function syncDialogState(array $state, string $mode, array $profile = []): array
+    {
+        return $this->dialogState->sync(
+            $state,
+            $mode,
+            $profile,
+            count($this->catalog->entities()),
+            count($this->catalog->forms())
+        );
+    }
+
+    private function isDialogChecklistQuestion(string $text): bool
+    {
+        $patterns = [
+            'paso actual',
+            'checklist',
+            'en que paso',
+            'en que vamos',
+            'que falta',
+            'q falta',
+            'q mas falta',
+            'que sigue',
+            'estado actual',
+            'avance actual',
+        ];
+        foreach ($patterns as $pattern) {
+            if (str_contains($text, $pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function buildDialogChecklistReply(array $state, string $mode, array $profile = []): string
+    {
+        $synced = $this->syncDialogState($state, $mode, $profile);
+        $reply = $this->dialogState->buildChecklistReply($synced, $mode);
+        if ($mode === 'builder' && !empty($state['builder_pending_command']) && is_array($state['builder_pending_command'])) {
+            $reply .= "\n\n" . 'Accion pendiente:' . "\n" . $this->buildPendingPreviewReply((array) $state['builder_pending_command']);
+        }
+
+        if ($mode === 'builder') {
+            $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
+            if ($businessType !== '') {
+                $profileData = $this->findDomainProfile($businessType);
+                $label = (string) ($profileData['label'] ?? $businessType);
+                $reply .= "\n" . 'Ruta activa: ' . $label . '.';
+            }
+        }
+
+        return $reply;
     }
 
     private function parseBuild(string $text, array $state, array $profile = []): array
@@ -4020,6 +4122,89 @@ private function parseEntityFromCrudText(string $text): string
         )));
     }
 
+    private function loadCountryOverrides(string $tenantId = 'default'): array
+    {
+        if ($this->countryOverridesCache !== null) {
+            return $this->countryOverridesCache;
+        }
+
+        $frameworkRoot = defined('FRAMEWORK_ROOT') ? FRAMEWORK_ROOT : dirname(__DIR__, 3);
+        $basePath = $frameworkRoot . '/contracts/agents/country_language_overrides.json';
+        $tenantPath = $this->projectRoot . '/storage/tenants/' . $this->safe($tenantId) . '/country_language_overrides.json';
+
+        $base = $this->readJson($basePath, [
+            'global' => ['typo_rules' => [], 'synonyms' => []],
+            'countries' => [],
+        ]);
+        $tenant = is_file($tenantPath) ? $this->readJson($tenantPath, []) : [];
+
+        if (!empty($tenant['global']) && is_array($tenant['global'])) {
+            $baseGlobal = is_array($base['global'] ?? null) ? $base['global'] : [];
+            $tenantGlobal = $tenant['global'];
+            $base['global'] = [
+                'typo_rules' => array_merge(
+                    is_array($baseGlobal['typo_rules'] ?? null) ? $baseGlobal['typo_rules'] : [],
+                    is_array($tenantGlobal['typo_rules'] ?? null) ? $tenantGlobal['typo_rules'] : []
+                ),
+                'synonyms' => array_merge(
+                    is_array($baseGlobal['synonyms'] ?? null) ? $baseGlobal['synonyms'] : [],
+                    is_array($tenantGlobal['synonyms'] ?? null) ? $tenantGlobal['synonyms'] : []
+                ),
+            ];
+        }
+
+        if (!empty($tenant['countries']) && is_array($tenant['countries'])) {
+            if (!is_array($base['countries'] ?? null)) {
+                $base['countries'] = [];
+            }
+            foreach ($tenant['countries'] as $country => $cfg) {
+                if (!is_array($cfg)) {
+                    continue;
+                }
+                $country = strtoupper((string) $country);
+                $existing = is_array($base['countries'][$country] ?? null) ? $base['countries'][$country] : [];
+                $base['countries'][$country] = [
+                    'typo_rules' => array_merge(
+                        is_array($existing['typo_rules'] ?? null) ? $existing['typo_rules'] : [],
+                        is_array($cfg['typo_rules'] ?? null) ? $cfg['typo_rules'] : []
+                    ),
+                    'synonyms' => array_merge(
+                        is_array($existing['synonyms'] ?? null) ? $existing['synonyms'] : [],
+                        is_array($cfg['synonyms'] ?? null) ? $cfg['synonyms'] : []
+                    ),
+                ];
+            }
+        }
+
+        $this->countryOverridesCache = $base;
+        return $this->countryOverridesCache;
+    }
+
+    private function resolveCountryCode(array $profile, string $text = ''): string
+    {
+        $country = strtoupper(trim((string) ($profile['country'] ?? $profile['country_code'] ?? '')));
+        if ($country !== '') {
+            return $country;
+        }
+        $text = $this->normalize($text);
+        $map = [
+            'colombia' => 'CO',
+            'mexico' => 'MX',
+            'argentina' => 'AR',
+            'peru' => 'PE',
+            'chile' => 'CL',
+            'ecuador' => 'EC',
+            'espana' => 'ES',
+            'costa rica' => 'CR',
+        ];
+        foreach ($map as $token => $code) {
+            if (str_contains($text, $token)) {
+                return $code;
+            }
+        }
+        return 'CO';
+    }
+
     private function trainingBasePath(): string
     {
         $frameworkRoot = defined('FRAMEWORK_ROOT') ? FRAMEWORK_ROOT : dirname(__DIR__, 3);
@@ -4196,6 +4381,7 @@ private function parseEntityFromCrudText(string $text): string
             'builder_pending_command' => null,
             'unknown_business_notice_sent' => false,
             'last_action' => null,
+            'dialog' => null,
             'last_messages' => [],
             'summary' => null,
         ];
@@ -4216,6 +4402,8 @@ private function parseEntityFromCrudText(string $text): string
 
     private function saveState(string $tenantId, string $userId, array $state): void
     {
+        $profile = $this->memory->getProfile($tenantId, $this->profileUserKey($userId));
+        $state = $this->syncDialogState($state, $this->contextMode, $profile);
         $path = $this->statePath($tenantId, $this->contextProjectId, $this->contextMode, $userId);
         $this->writeJson($path, $state);
     }

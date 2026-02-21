@@ -1,0 +1,78 @@
+{
+  "meta": {
+    "name": "country_language_overrides",
+    "version": "1.0.0",
+    "language": "es",
+    "updated": "2026-02-21",
+    "goal": "Normalizar variaciones locales y errores ortograficos frecuentes por pais para reducir repreguntas."
+  },
+  "global": {
+    "typo_rules": [
+      { "match": "misto", "replace": "mixto" },
+      { "match": "servivios", "replace": "servicios" },
+      { "match": "prodcuto", "replace": "producto" },
+      { "match": "factrua", "replace": "factura" },
+      { "match": "formlario", "replace": "formulario" },
+      { "match": "clente", "replace": "cliente" }
+    ],
+    "synonyms": {
+      "cel": "telefono",
+      "celu": "telefono",
+      "correo": "email",
+      "mail": "email",
+      "nit": "documento"
+    }
+  },
+  "countries": {
+    "CO": {
+      "typo_rules": [
+        { "match": "ferreteriaa", "replace": "ferreteria" },
+        { "match": "veterinariaa", "replace": "veterinaria" },
+        { "match": "contaduria", "replace": "contabilidad" }
+      ],
+      "synonyms": {
+        "celular": "telefono",
+        "cel": "telefono",
+        "nit": "documento",
+        "ruc": "documento"
+      }
+    },
+    "MX": {
+      "typo_rules": [
+        { "match": "facturacion", "replace": "facturacion" },
+        { "match": "cotisacion", "replace": "cotizacion" }
+      ],
+      "synonyms": {
+        "rfc": "documento",
+        "cel": "telefono"
+      }
+    },
+    "AR": {
+      "typo_rules": [
+        { "match": "factruacion", "replace": "facturacion" }
+      ],
+      "synonyms": {
+        "cuit": "documento",
+        "cel": "telefono"
+      }
+    },
+    "PE": {
+      "typo_rules": [
+        { "match": "boletaas", "replace": "boletas" }
+      ],
+      "synonyms": {
+        "ruc": "documento",
+        "cel": "telefono"
+      }
+    },
+    "CL": {
+      "typo_rules": [
+        { "match": "boletaa", "replace": "boleta" }
+      ],
+      "synonyms": {
+        "rut": "documento",
+        "cel": "telefono"
+      }
+    }
+  }
+}

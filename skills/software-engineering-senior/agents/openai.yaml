@@ -1,0 +1,7 @@
+interface:
+  display_name: "Software Engineering Senior"
+  short_description: "Senior coding workflow with strict QA gates."
+  default_prompt: "Use $software-engineering-senior to analyze root cause, patch incrementally, and verify with pre/post QA gates."
+
+policy:
+  allow_implicit_invocation: true

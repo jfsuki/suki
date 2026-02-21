@@ -159,3 +159,32 @@ Respuesta esperada:
 
 Fuente del reporte:
 - `project/storage/tenants/{tenant}/telemetry/YYYY-MM-DD.log.jsonl`
+
+## 13) Probar P0/P1/P2 (estado + entrenamiento + calidad)
+### P0 checklist por estado
+En builder y app pregunta:
+- `paso actual`
+- `checklist`
+- `que falta`
+
+Esperado:
+- Respuesta con checklist `[x]/[ ]`
+- Paso actual y siguiente accion
+
+### P1 entrenamiento por pais
+1) Ejecuta:
+```
+php framework/cron/agent_nurture.php default
+```
+2) Verifica archivos:
+- `project/storage/tenants/default/training_overrides.json`
+- `project/storage/tenants/default/country_language_overrides.json`
+
+### P2 dashboard calidad conversacional
+API:
+```
+/api/chat/quality?tenant_id=default&days=7
+```
+UI:
+- `project/public/chat_builder.html` (panel derecho > Calidad conversacional)
+- `project/public/chat_app.html` (panel derecho > Calidad conversacional)

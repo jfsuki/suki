@@ -6,7 +6,8 @@
         "cliente": "cliente",
         "clientes": "cliente",
         "factura": "factura",
-        "facturas": "factura"
+        "facturas": "factura",
+        "ana": "clientes"
     },
     "field_aliases": {
         "nit": "nit",

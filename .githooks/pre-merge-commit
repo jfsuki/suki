@@ -1,0 +1,7 @@
+#!/bin/sh
+php framework/scripts/qa_gate.php post
+if [ $? -ne 0 ]; then
+  echo "merge blocked: chat_acid/db_health or QA post-check failed."
+  exit 1
+fi
+exit 0

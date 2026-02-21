@@ -115,7 +115,13 @@ final class ChatAgent
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
                 'message' => $text,
                 'resolved_locally' => true,
+                'action' => $action,
                 'mode' => $mode,
+                'session_id' => $sessionId,
+                'user_id' => $userId,
+                'project_id' => $projectId,
+                'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                'requested_slot' => (string) (($result['state']['requested_slot'] ?? '') ?: ''),
             ]));
             return $reply;
         }
@@ -147,7 +153,13 @@ final class ChatAgent
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
                 'message' => $text,
                 'resolved_locally' => true,
+                'action' => $action,
                 'mode' => $mode,
+                'session_id' => $sessionId,
+                'user_id' => $userId,
+                'project_id' => $projectId,
+                'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                'requested_slot' => (string) (($result['state']['requested_slot'] ?? '') ?: ''),
             ]));
             return $reply;
         }
@@ -164,9 +176,15 @@ final class ChatAgent
                 'message' => $text,
                 'provider_used' => $provider,
                 'resolved_locally' => false,
+                'action' => $action,
                 'mode' => $mode,
                 'llm_request_count' => 1,
                 'usage' => $usage,
+                'session_id' => $sessionId,
+                'user_id' => $userId,
+                'project_id' => $projectId,
+                'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                'requested_slot' => (string) (($result['state']['requested_slot'] ?? '') ?: ''),
             ]));
 
             $json = $llmResult['json'] ?? null;
@@ -179,6 +197,17 @@ final class ChatAgent
             return $this->reply($textReply !== '' ? $textReply : 'Listo.', $channel, $sessionId, $userId);
         }
 
+        $this->telemetry()->record($tenantId, array_merge($telemetry, [
+            'message' => $text,
+            'resolved_locally' => true,
+            'action' => 'error',
+            'mode' => $mode,
+            'session_id' => $sessionId,
+            'user_id' => $userId,
+            'project_id' => $projectId,
+            'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+            'status' => 'error',
+        ]));
         return $this->reply('No entendi. Puedes decir: crear cliente nombre=Juan nit=123', $channel, $sessionId, $userId, 'error');
     }
 
