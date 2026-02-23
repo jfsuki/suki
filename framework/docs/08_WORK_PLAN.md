@@ -63,6 +63,15 @@
   - `BuilderOnboardingFlow` extraido como puerta de entrada del onboarding builder.
   - pruebas dedicadas agregadas: `framework/tests/mode_guard_policy_test.php` y `framework/tests/builder_onboarding_flow_test.php`.
 
+## P1 kickoff update (2026-02-23)
+- Routing and command execution seams added:
+  - `IntentRouter` + `IntentRouteResult` integrados en `ChatAgent`.
+  - `CommandBus` + `MapCommandHandler` integrados en `ChatAgent` (dispatch centralizado).
+- Dedicated tests added:
+  - `framework/tests/intent_router_test.php`
+  - `framework/tests/command_bus_test.php`
+- Unit runner expanded to validate P1 components before full QA gate.
+
 ## Execution checklist
 - [x] Summary dependency ordering stable
 - [x] Framework/project separation (paths + webroots)

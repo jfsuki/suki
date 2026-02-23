@@ -20,6 +20,8 @@ final class UnitTestRunner
         $tests[] = $this->wrap('gateway_golden', fn() => $this->checkGatewayGolden());
         $tests[] = $this->wrap('mode_guard_policy', fn() => $this->checkModeGuardPolicy());
         $tests[] = $this->wrap('builder_onboarding_flow', fn() => $this->checkBuilderOnboardingFlow());
+        $tests[] = $this->wrap('intent_router', fn() => $this->checkIntentRouter());
+        $tests[] = $this->wrap('command_bus', fn() => $this->checkCommandBus());
 
         $summary = [
             'passed' => count(array_filter($tests, fn($t) => $t['status'] === 'pass')),
@@ -180,5 +182,50 @@ final class UnitTestRunner
         if ((string) ($delegatedResult['reply'] ?? '') !== 'delegated' || $delegated < 1) {
             throw new \RuntimeException('BuilderOnboardingFlow no delega al core handler.');
         }
+    }
+
+    private function checkIntentRouter(): void
+    {
+        $router = new IntentRouter();
+        $local = $router->route(['action' => 'respond_local', 'reply' => 'ok']);
+        if (!$local->isLocalResponse() || $local->reply() !== 'ok') {
+            throw new \RuntimeException('IntentRouter no enruta respond_local.');
+        }
+
+        $cmd = $router->route(['action' => 'execute_command', 'command' => ['command' => 'CreateEntity']]);
+        if (!$cmd->isCommand() || (string) (($cmd->command()['command'] ?? '')) !== 'CreateEntity') {
+            throw new \RuntimeException('IntentRouter no enruta execute_command.');
+        }
+
+        $llm = $router->route(['action' => 'send_to_llm', 'llm_request' => ['messages' => []]]);
+        if (!$llm->isLlmRequest()) {
+            throw new \RuntimeException('IntentRouter no enruta send_to_llm.');
+        }
+    }
+
+    private function checkCommandBus(): void
+    {
+        $bus = new CommandBus();
+        $bus->register(new MapCommandHandler(['CreateEntity'], static fn(array $command, array $context): array => [
+            'ok' => true,
+            'command' => (string) ($command['command'] ?? ''),
+            'mode' => (string) ($context['mode'] ?? ''),
+        ]));
+
+        $res = $bus->dispatch(['command' => 'CreateEntity'], ['mode' => 'builder']);
+        if (empty($res['ok']) || (string) ($res['mode'] ?? '') !== 'builder') {
+            throw new \RuntimeException('CommandBus no despacha handler soportado.');
+        }
+
+        try {
+            $bus->dispatch(['command' => 'UnknownCommand'], []);
+        } catch (\RuntimeException $e) {
+            if ($e->getMessage() === 'COMMAND_NOT_SUPPORTED') {
+                return;
+            }
+            throw new \RuntimeException('CommandBus lanzo error inesperado.');
+        }
+
+        throw new \RuntimeException('CommandBus debe fallar comando desconocido.');
     }
 }

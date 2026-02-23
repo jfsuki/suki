@@ -19,6 +19,8 @@ final class ChatAgent
     private ?ConversationGateway $gateway = null;
     private ?LLMRouter $llmRouter = null;
     private ?Telemetry $telemetry = null;
+    private ?IntentRouter $intentRouter = null;
+    private ?CommandBus $commandBus = null;
     private FormWizard $wizard;
     private ContractWriter $writer;
     private EntityBuilder $builder;
@@ -148,11 +150,13 @@ final class ChatAgent
 
         $gateway = $this->gateway();
         $result = $gateway->handle($tenantId, $userId, $text, $mode, $projectId);
-        $action = $result['action'] ?? 'respond_local';
-        $telemetry = $result['telemetry'] ?? [];
+        $route = $this->intentRouter()->route($result);
+        $action = $route->kind();
+        $telemetry = $route->telemetry();
+        $state = $route->state();
 
-        if ($action === 'respond_local' || $action === 'ask_user') {
-            $reply = $this->reply((string) ($result['reply'] ?? ''), $channel, $sessionId, $userId);
+        if ($route->isLocalResponse()) {
+            $reply = $this->reply($route->reply(), $channel, $sessionId, $userId);
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
                 'message' => $text,
                 'resolved_locally' => true,
@@ -162,15 +166,15 @@ final class ChatAgent
                 'user_id' => $userId,
                 'project_id' => $projectId,
                 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-                'requested_slot' => (string) (($result['state']['requested_slot'] ?? '') ?: ''),
+                'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
             ]));
             return $reply;
         }
 
-        if ($action === 'execute_command' && !empty($result['command'])) {
-            $commandPayload = (array) $result['command'];
+        if ($route->isCommand()) {
+            $commandPayload = $route->command();
             try {
-                $reply = $this->executeCommandPayload($commandPayload, $channel, $sessionId, $userId, $mode);
+                $reply = $this->dispatchCommandPayload($commandPayload, $channel, $sessionId, $userId, $mode);
                 if (($reply['status'] ?? '') === 'success') {
                     $this->gateway()->rememberExecution(
                         $tenantId,
@@ -212,14 +216,14 @@ final class ChatAgent
                 'user_id' => $userId,
                 'project_id' => $projectId,
                 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-                'requested_slot' => (string) (($result['state']['requested_slot'] ?? '') ?: ''),
+                'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
             ]));
             return $reply;
         }
 
-        if ($action === 'send_to_llm' && !empty($result['llm_request'])) {
+        if ($route->isLlmRequest()) {
             try {
-                $llmResult = $this->llmRouter()->chat((array) $result['llm_request']);
+                $llmResult = $this->llmRouter()->chat($route->llmRequest());
             } catch (\Throwable $e) {
                 return $this->reply('IA no disponible. Usa comandos simples.', $channel, $sessionId, $userId);
             }
@@ -237,7 +241,7 @@ final class ChatAgent
                 'user_id' => $userId,
                 'project_id' => $projectId,
                 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-                'requested_slot' => (string) (($result['state']['requested_slot'] ?? '') ?: ''),
+                'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
             ]));
 
             $json = $llmResult['json'] ?? null;
@@ -1068,6 +1072,69 @@ final class ChatAgent
             $this->telemetry = new Telemetry();
         }
         return $this->telemetry;
+    }
+
+    private function intentRouter(): IntentRouter
+    {
+        if (!$this->intentRouter) {
+            $this->intentRouter = new IntentRouter();
+        }
+        return $this->intentRouter;
+    }
+
+    private function commandBus(): CommandBus
+    {
+        if (!$this->commandBus) {
+            $this->commandBus = new CommandBus();
+            $supportedCommands = [
+                'AuthLogin',
+                'AuthCreateUser',
+                'CreateEntity',
+                'CreateForm',
+                'InstallPlaybook',
+                'CreateRecord',
+                'QueryRecords',
+                'ReadRecord',
+                'UpdateRecord',
+                'DeleteRecord',
+            ];
+            $this->commandBus->register(new MapCommandHandler(
+                $supportedCommands,
+                function (array $command, array $context): array {
+                    return $this->executeCommandPayload(
+                        $command,
+                        (string) ($context['channel'] ?? 'local'),
+                        (string) ($context['session_id'] ?? 'sess'),
+                        (string) ($context['user_id'] ?? 'anon'),
+                        (string) ($context['mode'] ?? 'app')
+                    );
+                }
+            ));
+        }
+        return $this->commandBus;
+    }
+
+    private function dispatchCommandPayload(
+        array $commandPayload,
+        string $channel,
+        string $sessionId,
+        string $userId,
+        string $mode
+    ): array {
+        try {
+            return $this->commandBus()->dispatch($commandPayload, [
+                'channel' => $channel,
+                'session_id' => $sessionId,
+                'user_id' => $userId,
+                'mode' => $mode,
+            ]);
+        } catch (RuntimeException $e) {
+            $code = (string) $e->getMessage();
+            if (in_array($code, ['COMMAND_NOT_SUPPORTED', 'COMMAND_MISSING'], true)) {
+                return $this->reply('Comando no soportado.', $channel, $sessionId, $userId, 'error');
+            }
+            throw $e;
+        }
     }
 
     private function executeCommandPayload(array $command, string $channel, string $sessionId, string $userId, string $mode = 'app'): array

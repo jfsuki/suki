@@ -95,3 +95,20 @@ If a decision conflicts with a higher level, it is invalid.
 - If it cannot be explained to a non-technical user, it is invalid.
 - If an action cannot be audited, it is invalid.
 - If a capability is not in registry/contracts, it cannot be claimed.
+
+## 12) Engineering execution constitution (2026-02-23)
+- Philosophy baseline (C + C++ + Rust):
+  - C: contracts pequenos, estables, explicitos; sin comportamiento oculto.
+  - C++: rutas de ejecucion optimizadas y predecibles; optimizacion interna al engine.
+  - Rust: seguridad por defecto, errores tipados/explicitos, permisos deny-by-default.
+- Execution paths:
+  - Fast path (default): acciones conocidas sin IA.
+  - Slow path (fallback): IA solo propone estructura; kernel valida/decide/ejecuta.
+- AI role:
+  - IA propone; nunca ejecuta ni inventa datos faltantes.
+  - Si falta informacion critica: pedir aclaracion minima.
+- Prompt constitution obligatorio:
+  - ROLE, CONTEXT, INPUT, CONSTRAINTS, OUTPUT_FORMAT, FAIL_RULES.
+- Operational token economy:
+  - contexto minimo, vocabulario cerrado, resumen sobre replay historico,
+  - dependencia de IA debe bajar con contratos/memoria/cache.

@@ -270,3 +270,15 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Pruebas dedicadas nuevas:
   - `framework/tests/mode_guard_policy_test.php`
   - `framework/tests/builder_onboarding_flow_test.php`
+
+## Checkpoint (2026-02-23, inicio P1 router + command bus)
+- `ChatAgent` desacoplado en dos costuras nuevas:
+  - `IntentRouter` + `IntentRouteResult` para decidir ruta de ejecucion.
+  - `CommandBus` + `MapCommandHandler` para despacho de comandos.
+- Compatibilidad preservada:
+  - la semantica actual de comandos se mantiene; el bus envuelve la ejecucion existente.
+- Pruebas nuevas:
+  - `framework/tests/intent_router_test.php`
+  - `framework/tests/command_bus_test.php`
+- Regla consolidada:
+  - IA propone, kernel valida/decide/ejecuta; fast path sin IA como default.
