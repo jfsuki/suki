@@ -72,6 +72,16 @@
   - `framework/tests/command_bus_test.php`
 - Unit runner expanded to validate P1 components before full QA gate.
 
+## P1.2 update (2026-02-23)
+- Command handlers separados por responsabilidad:
+  - `CreateEntityCommandHandler`
+  - `CreateFormCommandHandler`
+  - `InstallPlaybookCommandHandler`
+  - `CrudCommandHandler`
+- `ChatAgent` reduce el switch de `executeCommandPayload` a autenticacion (legacy compatible).
+- `dispatchCommandPayload` ahora pasa contexto explicito para handlers (guards de modo, existencia entidad/form, builder services, playbook installer).
+- Pruebas del bus actualizadas para validar despacho real por handler y fallback de compatibilidad auth.
+
 ## Execution checklist
 - [x] Summary dependency ordering stable
 - [x] Framework/project separation (paths + webroots)

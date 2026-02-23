@@ -5,22 +5,85 @@ require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/autoload.php';
 
 use App\Core\CommandBus;
+use App\Core\CreateEntityCommandHandler;
+use App\Core\CreateFormCommandHandler;
+use App\Core\CrudCommandHandler;
+use App\Core\InstallPlaybookCommandHandler;
 use App\Core\MapCommandHandler;
 
 $bus = new CommandBus();
-$bus->register(new MapCommandHandler(['CreateEntity', 'CreateForm'], static function (array $command, array $context): array {
-    return [
-        'ok' => true,
-        'command' => (string) ($command['command'] ?? ''),
-        'mode' => (string) ($context['mode'] ?? ''),
-    ];
-}));
+$bus->register(new CreateEntityCommandHandler());
+$bus->register(new CreateFormCommandHandler());
+$bus->register(new InstallPlaybookCommandHandler());
+$bus->register(new CrudCommandHandler());
+$bus->register(new MapCommandHandler(['AuthLogin'], static fn(array $command, array $context): array => [
+    'status' => 'success',
+    'reply' => 'auth handler ok',
+]));
+
+$reply = static fn(
+    string $text,
+    string $channel,
+    string $sessionId,
+    string $userId,
+    string $status = 'success',
+    array $data = []
+): array => [
+    'status' => $status,
+    'reply' => $text,
+    'data' => $data,
+    'channel' => $channel,
+    'session_id' => $sessionId,
+    'user_id' => $userId,
+];
+
+$baseContext = [
+    'channel' => 'test',
+    'session_id' => 'sess',
+    'user_id' => 'user',
+    'reply' => $reply,
+];
 
 $failures = [];
 
-$okResult = $bus->dispatch(['command' => 'CreateEntity'], ['mode' => 'builder']);
-if (empty($okResult['ok']) || (string) ($okResult['mode'] ?? '') !== 'builder') {
-    $failures[] = 'Dispatch known command failed';
+$entityGuard = $bus->dispatch(
+    ['command' => 'CreateEntity', 'entity' => 'clientes'],
+    array_merge($baseContext, ['mode' => 'app'])
+);
+if ((string) ($entityGuard['status'] ?? '') !== 'error') {
+    $failures[] = 'CreateEntity guard failed';
+}
+
+$formGuard = $bus->dispatch(
+    ['command' => 'CreateForm', 'entity' => 'clientes'],
+    array_merge($baseContext, ['mode' => 'app'])
+);
+if ((string) ($formGuard['status'] ?? '') !== 'error') {
+    $failures[] = 'CreateForm guard failed';
+}
+
+$playbookGuard = $bus->dispatch(
+    ['command' => 'InstallPlaybook'],
+    array_merge($baseContext, ['mode' => 'app'])
+);
+if ((string) ($playbookGuard['status'] ?? '') !== 'error') {
+    $failures[] = 'InstallPlaybook guard failed';
+}
+
+$crudGuard = $bus->dispatch(
+    ['command' => 'CreateRecord', 'entity' => 'clientes', 'data' => []],
+    array_merge($baseContext, ['mode' => 'builder'])
+);
+if ((string) ($crudGuard['status'] ?? '') !== 'error') {
+    $failures[] = 'Crud mode guard failed';
+}
+
+$authResult = $bus->dispatch(
+    ['command' => 'AuthLogin'],
+    $baseContext
+);
+if ((string) ($authResult['status'] ?? '') !== 'success') {
+    $failures[] = 'Map auth fallback failed';
 }
 
 try {
@@ -38,4 +101,3 @@ echo json_encode([
     'failures' => $failures,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
 exit($ok ? 0 : 1);
-

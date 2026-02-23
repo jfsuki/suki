@@ -1086,20 +1086,12 @@ final class ChatAgent
     {
         if (!$this->commandBus) {
             $this->commandBus = new CommandBus();
-            $supportedCommands = [
-                'AuthLogin',
-                'AuthCreateUser',
-                'CreateEntity',
-                'CreateForm',
-                'InstallPlaybook',
-                'CreateRecord',
-                'QueryRecords',
-                'ReadRecord',
-                'UpdateRecord',
-                'DeleteRecord',
-            ];
+            $this->commandBus->register(new CreateEntityCommandHandler());
+            $this->commandBus->register(new CreateFormCommandHandler());
+            $this->commandBus->register(new InstallPlaybookCommandHandler());
+            $this->commandBus->register(new CrudCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
-                $supportedCommands,
+                ['AuthLogin', 'AuthCreateUser'],
                 function (array $command, array $context): array {
                     return $this->executeCommandPayload(
                         $command,
@@ -1122,15 +1114,67 @@ final class ChatAgent
         string $mode
     ): array {
         try {
+            $reply = function (
+                string $text,
+                string $ctxChannel,
+                string $ctxSessionId,
+                string $ctxUserId,
+                string $status = 'success',
+                array $data = []
+            ): array {
+                return $this->reply($text, $ctxChannel, $ctxSessionId, $ctxUserId, $status, $data);
+            };
             return $this->commandBus()->dispatch($commandPayload, [
                 'channel' => $channel,
                 'session_id' => $sessionId,
                 'user_id' => $userId,
                 'mode' => $mode,
+                'reply' => $reply,
+                'entity_exists' => fn(string $entity): bool => $this->entityExists($entity),
+                'form_exists_for_entity' => fn(string $entity): bool => $this->formExistsForEntity($entity),
+                'builder' => $this->builder,
+                'writer' => $this->writer,
+                'migrator' => $this->migrator(),
+                'entities' => $this->entities,
+                'wizard' => $this->wizard,
+                'command_layer' => $this->command(),
+                'playbook_installer' => new PlaybookInstaller(),
+                'register_entity' => function (string $entityName, string $ctxUserId): void {
+                    try {
+                        $registry = new ProjectRegistry();
+                        $manifest = $registry->resolveProjectFromManifest();
+                        $projectId = (string) ($manifest['id'] ?? 'default');
+                        $registry->ensureProject(
+                            $projectId,
+                            (string) ($manifest['name'] ?? 'Proyecto'),
+                            (string) ($manifest['status'] ?? 'draft'),
+                            (string) ($manifest['tenant_mode'] ?? 'shared'),
+                            $ctxUserId
+                        );
+                        $registry->registerEntity($projectId, $entityName, 'chat');
+                    } catch (\Throwable $e) {
+                        // best effort registry sync
+                    }
+                },
+                'register_form' => function (string $ctxUserId): void {
+                    try {
+                        $registry = new ProjectRegistry();
+                        $manifest = $registry->resolveProjectFromManifest();
+                        $registry->ensureProject(
+                            (string) ($manifest['id'] ?? 'default'),
+                            (string) ($manifest['name'] ?? 'Proyecto'),
+                            (string) ($manifest['status'] ?? 'draft'),
+                            (string) ($manifest['tenant_mode'] ?? 'shared'),
+                            $ctxUserId
+                        );
+                    } catch (\Throwable $e) {
+                        // best effort registry sync
+                    }
+                },
             ]);
         } catch (RuntimeException $e) {
             $code = (string) $e->getMessage();
-            if (in_array($code, ['COMMAND_NOT_SUPPORTED', 'COMMAND_MISSING'], true)) {
+            if (in_array($code, ['COMMAND_NOT_SUPPORTED', 'COMMAND_MISSING', 'INVALID_CONTEXT'], true)) {
                 return $this->reply('Comando no soportado.', $channel, $sessionId, $userId, 'error');
             }
             throw $e;
@@ -1140,26 +1184,10 @@ final class ChatAgent
     private function executeCommandPayload(array $command, string $channel, string $sessionId, string $userId, string $mode = 'app'): array
     {
         $cmd = (string) ($command['command'] ?? '');
-        $entity = (string) ($command['entity'] ?? '');
-        $id = $command['id'] ?? null;
         $data = (array) ($command['data'] ?? []);
-        $filters = (array) ($command['filters'] ?? []);
 
         if ($cmd === '') {
             return $this->reply('Comando incompleto.', $channel, $sessionId, $userId, 'error');
-        }
-
-        if ($mode === 'builder' && !in_array($cmd, ['CreateEntity', 'CreateForm', 'InstallPlaybook'], true)) {
-            return $this->reply('Estas en modo creador. Usa el chat app para registrar datos.', $channel, $sessionId, $userId, 'error');
-        }
-
-        if (in_array($cmd, ['CreateRecord', 'QueryRecords', 'ReadRecord', 'UpdateRecord', 'DeleteRecord'], true)) {
-            if ($entity === '' || !$this->entityExists($entity)) {
-                if ($mode === 'builder') {
-                    return $this->reply('No existe esa tabla. ¿Quieres crearla en el creador?', $channel, $sessionId, $userId, 'error');
-                }
-                return $this->reply('Esa tabla no existe en esta app. Debe ser agregada por el creador.', $channel, $sessionId, $userId, 'error');
-            }
         }
 
         switch ($cmd) {
@@ -1201,120 +1229,6 @@ final class ChatAgent
                 $registry->touchUser($newId, $role, 'auth', $command['tenant_id'] ?? 'default', $command['label'] ?? $newId);
                 $registry->assignUserToProject($projectId, $newId, $role);
                 return $this->reply('Usuario creado. ¿Quieres iniciar sesión ahora?', $channel, $sessionId, $userId, 'success');
-            case 'CreateEntity':
-                if ($mode === 'app') {
-                    return $this->reply('Estas en modo app. Usa el chat creador para crear tablas.', $channel, $sessionId, $userId, 'error');
-                }
-                if ($entity === '') {
-                    return $this->reply('Necesito el nombre de la tabla.', $channel, $sessionId, $userId, 'error');
-                }
-                if ($this->entityExists($entity)) {
-                    return $this->reply('La tabla ' . $entity . ' ya existe. No la voy a duplicar.', $channel, $sessionId, $userId, 'success', [
-                        'entity' => ['name' => $entity],
-                        'already_exists' => true,
-                    ]);
-                }
-                $entityPayload = $this->builder->build($entity, $command['fields'] ?? []);
-                $this->writer->writeEntity($entityPayload);
-                $this->migrator()->migrateEntity($entityPayload, true);
-                try {
-                    $registry = new ProjectRegistry();
-                    $manifest = $registry->resolveProjectFromManifest();
-                    $registry->ensureProject($manifest['id'] ?? 'default', $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', $userId);
-                    $registry->registerEntity($manifest['id'] ?? 'default', $entityPayload['name'] ?? $entity, 'chat');
-                } catch (\Throwable $e) {
-                    // ignore registry errors
-                }
-                return $this->reply('Tabla creada: ' . $entityPayload['name'], $channel, $sessionId, $userId, 'success', ['entity' => $entityPayload]);
-            case 'CreateForm':
-                if ($mode === 'app') {
-                    return $this->reply('Estas en modo app. Usa el chat creador para crear formularios.', $channel, $sessionId, $userId, 'error');
-                }
-                if ($entity === '') {
-                    return $this->reply('Necesito la entidad para el formulario.', $channel, $sessionId, $userId, 'error');
-                }
-                if ($this->formExistsForEntity($entity)) {
-                    return $this->reply('El formulario de ' . $entity . ' ya existe. No lo voy a duplicar.', $channel, $sessionId, $userId, 'success', [
-                        'form' => ['name' => $entity . '.form'],
-                        'already_exists' => true,
-                    ]);
-                }
-                $entityData = $this->entities->get($entity);
-                $form = $this->wizard->buildFromEntity($entityData);
-                $this->writer->writeForm($form);
-                try {
-                    $registry = new ProjectRegistry();
-                    $manifest = $registry->resolveProjectFromManifest();
-                    $registry->ensureProject($manifest['id'] ?? 'default', $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', $userId);
-                } catch (\Throwable $e) {
-                    // ignore registry errors
-                }
-                return $this->reply('Formulario creado para ' . $entity, $channel, $sessionId, $userId, 'success', ['form' => $form]);
-            case 'InstallPlaybook':
-                if ($mode === 'app') {
-                    return $this->reply('Estas en modo app. Usa el chat creador para instalar playbooks.', $channel, $sessionId, $userId, 'error');
-                }
-                $sectorKey = strtoupper(trim((string) ($command['sector_key'] ?? $data['sector_key'] ?? '')));
-                $installer = new PlaybookInstaller();
-                if ($sectorKey === '') {
-                    $sectors = $installer->listSectors();
-                    $keys = array_map(
-                        static fn(array $row): string => (string) ($row['sector_key'] ?? ''),
-                        array_filter($sectors, 'is_array')
-                    );
-                    $keys = array_values(array_filter($keys, static fn(string $v): bool => $v !== ''));
-                    return $this->reply(
-                        'Necesito el sector del playbook. Opciones: ' . implode(', ', $keys),
-                        $channel,
-                        $sessionId,
-                        $userId,
-                        'error',
-                        ['sectors' => $sectors]
-                    );
-                }
-                $isDryRun = !empty($command['dry_run']);
-                $result = $installer->installSector(
-                    $sectorKey,
-                    $isDryRun,
-                    !empty($command['overwrite'])
-                );
-                if (empty($result['ok'])) {
-                    return $this->reply(
-                        (string) ($result['message'] ?? 'No pude instalar ese playbook.'),
-                        $channel,
-                        $sessionId,
-                        $userId,
-                        'error',
-                        $result
-                    );
-                }
-                $created = is_array($result['created'] ?? null) ? $result['created'] : [];
-                $skipped = is_array($result['skipped'] ?? null) ? $result['skipped'] : [];
-                $reply = $isDryRun
-                    ? 'Playbook ' . $sectorKey . ' validado en simulacion.'
-                    : 'Playbook ' . $sectorKey . ' instalado.';
-                if (!empty($created)) {
-                    $reply .= ' Contratos creados: ' . implode(', ', $created) . '.';
-                }
-                if (!empty($skipped)) {
-                    $reply .= ' Ya existian: ' . count($skipped) . '.';
-                }
-                return $this->reply($reply, $channel, $sessionId, $userId, 'success', $result);
-            case 'CreateRecord':
-                $result = $this->command()->createRecord($entity, $data);
-                return $this->reply('Registro creado en ' . $entity, $channel, $sessionId, $userId, 'success', $result);
-            case 'QueryRecords':
-                $result = $this->command()->queryRecords($entity, $filters, 20, 0);
-                return $this->reply('Resultados para ' . $entity . ': ' . count($result), $channel, $sessionId, $userId, 'success', $result);
-            case 'ReadRecord':
-                $result = $this->command()->readRecord($entity, $id, true);
-                return $this->reply('Registro de ' . $entity, $channel, $sessionId, $userId, 'success', $result);
-            case 'UpdateRecord':
-                $result = $this->command()->updateRecord($entity, $id, $data);
-                return $this->reply('Registro actualizado en ' . $entity, $channel, $sessionId, $userId, 'success', $result);
-            case 'DeleteRecord':
-                $result = $this->command()->deleteRecord($entity, $id);
-                return $this->reply('Registro eliminado en ' . $entity, $channel, $sessionId, $userId, 'success', $result);
         }
 
         return $this->reply('Comando no soportado.', $channel, $sessionId, $userId, 'error');
@@ -1323,21 +1237,21 @@ final class ChatAgent
     private function executeLlmJson(array $json, string $channel, string $sessionId, string $userId, string $mode = 'app'): array
     {
         if (isset($json['command'])) {
-            return $this->executeCommandPayload((array) $json['command'], $channel, $sessionId, $userId, $mode);
+            return $this->dispatchCommandPayload((array) $json['command'], $channel, $sessionId, $userId, $mode);
         }
         if (isset($json['actions']) && is_array($json['actions'])) {
             foreach ($json['actions'] as $action) {
                 if (!is_array($action)) continue;
                 $type = strtolower((string) ($action['type'] ?? ''));
                 if ($type === 'create_record') {
-                    return $this->executeCommandPayload([
+                    return $this->dispatchCommandPayload([
                         'command' => 'CreateRecord',
                         'entity' => $action['entity'] ?? '',
                         'data' => $action['data'] ?? [],
                     ], $channel, $sessionId, $userId, $mode);
                 }
                 if ($type === 'query_records') {
-                    return $this->executeCommandPayload([
+                    return $this->dispatchCommandPayload([
                         'command' => 'QueryRecords',
                         'entity' => $action['entity'] ?? '',
                         'filters' => $action['filters'] ?? [],
@@ -1395,3 +1309,4 @@ final class ChatAgent
         ]);
     }
 }
+

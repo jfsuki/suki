@@ -282,3 +282,15 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
   - `framework/tests/command_bus_test.php`
 - Regla consolidada:
   - IA propone, kernel valida/decide/ejecuta; fast path sin IA como default.
+
+## Checkpoint (2026-02-23, P1.2 handlers por comando)
+- `ChatAgent` ahora registra handlers dedicados por comando para reducir switch legacy:
+  - `CreateEntityCommandHandler`
+  - `CreateFormCommandHandler`
+  - `InstallPlaybookCommandHandler`
+  - `CrudCommandHandler`
+- `dispatchCommandPayload` entrega contexto tipado (builder/writer/migrator/entity checks/playbook installer) para ejecucion controlada por handler.
+- `executeCommandPayload` queda solo para compatibilidad de autenticacion (`AuthLogin`, `AuthCreateUser`).
+- Cobertura reforzada:
+  - `UnitTestRunner::checkCommandBus` valida guards y despacho de handlers nuevos.
+  - `framework/tests/command_bus_test.php` actualizado al nuevo modelo.

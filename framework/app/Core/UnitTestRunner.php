@@ -206,15 +206,87 @@ final class UnitTestRunner
     private function checkCommandBus(): void
     {
         $bus = new CommandBus();
-        $bus->register(new MapCommandHandler(['CreateEntity'], static fn(array $command, array $context): array => [
-            'ok' => true,
-            'command' => (string) ($command['command'] ?? ''),
-            'mode' => (string) ($context['mode'] ?? ''),
+        $bus->register(new CreateEntityCommandHandler());
+        $bus->register(new CreateFormCommandHandler());
+        $bus->register(new InstallPlaybookCommandHandler());
+        $bus->register(new CrudCommandHandler());
+        $bus->register(new MapCommandHandler(['AuthLogin'], static fn(array $command, array $context): array => [
+            'status' => 'success',
+            'reply' => 'auth handler ok',
         ]));
 
-        $res = $bus->dispatch(['command' => 'CreateEntity'], ['mode' => 'builder']);
-        if (empty($res['ok']) || (string) ($res['mode'] ?? '') !== 'builder') {
-            throw new \RuntimeException('CommandBus no despacha handler soportado.');
+        $reply = static fn(
+            string $text,
+            string $channel,
+            string $sessionId,
+            string $userId,
+            string $status = 'success',
+            array $data = []
+        ): array => [
+            'status' => $status,
+            'reply' => $text,
+            'data' => $data,
+            'channel' => $channel,
+            'session_id' => $sessionId,
+            'user_id' => $userId,
+        ];
+
+        $baseContext = [
+            'channel' => 'test',
+            'session_id' => 'sess',
+            'user_id' => 'user',
+            'reply' => $reply,
+        ];
+
+        $resEntity = $bus->dispatch(
+            ['command' => 'CreateEntity', 'entity' => 'clientes'],
+            array_merge($baseContext, ['mode' => 'app'])
+        );
+        if ((string) ($resEntity['status'] ?? '') !== 'error') {
+            throw new \RuntimeException('CreateEntity handler no respondio guard de modo app.');
+        }
+
+        $resForm = $bus->dispatch(
+            ['command' => 'CreateForm', 'entity' => 'clientes'],
+            array_merge($baseContext, ['mode' => 'app'])
+        );
+        if ((string) ($resForm['status'] ?? '') !== 'error') {
+            throw new \RuntimeException('CreateForm handler no respondio guard de modo app.');
+        }
+
+        $resPlaybook = $bus->dispatch(
+            ['command' => 'InstallPlaybook'],
+            array_merge($baseContext, ['mode' => 'app'])
+        );
+        if ((string) ($resPlaybook['status'] ?? '') !== 'error') {
+            throw new \RuntimeException('InstallPlaybook handler no respondio guard de modo app.');
+        }
+
+        $resCrud = $bus->dispatch(
+            ['command' => 'CreateRecord', 'entity' => 'clientes', 'data' => []],
+            array_merge($baseContext, ['mode' => 'builder'])
+        );
+        if ((string) ($resCrud['status'] ?? '') !== 'error') {
+            throw new \RuntimeException('Crud handler no respondio guard de modo builder.');
+        }
+
+        $resCrudMissingEntity = $bus->dispatch(
+            ['command' => 'CreateRecord', 'entity' => 'clientes', 'data' => []],
+            array_merge($baseContext, [
+                'mode' => 'app',
+                'entity_exists' => static fn(string $entity): bool => false,
+            ])
+        );
+        if ((string) ($resCrudMissingEntity['status'] ?? '') !== 'error') {
+            throw new \RuntimeException('Crud handler no valida existencia de entidad.');
+        }
+
+        $resAuth = $bus->dispatch(
+            ['command' => 'AuthLogin'],
+            $baseContext
+        );
+        if ((string) ($resAuth['status'] ?? '') !== 'success') {
+            throw new \RuntimeException('MapCommandHandler no mantiene compatibilidad para AuthLogin.');
         }
 
         try {
