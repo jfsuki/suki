@@ -6425,7 +6425,14 @@ private function parseEntityFromCrudText(string $text): string
         if (is_file($projectPath)) {
             $projectOverride = $this->readJson($projectPath, []);
             if (!empty($projectOverride)) {
-                foreach (['solver_intents', 'sector_playbooks', 'knowledge_prompt_template'] as $key) {
+                foreach ([
+                    'solver_intents',
+                    'sector_playbooks',
+                    'knowledge_prompt_template',
+                    'builder_guidance',
+                    'guided_conversation_flows',
+                    'discovery',
+                ] as $key) {
                     if (isset($projectOverride[$key]) && is_array($projectOverride[$key])) {
                         $base[$key] = $projectOverride[$key];
                     }

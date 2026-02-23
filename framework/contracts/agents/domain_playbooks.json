@@ -1,7 +1,7 @@
 {
     "meta": {
         "name": "domain_playbooks",
-        "version": "0.4.0",
+        "version": "0.5.0",
         "updated_at": "2026-02-23",
         "goal": "Universal business playbooks to create ERP/CRM/accounting and operational mini-apps by conversation.",
         "notes": [
@@ -10,7 +10,8 @@
             "Agent must validate real entities/forms from registry before promising actions.",
             "Coverage expanded for ERP, CRM, accounting, medical, church, commerce and SAP-side mini-apps.",
             "v0.3.6: +perfil spa_bienestar y aliases de estetica/spa para onboarding.",
-            "v0.4.0: +solver_intents por sector, +sector_playbooks accionables y +blueprints mata-excels para asesoria consultiva."
+            "v0.4.0: +solver_intents por sector, +sector_playbooks accionables y +blueprints mata-excels para asesoria consultiva.",
+            "v0.5.0: +playbooks iglesia/educacion/servicios_pro, +builder_guidance ampliada, +guided_conversation_flows y +prompt constitution."
         ]
     },
     "discovery": {
@@ -1872,6 +1873,132 @@
                 "quiero saber quien cumple anos este mes",
                 "quiero fidelizacion para servicios personales"
             ]
+        },
+        {
+            "name": "SOLVE_CHURCH_ADMIN",
+            "sector_key": "IGLESIA",
+            "action": "APPLY_PLAYBOOK_IGLESIA",
+            "utterances": [
+                "como llevo el control de los diezmos",
+                "necesito saber quien no ha venido al culto",
+                "quiero imprimir certificados de donacion",
+                "registro de bautizos",
+                "control de escuela dominical",
+                "gestion de celulas o grupos",
+                "finanzas de la iglesia",
+                "directorio de hermanos",
+                "seguimiento de visitacion",
+                "control de inventario de la iglesia",
+                "quiero registrar ofrendas por servicio",
+                "base de datos de la congregacion",
+                "control de asistencia a la iglesia",
+                "gestion de ministerios",
+                "necesito organizar los eventos de la iglesia",
+                "control de gastos de la iglesia",
+                "ficha de miembro con foto",
+                "seguimiento a nuevos creyentes",
+                "reporte de ingresos dominicales",
+                "quiero una app para mi iglesia",
+                "control de promesas de fe",
+                "quiero saber cuanto ingreso por sede",
+                "seguimiento de discipulado",
+                "control de voluntarios por ministerio",
+                "programacion de predicaciones",
+                "gestion de grupos pequenos",
+                "control de ayudas sociales de la iglesia",
+                "quiero saber miembros inactivos",
+                "historial de aportes por familia",
+                "control de asistencia juvenil",
+                "registro de matrimonios y bautizos",
+                "quiero consolidar diezmos y ofrendas",
+                "necesito reporte financiero mensual de iglesia",
+                "quiero certificados para donantes",
+                "quienes faltan seguido al servicio"
+            ]
+        },
+        {
+            "name": "SOLVE_ACADEMIC_CONTROL",
+            "sector_key": "EDUCACION",
+            "action": "APPLY_PLAYBOOK_EDUCACION",
+            "utterances": [
+                "quien debe la mensualidad",
+                "notas de los alumnos",
+                "generar boletines",
+                "asistencia a clase",
+                "agenda escolar",
+                "control de rutas",
+                "observador del alumno",
+                "matriculas y pensiones",
+                "gestion de jardin infantil",
+                "academia de cursos",
+                "control de pagos de estudiantes",
+                "reporte de inasistencias",
+                "comunicacion con padres de familia",
+                "historial academico",
+                "gestion de profesores y materias",
+                "quiero saber quien falto hoy",
+                "control de tareas y entregas",
+                "ficha medica del estudiante",
+                "cobro de pensiones atrasadas",
+                "quiero una app para mi colegio",
+                "seguimiento de compromisos disciplinarios",
+                "reporte de estudiantes en mora",
+                "control de evaluaciones por periodo",
+                "registro de observaciones de convivencia",
+                "portal de notas para acudientes",
+                "control de asistencia por materia",
+                "historial de pagos por estudiante",
+                "alerta de riesgo de desercion",
+                "calculo de promedio final por alumno",
+                "gestion de docentes y horarios",
+                "control de biblioteca escolar",
+                "seguimiento de actividades extracurriculares",
+                "quiero reporte de cartera vencida del colegio",
+                "control de estudiantes nuevos y retirados",
+                "quiero digitalizar secretaria academica"
+            ]
+        },
+        {
+            "name": "SOLVE_TIMESHEET_BILLING",
+            "sector_key": "SERVICIOS_PRO",
+            "action": "APPLY_PLAYBOOK_SERVICIOS_PRO",
+            "utterances": [
+                "cuantas horas trabaje en este proyecto",
+                "facturar horas al cliente",
+                "control de viaticos",
+                "gestion de bufete de abogados",
+                "seguimiento de casos juridicos",
+                "timesheet consultoria",
+                "gastos reembolsables",
+                "rentabilidad por proyecto",
+                "cronograma de entregas",
+                "registro de actividades diarias",
+                "control de horas facturables",
+                "gestion de clientes y proyectos",
+                "reporte de gastos por cliente",
+                "no se en que se me va el tiempo",
+                "quiero cobrar lo justo por mi trabajo",
+                "seguimiento de tareas de equipo",
+                "control de vencimientos de terminos legales",
+                "gestion de contador o revisor fiscal",
+                "quiero una app para gestionar mis casos",
+                "control de trabajo por abogado",
+                "registro de minutas y actuaciones",
+                "horas no facturables por proyecto",
+                "utilidad real por cliente",
+                "control de anticipos y cobros parciales",
+                "agenda de audiencias y entregables",
+                "quiero consolidar horas por consultor",
+                "seguimiento de aprobacion de tiempos",
+                "facturacion por hitos y horas",
+                "control de gastos de viaje del equipo",
+                "quiero ver proyectos que no son rentables",
+                "gestionar pipeline de clientes profesionales",
+                "control de expedientes por etapa",
+                "tablero de productividad por consultor",
+                "quiero reporte semanal de horas por cliente",
+                "quiero automatizar cuenta de cobro por horas"
+            ]
         }
     ],
     "sector_playbooks": [
@@ -2448,6 +2575,441 @@
                     "clientes_recurrentes"
                 ]
             }
+        },
+        {
+            "sector_key": "IGLESIA",
+            "profile_key": "iglesia_fundacion",
+            "triggers": [
+                "iglesia",
+                "culto",
+                "diezmo",
+                "ofrenda",
+                "miembros",
+                "congregacion",
+                "ministerio"
+            ],
+            "pain_points": [
+                {
+                    "detect": "no tengo control de las donaciones",
+                    "diagnosis": "Falta de trazabilidad de aportes, asistencia y seguimiento pastoral.",
+                    "solution_pitch": "Implementa directorio de miembros + donaciones + asistencia para control financiero y pastoral."
+                }
+            ],
+            "mini_apps": [
+                "directorio_miembros",
+                "control_diezmos",
+                "asistencia_eventos",
+                "certificados_donacion"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "miembros",
+                        "fields": [
+                            {
+                                "name": "nombre_completo",
+                                "type": "text"
+                            },
+                            {
+                                "name": "documento",
+                                "type": "text"
+                            },
+                            {
+                                "name": "telefono",
+                                "type": "text"
+                            },
+                            {
+                                "name": "fecha_nacimiento",
+                                "type": "date"
+                            },
+                            {
+                                "name": "ministerio",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text",
+                                "options": [
+                                    "ACTIVO",
+                                    "INACTIVO"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "donaciones",
+                        "fields": [
+                            {
+                                "name": "miembro_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            },
+                            {
+                                "name": "tipo",
+                                "type": "text",
+                                "options": [
+                                    "DIEZMO",
+                                    "OFRENDA",
+                                    "PROYECTO"
+                                ]
+                            },
+                            {
+                                "name": "monto",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "metodo_pago",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "asistencias_culto",
+                        "fields": [
+                            {
+                                "name": "fecha_servicio",
+                                "type": "date"
+                            },
+                            {
+                                "name": "miembro_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "asistio",
+                                "type": "bool"
+                            },
+                            {
+                                "name": "observacion",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "certificados_donacion",
+                        "fields": [
+                            {
+                                "name": "miembro_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "ano",
+                                "type": "number"
+                            },
+                            {
+                                "name": "valor_certificado",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "fecha_emision",
+                                "type": "date"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "total_donaciones_mes = sum(monto) donde mes(fecha)=mes_actual",
+                    "porcentaje_asistencia = (sum(asistio=true) / total_miembros_activos) * 100",
+                    "si total_donaciones_mes < meta_mes entonces alerta_finanzas = true"
+                ],
+                "kpis": [
+                    "ingresos_mensuales",
+                    "crecimiento_membresia",
+                    "asistencia_promedio",
+                    "miembros_inactivos"
+                ]
+            }
+        },
+        {
+            "sector_key": "EDUCACION",
+            "profile_key": "colegio_academia",
+            "triggers": [
+                "colegio",
+                "escuela",
+                "academia",
+                "estudiante",
+                "alumno",
+                "notas",
+                "pension"
+            ],
+            "pain_points": [
+                {
+                    "detect": "no se quien ha pagado la pension",
+                    "diagnosis": "No hay control centralizado de cartera, asistencia y rendimiento academico.",
+                    "solution_pitch": "Usa tracker de pagos + asistencia + calificaciones para alertas tempranas de mora y riesgo academico."
+                }
+            ],
+            "mini_apps": [
+                "control_pagos",
+                "boletin_notas",
+                "asistencia_clase",
+                "cartera_estudiantil"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "estudiantes",
+                        "fields": [
+                            {
+                                "name": "nombre_completo",
+                                "type": "text"
+                            },
+                            {
+                                "name": "grado_curso",
+                                "type": "text"
+                            },
+                            {
+                                "name": "acudiente_nombre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "acudiente_celular",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text",
+                                "options": [
+                                    "ACTIVO",
+                                    "RETIRADO"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "pagos_pension",
+                        "fields": [
+                            {
+                                "name": "estudiante_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "periodo",
+                                "type": "text"
+                            },
+                            {
+                                "name": "fecha_pago",
+                                "type": "date"
+                            },
+                            {
+                                "name": "valor",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text",
+                                "options": [
+                                    "PAGO",
+                                    "MORA"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "asistencia_clase",
+                        "fields": [
+                            {
+                                "name": "estudiante_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            },
+                            {
+                                "name": "asistio",
+                                "type": "bool"
+                            },
+                            {
+                                "name": "observacion",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "calificaciones",
+                        "fields": [
+                            {
+                                "name": "estudiante_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "materia",
+                                "type": "text"
+                            },
+                            {
+                                "name": "periodo",
+                                "type": "text"
+                            },
+                            {
+                                "name": "nota_final",
+                                "type": "decimal"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "si no existe pago para periodo_actual y dia > 10 entonces estado_mora = true",
+                    "promedio_periodo = promedio(nota_final) por estudiante_id y periodo",
+                    "riesgo_desercion = asistencias_bajas + mora_recurrente"
+                ],
+                "kpis": [
+                    "cartera_vencida",
+                    "promedio_general_curso",
+                    "inasistencia_promedio",
+                    "desercion_escolar"
+                ]
+            }
+        },
+        {
+            "sector_key": "SERVICIOS_PRO",
+            "profile_key": "consultoria_profesional",
+            "triggers": [
+                "horas",
+                "timesheet",
+                "proyecto",
+                "cliente",
+                "consultoria",
+                "abogado",
+                "caso",
+                "viaticos"
+            ],
+            "pain_points": [
+                {
+                    "detect": "no se cuantas horas cobrar",
+                    "diagnosis": "Fuga de ingresos por no registrar horas facturables y gastos reembolsables.",
+                    "solution_pitch": "Registra horas por proyecto, gastos y aprobaciones para facturar con trazabilidad."
+                }
+            ],
+            "mini_apps": [
+                "timesheet_horas",
+                "gastos_reembolsables",
+                "gestion_casos",
+                "facturacion_horas"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "proyectos_casos",
+                        "fields": [
+                            {
+                                "name": "nombre_caso",
+                                "type": "text"
+                            },
+                            {
+                                "name": "cliente",
+                                "type": "text"
+                            },
+                            {
+                                "name": "tarifa_hora",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text",
+                                "options": [
+                                    "ACTIVO",
+                                    "CERRADO",
+                                    "FACTURADO"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "registro_horas",
+                        "fields": [
+                            {
+                                "name": "caso_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            },
+                            {
+                                "name": "horas_invertidas",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "descripcion_actividad",
+                                "type": "text"
+                            },
+                            {
+                                "name": "es_facturable",
+                                "type": "bool"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "gastos_reembolsables",
+                        "fields": [
+                            {
+                                "name": "caso_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            },
+                            {
+                                "name": "monto",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "concepto",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text",
+                                "options": [
+                                    "PENDIENTE",
+                                    "APROBADO",
+                                    "REEMBOLSADO"
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "name": "facturacion_servicios",
+                        "fields": [
+                            {
+                                "name": "caso_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "periodo",
+                                "type": "text"
+                            },
+                            {
+                                "name": "total_horas",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "total_gastos",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "total_factura",
+                                "type": "decimal"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "total_honorarios = sum(horas_invertidas * tarifa_hora) donde es_facturable=true",
+                    "total_a_cobrar = total_honorarios + sum(gastos_aprobados)",
+                    "rentabilidad = total_a_cobrar - costos_internos"
+                ],
+                "kpis": [
+                    "horas_no_facturables",
+                    "ingreso_por_cliente",
+                    "gastos_pendientes_reembolso",
+                    "rentabilidad_proyecto"
+                ]
+            }
         }
     ],
     "knowledge_prompt_template": {
@@ -2462,7 +3024,221 @@
             "no inventar capacidades fuera de registry",
             "en modo app no crear tablas",
             "en modo builder no ejecutar crud de negocio",
-            "si hay baja confianza usar LLM fallback y guardar aprendizaje en memoria tenant"
+            "si hay baja confianza usar LLM fallback y guardar aprendizaje en memoria tenant",
+            "deny-by-default para acciones sin permiso explicito",
+            "toda accion debe quedar auditable"
+        ],
+        "prompt_engine_constitution": [
+            "ROLE",
+            "CONTEXT",
+            "INPUT",
+            "CONSTRAINTS",
+            "OUTPUT_FORMAT",
+            "FAIL_RULES"
+        ],
+        "fail_rules": [
+            "si falta informacion critica devolver NEEDS_CLARIFICATION",
+            "si solicitud contradice contratos devolver INVALID_REQUEST",
+            "si confianza < 0.70 devolver NEEDS_CLARIFICATION"
         ]
-    }
+    },
+    "builder_guidance": [
+        {
+            "topic": "FIELD_TYPE_SELECTION",
+            "user_triggers": [
+                "campo para el precio",
+                "guardar un valor",
+                "campo para dinero",
+                "cuanto cuesta",
+                "moneda",
+                "campo para el telefono",
+                "guardar un celular",
+                "numero de contacto",
+                "whatsapp",
+                "campo para fecha",
+                "cuando paso",
+                "dia de registro",
+                "cumpleanos"
+            ],
+            "agent_response_template": "Para valores monetarios usa 'decimal' para conservar centavos y evitar errores de calculo. Quieres que lo cree como decimal?"
+        },
+        {
+            "topic": "RELATIONS",
+            "user_triggers": [
+                "conectar clientes con ventas",
+                "vincular dos tablas",
+                "relacionar productos con inventario",
+                "unir tablas"
+            ],
+            "agent_response_template": "Para relacionar tablas creo en {tabla_B} un campo {tabla_A}_id que guarda el ID padre. Procedo con esa relacion?"
+        },
+        {
+            "topic": "MASTER_DETAIL",
+            "user_triggers": [
+                "factura con items",
+                "pedido con detalle",
+                "maestro detalle",
+                "cabecera detalle"
+            ],
+            "agent_response_template": "Para maestro-detalle creamos una tabla cabecera y una tabla detalle con llave foranea a la cabecera. Quieres que configure ambas ahora?"
+        },
+        {
+            "topic": "PERFORMANCE",
+            "user_triggers": [
+                "la busqueda es muy lenta",
+                "tarda mucho en encontrar",
+                "optimizar la tabla",
+                "va lento"
+            ],
+            "agent_response_template": "Puedo aplicar indices en campos de busqueda y filtros frecuentes. No cambia datos, solo acelera consultas. Lo aplico?"
+        },
+        {
+            "topic": "IMPORT_DATA",
+            "user_triggers": [
+                "importar excel",
+                "subir archivo",
+                "cargar xlsx",
+                "cargar csv"
+            ],
+            "agent_response_template": "Primero definimos llave unica y regla de duplicados (actualizar o saltar). Te propongo empezar en simulacion para validar columnas. Continuo?"
+        },
+        {
+            "topic": "REPORTS_DOCS",
+            "user_triggers": [
+                "necesito reporte",
+                "quiero documento",
+                "cotizacion pdf",
+                "factura pdf"
+            ],
+            "agent_response_template": "Puedo crear reporte y plantilla de documento con campos dinamicos. Dime el documento principal y lo dejo listo para no tecnicos."
+        },
+        {
+            "topic": "FE_CO_SETUP",
+            "user_triggers": [
+                "factura electronica",
+                "dian",
+                "cufe",
+                "alanube"
+            ],
+            "agent_response_template": "Para facturacion electronica en CO revisamos RUT, resolucion DIAN, prefijo/rango y credenciales de proveedor. Quieres checklist guiado paso a paso?"
+        },
+        {
+            "topic": "SECURITY_ROLES",
+            "user_triggers": [
+                "roles y permisos",
+                "solo admin",
+                "auditoria",
+                "seguridad"
+            ],
+            "agent_response_template": "Te recomiendo definir roles por modulo y confirmar acciones destructivas. Inicio con matriz basica admin-operador-vendedor?"
+        }
+    ],
+    "guided_conversation_flows": [
+        {
+            "flow_key": "SECTOR_DISCOVERY_BASE",
+            "mode": "builder",
+            "steps": [
+                {
+                    "id": 1,
+                    "ask": "Que tipo de negocio tienes?",
+                    "capture": "business_type"
+                },
+                {
+                    "id": 2,
+                    "ask": "Que proceso quieres controlar primero?",
+                    "capture": "core_process"
+                },
+                {
+                    "id": 3,
+                    "ask": "Que documento necesitas primero?",
+                    "capture": "document_type"
+                },
+                {
+                    "id": 4,
+                    "ask": "Quieres instalar plantilla experta del sector detectado?",
+                    "capture": "confirmation"
+                }
+            ],
+            "success_criteria": [
+                "pending_command InstallPlaybook preparado",
+                "una sola pregunta critica por turno",
+                "confirmacion explicita antes de crear estructura"
+            ]
+        },
+        {
+            "flow_key": "IGLESIA_ONBOARDING",
+            "mode": "builder",
+            "steps": [
+                {
+                    "id": 1,
+                    "ask": "Necesitas controlar miembros, donaciones o ambos?",
+                    "capture": "scope"
+                },
+                {
+                    "id": 2,
+                    "ask": "Quieres reportes por sede o consolidado?",
+                    "capture": "report_scope"
+                },
+                {
+                    "id": 3,
+                    "ask": "Te preparo certificados de donacion?",
+                    "capture": "certificates"
+                }
+            ],
+            "success_criteria": [
+                "playbook IGLESIA sugerido",
+                "mini apps directorio + donaciones + asistencia activadas"
+            ]
+        },
+        {
+            "flow_key": "EDUCACION_ONBOARDING",
+            "mode": "builder",
+            "steps": [
+                {
+                    "id": 1,
+                    "ask": "Quieres iniciar por pagos, notas o asistencia?",
+                    "capture": "priority"
+                },
+                {
+                    "id": 2,
+                    "ask": "Manejas pensiones mensuales o periodos personalizados?",
+                    "capture": "billing_cycle"
+                },
+                {
+                    "id": 3,
+                    "ask": "Necesitas alertas de mora y riesgo de inasistencia?",
+                    "capture": "alerts"
+                }
+            ],
+            "success_criteria": [
+                "playbook EDUCACION confirmado",
+                "flujo cartera + calificaciones + asistencia disponible"
+            ]
+        },
+        {
+            "flow_key": "SERVICIOS_PRO_ONBOARDING",
+            "mode": "builder",
+            "steps": [
+                {
+                    "id": 1,
+                    "ask": "Facturas por horas, por hitos o mixto?",
+                    "capture": "billing_model"
+                },
+                {
+                    "id": 2,
+                    "ask": "Debes gestionar gastos reembolsables?",
+                    "capture": "expense_policy"
+                },
+                {
+                    "id": 3,
+                    "ask": "Quieres aprobacion de horas antes de facturar?",
+                    "capture": "approval_flow"
+                }
+            ],
+            "success_criteria": [
+                "playbook SERVICIOS_PRO confirmado",
+                "timesheet + gastos + facturacion habilitados"
+            ]
+        }
+    ]
 }

@@ -82,6 +82,17 @@
 - `dispatchCommandPayload` ahora pasa contexto explicito para handlers (guards de modo, existencia entidad/form, builder services, playbook installer).
 - Pruebas del bus actualizadas para validar despacho real por handler y fallback de compatibilidad auth.
 
+## Knowledge update (2026-02-23)
+- Base de conocimiento de dominio ampliada:
+  - `framework/contracts/agents/domain_playbooks.json` ahora incluye 3 verticales nuevas (`IGLESIA`, `EDUCACION`, `SERVICIOS_PRO`) con `solver_intents`, triggers, blueprints y KPIs.
+  - bloques nuevos `builder_guidance` y `guided_conversation_flows` para estandarizar respuestas de onboarding/no-tecnico.
+- Espejo por proyecto normalizado:
+  - `project/contracts/knowledge/domain_playbooks.json` sincronizado con la base canonica y JSON valido.
+- Entrenamiento conversacional reforzado:
+  - `framework/contracts/agents/conversation_training_base.json` actualizado a `v0.3.7` con intents sectoriales y smoke tests nuevos.
+- Capa de carga de playbook ajustada:
+  - `ConversationGateway::loadDomainPlaybook` ahora acepta override de `builder_guidance`, `guided_conversation_flows` y `discovery` desde proyecto.
+
 ## Execution checklist
 - [x] Summary dependency ordering stable
 - [x] Framework/project separation (paths + webroots)

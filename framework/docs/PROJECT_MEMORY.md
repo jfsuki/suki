@@ -294,3 +294,13 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Cobertura reforzada:
   - `UnitTestRunner::checkCommandBus` valida guards y despacho de handlers nuevos.
   - `framework/tests/command_bus_test.php` actualizado al nuevo modelo.
+
+## Checkpoint (2026-02-23, expansion playbooks y entrenamiento)
+- Playbooks sectoriales ampliados para asesoria consultiva:
+  - nuevos `solver_intents`: `SOLVE_CHURCH_ADMIN`, `SOLVE_ACADEMIC_CONTROL`, `SOLVE_TIMESHEET_BILLING`.
+  - nuevos `sector_playbooks`: `IGLESIA`, `EDUCACION`, `SERVICIOS_PRO`.
+- Se agregaron bloques de conocimiento para guiar conversaciones:
+  - `builder_guidance` (tipos de campo, relaciones, master-detalle, performance, importacion, reportes, FE CO, seguridad).
+  - `guided_conversation_flows` (flujo base sectorial + flujos dedicados por vertical).
+- `project/contracts/knowledge/domain_playbooks.json` se normalizo y sincronizo con la version canonica para eliminar errores de parseo y mantener consistencia de entrenamiento.
+- `conversation_training_base.json` extendido a `v0.3.7` con intents/utterances y smoke tests para los tres sectores nuevos.
