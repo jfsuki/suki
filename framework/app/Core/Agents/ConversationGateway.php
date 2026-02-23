@@ -1192,6 +1192,11 @@ final class ConversationGateway
             return 'Voy a crear el formulario para ' . $entity . '.' . "\n"
                 . 'Responde "si" para crearlo o "no" para cambiarlo.';
         }
+        if ($commandName === 'InstallPlaybook') {
+            $sector = strtoupper(trim((string) ($command['sector_key'] ?? 'NEGOCIO')));
+            return 'Voy a instalar la plantilla experta para ' . $sector . '.' . "\n"
+                . 'Responde "si" para instalarla o "no" para cancelarla.';
+        }
         return 'Tengo una accion pendiente para continuar.' . "\n"
             . 'Responde "si" para ejecutarla o "no" para cambiarla.';
     }
@@ -1212,6 +1217,12 @@ final class ConversationGateway
             return 'Te explico facil:' . "\n"
                 . '- Voy a crear el formulario para la tabla ' . $entity . '.' . "\n"
                 . '- Responde "si" para seguir o "no" para cambiar.';
+        }
+        if ($commandName === 'InstallPlaybook') {
+            $sector = strtoupper(trim((string) ($command['sector_key'] ?? 'NEGOCIO')));
+            return 'Te explico facil:' . "\n"
+                . '- Voy a instalar la plantilla para ' . $sector . '.' . "\n"
+                . '- Responde "si" para instalarla o "no" para mantenerlo manual.';
         }
         return 'Te explico facil: tengo una accion pendiente.' . "\n"
             . 'Responde "si" para seguir o "no" para cambiar.';
@@ -2138,7 +2149,17 @@ final class ConversationGateway
         $trigger = $this->isBuilderOnboardingTrigger($text);
         $businessHint = $this->detectBusinessType($text) !== '';
         $playbookInstall = $this->parseInstallPlaybookRequest($text);
+        $playbookRoute = $this->classifyWithPlaybookIntents($text, $profile);
+        $playbookAction = (string) ($playbookRoute['action'] ?? '');
+        $playbookConfidence = (float) ($playbookRoute['confidence'] ?? 0.0);
         if (!empty($playbookInstall['matched'])) {
+            return null;
+        }
+        if (
+            str_starts_with($playbookAction, 'APPLY_PLAYBOOK_')
+            && $playbookConfidence >= 0.72
+            && !$trigger
+        ) {
             return null;
         }
         if ($this->isFormListQuestion($text)) {
@@ -4719,6 +4740,7 @@ private function parseEntityFromCrudText(string $text): string
         }
         $intentName = (string) $route['intent'];
         $action = (string) ($route['action'] ?? '');
+        $isPlaybookAction = str_starts_with($action, 'APPLY_PLAYBOOK_');
         $confidence = (float) ($route['confidence'] ?? 0);
         $threshold = (float) ($training['routing']['confidence_threshold'] ?? 0.72);
         $missing = $route['missing_required'] ?? false;
@@ -4734,14 +4756,8 @@ private function parseEntityFromCrudText(string $text): string
             'AUTH_LOGIN',
             'USER_CREATE',
             'PROJECT_SWITCH',
-            'APPLY_PLAYBOOK_FERRETERIA',
-            'APPLY_PLAYBOOK_FARMACIA',
-            'APPLY_PLAYBOOK_RESTAURANTE',
-            'APPLY_PLAYBOOK_MANTENIMIENTO',
-            'APPLY_PLAYBOOK_PRODUCCION',
-            'APPLY_PLAYBOOK_BELLEZA',
         ];
-        if ($this->hasCrudSignals($text) && !in_array($action, $allowedTrainingActions, true)) {
+        if ($this->hasCrudSignals($text) && !$isPlaybookAction && !in_array($action, $allowedTrainingActions, true)) {
             return [];
         }
 
@@ -4756,6 +4772,10 @@ private function parseEntityFromCrudText(string $text): string
                 ];
             }
             return [];
+        }
+
+        if ($isPlaybookAction) {
+            return $this->routePlaybookAction($action, $intentName, $text, $profile, $tenantId, $userId, $mode, $state);
         }
 
         switch ($action) {
@@ -4844,13 +4864,6 @@ private function parseEntityFromCrudText(string $text): string
                     return ['action' => 'ask_user', 'reply' => $route['ask'], 'intent' => $intentName, 'active_task' => $action];
                 }
                 return ['action' => 'respond_local', 'reply' => 'Dime el ID del proyecto para cambiar.', 'intent' => $intentName];
-            case 'APPLY_PLAYBOOK_FERRETERIA':
-            case 'APPLY_PLAYBOOK_FARMACIA':
-            case 'APPLY_PLAYBOOK_RESTAURANTE':
-            case 'APPLY_PLAYBOOK_MANTENIMIENTO':
-            case 'APPLY_PLAYBOOK_PRODUCCION':
-            case 'APPLY_PLAYBOOK_BELLEZA':
-                return $this->routePlaybookAction($action, $intentName, $text, $profile, $tenantId, $userId, $mode, $state);
             default:
                 return [];
         }
@@ -5101,9 +5114,13 @@ private function parseEntityFromCrudText(string $text): string
             ];
         }
 
-        $proposal = $this->buildCreateTableProposal($targetEntity, $updatedProfile);
+        $pendingCommand = [
+            'command' => 'InstallPlaybook',
+            'sector_key' => $sectorKey,
+            'dry_run' => true,
+        ];
         $replyLines = [];
-        $replyLines[] = 'Entendi tu dolor de negocio en ' . strtolower($this->humanizeSectorKey($sectorKey)) . '.';
+        $replyLines[] = 'Entiendo tu necesidad en ' . strtolower($this->humanizeSectorKey($sectorKey)) . '.';
         if ($diagnosis !== '') {
             $replyLines[] = 'Diagnostico: ' . $diagnosis;
         }
@@ -5113,33 +5130,35 @@ private function parseEntityFromCrudText(string $text): string
         if ($miniApp !== '') {
             $replyLines[] = 'Mini-app sugerida: ' . str_replace('_', ' ', $miniApp) . '.';
         }
-        if (!empty($keyFields)) {
-            $replyLines[] = 'Campos clave sugeridos: ' . implode(', ', $keyFields) . '.';
-        }
-        $replyLines[] = $proposal['reply'];
+        $replyLines[] = 'Tengo una plantilla experta para ' . $sectorKey . '. Quieres instalarla?';
 
         return [
             'action' => 'ask_user',
             'reply' => implode("\n", $replyLines),
             'intent' => $intentName,
-            'entity' => (string) ($proposal['entity'] ?? $targetEntity),
-            'pending_command' => is_array($proposal['command'] ?? null) ? $proposal['command'] : [],
-            'active_task' => 'create_table',
+            'entity' => $targetEntity !== '' ? $targetEntity : null,
+            'pending_command' => $pendingCommand,
+            'active_task' => 'install_playbook',
             'collected' => $collected,
         ];
     }
 
     private function sectorKeyByPlaybookAction(string $action): string
     {
-        $map = [
-            'APPLY_PLAYBOOK_FERRETERIA' => 'FERRETERIA',
-            'APPLY_PLAYBOOK_FARMACIA' => 'FARMACIA',
-            'APPLY_PLAYBOOK_RESTAURANTE' => 'RESTAURANTE',
-            'APPLY_PLAYBOOK_MANTENIMIENTO' => 'MANTENIMIENTO',
-            'APPLY_PLAYBOOK_PRODUCCION' => 'PRODUCCION',
-            'APPLY_PLAYBOOK_BELLEZA' => 'BELLEZA',
-        ];
-        return (string) ($map[$action] ?? '');
+        $action = strtoupper(trim($action));
+        $prefix = 'APPLY_PLAYBOOK_';
+        if (!str_starts_with($action, $prefix)) {
+            return '';
+        }
+        $sectorKey = substr($action, strlen($prefix));
+        if (!is_string($sectorKey)) {
+            return '';
+        }
+        $sectorKey = strtoupper(trim($sectorKey));
+        if ($sectorKey === '' || preg_match('/^[A-Z0-9_]+$/', $sectorKey) !== 1) {
+            return '';
+        }
+        return $sectorKey;
     }
 
     private function findSectorPlaybook(string $sectorKey, array $playbook = []): array
