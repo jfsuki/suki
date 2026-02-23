@@ -53,7 +53,7 @@ Mapeo de "mensaje -> accion JSON" para ahorrar tokens.
 - `ConversationGateway` usa SQL para:
   - `state` y `working_memory` por `tenant + project + mode + user`
   - `profile` (mem_user)
-  - `glossary` y `research_queue` (mem_tenant)
+  - `glossary`, `research_queue`, `latam_lexicon_overrides` y `agent_shared_knowledge` (mem_tenant)
   - logs de corto plazo (chat_log)
 - Migracion legacy JSON -> SQL:
   - `php framework/scripts/migrate_memory_json_to_sql.php --dry-run`

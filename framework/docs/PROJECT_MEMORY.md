@@ -59,6 +59,8 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
   - ruta tecnica resumida (logica + base de datos + pasos de construccion) disponible por chat en modo builder
 - Knowledge base externa reforzada (sin hardcode):
   - `framework/contracts/agents/domain_playbooks.json` con perfiles de negocio, entidades sugeridas y reportes
+  - `solver_intents` sectoriales (`SOLVE_*`) + acciones `APPLY_PLAYBOOK_*` para respuesta tipo consultor
+  - `project/contracts/knowledge/domain_playbooks.json` como memoria de negocio instalable por proyecto
   - `framework/contracts/agents/accounting_tax_knowledge_co.json` con base contable/tributaria operativa y checklists
   - `framework/contracts/agents/unspsc_co_common.json` con codigos UNSPSC comunes (CO), aliases comerciales y recomendaciones por tipo de negocio
   - merge de entidades contables minimas por tipo de negocio en onboarding

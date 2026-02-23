@@ -1,0 +1,854 @@
+{
+    "meta": {
+        "name": "domain_playbooks_project_knowledge",
+        "version": "1.0.0",
+        "updated_at": "2026-02-23",
+        "source": "framework/contracts/agents/domain_playbooks.json",
+        "description": "Memoria global de negocio instalada por proyecto para recomendaciones consultivas en tiempo real."
+    },
+    "solver_intents": [
+        {
+            "name": "SOLVE_UNIT_CONVERSION",
+            "sector_key": "FERRETERIA",
+            "action": "APPLY_PLAYBOOK_FERRETERIA",
+            "utterances": [
+                "pierdo plata con los cables",
+                "compro por rollo y vendo por metro",
+                "no me cuadra el inventario suelto",
+                "se me descuadra el stock cuando vendo por unidades",
+                "necesito convertir cajas a unidades",
+                "vendo por metro pero compro por caja",
+                "el excel no me calcula conversion de unidades",
+                "quiero controlar inventario fraccionado",
+                "no se cuanto cable real me queda",
+                "en ferreteria vendo suelto y no cuadra",
+                "necesito factor de conversion por producto",
+                "mis clavos vienen en caja y salen por unidad",
+                "quiero alerta cuando quede poco por metro",
+                "la varilla la compro en paquete y vendo por pieza",
+                "el sistema no entiende unidad compra y venta",
+                "quiero descontar inventario por fracciones",
+                "como manejo productos por rollo y metro",
+                "se me pierde material en conversion",
+                "quiero saber stock real por unidad vendible",
+                "mi bodega no controla conversiones",
+                "necesito inventario para ferreteria por factor",
+                "no quiero seguir con formulas manuales en excel",
+                "quiero que me sugieras campos para conversion",
+                "tengo ferreteria y necesito control por metros",
+                "me quedo sin material por mal calculo de conversion",
+                "quiero control de entradas y salidas por fraccion",
+                "no tengo alerta de reabastecimiento por metro",
+                "quiero mata excel para conversion de unidades",
+                "como configuro unidad_compra y unidad_venta",
+                "quiero app para inventario de ferreteria con conversion",
+                "quiero ferreteria con factor_conversion",
+                "sugiereme tabla para vender suelto",
+                "no me sirve el pos para conversion de unidades",
+                "necesito controlar materiales por medida",
+                "quiero descontar metros exactos del rollo"
+            ]
+        },
+        {
+            "name": "SOLVE_EXPIRY_CONTROL",
+            "sector_key": "FARMACIA",
+            "action": "APPLY_PLAYBOOK_FARMACIA",
+            "utterances": [
+                "se me vencen los medicamentos",
+                "quiero control de fechas de vencimiento",
+                "necesito alerta por lotes proximos a vencer",
+                "no quiero perder dinero por productos vencidos",
+                "quiero manejar fefo en farmacia",
+                "no tengo trazabilidad por lote",
+                "quiero saber dias restantes para vencer",
+                "me da miedo vender un lote vencido",
+                "en drogueria revisamos vencimiento a mano",
+                "quiero app para controlar vencimientos",
+                "necesito semaforo rojo amarillo para vencidos",
+                "quiero retirar de vitrina lo que vence pronto",
+                "quiero promocionar lotes que vencen",
+                "no me cuadra inventario por lote",
+                "quiero lotes con fecha_vencimiento",
+                "necesito control legal de caducidad",
+                "tengo perdida por medicinas vencidas",
+                "quiero registro de lotes en stock",
+                "quiero farmacia con alertas de vencimiento",
+                "no quiero revisar caja por caja",
+                "me ayudas con control de caducidad",
+                "quiero dashboard de lotes por vencer",
+                "quiero notificacion cuando falten 30 dias",
+                "como organizo inventario por lotes",
+                "necesito trazabilidad de insumos medicos",
+                "quiero saber que lote vender primero",
+                "quiero fefo en mi mini app",
+                "tengo productos sin fecha clara",
+                "quiero monitoreo de fechas de vencimiento",
+                "sugiereme tablas para farmacia por lote",
+                "quiero evitar riesgo sanitario por vencidos",
+                "quiero control de vencimientos para alimentos",
+                "me ayudas a configurar alerta roja por vencido",
+                "quiero checklist de vencimientos diario",
+                "quiero app de farmacia con lotes y alertas"
+            ]
+        },
+        {
+            "name": "SOLVE_RECIPE_COSTING",
+            "sector_key": "RESTAURANTE",
+            "action": "APPLY_PLAYBOOK_RESTAURANTE",
+            "utterances": [
+                "no se cuanto me cuesta cada plato",
+                "quiero escandallo automatico",
+                "quiero calcular margen real por receta",
+                "la comida sube de precio y no lo controlo",
+                "pierdo plata por merma en cocina",
+                "quiero costeo por gramos",
+                "quiero controlar desperdicio por receta",
+                "necesito saber rentabilidad por producto",
+                "el excel de recetas se rompio",
+                "quiero receta con ingredientes y costos",
+                "quiero alerta cuando suba costo del ingrediente",
+                "quiero calcular costo total del plato",
+                "quiero margen de ganancia real",
+                "quiero restaurante con control de mermas",
+                "quiero saber plato estrella y rentable",
+                "necesito costo por porcion exacto",
+                "quiero comparar precio venta vs costo real",
+                "quiero ver perdida mensual por desperdicio",
+                "quiero control de insumos por receta",
+                "me ayudas a costear menu",
+                "quiero app para escandallo de heladeria",
+                "quiero controlar cono por gramos",
+                "no tengo indicador de rentabilidad de cocina",
+                "quiero sugerencia de precio por margen",
+                "como hago costeo de recetas sin excel",
+                "quiero dashboard de costos de alimentos",
+                "necesito costear productos de cafeteria",
+                "quiero ver merma por turno",
+                "quiero saber que plato deja mas dinero",
+                "quiero mini app de recetas y costos",
+                "quiero controlar costo por ingrediente",
+                "quiero analizar variacion de costos semanal",
+                "quiero reportar desperdicio diario",
+                "quiero control de costo de menu",
+                "quiero costeo para restaurante pequeno"
+            ]
+        },
+        {
+            "name": "SOLVE_MAINTENANCE_OT",
+            "sector_key": "MANTENIMIENTO",
+            "action": "APPLY_PLAYBOOK_MANTENIMIENTO",
+            "utterances": [
+                "quiero generar ordenes de trabajo",
+                "el papel de taller se pierde",
+                "necesito controlar tiempos por tecnico",
+                "quiero registrar repuestos por orden",
+                "quiero saber equipo que mas falla",
+                "no tengo historial de mantenimientos",
+                "quiero hoja de vida de equipos",
+                "necesito checklist preoperacional",
+                "quiero reportar danos en campo",
+                "quiero asignar tecnico y cerrar orden",
+                "quiero calcular horas trabajadas por ot",
+                "quiero costo de mano de obra por servicio",
+                "quiero taller sin formatos en papel",
+                "no se si cobramos todos los repuestos",
+                "quiero registrar inicio y fin de servicio",
+                "quiero mantenimiento preventivo programado",
+                "quiero alertas de proximo mantenimiento",
+                "quiero app para ordenes de trabajo",
+                "quiero trazabilidad de reparaciones",
+                "quiero estado abierta en proceso cerrada",
+                "me ayudas a controlar tecnicos en campo",
+                "quiero reporte de tiempos promedio de solucion",
+                "quiero registrar consumo de insumos por ot",
+                "quiero saber productividad de cada tecnico",
+                "quiero controlar autos en taller",
+                "quiero controlar maquinas industriales",
+                "quiero mini app de mantenimiento",
+                "como hago control de ordenes de trabajo",
+                "quiero tablero de pendientes de mantenimiento",
+                "quiero seguimiento de solicitudes de reparacion",
+                "quiero control de repuestos usados",
+                "quiero indicador de reincidencia de fallas",
+                "quiero gestionar servicios tecnicos por chat",
+                "necesito flujo de apertura y cierre de ot",
+                "quiero digitalizar mantenimiento industrial"
+            ]
+        },
+        {
+            "name": "SOLVE_BATCH_TRACEABILITY",
+            "sector_key": "PRODUCCION",
+            "action": "APPLY_PLAYBOOK_PRODUCCION",
+            "utterances": [
+                "quiero trazabilidad de lotes",
+                "necesito saber que materia prima use",
+                "quiero conectar lote de entrada con salida",
+                "quiero control de calidad por lote",
+                "no quiero excel de lotes roto",
+                "quiero liberar lote solo si cumple calidad",
+                "quiero registrar ph y temperatura",
+                "quiero alerta cuando valor salga de rango",
+                "quiero reporte de mermas de produccion",
+                "quiero saber perdida por desperdicio",
+                "quiero cumplimiento invima en trazabilidad",
+                "necesito trazabilidad tipo iso",
+                "quiero produccion con lote y control",
+                "quiero laboratorio con parametros en tiempo real",
+                "quiero liberar o bloquear lote automaticamente",
+                "quiero tablero de no conformidades",
+                "quiero auditar variables por turno",
+                "quiero registrar peso y humedad por lote",
+                "quiero saber que lote se reclamo",
+                "quiero reaccion rapida ante reclamos",
+                "quiero app para control de lotes",
+                "quiero historial de lote completo",
+                "quiero controlar insumos consumidos por lote",
+                "quiero reporte de eficiencia por turno",
+                "quiero mini app para manufactura pyme",
+                "como hago trazabilidad integral sin excel",
+                "quiero certificar lote antes de venta",
+                "quiero control de variables de laboratorio",
+                "quiero control de calidad declarativo",
+                "quiero seguimiento de lote desde mezcla a despacho",
+                "quiero integrar produccion y calidad",
+                "quiero control de merma por linea",
+                "quiero detectar tendencia de desperdicio mensual",
+                "quiero validar limites min max automaticamente",
+                "quiero bitacora de lote por operador"
+            ]
+        },
+        {
+            "name": "SOLVE_CLIENT_RETENTION",
+            "sector_key": "BELLEZA",
+            "action": "APPLY_PLAYBOOK_BELLEZA",
+            "utterances": [
+                "quiero que mis clientes vuelvan mas",
+                "necesito historial de servicios por cliente",
+                "quiero agenda con recordatorios",
+                "se me van clientes por no hacer seguimiento",
+                "quiero saber cuando toca proxima visita",
+                "quiero guardar formula de tinte",
+                "quiero registrar alergias del cliente",
+                "quiero predecir retorno de clientes",
+                "quiero mensaje automatico por whatsapp",
+                "quiero controlar citas perdidas",
+                "quiero reducir inasistencias",
+                "quiero agenda inteligente para spa",
+                "quiero historial para barberia",
+                "quiero seguimiento para peluqueria",
+                "quiero cartera de clientes frecuentes",
+                "quiero app para fidelizacion",
+                "quiero saber cliente que no vuelve",
+                "quiero activar campana antes de la fecha esperada",
+                "quiero control de insumos por servicio",
+                "quiero saber cuantos ml use por cliente",
+                "quiero mini app para salon de belleza",
+                "quiero mejorar recurrencia de citas",
+                "quiero capturar preferencias de cada cliente",
+                "quiero recomendar proximo servicio automaticamente",
+                "quiero reporte de frecuencia promedio",
+                "quiero no perder ventas por olvido",
+                "quiero control de clientes en bienestar",
+                "quiero calendario de citas con estado",
+                "quiero retencion de clientes por chat",
+                "quiero soporte para negocio de estetica",
+                "quiero historial rapido para veterinaria",
+                "quiero recordar vacunas y controles",
+                "quiero mensaje 2 dias antes de retorno",
+                "quiero saber quien cumple anos este mes",
+                "quiero fidelizacion para servicios personales"
+            ]
+        }
+    ],
+    "sector_playbooks": [
+        {
+            "sector_key": "FERRETERIA",
+            "profile_key": "ferreteria",
+            "triggers": [
+                "cables",
+                "metros",
+                "rollos",
+                "unidades",
+                "materiales",
+                "construccion",
+                "ferreteria"
+            ],
+            "pain_points": [
+                {
+                    "detect": "pierdo plata con los cables",
+                    "diagnosis": "Problema de conversion de unidades: compra por caja/rollo y venta por metro/unidad.",
+                    "solution_pitch": "Configura inventario fraccionado con factor_conversion y doble stock (compra/venta)."
+                }
+            ],
+            "mini_apps": [
+                "inventario_fraccionado",
+                "reabastecimiento_whatsapp"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "productos",
+                        "fields": [
+                            {
+                                "name": "nombre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "unidad_compra",
+                                "type": "text",
+                                "note": "Ej: Rollo, Caja"
+                            },
+                            {
+                                "name": "unidad_venta",
+                                "type": "text",
+                                "note": "Ej: Metro, Unidad"
+                            },
+                            {
+                                "name": "factor_conversion",
+                                "type": "decimal",
+                                "note": "Unidades de venta por unidad de compra"
+                            },
+                            {
+                                "name": "costo_base",
+                                "type": "decimal"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "inventario",
+                        "fields": [
+                            {
+                                "name": "producto_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "stock_compra",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "stock_venta",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "punto_reorden",
+                                "type": "decimal"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "movimientos",
+                        "fields": [
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            },
+                            {
+                                "name": "producto_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "tipo",
+                                "type": "text",
+                                "options": [
+                                    "ENTRADA",
+                                    "SALIDA"
+                                ]
+                            },
+                            {
+                                "name": "cantidad",
+                                "type": "decimal"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "stock_real_venta = (stock_compra * factor_conversion) - sum(salidas)",
+                    "si stock_real_venta <= punto_reorden entonces alerta_reabastecimiento = true"
+                ],
+                "kpis": [
+                    "quiebres_stock",
+                    "margen_por_producto",
+                    "dias_stock"
+                ]
+            }
+        },
+        {
+            "sector_key": "FARMACIA",
+            "profile_key": "farmacia_naturista",
+            "triggers": [
+                "farmacia",
+                "drogueria",
+                "vencimiento",
+                "lote",
+                "medicamentos",
+                "caducidad"
+            ],
+            "pain_points": [
+                {
+                    "detect": "se me vencen los medicamentos",
+                    "diagnosis": "Falta control FEFO y trazabilidad por lote.",
+                    "solution_pitch": "Configura lotes con fecha_vencimiento y semaforo de alertas por dias restantes."
+                }
+            ],
+            "mini_apps": [
+                "fefo_alertas",
+                "control_lotes_sanitario"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "catalogo",
+                        "fields": [
+                            {
+                                "name": "nombre_comercial",
+                                "type": "text"
+                            },
+                            {
+                                "name": "principio_activo",
+                                "type": "text"
+                            },
+                            {
+                                "name": "proveedor",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "lotes_stock",
+                        "fields": [
+                            {
+                                "name": "catalogo_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "numero_lote",
+                                "type": "text"
+                            },
+                            {
+                                "name": "fecha_vencimiento",
+                                "type": "date"
+                            },
+                            {
+                                "name": "cantidad_disponible",
+                                "type": "decimal"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "alertas",
+                        "fields": [
+                            {
+                                "name": "lote_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "dias_para_vencer",
+                                "type": "number"
+                            },
+                            {
+                                "name": "nivel_urgencia",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado_notificacion",
+                                "type": "bool"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "dias_restantes = fecha_vencimiento - hoy",
+                    "si dias_restantes <= 30 entonces nivel_urgencia = ROJO",
+                    "si dias_restantes > 30 y dias_restantes <= 90 entonces nivel_urgencia = AMARILLO"
+                ],
+                "kpis": [
+                    "lotes_por_vencer_30_dias",
+                    "valor_inventario_vencido",
+                    "rotacion_fefo"
+                ]
+            }
+        },
+        {
+            "sector_key": "RESTAURANTE",
+            "profile_key": "restaurante_cafeteria",
+            "triggers": [
+                "restaurante",
+                "heladeria",
+                "receta",
+                "escandallo",
+                "merma",
+                "costo plato"
+            ],
+            "pain_points": [
+                {
+                    "detect": "no se cuanto me cuesta este plato",
+                    "diagnosis": "Falta costeo de receta con merma real.",
+                    "solution_pitch": "Configura ingredientes+recetas para calcular costo_total y margen_real automaticamente."
+                }
+            ],
+            "mini_apps": [
+                "escandallo_automatico",
+                "control_mermas"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "ingredientes",
+                        "fields": [
+                            {
+                                "name": "nombre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "costo_por_gramo",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "merma_porcentaje",
+                                "type": "decimal"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "recetas",
+                        "fields": [
+                            {
+                                "name": "nombre_plato",
+                                "type": "text"
+                            },
+                            {
+                                "name": "precio_venta_publico",
+                                "type": "decimal"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "detalle_receta",
+                        "fields": [
+                            {
+                                "name": "receta_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "ingrediente_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "cantidad_gramos",
+                                "type": "decimal"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "costo_total_plato = sum(cantidad_gramos * costo_por_gramo) * (1 + merma_porcentaje)",
+                    "margen_real = ((precio_venta_publico - costo_total_plato) / precio_venta_publico) * 100"
+                ],
+                "kpis": [
+                    "margen_promedio",
+                    "merma_mensual",
+                    "plato_estrella"
+                ]
+            }
+        },
+        {
+            "sector_key": "MANTENIMIENTO",
+            "profile_key": "servicios_mantenimiento",
+            "triggers": [
+                "orden de trabajo",
+                "ot",
+                "taller",
+                "mantenimiento",
+                "repuesto",
+                "tecnico"
+            ],
+            "pain_points": [
+                {
+                    "detect": "el papel del taller se pierde",
+                    "diagnosis": "No existe control digital de OT, tiempos y repuestos.",
+                    "solution_pitch": "Digitaliza apertura/asignacion/cierre OT con registro de horas y consumo."
+                }
+            ],
+            "mini_apps": [
+                "gestor_ot",
+                "checklist_preoperacional",
+                "hoja_vida_equipos"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "equipos_autos",
+                        "fields": [
+                            {
+                                "name": "placa_id",
+                                "type": "text"
+                            },
+                            {
+                                "name": "marca",
+                                "type": "text"
+                            },
+                            {
+                                "name": "modelo",
+                                "type": "text"
+                            },
+                            {
+                                "name": "cliente_dueno",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "orden_trabajo",
+                        "fields": [
+                            {
+                                "name": "ot_id",
+                                "type": "text"
+                            },
+                            {
+                                "name": "placa_id",
+                                "type": "text"
+                            },
+                            {
+                                "name": "tecnico_asignado",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "registro_horas",
+                        "fields": [
+                            {
+                                "name": "ot_id",
+                                "type": "text"
+                            },
+                            {
+                                "name": "hora_inicio",
+                                "type": "datetime"
+                            },
+                            {
+                                "name": "hora_fin",
+                                "type": "datetime"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "horas_trabajadas = sum(hora_fin - hora_inicio) por ot_id",
+                    "costo_mano_obra = horas_trabajadas * tarifa_hora_tecnico"
+                ],
+                "kpis": [
+                    "tiempo_promedio_solucion",
+                    "equipo_mas_falla",
+                    "ot_abiertas"
+                ]
+            }
+        },
+        {
+            "sector_key": "PRODUCCION",
+            "profile_key": "manufactura_pyme",
+            "triggers": [
+                "lote",
+                "produccion",
+                "laboratorio",
+                "calidad",
+                "merma",
+                "trazabilidad"
+            ],
+            "pain_points": [
+                {
+                    "detect": "necesito trazabilidad de lotes",
+                    "diagnosis": "Sin relacion materia_prima -> lote_final y sin validacion automatica de calidad.",
+                    "solution_pitch": "Implementa trazabilidad integral con reglas de liberacion por limites de control."
+                }
+            ],
+            "mini_apps": [
+                "trazabilidad_integral",
+                "liberacion_lotes",
+                "control_mermas_turno"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "lote_produccion",
+                        "fields": [
+                            {
+                                "name": "lote_id",
+                                "type": "text"
+                            },
+                            {
+                                "name": "fecha_elab",
+                                "type": "date"
+                            },
+                            {
+                                "name": "producto_final",
+                                "type": "text"
+                            },
+                            {
+                                "name": "cantidad_producida",
+                                "type": "decimal"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "trazabilidad",
+                        "fields": [
+                            {
+                                "name": "lote_id",
+                                "type": "text"
+                            },
+                            {
+                                "name": "lote_materia_prima_usada",
+                                "type": "text"
+                            },
+                            {
+                                "name": "cantidad_consumida",
+                                "type": "decimal"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "control_calidad",
+                        "fields": [
+                            {
+                                "name": "lote_id",
+                                "type": "text"
+                            },
+                            {
+                                "name": "variable_medida",
+                                "type": "text"
+                            },
+                            {
+                                "name": "valor_registrado",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "limite_inferior",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "limite_superior",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "aprobado",
+                                "type": "bool"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "aprobado = valor_registrado entre limite_inferior y limite_superior",
+                    "si todas las variables aprobadas entonces lote_estado = LIBERADO"
+                ],
+                "kpis": [
+                    "lotes_rechazados",
+                    "merma_turno",
+                    "cumplimiento_calidad"
+                ]
+            }
+        },
+        {
+            "sector_key": "BELLEZA",
+            "profile_key": "spa_bienestar",
+            "triggers": [
+                "spa",
+                "barberia",
+                "peluqueria",
+                "citas",
+                "retencion",
+                "recordatorio"
+            ],
+            "pain_points": [
+                {
+                    "detect": "mis clientes no vuelven",
+                    "diagnosis": "Falta historial y prediccion de retorno con recordatorios automaticos.",
+                    "solution_pitch": "Configura citas+historial y trigger de remarketing antes de proxima visita esperada."
+                }
+            ],
+            "mini_apps": [
+                "agenda_inteligente",
+                "historial_cliente",
+                "remarketing_automatico"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "clientes",
+                        "fields": [
+                            {
+                                "name": "celular_id",
+                                "type": "text"
+                            },
+                            {
+                                "name": "nombre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "fecha_cumpleanos",
+                                "type": "date"
+                            },
+                            {
+                                "name": "preferencias_notas",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "historial_citas",
+                        "fields": [
+                            {
+                                "name": "cita_id",
+                                "type": "text"
+                            },
+                            {
+                                "name": "celular_id",
+                                "type": "text"
+                            },
+                            {
+                                "name": "fecha_servicio",
+                                "type": "date"
+                            },
+                            {
+                                "name": "tipo_servicio",
+                                "type": "text"
+                            },
+                            {
+                                "name": "profesional",
+                                "type": "text"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "dias_promedio_retorno = promedio(diferencia_dias_entre_citas)",
+                    "fecha_proxima_esperada = fecha_ultima_cita + dias_promedio_retorno",
+                    "si faltan 2 dias para fecha_proxima_esperada entonces enviar_recordatorio = true"
+                ],
+                "kpis": [
+                    "frecuencia_retorno",
+                    "tasa_inasistencia",
+                    "clientes_recurrentes"
+                ]
+            }
+        }
+    ],
+    "knowledge_prompt_template": {
+        "goal": "Convertir dolores de negocio en mini-apps ejecutables y auditables para usuarios no tecnicos.",
+        "response_contract": {
+            "1_diagnosis": "Explica el problema detectado en lenguaje humano.",
+            "2_solution": "Sugiere mini-app puntual (mata-excel) con tablas y flujo.",
+            "3_next_step": "Pide solo 1 dato critico faltante.",
+            "4_confirmation": "Pide confirmacion minima antes de crear estructura."
+        },
+        "guardrails": [
+            "no inventar capacidades fuera de registry",
+            "en modo app no crear tablas",
+            "en modo builder no ejecutar crud de negocio",
+            "si hay baja confianza usar LLM fallback y guardar aprendizaje en memoria tenant"
+        ]
+    }
+}

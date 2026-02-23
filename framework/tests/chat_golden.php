@@ -25,6 +25,7 @@ $steps = [
     ['mode' => 'builder', 'message' => 'si', 'contains' => 'Tabla creada'],
     ['mode' => 'builder', 'message' => 'no', 'contains' => 'seguimos sin campos calculados'],
     ['mode' => 'builder', 'message' => 'crear formulario ' . $entity, 'contains' => 'Formulario creado'],
+    ['mode' => 'app', 'message' => 'tengo ferreteria, compro por rollo y vendo por metro, pierdo plata con cables', 'contains' => 'factor_conversion'],
     ['mode' => 'app', 'message' => 'crear ' . $entity . ' nombre=Ana', 'contains' => 'Registro creado'],
     ['mode' => 'app', 'message' => 'quiero crear una tabla productos', 'contains' => 'Creador de apps'],
     ['mode' => 'builder', 'message' => 'crear cliente nombre=Ana', 'contains' => 'chat de la app'],

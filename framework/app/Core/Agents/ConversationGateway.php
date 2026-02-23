@@ -432,6 +432,9 @@ final class ConversationGateway
         if (!empty($trainingRoute)) {
             $reply = $trainingRoute['reply'] ?? '';
             if (($trainingRoute['action'] ?? '') === 'ask_user') {
+                if (!empty($trainingRoute['pending_command']) && is_array($trainingRoute['pending_command']) && $mode === 'builder') {
+                    $this->setBuilderPendingCommand($state, (array) $trainingRoute['pending_command']);
+                }
                 $state = $this->updateState($state, $raw, $reply, $trainingRoute['intent'] ?? null, $trainingRoute['entity'] ?? null, $trainingRoute['collected'] ?? [], $trainingRoute['active_task'] ?? null);
                 $this->saveState($tenantId, $userId, $state);
                 return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('training', true, $trainingRoute));
@@ -1428,18 +1431,26 @@ final class ConversationGateway
         $basePath = $frameworkRoot . '/contracts/agents/latam_es_col_conversation_lexicon.json';
         $tenantPath = $this->projectRoot . '/storage/tenants/' . $this->safe($tenantId) . '/latam_lexicon_overrides.json';
         $baseMtime = is_file($basePath) ? (int) @filemtime($basePath) : 0;
-        $tenantMtime = is_file($tenantPath) ? (int) @filemtime($tenantPath) : 0;
         $cacheKey = $this->safe($tenantId);
+
+        $tenant = $this->memory->getTenantMemory($tenantId, 'latam_lexicon_overrides', []);
+        if (empty($tenant) && is_file($tenantPath)) {
+            $tenant = $this->readJson($tenantPath, []);
+            if (!empty($tenant)) {
+                $this->memory->saveTenantMemory($tenantId, 'latam_lexicon_overrides', $tenant);
+            }
+        }
+        $tenantHashSource = json_encode($tenant, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $tenantHash = is_string($tenantHashSource) ? sha1($tenantHashSource) : '';
 
         if (isset($this->latamLexiconCache[$cacheKey])) {
             $cached = $this->latamLexiconCache[$cacheKey];
-            if (($cached['base_mtime'] ?? 0) === $baseMtime && ($cached['tenant_mtime'] ?? 0) === $tenantMtime) {
+            if (($cached['base_mtime'] ?? 0) === $baseMtime && ($cached['tenant_hash'] ?? '') === $tenantHash) {
                 return is_array($cached['data'] ?? null) ? $cached['data'] : [];
             }
         }
 
         $base = $this->readJson($basePath, []);
-        $tenant = is_file($tenantPath) ? $this->readJson($tenantPath, []) : [];
         $merged = [
             'phrase_rules' => array_merge(
                 is_array($base['phrase_rules'] ?? null) ? $base['phrase_rules'] : [],
@@ -1458,7 +1469,7 @@ final class ConversationGateway
         $this->latamLexiconCache[$cacheKey] = [
             'data' => $merged,
             'base_mtime' => $baseMtime,
-            'tenant_mtime' => $tenantMtime,
+            'tenant_hash' => $tenantHash,
         ];
 
         return $merged;
@@ -4507,10 +4518,13 @@ private function parseEntityFromCrudText(string $text): string
 
     private function routeTraining(string $text, array $training, array $profile = [], string $tenantId = 'default', string $userId = 'anon', array $state = [], array $lexicon = [], string $mode = 'app'): array
     {
-        if (empty($training) || empty($training['intents'])) {
-            return [];
+        $route = [];
+        if (!empty($training) && !empty($training['intents'])) {
+            $route = $this->classifyWithTraining($text, $training, $profile);
         }
-        $route = $this->classifyWithTraining($text, $training, $profile);
+        if (empty($route['intent'])) {
+            $route = $this->classifyWithPlaybookIntents($text, $profile);
+        }
         if (empty($route['intent'])) {
             return [];
         }
@@ -4531,6 +4545,12 @@ private function parseEntityFromCrudText(string $text): string
             'AUTH_LOGIN',
             'USER_CREATE',
             'PROJECT_SWITCH',
+            'APPLY_PLAYBOOK_FERRETERIA',
+            'APPLY_PLAYBOOK_FARMACIA',
+            'APPLY_PLAYBOOK_RESTAURANTE',
+            'APPLY_PLAYBOOK_MANTENIMIENTO',
+            'APPLY_PLAYBOOK_PRODUCCION',
+            'APPLY_PLAYBOOK_BELLEZA',
         ];
         if ($this->hasCrudSignals($text) && !in_array($action, $allowedTrainingActions, true)) {
             return [];
@@ -4635,6 +4655,13 @@ private function parseEntityFromCrudText(string $text): string
                     return ['action' => 'ask_user', 'reply' => $route['ask'], 'intent' => $intentName, 'active_task' => $action];
                 }
                 return ['action' => 'respond_local', 'reply' => 'Dime el ID del proyecto para cambiar.', 'intent' => $intentName];
+            case 'APPLY_PLAYBOOK_FERRETERIA':
+            case 'APPLY_PLAYBOOK_FARMACIA':
+            case 'APPLY_PLAYBOOK_RESTAURANTE':
+            case 'APPLY_PLAYBOOK_MANTENIMIENTO':
+            case 'APPLY_PLAYBOOK_PRODUCCION':
+            case 'APPLY_PLAYBOOK_BELLEZA':
+                return $this->routePlaybookAction($action, $intentName, $text, $profile, $tenantId, $userId, $mode, $state);
             default:
                 return [];
         }
@@ -4716,6 +4743,303 @@ private function parseEntityFromCrudText(string $text): string
             'ask' => $ask,
             'entities' => $entities,
         ];
+    }
+
+    private function classifyWithPlaybookIntents(string $text, array $profile = []): array
+    {
+        $playbook = $this->loadDomainPlaybook();
+        $intents = is_array($playbook['solver_intents'] ?? null) ? $playbook['solver_intents'] : [];
+        if (empty($intents)) {
+            return [];
+        }
+
+        $textTokens = $this->tokenizeTraining($text);
+        $profileBusinessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
+        $best = ['intent' => null, 'score' => 0.0, 'action' => null, 'sector_key' => null];
+
+        foreach ($intents as $intent) {
+            if (!is_array($intent)) {
+                continue;
+            }
+            $utterances = is_array($intent['utterances'] ?? null) ? $intent['utterances'] : [];
+            $score = 0.0;
+            foreach ($utterances as $utter) {
+                $sample = $this->normalize((string) $utter);
+                if ($sample === '') {
+                    continue;
+                }
+                if (str_contains($text, $sample)) {
+                    $score = max($score, 0.92);
+                    continue;
+                }
+                if (empty($textTokens)) {
+                    continue;
+                }
+                $utterTokens = $this->tokenizeTraining($sample);
+                if (empty($utterTokens)) {
+                    continue;
+                }
+                $overlap = $this->tokenOverlap($textTokens, $utterTokens);
+                if ($overlap >= 0.52) {
+                    $score = max($score, 0.5 + ($overlap * 0.45));
+                } elseif ($overlap >= 0.36) {
+                    $score = max($score, 0.45 + ($overlap * 0.35));
+                }
+            }
+
+            $sectorKey = strtoupper(trim((string) ($intent['sector_key'] ?? '')));
+            $sector = $this->findSectorPlaybook($sectorKey, $playbook);
+            $triggers = is_array($sector['triggers'] ?? null) ? $sector['triggers'] : [];
+            foreach ($triggers as $trigger) {
+                $needle = $this->normalize((string) $trigger);
+                if ($needle !== '' && str_contains($text, $needle)) {
+                    $score += 0.03;
+                }
+            }
+            $sectorProfile = $this->normalizeBusinessType((string) ($sector['profile_key'] ?? ''));
+            if ($sectorProfile !== '' && $profileBusinessType !== '' && $sectorProfile === $profileBusinessType) {
+                $score += 0.08;
+            }
+
+            if ($score > 0.98) {
+                $score = 0.98;
+            }
+            if ($score > (float) $best['score']) {
+                $best = [
+                    'intent' => (string) ($intent['name'] ?? ''),
+                    'score' => $score,
+                    'action' => (string) ($intent['action'] ?? ''),
+                    'sector_key' => $sectorKey,
+                ];
+            }
+        }
+
+        if ((string) ($best['intent'] ?? '') === '') {
+            return [];
+        }
+
+        return [
+            'intent' => (string) $best['intent'],
+            'action' => (string) ($best['action'] ?? ''),
+            'confidence' => (float) ($best['score'] ?? 0.0),
+            'missing_required' => false,
+            'ask' => null,
+            'entities' => [
+                'sector_key' => (string) ($best['sector_key'] ?? ''),
+            ],
+        ];
+    }
+
+    private function routePlaybookAction(
+        string $action,
+        string $intentName,
+        string $text,
+        array $profile,
+        string $tenantId,
+        string $userId,
+        string $mode,
+        array $state = []
+    ): array {
+        $sectorKey = $this->sectorKeyByPlaybookAction($action);
+        if ($sectorKey === '') {
+            return [];
+        }
+        $playbook = $this->loadDomainPlaybook();
+        $sector = $this->findSectorPlaybook($sectorKey, $playbook);
+        if (empty($sector)) {
+            $this->appendResearchTopic($tenantId, $sectorKey . ':playbook_missing', [
+                'requested_action' => $action,
+                'source' => 'playbook_router',
+            ]);
+            return [];
+        }
+
+        $updatedProfile = $profile;
+        $profileBusinessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
+        $sectorProfile = $this->normalizeBusinessType((string) ($sector['profile_key'] ?? ''));
+        if ($sectorProfile !== '' && $profileBusinessType !== $sectorProfile) {
+            $updatedProfile['business_type'] = $sectorProfile;
+            $this->saveProfile($tenantId, $this->profileUserKey($userId), $updatedProfile);
+            $profileBusinessType = $sectorProfile;
+        }
+
+        $this->saveSharedPlaybookKnowledge($tenantId, $sectorKey, $intentName, $mode, $text);
+        $painPoint = is_array(($sector['pain_points'][0] ?? null)) ? $sector['pain_points'][0] : [];
+        $diagnosis = trim((string) ($painPoint['diagnosis'] ?? ''));
+        $solutionPitch = trim((string) ($painPoint['solution_pitch'] ?? ''));
+        $miniApps = is_array($sector['mini_apps'] ?? null) ? $sector['mini_apps'] : [];
+        $miniApp = (string) ($miniApps[0] ?? '');
+
+        $blueprint = is_array($sector['blueprint'] ?? null) ? $sector['blueprint'] : [];
+        $blueprintEntities = is_array($blueprint['entities'] ?? null) ? $blueprint['entities'] : [];
+        $firstBlueprint = is_array(($blueprintEntities[0] ?? null)) ? $blueprintEntities[0] : [];
+        $targetEntity = $this->normalizeEntityForSchema((string) ($firstBlueprint['name'] ?? ''));
+        if ($targetEntity === '') {
+            $domainProfile = $this->findDomainProfile($profileBusinessType, $playbook);
+            $targetEntity = $this->normalizeEntityForSchema((string) (($domainProfile['entities'][0] ?? 'clientes')));
+        }
+        if ($targetEntity === '') {
+            $targetEntity = 'clientes';
+        }
+        $keyFields = $this->sectorBlueprintFieldPreview($sector, 6);
+
+        $collected = [
+            'sector_key' => $sectorKey,
+            'business_type' => $profileBusinessType !== '' ? $profileBusinessType : null,
+        ];
+        if ($mode !== 'builder') {
+            $replyLines = [];
+            $replyLines[] = 'Detecte este caso de negocio: ' . $this->humanizeSectorKey($sectorKey) . '.';
+            if ($diagnosis !== '') {
+                $replyLines[] = 'Diagnostico: ' . $diagnosis;
+            }
+            if ($solutionPitch !== '') {
+                $replyLines[] = 'Solucion sugerida: ' . $solutionPitch;
+            }
+            if ($miniApp !== '') {
+                $replyLines[] = 'Mini-app recomendada: ' . str_replace('_', ' ', $miniApp) . '.';
+            }
+            if (!empty($keyFields)) {
+                $replyLines[] = 'Campos clave a configurar: ' . implode(', ', $keyFields) . '.';
+            }
+            $replyLines[] = 'Siguiente paso: abre el Creador de apps y dime "crear app para ' . strtolower($this->humanizeSectorKey($sectorKey)) . '".';
+            return [
+                'action' => 'respond_local',
+                'reply' => implode("\n", $replyLines),
+                'intent' => $intentName,
+                'collected' => $collected,
+                'active_task' => 'playbook_consulting',
+            ];
+        }
+
+        $proposal = $this->buildCreateTableProposal($targetEntity, $updatedProfile);
+        $replyLines = [];
+        $replyLines[] = 'Entendi tu dolor de negocio en ' . strtolower($this->humanizeSectorKey($sectorKey)) . '.';
+        if ($diagnosis !== '') {
+            $replyLines[] = 'Diagnostico: ' . $diagnosis;
+        }
+        if ($solutionPitch !== '') {
+            $replyLines[] = 'Solucion recomendada: ' . $solutionPitch;
+        }
+        if ($miniApp !== '') {
+            $replyLines[] = 'Mini-app sugerida: ' . str_replace('_', ' ', $miniApp) . '.';
+        }
+        if (!empty($keyFields)) {
+            $replyLines[] = 'Campos clave sugeridos: ' . implode(', ', $keyFields) . '.';
+        }
+        $replyLines[] = $proposal['reply'];
+
+        return [
+            'action' => 'ask_user',
+            'reply' => implode("\n", $replyLines),
+            'intent' => $intentName,
+            'entity' => (string) ($proposal['entity'] ?? $targetEntity),
+            'pending_command' => is_array($proposal['command'] ?? null) ? $proposal['command'] : [],
+            'active_task' => 'create_table',
+            'collected' => $collected,
+        ];
+    }
+
+    private function sectorKeyByPlaybookAction(string $action): string
+    {
+        $map = [
+            'APPLY_PLAYBOOK_FERRETERIA' => 'FERRETERIA',
+            'APPLY_PLAYBOOK_FARMACIA' => 'FARMACIA',
+            'APPLY_PLAYBOOK_RESTAURANTE' => 'RESTAURANTE',
+            'APPLY_PLAYBOOK_MANTENIMIENTO' => 'MANTENIMIENTO',
+            'APPLY_PLAYBOOK_PRODUCCION' => 'PRODUCCION',
+            'APPLY_PLAYBOOK_BELLEZA' => 'BELLEZA',
+        ];
+        return (string) ($map[$action] ?? '');
+    }
+
+    private function findSectorPlaybook(string $sectorKey, array $playbook = []): array
+    {
+        $sectorKey = strtoupper(trim($sectorKey));
+        if ($sectorKey === '') {
+            return [];
+        }
+        if (empty($playbook)) {
+            $playbook = $this->loadDomainPlaybook();
+        }
+        $sectors = is_array($playbook['sector_playbooks'] ?? null) ? $playbook['sector_playbooks'] : [];
+        foreach ($sectors as $sector) {
+            if (!is_array($sector)) {
+                continue;
+            }
+            if (strtoupper((string) ($sector['sector_key'] ?? '')) === $sectorKey) {
+                return $sector;
+            }
+        }
+        return [];
+    }
+
+    private function humanizeSectorKey(string $sectorKey): string
+    {
+        $label = strtolower(str_replace('_', ' ', trim($sectorKey)));
+        return $label !== '' ? ucfirst($label) : 'Negocio';
+    }
+
+    private function sectorBlueprintFieldPreview(array $sector, int $limit = 6): array
+    {
+        $blueprint = is_array($sector['blueprint'] ?? null) ? $sector['blueprint'] : [];
+        $entities = is_array($blueprint['entities'] ?? null) ? $blueprint['entities'] : [];
+        $firstEntity = is_array(($entities[0] ?? null)) ? $entities[0] : [];
+        $fields = is_array($firstEntity['fields'] ?? null) ? $firstEntity['fields'] : [];
+        $preview = [];
+        foreach ($fields as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+            $name = trim((string) ($field['name'] ?? ''));
+            if ($name === '') {
+                continue;
+            }
+            $preview[] = $name;
+            if (count($preview) >= $limit) {
+                break;
+            }
+        }
+        return $preview;
+    }
+
+    private function saveSharedPlaybookKnowledge(string $tenantId, string $sectorKey, string $intentName, string $mode, string $text): void
+    {
+        $state = $this->memory->getTenantMemory($tenantId, 'agent_shared_knowledge', [
+            'sectors' => [],
+            'recent' => [],
+            'updated_at' => null,
+        ]);
+        $sectors = is_array($state['sectors'] ?? null) ? $state['sectors'] : [];
+        if (!isset($sectors[$sectorKey]) || !is_array($sectors[$sectorKey])) {
+            $sectors[$sectorKey] = [
+                'hits' => 0,
+                'last_intent' => null,
+                'last_mode' => null,
+                'updated_at' => null,
+            ];
+        }
+        $sectors[$sectorKey]['hits'] = (int) ($sectors[$sectorKey]['hits'] ?? 0) + 1;
+        $sectors[$sectorKey]['last_intent'] = $intentName;
+        $sectors[$sectorKey]['last_mode'] = $mode;
+        $sectors[$sectorKey]['updated_at'] = date('c');
+
+        $recent = is_array($state['recent'] ?? null) ? $state['recent'] : [];
+        $recent[] = [
+            'ts' => date('c'),
+            'sector_key' => $sectorKey,
+            'intent' => $intentName,
+            'mode' => $mode,
+            'text_excerpt' => mb_substr(trim($text), 0, 160),
+        ];
+        if (count($recent) > 60) {
+            $recent = array_slice($recent, -60);
+        }
+
+        $state['sectors'] = $sectors;
+        $state['recent'] = $recent;
+        $state['updated_at'] = date('c');
+        $this->memory->saveTenantMemory($tenantId, 'agent_shared_knowledge', $state);
     }
 
     private function hasCrudSignals(string $text): bool
@@ -4995,6 +5319,10 @@ private function parseEntityFromCrudText(string $text): string
             $profileData = $this->findDomainProfile($businessType);
             $label = (string) ($profileData['label'] ?? $businessType);
             $reply = 'Listo, te voy guiando con plantilla de ' . $label . '.';
+            $hint = $this->buildProfileLearningHint($businessType, $text);
+            if ($hint !== '') {
+                $reply .= "\n" . $hint;
+            }
         }
         if (str_contains($text, 'respuesta corta') || str_contains($text, 'breve')) {
             $updated['preferred_style'] = 'breve';
@@ -5002,6 +5330,72 @@ private function parseEntityFromCrudText(string $text): string
         }
         $this->saveProfile($tenantId, $this->profileUserKey($userId), $updated);
         return ['profile' => $updated, 'reply' => $reply];
+    }
+
+    private function buildProfileLearningHint(string $businessType, string $text): string
+    {
+        $businessType = $this->normalizeBusinessType($businessType);
+        if ($businessType === '') {
+            return '';
+        }
+        $playbook = $this->loadDomainPlaybook();
+        $sectors = is_array($playbook['sector_playbooks'] ?? null) ? $playbook['sector_playbooks'] : [];
+        $text = $this->normalize($text);
+        foreach ($sectors as $sector) {
+            if (!is_array($sector)) {
+                continue;
+            }
+            $profileKey = $this->normalizeBusinessType((string) ($sector['profile_key'] ?? ''));
+            if ($profileKey === '' || $profileKey !== $businessType) {
+                continue;
+            }
+            $matches = false;
+            $triggers = is_array($sector['triggers'] ?? null) ? $sector['triggers'] : [];
+            foreach ($triggers as $trigger) {
+                $needle = $this->normalize((string) $trigger);
+                if ($needle !== '' && str_contains($text, $needle)) {
+                    $matches = true;
+                    break;
+                }
+            }
+            if (!$matches) {
+                $painPoints = is_array($sector['pain_points'] ?? null) ? $sector['pain_points'] : [];
+                foreach ($painPoints as $painPoint) {
+                    if (!is_array($painPoint)) {
+                        continue;
+                    }
+                    $detect = $this->normalize((string) ($painPoint['detect'] ?? ''));
+                    if ($detect !== '' && str_contains($text, $detect)) {
+                        $matches = true;
+                        break;
+                    }
+                }
+            }
+            if (!$matches) {
+                return '';
+            }
+            $fields = $this->sectorBlueprintFieldPreview($sector, 6);
+            $miniApps = is_array($sector['mini_apps'] ?? null) ? $sector['mini_apps'] : [];
+            $miniApp = (string) ($miniApps[0] ?? '');
+            $entity = '';
+            $blueprint = is_array($sector['blueprint'] ?? null) ? $sector['blueprint'] : [];
+            $entities = is_array($blueprint['entities'] ?? null) ? $blueprint['entities'] : [];
+            if (is_array($entities[0] ?? null)) {
+                $entity = (string) (($entities[0]['name'] ?? '') ?: '');
+            }
+            $lines = [];
+            if ($miniApp !== '') {
+                $lines[] = 'Mini-app recomendada: ' . str_replace('_', ' ', $miniApp) . '.';
+            }
+            if ($entity !== '') {
+                $lines[] = 'Te sugiero empezar con la tabla ' . $entity . '.';
+            }
+            if (!empty($fields)) {
+                $lines[] = 'Campos clave: ' . implode(', ', $fields) . '.';
+            }
+            return implode(' ', $lines);
+        }
+        return '';
     }
 
     private function storeMemoryNote(array $profile, string $text, string $tenantId, string $userId): array
@@ -5760,19 +6154,39 @@ private function parseEntityFromCrudText(string $text): string
             return $this->domainPlaybookCache;
         }
         $frameworkRoot = defined('FRAMEWORK_ROOT') ? FRAMEWORK_ROOT : dirname(__DIR__, 3);
-        $path = $frameworkRoot . '/contracts/agents/domain_playbooks.json';
-        if (!is_file($path)) {
+        $frameworkPath = $frameworkRoot . '/contracts/agents/domain_playbooks.json';
+        if (!is_file($frameworkPath)) {
             $this->domainPlaybookCache = [];
             return [];
         }
-        $raw = file_get_contents($path);
+        $raw = file_get_contents($frameworkPath);
         if ($raw === false || $raw === '') {
             $this->domainPlaybookCache = [];
             return [];
         }
         $raw = ltrim($raw, "\xEF\xBB\xBF");
         $decoded = json_decode($raw, true);
-        $this->domainPlaybookCache = is_array($decoded) ? $decoded : [];
+        $base = is_array($decoded) ? $decoded : [];
+
+        $projectPath = $this->projectRoot . '/contracts/knowledge/domain_playbooks.json';
+        if (is_file($projectPath)) {
+            $projectOverride = $this->readJson($projectPath, []);
+            if (!empty($projectOverride)) {
+                foreach (['solver_intents', 'sector_playbooks', 'knowledge_prompt_template'] as $key) {
+                    if (isset($projectOverride[$key]) && is_array($projectOverride[$key])) {
+                        $base[$key] = $projectOverride[$key];
+                    }
+                }
+                if (isset($projectOverride['meta']) && is_array($projectOverride['meta'])) {
+                    $base['meta'] = array_merge(
+                        is_array($base['meta'] ?? null) ? $base['meta'] : [],
+                        ['project_override' => true]
+                    );
+                }
+            }
+        }
+
+        $this->domainPlaybookCache = $base;
         return $this->domainPlaybookCache;
     }
 

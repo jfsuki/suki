@@ -50,7 +50,12 @@
 - Memory persistence hardening:
   - `MemoryRepositoryInterface` + `SqlMemoryRepository` added.
   - ConversationGateway stores state/profile/working-memory in SQL multi-tenant tables.
+  - ConversationGateway moved `latam_lexicon_overrides` to `mem_tenant` (legacy file only as one-time fallback).
+  - Shared tenant learning key `agent_shared_knowledge` added for cross-agent knowledge reuse.
   - Legacy JSON migration script added: `framework/scripts/migrate_memory_json_to_sql.php`.
+- Domain consulting layer:
+  - `domain_playbooks.json` expanded with `solver_intents` + `sector_playbooks` (6 verticals mata-excel).
+  - New project knowledge mirror: `project/contracts/knowledge/domain_playbooks.json`.
 
 ## Execution checklist
 - [x] Summary dependency ordering stable

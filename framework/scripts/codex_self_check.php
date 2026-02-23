@@ -24,9 +24,11 @@ $requiredFiles = [
     'framework/docs/PROJECT_MEMORY_CANONICAL.md',
     'framework/docs/CODEX_SELF_CHECKLIST.md',
     'framework/docs/AGENT_SKILLS_MATRIX.md',
+    'framework/docs/DOMAIN_PLAYBOOKS_PROMPT_BASE.md',
     'framework/contracts/agents/WORKING_MEMORY_SCHEMA.json',
     'framework/contracts/agents/conversation_training_base.json',
     'framework/contracts/agents/domain_playbooks.json',
+    'project/contracts/knowledge/domain_playbooks.json',
 ];
 
 $missingFiles = [];

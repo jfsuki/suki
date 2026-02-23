@@ -67,6 +67,14 @@ framework/contracts/agents/latam_es_col_conversation_lexicon.json
 ```
 Uso: estandariza palabras de negocio no tecnico (ej: planilla->tabla, columna->campo, fila->registro, sumatoria->formula) antes de clasificar.
 
+Playbooks sectoriales (consultoria activa):
+```
+framework/contracts/agents/domain_playbooks.json
+project/contracts/knowledge/domain_playbooks.json
+```
+- `solver_intents` mapea dolores de negocio a acciones `APPLY_PLAYBOOK_*`.
+- `sector_playbooks` define triggers, pain_points y blueprints por vertical.
+
 ## Memoria por tenant (SQL first)
 Persistencia principal:
 - `mem_global` (reglas compartidas)
@@ -77,6 +85,8 @@ Persistencia principal:
 Clave de estado en SQL:
 - `state::{project}::{mode}` sobre `mem_user` por `tenant_id + user_id`
 - `working_memory::{project}::{mode}` sobre `mem_user`
+- `latam_lexicon_overrides` sobre `mem_tenant` (sin dependencia runtime de archivos)
+- `agent_shared_knowledge` sobre `mem_tenant` (aprendizaje agregado por sector/intencion)
 
 Compatibilidad:
 - si hay JSON legacy en `project/storage/*`, el gateway los lee una vez y los rehidrata en SQL.

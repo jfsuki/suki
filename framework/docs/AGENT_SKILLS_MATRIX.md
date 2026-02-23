@@ -24,6 +24,7 @@ Purpose: Define expected capability baseline for each agent role in SUKI AI-AOS.
 - Never bypass execution engine or permission guards.
 - Never execute external actions without contract and audit trail.
 - Always produce user responses with clear next step.
+- Persist reusable learnings in tenant shared memory (`agent_shared_knowledge`) to reduce repeated LLM dependency.
 
 ## Conversation quality metrics
 - Intent resolution rate (local-first).

@@ -49,6 +49,7 @@ $summary = [
     'glossary' => 0,
     'research_queue' => 0,
     'tenant_lexicon' => 0,
+    'tenant_latam_lexicon_overrides' => 0,
     'tenant_policy' => 0,
     'tenant_training_overrides' => 0,
     'tenant_country_overrides' => 0,
@@ -114,6 +115,14 @@ foreach (glob($tenantRoot . '/*') ?: [] as $tenantPath) {
         $summary['tenant_lexicon']++;
     }
 
+    $latamLexiconOverrides = read_json_file($tenantPath . '/latam_lexicon_overrides.json', []);
+    if (!empty($latamLexiconOverrides)) {
+        if (!$dryRun) {
+            $repo->saveTenantMemory($tenantId, 'latam_lexicon_overrides', $latamLexiconOverrides);
+        }
+        $summary['tenant_latam_lexicon_overrides']++;
+    }
+
     $policy = read_json_file($tenantPath . '/dialog_policy.json', []);
     if (!empty($policy)) {
         if (!$dryRun) {
@@ -166,4 +175,3 @@ foreach (glob($tenantRoot . '/*') ?: [] as $tenantPath) {
 }
 
 echo json_encode($summary, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
-
