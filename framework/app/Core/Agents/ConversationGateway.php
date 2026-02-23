@@ -480,7 +480,8 @@ final class ConversationGateway
             $this->saveState($tenantId, $userId, $state);
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('build_guard', true));
         }
-        if ($mode === 'builder' && $this->hasRuntimeCrudSignals($normalized) && !$this->hasBuildSignals($normalized)) {
+        $isPlaybookBuilderRequest = !empty($this->parseInstallPlaybookRequest($normalized)['matched']);
+        if ($mode === 'builder' && $this->hasRuntimeCrudSignals($normalized) && !$this->hasBuildSignals($normalized) && !$isPlaybookBuilderRequest) {
             $reply = 'Estas en el Creador. Aqui definimos estructura (tablas/formularios). Para registrar datos usa el chat de la app.';
             $state = $this->updateState($state, $raw, $reply, null, null, [], null);
             $this->saveState($tenantId, $userId, $state);
@@ -1744,6 +1745,33 @@ final class ConversationGateway
 
     private function parseBuild(string $text, array $state, array $profile = []): array
     {
+        $playbookInstall = $this->parseInstallPlaybookRequest($text);
+        if (!empty($playbookInstall['matched'])) {
+            if (!empty($playbookInstall['list_only'])) {
+                return [
+                    'ask' => $this->buildPlaybookListReply(),
+                    'active_task' => 'builder_onboarding',
+                ];
+            }
+            $sectorKey = (string) ($playbookInstall['sector_key'] ?? '');
+            if ($sectorKey === '') {
+                return [
+                    'ask' => 'Dime el sector del playbook que quieres instalar.' . "\n" . $this->buildPlaybookListReply(),
+                    'active_task' => 'builder_onboarding',
+                ];
+            }
+            return [
+                'command' => [
+                    'command' => 'InstallPlaybook',
+                    'sector_key' => $sectorKey,
+                    'dry_run' => !empty($playbookInstall['dry_run']),
+                    'overwrite' => !empty($playbookInstall['overwrite']),
+                ],
+                'entity' => null,
+                'collected' => ['sector_key' => $sectorKey],
+            ];
+        }
+
         $hasCreate = str_contains($text, 'crear') || preg_match('/\b(crea|armar|construir|haz)\b/u', $text) === 1;
         $hasTable = str_contains($text, 'tabla') || str_contains($text, 'entidad');
         $hasForm = str_contains($text, 'formulario') || str_contains($text, 'form');
@@ -1908,6 +1936,147 @@ final class ConversationGateway
         return [];
     }
 
+    private function parseInstallPlaybookRequest(string $text): array
+    {
+        $text = preg_replace('/playbo+que/u', 'playbook', $text) ?? $text;
+
+        $listSignals = [
+            'que playbooks',
+            'listar playbooks',
+            'lista de playbooks',
+            'playbooks disponibles',
+            'sectores disponibles',
+            'que sectores',
+        ];
+        foreach ($listSignals as $signal) {
+            if (str_contains($text, $signal)) {
+                return ['matched' => true, 'list_only' => true, 'sector_key' => ''];
+            }
+        }
+
+        $installSignals = [
+            'instalar playbook',
+            'instala playbook',
+            'aplicar playbook',
+            'aplica playbook',
+            'activar playbook',
+            'instalar sector',
+            'instala sector',
+        ];
+
+        $matched = false;
+        foreach ($installSignals as $signal) {
+            if (str_contains($text, $signal)) {
+                $matched = true;
+                break;
+            }
+        }
+        if (!$matched) {
+            return ['matched' => false, 'list_only' => false, 'sector_key' => '', 'dry_run' => false, 'overwrite' => false];
+        }
+
+        $dryRun = str_contains($text, 'simulacion')
+            || str_contains($text, 'dry run')
+            || str_contains($text, 'sin instalar')
+            || str_contains($text, 'solo revisar');
+        $overwrite = str_contains($text, 'overwrite')
+            || str_contains($text, 'sobrescribir')
+            || str_contains($text, 'reinstalar');
+
+        return [
+            'matched' => true,
+            'list_only' => false,
+            'sector_key' => $this->detectSectorKeyFromText($text),
+            'dry_run' => $dryRun,
+            'overwrite' => $overwrite,
+        ];
+    }
+
+    private function buildPlaybookListReply(): string
+    {
+        $playbook = $this->loadDomainPlaybook();
+        $sectors = is_array($playbook['sector_playbooks'] ?? null) ? $playbook['sector_playbooks'] : [];
+        if (empty($sectors)) {
+            return 'No hay playbooks sectoriales disponibles en este proyecto.';
+        }
+        $lines = [];
+        $lines[] = 'Playbooks disponibles:';
+        foreach ($sectors as $sector) {
+            if (!is_array($sector)) {
+                continue;
+            }
+            $key = strtoupper((string) ($sector['sector_key'] ?? ''));
+            if ($key === '') {
+                continue;
+            }
+            $label = $this->humanizeSectorKey($key);
+            $miniApps = is_array($sector['mini_apps'] ?? null) ? $sector['mini_apps'] : [];
+            $mini = !empty($miniApps) ? (string) ($miniApps[0] ?? '') : '';
+            if ($mini !== '') {
+                $lines[] = '- ' . $label . ' (' . $key . '): ' . str_replace('_', ' ', $mini);
+            } else {
+                $lines[] = '- ' . $label . ' (' . $key . ')';
+            }
+        }
+        $lines[] = 'Para instalar, escribe: instalar playbook FERRETERIA (o el sector que necesites).';
+        return implode("\n", $lines);
+    }
+
+    private function detectSectorKeyFromText(string $text): string
+    {
+        $text = $this->normalize($text);
+        $playbook = $this->loadDomainPlaybook();
+        $sectors = is_array($playbook['sector_playbooks'] ?? null) ? $playbook['sector_playbooks'] : [];
+        $profiles = is_array($playbook['profiles'] ?? null) ? $playbook['profiles'] : [];
+        $profileByKey = [];
+        foreach ($profiles as $profile) {
+            if (!is_array($profile)) {
+                continue;
+            }
+            $key = strtolower((string) ($profile['key'] ?? ''));
+            if ($key !== '') {
+                $profileByKey[$key] = $profile;
+            }
+        }
+
+        foreach ($sectors as $sector) {
+            if (!is_array($sector)) {
+                continue;
+            }
+            $sectorKey = strtoupper((string) ($sector['sector_key'] ?? ''));
+            if ($sectorKey === '') {
+                continue;
+            }
+            if (str_contains($text, strtolower($sectorKey))) {
+                return $sectorKey;
+            }
+            $triggers = is_array($sector['triggers'] ?? null) ? $sector['triggers'] : [];
+            foreach ($triggers as $trigger) {
+                $needle = $this->normalize((string) $trigger);
+                if ($needle !== '' && str_contains($text, $needle)) {
+                    return $sectorKey;
+                }
+            }
+            $profileKey = strtolower((string) ($sector['profile_key'] ?? ''));
+            if ($profileKey !== '' && isset($profileByKey[$profileKey])) {
+                $profile = $profileByKey[$profileKey];
+                $label = $this->normalize((string) ($profile['label'] ?? ''));
+                if ($label !== '' && str_contains($text, $label)) {
+                    return $sectorKey;
+                }
+                $aliases = is_array($profile['aliases'] ?? null) ? $profile['aliases'] : [];
+                foreach ($aliases as $alias) {
+                    $needle = $this->normalize((string) $alias);
+                    if ($needle !== '' && str_contains($text, $needle)) {
+                        return $sectorKey;
+                    }
+                }
+            }
+        }
+
+        return '';
+    }
+
     private function buildExistingEntityNextStep(string $entity, array $state, array $profile = []): array
     {
         $entity = $this->normalizeEntityForSchema($entity);
@@ -1968,6 +2137,25 @@ final class ConversationGateway
         $isOnboarding = $active === 'builder_onboarding';
         $trigger = $this->isBuilderOnboardingTrigger($text);
         $businessHint = $this->detectBusinessType($text) !== '';
+        $playbookInstall = $this->parseInstallPlaybookRequest($text);
+        if (!empty($playbookInstall['matched'])) {
+            return null;
+        }
+        if ($this->isFormListQuestion($text)) {
+            return ['action' => 'respond_local', 'reply' => $this->buildFormList(), 'state' => $state];
+        }
+        if ($this->isEntityListQuestion($text)) {
+            return ['action' => 'respond_local', 'reply' => $this->buildEntityList(), 'state' => $state];
+        }
+        if (
+            $this->isBuilderProgressQuestion($text)
+            || str_contains($text, 'estado del proyecto')
+            || str_contains($text, 'status del proyecto')
+            || str_contains($text, 'estatus del proyecto')
+            || str_contains($text, 'resumen del proyecto')
+        ) {
+            return ['action' => 'respond_local', 'reply' => $this->buildProjectStatus(), 'state' => $state];
+        }
         if (!$isOnboarding && !$trigger && !$businessHint) {
             return null;
         }
@@ -4340,6 +4528,7 @@ private function parseEntityFromCrudText(string $text): string
                 $actions[] = 'siguiente paso';
                 $actions[] = 'crear tabla ordenes_trabajo numero:texto fecha:fecha estado:texto';
             }
+            $actions[] = 'instalar playbook FERRETERIA en simulacion';
 
             $lines = [];
             $lines[] = 'Puedo ayudarte con:';
@@ -5088,7 +5277,8 @@ private function parseEntityFromCrudText(string $text): string
             ];
         }
 
-        if ($mode === 'builder' && $this->hasRuntimeCrudSignals($text) && !$this->hasBuildSignals($text)) {
+        $isPlaybookBuilderRequest = !empty($this->parseInstallPlaybookRequest($text)['matched']);
+        if ($mode === 'builder' && $this->hasRuntimeCrudSignals($text) && !$this->hasBuildSignals($text) && !$isPlaybookBuilderRequest) {
             return [
                 'action' => 'respond_local',
                 'reply' => 'Estas en el Creador. Aqui definimos estructura. Para registrar datos usa el chat de la app.',
@@ -5236,6 +5426,28 @@ private function parseEntityFromCrudText(string $text): string
     private function isEntityListQuestion(string $text): bool
     {
         $patterns = ['q tablas', 'que tablas', 'tabla?', 'tablas?', 'que entidades', 'q entidades'];
+        foreach ($patterns as $pattern) {
+            if (str_contains($text, $pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function isFormListQuestion(string $text): bool
+    {
+        $patterns = [
+            'q formularios',
+            'que formularios',
+            'formulario?',
+            'formularios?',
+            'que forms',
+            'q forms',
+            'que pantallas',
+            'q pantallas',
+            'que vistas',
+            'q vistas',
+        ];
         foreach ($patterns as $pattern) {
             if (str_contains($text, $pattern)) {
                 return true;

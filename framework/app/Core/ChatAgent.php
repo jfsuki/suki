@@ -7,6 +7,7 @@ use App\Core\Agents\ConversationGateway;
 use App\Core\Agents\AcidChatRunner;
 use App\Core\Agents\Telemetry;
 use App\Core\LLM\LLMRouter;
+use App\Core\PlaybookInstaller;
 
 use RuntimeException;
 
@@ -1081,7 +1082,7 @@ final class ChatAgent
             return $this->reply('Comando incompleto.', $channel, $sessionId, $userId, 'error');
         }
 
-        if ($mode === 'builder' && !in_array($cmd, ['CreateEntity', 'CreateForm'], true)) {
+        if ($mode === 'builder' && !in_array($cmd, ['CreateEntity', 'CreateForm', 'InstallPlaybook'], true)) {
             return $this->reply('Estas en modo creador. Usa el chat app para registrar datos.', $channel, $sessionId, $userId, 'error');
         }
 
@@ -1182,6 +1183,56 @@ final class ChatAgent
                     // ignore registry errors
                 }
                 return $this->reply('Formulario creado para ' . $entity, $channel, $sessionId, $userId, 'success', ['form' => $form]);
+            case 'InstallPlaybook':
+                if ($mode === 'app') {
+                    return $this->reply('Estas en modo app. Usa el chat creador para instalar playbooks.', $channel, $sessionId, $userId, 'error');
+                }
+                $sectorKey = strtoupper(trim((string) ($command['sector_key'] ?? $data['sector_key'] ?? '')));
+                $installer = new PlaybookInstaller();
+                if ($sectorKey === '') {
+                    $sectors = $installer->listSectors();
+                    $keys = array_map(
+                        static fn(array $row): string => (string) ($row['sector_key'] ?? ''),
+                        array_filter($sectors, 'is_array')
+                    );
+                    $keys = array_values(array_filter($keys, static fn(string $v): bool => $v !== ''));
+                    return $this->reply(
+                        'Necesito el sector del playbook. Opciones: ' . implode(', ', $keys),
+                        $channel,
+                        $sessionId,
+                        $userId,
+                        'error',
+                        ['sectors' => $sectors]
+                    );
+                }
+                $isDryRun = !empty($command['dry_run']);
+                $result = $installer->installSector(
+                    $sectorKey,
+                    $isDryRun,
+                    !empty($command['overwrite'])
+                );
+                if (empty($result['ok'])) {
+                    return $this->reply(
+                        (string) ($result['message'] ?? 'No pude instalar ese playbook.'),
+                        $channel,
+                        $sessionId,
+                        $userId,
+                        'error',
+                        $result
+                    );
+                }
+                $created = is_array($result['created'] ?? null) ? $result['created'] : [];
+                $skipped = is_array($result['skipped'] ?? null) ? $result['skipped'] : [];
+                $reply = $isDryRun
+                    ? 'Playbook ' . $sectorKey . ' validado en simulacion.'
+                    : 'Playbook ' . $sectorKey . ' instalado.';
+                if (!empty($created)) {
+                    $reply .= ' Contratos creados: ' . implode(', ', $created) . '.';
+                }
+                if (!empty($skipped)) {
+                    $reply .= ' Ya existian: ' . count($skipped) . '.';
+                }
+                return $this->reply($reply, $channel, $sessionId, $userId, 'success', $result);
             case 'CreateRecord':
                 $result = $this->command()->createRecord($entity, $data);
                 return $this->reply('Registro creado en ' . $entity, $channel, $sessionId, $userId, 'success', $result);

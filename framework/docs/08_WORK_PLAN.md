@@ -56,6 +56,8 @@
 - Domain consulting layer:
   - `domain_playbooks.json` expanded with `solver_intents` + `sector_playbooks` (6 verticals mata-excel).
   - New project knowledge mirror: `project/contracts/knowledge/domain_playbooks.json`.
+  - Builder command interno: instalacion de playbooks sin terminal (`InstallPlaybook`).
+  - Worker de autoaprendizaje promueve `agent_shared_knowledge` -> `training_overrides`.
 
 ## Execution checklist
 - [x] Summary dependency ordering stable

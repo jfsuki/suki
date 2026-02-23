@@ -3,14 +3,19 @@
 
 namespace App\Jobs;
 
+use App\Core\MemoryRepositoryInterface;
+use App\Core\SqlMemoryRepository;
+
 final class AgentNurtureJob
 {
     private string $projectRoot;
+    private ?MemoryRepositoryInterface $memory = null;
 
-    public function __construct(?string $projectRoot = null)
+    public function __construct(?string $projectRoot = null, ?MemoryRepositoryInterface $memory = null)
     {
         $this->projectRoot = $projectRoot
             ?? (defined('PROJECT_ROOT') ? PROJECT_ROOT : dirname(__DIR__, 2) . '/project');
+        $this->memory = $memory;
     }
 
     public function run(string $tenantId = 'default', int $maxLines = 200): array
@@ -32,10 +37,7 @@ final class AgentNurtureJob
             'field_aliases' => [],
         ]);
 
-        $overrides = $this->readJson($overridePath, [
-            'intents' => [],
-            'updated' => date('Y-m-d'),
-        ]);
+        $overrides = $this->loadTrainingOverrides($tenantId, $overridePath);
         $countryOverrides = $this->readJson($countryOverridePath, [
             'global' => ['typo_rules' => [], 'synonyms' => []],
             'countries' => [],
@@ -151,17 +153,23 @@ final class AgentNurtureJob
             }
         }
 
+        $promoted = $this->promoteSharedKnowledgeToTraining($tenantId, $overrides, $baseIntents);
+
         $this->writeJson($lexiconPath, $lexicon);
         $overrides['updated'] = date('Y-m-d');
         $this->writeJson($overridePath, $overrides);
+        $this->saveTenantMemorySafe($tenantId, 'training_overrides', $overrides);
         $countryOverrides['updated'] = date('Y-m-d');
         $this->writeJson($countryOverridePath, $countryOverrides);
+        $this->saveTenantMemorySafe($tenantId, 'country_language_overrides', $countryOverrides);
+        $this->saveTenantMemorySafe($tenantId, 'lexicon', $lexicon);
 
         return [
             'tenant' => $tenantId,
             'added' => $added,
             'added_utterances' => $addedUtterances,
             'added_country_rules' => $addedCountryRules,
+            'promoted_shared_utterances' => $promoted,
         ];
     }
 
@@ -276,6 +284,170 @@ final class AgentNurtureJob
             return true;
         }
         return false;
+    }
+
+    private function loadTrainingOverrides(string $tenantId, string $overridePath): array
+    {
+        $default = [
+            'intents' => [],
+            'updated' => date('Y-m-d'),
+        ];
+        $fileOverrides = $this->readJson($overridePath, $default);
+        $memoryOverrides = $this->loadTenantMemorySafe($tenantId, 'training_overrides', []);
+        if (empty($memoryOverrides)) {
+            return $fileOverrides;
+        }
+        return $this->mergeTrainingOverrides($fileOverrides, $memoryOverrides);
+    }
+
+    private function mergeTrainingOverrides(array $base, array $incoming): array
+    {
+        if (empty($incoming['intents']) || !is_array($incoming['intents'])) {
+            return $base;
+        }
+        if (!isset($base['intents']) || !is_array($base['intents'])) {
+            $base['intents'] = [];
+        }
+        foreach ($incoming['intents'] as $intentName => $intentCfg) {
+            if (!isset($base['intents'][$intentName]) || !is_array($base['intents'][$intentName])) {
+                $base['intents'][$intentName] = ['utterances' => []];
+            }
+            $existing = is_array($base['intents'][$intentName]['utterances'] ?? null)
+                ? $base['intents'][$intentName]['utterances']
+                : [];
+            $extra = is_array($intentCfg['utterances'] ?? null) ? $intentCfg['utterances'] : [];
+            foreach ($extra as $utterance) {
+                $normalized = $this->normalizeUtterance((string) $utterance);
+                if ($this->shouldSkipUtterance($normalized)) {
+                    continue;
+                }
+                if (!in_array($normalized, $existing, true)) {
+                    $existing[] = $normalized;
+                }
+            }
+            $base['intents'][$intentName]['utterances'] = array_slice($existing, -120);
+        }
+        return $base;
+    }
+
+    private function promoteSharedKnowledgeToTraining(string $tenantId, array &$overrides, array $baseIntents): int
+    {
+        $shared = $this->loadTenantMemorySafe($tenantId, 'agent_shared_knowledge', []);
+        if (empty($shared)) {
+            return 0;
+        }
+
+        $sectorIntentMap = [
+            'FERRETERIA' => 'SOLVE_UNIT_CONVERSION',
+            'FARMACIA' => 'SOLVE_EXPIRY_CONTROL',
+            'RESTAURANTE' => 'SOLVE_RECIPE_COSTING',
+            'MANTENIMIENTO' => 'SOLVE_MAINTENANCE_OT',
+            'PRODUCCION' => 'SOLVE_BATCH_TRACEABILITY',
+            'BELLEZA' => 'SOLVE_CLIENT_RETENTION',
+        ];
+
+        $promoted = 0;
+        $recent = is_array($shared['recent'] ?? null) ? $shared['recent'] : [];
+        $recent = array_slice($recent, -160);
+        foreach ($recent as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $sector = strtoupper((string) ($item['sector_key'] ?? ''));
+            $intent = (string) ($sectorIntentMap[$sector] ?? '');
+            if ($intent === '' || !isset($baseIntents[$intent])) {
+                continue;
+            }
+            $text = $this->normalizeUtterance((string) ($item['text_excerpt'] ?? ''));
+            if ($this->shouldSkipUtterance($text)) {
+                continue;
+            }
+            if ($this->addIntentUtterance($overrides, $intent, $text)) {
+                $promoted++;
+            }
+        }
+
+        $sectors = is_array($shared['sectors'] ?? null) ? $shared['sectors'] : [];
+        foreach ($sectors as $sectorKey => $info) {
+            $sectorKey = strtoupper((string) $sectorKey);
+            $intent = (string) ($sectorIntentMap[$sectorKey] ?? '');
+            if ($intent === '' || !isset($baseIntents[$intent])) {
+                continue;
+            }
+            $hits = is_array($info) ? (int) ($info['hits'] ?? 0) : 0;
+            if ($hits < 1) {
+                continue;
+            }
+            $synthetic = match ($sectorKey) {
+                'FERRETERIA' => 'mi negocio es ferreteria y vendo por metros',
+                'FARMACIA' => 'mi negocio es farmacia y necesito control fefo',
+                'RESTAURANTE' => 'mi restaurante necesita escandallo y mermas',
+                'MANTENIMIENTO' => 'quiero mini app de ordenes de trabajo',
+                'PRODUCCION' => 'necesito trazabilidad de lotes en produccion',
+                'BELLEZA' => 'quiero retener clientes con recordatorios',
+                default => '',
+            };
+            if ($synthetic === '') {
+                continue;
+            }
+            if ($this->addIntentUtterance($overrides, $intent, $synthetic)) {
+                $promoted++;
+            }
+        }
+
+        return $promoted;
+    }
+
+    private function addIntentUtterance(array &$overrides, string $intent, string $utterance): bool
+    {
+        $utterance = $this->normalizeUtterance($utterance);
+        if ($this->shouldSkipUtterance($utterance)) {
+            return false;
+        }
+        if (!isset($overrides['intents']) || !is_array($overrides['intents'])) {
+            $overrides['intents'] = [];
+        }
+        if (!isset($overrides['intents'][$intent]) || !is_array($overrides['intents'][$intent])) {
+            $overrides['intents'][$intent] = ['utterances' => []];
+        }
+        if (!isset($overrides['intents'][$intent]['utterances']) || !is_array($overrides['intents'][$intent]['utterances'])) {
+            $overrides['intents'][$intent]['utterances'] = [];
+        }
+        if (in_array($utterance, $overrides['intents'][$intent]['utterances'], true)) {
+            return false;
+        }
+        $overrides['intents'][$intent]['utterances'][] = $utterance;
+        $overrides['intents'][$intent]['utterances'] = array_slice(
+            $overrides['intents'][$intent]['utterances'],
+            -120
+        );
+        return true;
+    }
+
+    private function memory(): MemoryRepositoryInterface
+    {
+        if ($this->memory === null) {
+            $this->memory = new SqlMemoryRepository();
+        }
+        return $this->memory;
+    }
+
+    private function loadTenantMemorySafe(string $tenantId, string $key, array $default): array
+    {
+        try {
+            return $this->memory()->getTenantMemory($tenantId, $key, $default);
+        } catch (\Throwable $e) {
+            return $default;
+        }
+    }
+
+    private function saveTenantMemorySafe(string $tenantId, string $key, array $value): void
+    {
+        try {
+            $this->memory()->saveTenantMemory($tenantId, $key, $value);
+        } catch (\Throwable $e) {
+            // Memory persistence is best-effort for nurture jobs.
+        }
     }
 
     private function readJson(string $path, array $default): array

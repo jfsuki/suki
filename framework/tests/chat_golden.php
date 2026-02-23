@@ -21,6 +21,7 @@ $base = [
 $steps = [
     ['mode' => 'builder', 'message' => 'hola', 'contains' => 'Cami'],
     ['mode' => 'builder', 'message' => 'quiero crear una app para inventario', 'contains' => 'Paso'],
+    ['mode' => 'builder', 'message' => 'instalar playbook ferreteria en simulacion', 'contains' => 'Playbook FERRETERIA validado en simulacion'],
     ['mode' => 'builder', 'message' => 'quiero crear una tabla ' . $entity, 'contains' => 'Quieres que la cree'],
     ['mode' => 'builder', 'message' => 'si', 'contains' => 'Tabla creada'],
     ['mode' => 'builder', 'message' => 'no', 'contains' => 'seguimos sin campos calculados'],

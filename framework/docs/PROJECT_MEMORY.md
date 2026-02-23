@@ -57,6 +57,8 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
   - flujo guiado corto en builder: paso minimo + confirmacion `si/no` antes de crear tabla sugerida
   - sugerencia de campos en lenguaje no tecnico para usuarios basicos
   - ruta tecnica resumida (logica + base de datos + pasos de construccion) disponible por chat en modo builder
+  - comando interno de builder para instalar playbooks sectoriales sin terminal
+    (`instalar playbook FERRETERIA` / `... en simulacion`)
 - Knowledge base externa reforzada (sin hardcode):
   - `framework/contracts/agents/domain_playbooks.json` con perfiles de negocio, entidades sugeridas y reportes
   - `solver_intents` sectoriales (`SOLVE_*`) + acciones `APPLY_PLAYBOOK_*` para respuesta tipo consultor
@@ -67,6 +69,8 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
   - cobertura ampliada universal: ERP/CRM/contable, salud, iglesia/fundacion, restaurante, retail, manufactura, taller, ecommerce, constructora, educacion, hoteleria, agro
   - protocolo para dominios desconocidos: si no hay plantilla exacta, se registra cola de investigacion y el chat continua con preguntas minimas
   - memoria compartida de investigacion en `project/storage/chat/research/{tenant}.json` (usable por todos los mini-agentes)
+  - worker `AgentNurtureJob` ahora promueve automaticamente aprendizaje compartido
+    (`agent_shared_knowledge`) a `training_overrides` para reducir dependencia LLM
 - Chat help external JSON: conversation_training_base.json.
 - Acid test actualizado (framework/tests/chat_acid.php) y reportes.
 

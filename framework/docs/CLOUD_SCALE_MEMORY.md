@@ -58,6 +58,9 @@ Mapeo de "mensaje -> accion JSON" para ahorrar tokens.
 - Migracion legacy JSON -> SQL:
   - `php framework/scripts/migrate_memory_json_to_sql.php --dry-run`
   - `php framework/scripts/migrate_memory_json_to_sql.php`
+- Autoaprendizaje activo:
+  - `AgentNurtureJob` promueve `agent_shared_knowledge` a `training_overrides` automaticamente.
+  - Cron recomendado: `php framework/cron/agent_nurture.php default`.
 
 ## Portero inteligente (ahorro de tokens)
 1) **Nivel 0**: reglas/regex locales (saldo, listar, total).

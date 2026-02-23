@@ -74,6 +74,10 @@ project/contracts/knowledge/domain_playbooks.json
 ```
 - `solver_intents` mapea dolores de negocio a acciones `APPLY_PLAYBOOK_*`.
 - `sector_playbooks` define triggers, pain_points y blueprints por vertical.
+- Comando interno builder habilitado:
+  - `instalar playbook FERRETERIA`
+  - `instalar playbook FERRETERIA en simulacion`
+  - `que playbooks hay`
 
 ## Memoria por tenant (SQL first)
 Persistencia principal:
@@ -87,6 +91,7 @@ Clave de estado en SQL:
 - `working_memory::{project}::{mode}` sobre `mem_user`
 - `latam_lexicon_overrides` sobre `mem_tenant` (sin dependencia runtime de archivos)
 - `agent_shared_knowledge` sobre `mem_tenant` (aprendizaje agregado por sector/intencion)
+- `training_overrides` enriquecido por worker con promociones desde `agent_shared_knowledge`
 
 Compatibilidad:
 - si hay JSON legacy en `project/storage/*`, el gateway los lee una vez y los rehidrata en SQL.
