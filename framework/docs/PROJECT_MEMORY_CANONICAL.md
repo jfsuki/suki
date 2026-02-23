@@ -86,6 +86,7 @@ If a decision conflicts with a higher level, it is invalid.
 
 ## 10) Operational governance
 - Mandatory pre-check: `php framework/scripts/codex_self_check.php --strict`
+- Mandatory backup before DB/data-impacting changes: `php framework/scripts/db_backup.php`
 - Mandatory QA gate before push.
 - Temporary testing artifacts only in `framework/tests/tmp/`.
 - Changes are incremental and auditable.

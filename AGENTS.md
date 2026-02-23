@@ -66,6 +66,12 @@ Ejecutar siempre:
 
 Si falla, no se implementa nada hasta corregir causa raiz.
 
+## 3.2) Backup obligatorio (datos y tablas)
+- Antes de cambios de DB/kernel/contratos de datos o limpieza de pruebas:
+  - `php framework/scripts/db_backup.php`
+- `codex_self_check --strict` falla si no existe backup reciente (<= 24h).
+- Nunca ejecutar limpiezas masivas sin backup previo.
+
 ## 4) Reglas no negociables
 - No renombrar ni romper llaves existentes de contratos.
 - No SQL crudo en capa app (usar QueryBuilder/CommandLayer/Repository).

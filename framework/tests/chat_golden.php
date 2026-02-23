@@ -22,6 +22,7 @@ $steps = [
     ['mode' => 'builder', 'message' => 'quiero crear una app para inventario', 'contains' => 'Paso'],
     ['mode' => 'builder', 'message' => 'quiero crear una tabla ' . $entity, 'contains' => 'Quieres que la cree'],
     ['mode' => 'builder', 'message' => 'si', 'contains' => 'Tabla creada'],
+    ['mode' => 'builder', 'message' => 'no', 'contains' => 'seguimos sin campos calculados'],
     ['mode' => 'builder', 'message' => 'crear formulario ' . $entity, 'contains' => 'Formulario creado'],
     ['mode' => 'app', 'message' => 'crear ' . $entity . ' nombre=Ana', 'contains' => 'Registro creado'],
     ['mode' => 'app', 'message' => 'quiero crear una tabla productos', 'contains' => 'Creador de apps'],

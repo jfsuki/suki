@@ -40,6 +40,7 @@ foreach ($requiredFiles as $file) {
 $jsonCheck = validateJsonFiles($repoRoot);
 $tempPolicy = checkTempArtifactPolicy($repoRoot);
 $hookCheck = checkPrePushHook($repoRoot);
+$backupCheck = checkBackupPolicy($repoRoot);
 
 $report = [
     'ok' => true,
@@ -52,9 +53,10 @@ $report = [
     'json_validation' => $jsonCheck,
     'temp_artifact_policy' => $tempPolicy,
     'git_hooks' => $hookCheck,
+    'backup_policy' => $backupCheck,
 ];
 
-if (!empty($missingFiles) || !$jsonCheck['ok'] || !$tempPolicy['ok'] || !$hookCheck['ok']) {
+if (!empty($missingFiles) || !$jsonCheck['ok'] || !$tempPolicy['ok'] || !$hookCheck['ok'] || !$backupCheck['ok']) {
     $report['ok'] = false;
 }
 
@@ -176,6 +178,54 @@ function checkPrePushHook(string $repoRoot): array
     return [
         'ok' => $hasQaPost,
         'contains_qa_post' => $hasQaPost,
+    ];
+}
+
+function checkBackupPolicy(string $repoRoot): array
+{
+    $manifestPath = $repoRoot . DIRECTORY_SEPARATOR . 'project' . DIRECTORY_SEPARATOR . 'storage' . DIRECTORY_SEPARATOR . 'backups' . DIRECTORY_SEPARATOR . 'manifest.json';
+    if (!is_file($manifestPath)) {
+        return [
+            'ok' => false,
+            'error' => 'backup manifest not found',
+            'required' => 'run php framework/scripts/db_backup.php',
+        ];
+    }
+
+    $raw = file_get_contents($manifestPath);
+    if (!is_string($raw) || trim($raw) === '') {
+        return [
+            'ok' => false,
+            'error' => 'backup manifest empty',
+        ];
+    }
+
+    $data = json_decode($raw, true);
+    if (!is_array($data)) {
+        return [
+            'ok' => false,
+            'error' => 'backup manifest invalid JSON',
+        ];
+    }
+
+    $last = (string) ($data['last_backup_at'] ?? '');
+    $ts = $last !== '' ? strtotime($last) : false;
+    if ($ts === false) {
+        return [
+            'ok' => false,
+            'error' => 'last_backup_at missing/invalid',
+        ];
+    }
+
+    $ageHours = (time() - $ts) / 3600;
+    $ok = $ageHours <= 24;
+
+    return [
+        'ok' => $ok,
+        'last_backup_at' => $last,
+        'age_hours' => round($ageHours, 2),
+        'max_age_hours' => 24,
+        'required' => 'run php framework/scripts/db_backup.php if stale',
     ];
 }
 

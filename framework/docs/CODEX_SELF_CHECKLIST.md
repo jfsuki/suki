@@ -24,6 +24,7 @@ Mandatory checklist before any code/doc change in SUKI.
 - [ ] Multi-tenant context preserved (`tenant + project + mode + user`).
 
 ## D) Pre-check command (mandatory)
+- [ ] Run backup first if change touches DB/data/contracts: `php framework/scripts/db_backup.php`
 - [ ] Run: `php framework/scripts/codex_self_check.php --strict`
 - [ ] If it fails, fix root cause before implementing further.
 
