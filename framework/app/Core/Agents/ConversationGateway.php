@@ -406,6 +406,30 @@ final class ConversationGateway
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('software_blueprint', true));
         }
 
+        $builderGuidanceRoute = $this->routeBuilderGuidance($normalizedBase, $training, $state, $lexicon, $mode);
+        if (!empty($builderGuidanceRoute)) {
+            $reply = (string) ($builderGuidanceRoute['reply'] ?? 'Listo.');
+            $action = (string) ($builderGuidanceRoute['action'] ?? 'respond_local');
+            $state = $this->updateState(
+                $state,
+                $raw,
+                $reply,
+                $builderGuidanceRoute['intent'] ?? null,
+                null,
+                $builderGuidanceRoute['collected'] ?? [],
+                $builderGuidanceRoute['active_task'] ?? 'builder_guidance'
+            );
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result(
+                $action === 'ask_user' ? 'ask_user' : 'respond_local',
+                $reply,
+                null,
+                null,
+                $state,
+                $this->telemetry('builder_guidance', true, $builderGuidanceRoute)
+            );
+        }
+
         if ($mode === 'builder') {
             $onboarding = $this->handleBuilderOnboarding($normalizedBase, $state, $profile, $tenantId, $userId);
             if ($onboarding !== null) {
@@ -4889,6 +4913,234 @@ private function parseEntityFromCrudText(string $text): string
             default:
                 return [];
         }
+    }
+
+    private function routeBuilderGuidance(string $text, array $training, array $state, array $lexicon, string $mode): array
+    {
+        if ($mode !== 'builder') {
+            return [];
+        }
+        if (trim($text) === '') {
+            return [];
+        }
+        if (!empty($state['builder_pending_command']) && is_array($state['builder_pending_command'])) {
+            return [];
+        }
+
+        $activeTask = (string) ($state['active_task'] ?? '');
+        $onboardingStep = (string) ($state['onboarding_step'] ?? '');
+        if ($activeTask === 'builder_onboarding' && $onboardingStep !== '' && !in_array($onboardingStep, ['plan_ready', 'confirm_scope'], true)) {
+            return [];
+        }
+
+        $guides = $this->loadBuilderGuidance($training);
+        if (empty($guides)) {
+            return [];
+        }
+
+        $bestGuide = [];
+        $bestTrigger = '';
+        $bestScore = 0;
+        foreach ($guides as $guide) {
+            if (!is_array($guide)) {
+                continue;
+            }
+            $triggers = is_array($guide['user_triggers'] ?? null) ? $guide['user_triggers'] : [];
+            foreach ($triggers as $trigger) {
+                $needle = $this->normalize((string) $trigger);
+                if ($needle === '' || !str_contains($text, $needle)) {
+                    continue;
+                }
+                $score = mb_strlen($needle, 'UTF-8');
+                if ($score > $bestScore) {
+                    $bestScore = $score;
+                    $bestGuide = $guide;
+                    $bestTrigger = (string) $trigger;
+                }
+            }
+        }
+
+        if (empty($bestGuide)) {
+            return [];
+        }
+
+        $topic = strtoupper(trim((string) ($bestGuide['topic'] ?? 'GENERAL')));
+        $template = trim((string) ($bestGuide['agent_response_template'] ?? ''));
+        if ($template === '') {
+            return [];
+        }
+
+        $reply = $this->renderBuilderGuidanceTemplate($template, $text, $state, $lexicon);
+        if ($reply === '') {
+            return [];
+        }
+        $flowHint = $this->guidanceFlowHint($topic);
+        if ($flowHint !== '') {
+            $reply .= "\nFlujo sugerido: " . $flowHint;
+        }
+
+        return [
+            'action' => str_contains($reply, '?') ? 'ask_user' : 'respond_local',
+            'reply' => $reply,
+            'intent' => $this->guidanceIntentByTopic($topic),
+            'active_task' => 'builder_guidance',
+            'collected' => [
+                'topic' => $topic,
+                'trigger' => $bestTrigger,
+            ],
+        ];
+    }
+
+    private function loadBuilderGuidance(array $training = []): array
+    {
+        $playbook = $this->loadDomainPlaybook();
+        $playbookGuidance = is_array($playbook['builder_guidance'] ?? null) ? $playbook['builder_guidance'] : [];
+        $trainingGuidance = is_array($training['builder_guidance'] ?? null) ? $training['builder_guidance'] : [];
+
+        $merged = [];
+        $seen = [];
+        foreach (array_merge($playbookGuidance, $trainingGuidance) as $guide) {
+            if (!is_array($guide)) {
+                continue;
+            }
+            $topic = strtoupper(trim((string) ($guide['topic'] ?? '')));
+            $template = trim((string) ($guide['agent_response_template'] ?? ''));
+            $triggers = is_array($guide['user_triggers'] ?? null) ? $guide['user_triggers'] : [];
+            if ($topic === '' || $template === '' || empty($triggers)) {
+                continue;
+            }
+            $dedupeKey = mb_strtolower($topic . '|' . $template, 'UTF-8');
+            if (isset($seen[$dedupeKey])) {
+                continue;
+            }
+            $seen[$dedupeKey] = true;
+            $merged[] = [
+                'topic' => $topic,
+                'user_triggers' => array_values(array_filter(array_map(
+                    static fn($v): string => trim((string) $v),
+                    $triggers
+                ), static fn(string $v): bool => $v !== '')),
+                'agent_response_template' => $template,
+            ];
+        }
+
+        return $merged;
+    }
+
+    private function guidanceIntentByTopic(string $topic): string
+    {
+        $topic = strtoupper(trim($topic));
+        if ($topic === '') {
+            return 'BUILDER_GUIDANCE';
+        }
+        return 'BUILDER_GUIDANCE_' . $topic;
+    }
+
+    private function renderBuilderGuidanceTemplate(string $template, string $text, array $state, array $lexicon): string
+    {
+        $tables = $this->detectRelationTablesFromText($text, $state, $lexicon);
+        $field = $this->detectGuidanceFieldFromText($text);
+
+        return strtr($template, [
+            '{tabla_A}' => $tables['tabla_A'],
+            '{tabla_B}' => $tables['tabla_B'],
+            '{campo}' => $field,
+        ]);
+    }
+
+    private function detectRelationTablesFromText(string $text, array $state, array $lexicon): array
+    {
+        $tableA = '';
+        $tableB = '';
+
+        if (preg_match('/(?:conectar|relacionar|vincular|unir)\\s+([a-z0-9_]+)\\s+(?:con|y)\\s+([a-z0-9_]+)/u', $text, $matches) === 1) {
+            $tableA = $this->normalizeEntityForSchema((string) ($matches[1] ?? ''));
+            $tableB = $this->normalizeEntityForSchema((string) ($matches[2] ?? ''));
+        }
+
+        if ($tableA === '') {
+            $tableA = $this->normalizeEntityForSchema((string) ($state['entity'] ?? ''));
+        }
+        if ($tableA === '') {
+            $detected = $this->detectEntity($text, $lexicon, $state);
+            $tableA = $this->normalizeEntityForSchema($detected);
+        }
+        if ($tableB === '') {
+            if (preg_match('/\\bcon\\s+([a-z0-9_]+)/u', $text, $matches) === 1) {
+                $tableB = $this->normalizeEntityForSchema((string) ($matches[1] ?? ''));
+            }
+        }
+        if ($tableB === '' || $tableB === $tableA) {
+            $keywordEntity = $this->normalizeEntityForSchema($this->detectEntityKeywordInText($text));
+            if ($keywordEntity !== '' && $keywordEntity !== $tableA) {
+                $tableB = $keywordEntity;
+            }
+        }
+        if ($tableA === '') {
+            $tableA = 'clientes';
+        }
+        if ($tableB === '' || $tableB === $tableA) {
+            $tableB = 'ventas';
+        }
+
+        return [
+            'tabla_A' => $tableA,
+            'tabla_B' => $tableB,
+        ];
+    }
+
+    private function detectGuidanceFieldFromText(string $text): string
+    {
+        $matches = [];
+        if (preg_match('/\\bbusqueda\\s+por\\s+([a-z0-9_]+)/u', $text, $matches) === 1) {
+            return $this->normalizeEntityForSchema((string) ($matches[1] ?? '')) ?: 'nombre';
+        }
+        if (preg_match('/\\bcampo\\s+([a-z0-9_]+)/u', $text, $matches) === 1) {
+            return $this->normalizeEntityForSchema((string) ($matches[1] ?? '')) ?: 'nombre';
+        }
+        if (preg_match('/\\bpor\\s+([a-z0-9_]+)/u', $text, $matches) === 1) {
+            return $this->normalizeEntityForSchema((string) ($matches[1] ?? '')) ?: 'nombre';
+        }
+        return 'nombre';
+    }
+
+    private function guidanceFlowHint(string $topic): string
+    {
+        $topic = strtoupper(trim($topic));
+        if ($topic === '') {
+            return '';
+        }
+
+        $flowKeyMap = [
+            'FIELD_TYPE_SELECTION' => 'SECTOR_DISCOVERY_BASE',
+            'RELATIONS' => 'SECTOR_DISCOVERY_BASE',
+            'MASTER_DETAIL' => 'SECTOR_DISCOVERY_BASE',
+            'PERFORMANCE' => 'SECTOR_DISCOVERY_BASE',
+            'IMPORT_DATA' => 'SECTOR_DISCOVERY_BASE',
+            'REPORTS_DOCS' => 'SECTOR_DISCOVERY_BASE',
+            'FE_CO_SETUP' => 'SECTOR_DISCOVERY_BASE',
+            'SECURITY_ROLES' => 'SECTOR_DISCOVERY_BASE',
+        ];
+        $flowKey = (string) ($flowKeyMap[$topic] ?? '');
+        if ($flowKey === '') {
+            return '';
+        }
+
+        $playbook = $this->loadDomainPlaybook();
+        $flows = is_array($playbook['guided_conversation_flows'] ?? null) ? $playbook['guided_conversation_flows'] : [];
+        foreach ($flows as $flow) {
+            if (!is_array($flow)) {
+                continue;
+            }
+            if ((string) ($flow['flow_key'] ?? '') !== $flowKey) {
+                continue;
+            }
+            $steps = is_array($flow['steps'] ?? null) ? $flow['steps'] : [];
+            $firstStep = is_array(($steps[0] ?? null)) ? $steps[0] : [];
+            $ask = trim((string) ($firstStep['ask'] ?? ''));
+            return $ask;
+        }
+        return '';
     }
 
     private function classifyWithTraining(string $text, array $training, array $profile = []): array

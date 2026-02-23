@@ -304,3 +304,9 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
   - `guided_conversation_flows` (flujo base sectorial + flujos dedicados por vertical).
 - `project/contracts/knowledge/domain_playbooks.json` se normalizo y sincronizo con la version canonica para eliminar errores de parseo y mantener consistencia de entrenamiento.
 - `conversation_training_base.json` extendido a `v0.3.7` con intents/utterances y smoke tests para los tres sectores nuevos.
+
+## Checkpoint (2026-02-23, builder guidance data-driven)
+- `ConversationGateway` ahora consume `builder_guidance` desde contratos JSON (playbook + training) para respuestas guiadas en modo builder.
+- Interpolacion dinamica soportada en plantillas (`{tabla_A}`, `{tabla_B}`, `{campo}`) con deteccion desde el texto del usuario.
+- Se agrega sugerencia de flujo usando `guided_conversation_flows` para mantener respuestas consistentes con onboarding.
+- `conversation_training_base.json` incorpora bloque `builder_guidance` sincronizado y refinado (money/phone/date/relations/performance/import/reportes/FE/seguridad).

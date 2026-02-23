@@ -93,6 +93,15 @@
 - Capa de carga de playbook ajustada:
   - `ConversationGateway::loadDomainPlaybook` ahora acepta override de `builder_guidance`, `guided_conversation_flows` y `discovery` desde proyecto.
 
+## Runtime update (2026-02-23)
+- `builder_guidance` deja de ser solo contenido estatico: ahora el gateway lo enruta en tiempo real en modo builder.
+- Plantillas de guidance refinadas para:
+  - tipo de campo (precio/telefono/fecha),
+  - relaciones entre tablas,
+  - performance por campo,
+  - importaciones, reportes/documentos, FE CO y seguridad.
+- `UnitTestRunner` agrega prueba `builder_guidance` para validar recomendacion de tipo `decimal` y relaciones interpoladas.
+
 ## Execution checklist
 - [x] Summary dependency ordering stable
 - [x] Framework/project separation (paths + webroots)

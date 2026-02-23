@@ -1,7 +1,7 @@
 {
     "meta": {
         "name": "suki_conversation_training_base",
-        "version": "0.3.7",
+        "version": "0.3.8",
         "language": "es-CO",
         "timezone": "America/Bogota",
         "created": "2026-02-18",
@@ -16,7 +16,8 @@
             "v0.3.3: +utterances cortas (que tablas/que formularios), mejoras login/usuario, status y opciones",
             "v0.3.4: +utterances perfil negocio (mi negocio es...), mejor routing CRUD",
             "v0.3.6: +solver_intents sectoriales (APPLY_PLAYBOOK_*) para enrutar dolores de negocio.",
-            "v0.3.7: +solver_intents iglesia/educacion/servicios_pro y +flujos de consultoria para playbooks extendidos."
+            "v0.3.7: +solver_intents iglesia/educacion/servicios_pro y +flujos de consultoria para playbooks extendidos.",
+            "v0.3.8: +builder_guidance estructurado y sincronizado con domain_playbooks para respuestas guiadas data-driven."
         ]
     },
     "routing": {
@@ -2841,5 +2842,111 @@
             "MEMORY_UPDATE_REQUEST"
         ],
         "question_policy": "one_minimum_question"
-    }
+    },
+    "builder_guidance": [
+        {
+            "topic": "FIELD_TYPE_SELECTION",
+            "user_triggers": [
+                "un campo para el precio",
+                "campo para el precio",
+                "guardar un valor",
+                "campo para dinero",
+                "cuanto cuesta",
+                "moneda"
+            ],
+            "agent_response_template": "Para precios y valores monetarios, te recomiendo usar el tipo 'decimal' en lugar de 'numero' para manejar centavos con precision. Te parece bien que lo cree como 'decimal'?"
+        },
+        {
+            "topic": "FIELD_TYPE_SELECTION",
+            "user_triggers": [
+                "campo para el telefono",
+                "guardar un celular",
+                "numero de contacto",
+                "whatsapp",
+                "numero telefonico"
+            ],
+            "agent_response_template": "Entendido. Para telefonos, es mejor usar el tipo 'texto' en lugar de 'numero'. Asi puedes guardar simbolos como '+' o '-' y no se pierden los ceros a la izquierda. Lo creamos como 'texto'?"
+        },
+        {
+            "topic": "FIELD_TYPE_SELECTION",
+            "user_triggers": [
+                "campo para fecha",
+                "cuando paso",
+                "dia de registro",
+                "cumpleanos",
+                "fecha y hora"
+            ],
+            "agent_response_template": "Para fechas puedo usar 'date' (solo fecha) o 'datetime' (fecha y hora). Cual prefieres para este campo?"
+        },
+        {
+            "topic": "RELATIONS",
+            "user_triggers": [
+                "conectar clientes con ventas",
+                "vincular dos tablas",
+                "relacionar productos con inventario",
+                "unir tablas"
+            ],
+            "agent_response_template": "Excelente idea. Para conectar {tabla_A} con {tabla_B}, creare un campo especial en {tabla_B} que guardara el codigo unico (ID) de {tabla_A}. Asi el sistema sabra a quien pertenece cada registro. Procedo a crear esta conexion?"
+        },
+        {
+            "topic": "MASTER_DETAIL",
+            "user_triggers": [
+                "factura con items",
+                "pedido con detalle",
+                "maestro detalle",
+                "cabecera detalle"
+            ],
+            "agent_response_template": "Para maestro-detalle creamos una tabla cabecera y una tabla detalle enlazada por ID. Quieres que deje ambas configuradas ahora?"
+        },
+        {
+            "topic": "PERFORMANCE",
+            "user_triggers": [
+                "la busqueda es muy lenta",
+                "tarda mucho en encontrar",
+                "optimizar la tabla",
+                "va lento"
+            ],
+            "agent_response_template": "Entiendo. Para que la busqueda por {campo} sea instantanea, puedo aplicar una optimizacion llamada indice. Es como el indice de un libro: no cambia tus datos, solo acelera las consultas. Quieres que aplique esta optimizacion?"
+        },
+        {
+            "topic": "IMPORT_DATA",
+            "user_triggers": [
+                "importar excel",
+                "subir archivo",
+                "cargar xlsx",
+                "cargar csv"
+            ],
+            "agent_response_template": "Primero definimos la llave unica y la regla de duplicados (actualizar o saltar). Te propongo iniciar en simulacion para validar columnas. Continuo?"
+        },
+        {
+            "topic": "REPORTS_DOCS",
+            "user_triggers": [
+                "necesito reporte",
+                "quiero documento",
+                "cotizacion pdf",
+                "factura pdf"
+            ],
+            "agent_response_template": "Puedo crear reporte y plantilla de documento con campos dinamicos para no tecnicos. Cual documento principal quieres primero?"
+        },
+        {
+            "topic": "FE_CO_SETUP",
+            "user_triggers": [
+                "factura electronica",
+                "dian",
+                "cufe",
+                "alanube"
+            ],
+            "agent_response_template": "Para facturacion electronica en Colombia revisamos RUT, resolucion DIAN, prefijo/rango y credenciales del proveedor. Quieres checklist guiado paso a paso?"
+        },
+        {
+            "topic": "SECURITY_ROLES",
+            "user_triggers": [
+                "roles y permisos",
+                "solo admin",
+                "auditoria",
+                "seguridad"
+            ],
+            "agent_response_template": "Te recomiendo definir roles por modulo y confirmar acciones destructivas. Inicio con matriz basica admin-operador-vendedor?"
+        }
+    ]
 }

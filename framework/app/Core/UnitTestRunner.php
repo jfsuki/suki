@@ -20,6 +20,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('gateway_golden', fn() => $this->checkGatewayGolden());
         $tests[] = $this->wrap('mode_guard_policy', fn() => $this->checkModeGuardPolicy());
         $tests[] = $this->wrap('builder_onboarding_flow', fn() => $this->checkBuilderOnboardingFlow());
+        $tests[] = $this->wrap('builder_guidance', fn() => $this->checkBuilderGuidance());
         $tests[] = $this->wrap('intent_router', fn() => $this->checkIntentRouter());
         $tests[] = $this->wrap('command_bus', fn() => $this->checkCommandBus());
 
@@ -181,6 +182,27 @@ final class UnitTestRunner
         $delegatedResult = $flow->handle('quiero crear una app', ['active_task' => 'builder_onboarding'], [], 'default', 'unit', $ops, $core);
         if ((string) ($delegatedResult['reply'] ?? '') !== 'delegated' || $delegated < 1) {
             throw new \RuntimeException('BuilderOnboardingFlow no delega al core handler.');
+        }
+    }
+
+    private function checkBuilderGuidance(): void
+    {
+        $gateway = new \App\Core\Agents\ConversationGateway();
+        $user = 'guidance_' . time();
+        $projectId = 'guidance_proj';
+
+        $money = $gateway->handle('default', $user, 'un campo para el precio', 'builder', $projectId);
+        if ((string) ($money['action'] ?? '') !== 'ask_user') {
+            throw new \RuntimeException('Builder guidance debe responder en modo ask_user.');
+        }
+        if (stripos((string) ($money['reply'] ?? ''), 'decimal') === false) {
+            throw new \RuntimeException('Builder guidance de precio debe recomendar decimal.');
+        }
+
+        $relation = $gateway->handle('default', $user, 'conectar clientes con ventas', 'builder', $projectId);
+        $relationReply = (string) ($relation['reply'] ?? '');
+        if (stripos($relationReply, 'clientes') === false || stripos($relationReply, 'ventas') === false) {
+            throw new \RuntimeException('Builder guidance de relaciones debe interpolar tablas.');
         }
     }
 
