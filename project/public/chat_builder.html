@@ -273,7 +273,14 @@
 
         function apiBase() {
             const raw = apiBaseEl.value.trim();
-            return raw ? raw.replace(/\/+$/, '') : window.location.origin;
+            if (raw) return raw.replace(/\/+$/, '');
+            const path = window.location.pathname || '';
+            const marker = '/project/public/';
+            const idx = path.indexOf(marker);
+            if (idx >= 0) {
+                return (window.location.origin + path.substring(0, idx + marker.length - 1)).replace(/\/+$/, '');
+            }
+            return window.location.origin;
         }
 
         function addChip(label, msg = '', action = '') {
