@@ -20,7 +20,11 @@ $base = [
 
 $steps = [
     ['mode' => 'builder', 'message' => 'hola', 'contains' => 'Cami'],
-    ['mode' => 'builder', 'message' => 'quiero crear una app para inventario', 'contains' => 'Paso'],
+    [
+        'mode' => 'builder',
+        'message' => 'quiero crear una app para inventario',
+        'contains_any' => ['tipo de negocio', 'Paso 2'],
+    ],
     ['mode' => 'builder', 'message' => 'tengo una ferreteria y pierdo plata con los cables', 'contains' => 'plantilla experta para FERRETERIA'],
     ['mode' => 'builder', 'message' => 'si', 'contains' => 'Playbook FERRETERIA validado en simulacion'],
     ['mode' => 'builder', 'message' => 'quiero crear una tabla ' . $entity, 'contains' => 'Quieres que la cree'],
@@ -31,6 +35,20 @@ $steps = [
     ['mode' => 'app', 'message' => 'crear ' . $entity . ' nombre=Ana', 'contains' => 'Registro creado'],
     ['mode' => 'app', 'message' => 'quiero crear una tabla productos', 'contains' => 'Creador de apps'],
     ['mode' => 'builder', 'message' => 'crear cliente nombre=Ana', 'contains' => 'chat de la app'],
+];
+$correctionUser = 'golden_correction_' . $runId;
+$correctionSession = 'golden_correction_sess_' . $runId;
+$correctionSteps = [
+    ['mode' => 'builder', 'message' => 'mi negocio es una ferreteria', 'contains' => 'Paso 2'],
+    ['mode' => 'builder', 'message' => 'mixto', 'contains' => 'Paso 3'],
+    ['mode' => 'builder', 'message' => 'inventario, facturacion y pagos', 'contains' => 'Paso 4'],
+    ['mode' => 'builder', 'message' => 'factura, cotizacion', 'contains' => 'Negocio: Ferreteria'],
+    [
+        'mode' => 'builder',
+        'message' => 'no soy una ferreteria, fabrico bolsos, mas parecido a modisteria',
+        'contains_any' => ['Entendi tu negocio', 'No tengo plantilla exacta', 'dime en una frase que vendes o fabricas'],
+        'not_contains' => 'Negocio: Ferreteria',
+    ],
 ];
 
 $results = [];
@@ -43,7 +61,7 @@ foreach ($steps as $idx => $step) {
     ]);
     $out = $agent->handle($payload);
     $reply = (string) ($out['data']['reply'] ?? '');
-    $pass = stripos($reply, (string) $step['contains']) !== false;
+    $pass = evaluateGoldenStep($reply, $step);
     if ($pass) {
         $ok++;
     }
@@ -52,17 +70,49 @@ foreach ($steps as $idx => $step) {
         'mode' => $step['mode'],
         'message' => $step['message'],
         'reply' => $reply,
-        'expected_contains' => $step['contains'],
+        'expected_contains' => $step['contains'] ?? null,
+        'expected_contains_any' => $step['contains_any'] ?? null,
+        'expected_not_contains' => $step['not_contains'] ?? null,
+        'ok' => $pass,
+    ];
+}
+
+$baseCorrection = [
+    'channel' => 'local',
+    'tenant_id' => 'default',
+    'project_id' => 'suki_erp',
+    'user_id' => $correctionUser,
+    'session_id' => $correctionSession,
+];
+foreach ($correctionSteps as $idx => $step) {
+    $payload = array_merge($baseCorrection, [
+        'mode' => $step['mode'],
+        'message' => $step['message'],
+    ]);
+    $out = $agent->handle($payload);
+    $reply = (string) ($out['data']['reply'] ?? '');
+    $pass = evaluateGoldenStep($reply, $step);
+    if ($pass) {
+        $ok++;
+    }
+    $results[] = [
+        'step' => count($steps) + $idx + 1,
+        'mode' => $step['mode'],
+        'message' => $step['message'],
+        'reply' => $reply,
+        'expected_contains' => $step['contains'] ?? null,
+        'expected_contains_any' => $step['contains_any'] ?? null,
+        'expected_not_contains' => $step['not_contains'] ?? null,
         'ok' => $pass,
     ];
 }
 
 $report = [
     'summary' => [
-        'ok' => $ok === count($steps),
+        'ok' => $ok === (count($steps) + count($correctionSteps)),
         'passed' => $ok,
-        'failed' => count($steps) - $ok,
-        'total' => count($steps),
+        'failed' => (count($steps) + count($correctionSteps)) - $ok,
+        'total' => count($steps) + count($correctionSteps),
         'entity' => $entity,
         'run_id' => $runId,
         'ran_at' => date('Y-m-d H:i:s'),
@@ -117,5 +167,28 @@ function cleanupGoldenArtifacts(string $entity): void
     } catch (\Throwable $e) {
         // no-op: cleanup is best-effort to keep QA gate deterministic.
     }
+}
+
+function evaluateGoldenStep(string $reply, array $step): bool
+{
+    if (!empty($step['contains']) && stripos($reply, (string) $step['contains']) === false) {
+        return false;
+    }
+    if (!empty($step['contains_any']) && is_array($step['contains_any'])) {
+        $hit = false;
+        foreach ($step['contains_any'] as $needle) {
+            if (stripos($reply, (string) $needle) !== false) {
+                $hit = true;
+                break;
+            }
+        }
+        if (!$hit) {
+            return false;
+        }
+    }
+    if (!empty($step['not_contains']) && stripos($reply, (string) $step['not_contains']) !== false) {
+        return false;
+    }
+    return true;
 }
 

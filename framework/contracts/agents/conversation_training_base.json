@@ -17,7 +17,8 @@
             "v0.3.4: +utterances perfil negocio (mi negocio es...), mejor routing CRUD",
             "v0.3.6: +solver_intents sectoriales (APPLY_PLAYBOOK_*) para enrutar dolores de negocio.",
             "v0.3.7: +solver_intents iglesia/educacion/servicios_pro y +flujos de consultoria para playbooks extendidos.",
-            "v0.3.8: +builder_guidance estructurado y sincronizado con domain_playbooks para respuestas guiadas data-driven."
+            "v0.3.8: +builder_guidance estructurado y sincronizado con domain_playbooks para respuestas guiadas data-driven.",
+            "v0.3.9: solver_intents y builder_guidance sincronizados desde domain_playbooks (single source)."
         ]
     },
     "routing": {
@@ -2709,6 +2710,33 @@
                 "format": "estado + siguiente paso"
             },
             "disambiguation_prompt": "Retomo el ultimo paso pendiente?"
+        },
+        {
+            "name": "FLOW_CONTROL_BACK",
+            "description": "Volver al paso anterior del flujo activo sin perder contexto.",
+            "action": "FLOW_BACK",
+            "required_entities": [],
+            "optional_entities": [],
+            "utterances": [
+                "atras",
+                "atrás",
+                "volver",
+                "volver atras",
+                "volver atrás",
+                "paso anterior",
+                "regresar"
+            ],
+            "slot_filling": [],
+            "examples": [],
+            "notes": [
+                "Debe regresar al paso anterior respetando la maquina de estado."
+            ],
+            "response_style": {
+                "tone": "neutro",
+                "length": "muy breve",
+                "format": "estado + siguiente paso"
+            },
+            "disambiguation_prompt": "Volvemos al paso anterior del flujo?"
         }
     ],
     "lookup_tables": {

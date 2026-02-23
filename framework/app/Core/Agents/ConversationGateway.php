@@ -10,6 +10,7 @@ use App\Core\MemoryRepositoryInterface;
 use App\Core\ModeGuardPolicy;
 use App\Core\ProjectRegistry;
 use App\Core\SqlMemoryRepository;
+use App\Core\LLM\LLMRouter;
 use Opis\JsonSchema\Validator;
 use RuntimeException;
 
@@ -144,6 +145,29 @@ final class ConversationGateway
             $state = $this->updateState($state, $raw, $reply, 'dialog_checklist', null, [], $state['active_task'] ?? null);
             $this->saveState($tenantId, $userId, $state);
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('dialog_checklist', true));
+        }
+
+        $flowExpiryRoute = $this->routeFlowRuntimeExpiry($normalizedBase, $state, $mode, $profile);
+        if (!empty($flowExpiryRoute)) {
+            $reply = (string) ($flowExpiryRoute['reply'] ?? 'Listo.');
+            $state = $this->updateState(
+                $state,
+                $raw,
+                $reply,
+                (string) ($flowExpiryRoute['intent'] ?? 'FLOW_RUNTIME_EXPIRED'),
+                null,
+                $flowExpiryRoute['collected'] ?? [],
+                $flowExpiryRoute['active_task'] ?? ($state['active_task'] ?? null)
+            );
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result(
+                (string) ($flowExpiryRoute['action'] ?? 'ask_user'),
+                $reply,
+                null,
+                null,
+                $state,
+                $this->telemetry('flow_expiry', true, $flowExpiryRoute)
+            );
         }
 
         $flowControlRoute = $this->routeFlowControl($normalizedBase, $state, $profile, $mode, $tenantId, $userId);
@@ -520,11 +544,21 @@ final class ConversationGateway
                     $this->setBuilderPendingCommand($state, (array) $trainingRoute['pending_command']);
                 }
                 $state = $this->updateState($state, $raw, $reply, $trainingRoute['intent'] ?? null, $trainingRoute['entity'] ?? null, $trainingRoute['collected'] ?? [], $trainingRoute['active_task'] ?? null);
+                if (!empty($trainingRoute['state_patch']) && is_array($trainingRoute['state_patch'])) {
+                    foreach ($trainingRoute['state_patch'] as $key => $value) {
+                        $state[$key] = $value;
+                    }
+                }
                 $this->saveState($tenantId, $userId, $state);
                 return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('training', true, $trainingRoute));
             }
             if (($trainingRoute['action'] ?? '') === 'respond_local') {
                 $state = $this->updateState($state, $raw, $reply, $trainingRoute['intent'] ?? null, $trainingRoute['entity'] ?? null, $trainingRoute['collected'] ?? [], $trainingRoute['active_task'] ?? null);
+                if (!empty($trainingRoute['state_patch']) && is_array($trainingRoute['state_patch'])) {
+                    foreach ($trainingRoute['state_patch'] as $key => $value) {
+                        $state[$key] = $value;
+                    }
+                }
                 $this->saveState($tenantId, $userId, $state);
                 return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('training', true, $trainingRoute));
             }
@@ -2342,7 +2376,16 @@ final class ConversationGateway
             $localProfile['owner_name'] = $name;
         }
 
+        $existingBusinessType = (string) ($localProfile['business_type'] ?? '');
+        $explicitBusinessChange = preg_match('/\b(cambiar|cambia|otro negocio|nuevo negocio|no soy|soy una|soy un|fabrico|me dedico)\b/u', $text) === 1;
+        $explicitBusinessRejection = $this->isBusinessTypeRejectedByUser($text, $existingBusinessType);
+        $businessResolvedNote = '';
+
         $business = $this->detectBusinessType($text);
+        if ($explicitBusinessRejection) {
+            $business = '';
+            unset($localProfile['business_type']);
+        }
         if ($business === '' && (string) ($localState['onboarding_step'] ?? '') === 'business_type') {
             $scopeChoice = $this->detectBusinessScopeChoice($text);
             if ($scopeChoice !== '') {
@@ -2357,12 +2400,12 @@ final class ConversationGateway
                 }
             }
         }
-        $existingBusinessType = (string) ($localProfile['business_type'] ?? '');
-        $explicitBusinessChange = preg_match('/\b(cambiar|cambia|otro negocio|nuevo negocio)\b/u', $text) === 1;
-        if ($business !== '' && ($existingBusinessType === '' || $currentStep === 'business_type' || $explicitBusinessChange)) {
+        if ($business !== '' && ($existingBusinessType === '' || $currentStep === 'business_type' || $explicitBusinessChange || $explicitBusinessRejection)) {
             $localProfile['business_type'] = $business;
             unset($localProfile['business_candidate']);
             unset($localState['unknown_business_notice_sent']);
+            $localState['business_resolution_last_candidate'] = null;
+            $localState['business_resolution_last_status'] = null;
         }
         $unknownBusinessCandidate = $this->detectUnknownBusinessCandidate($text, $business);
         if ($unknownBusinessCandidate !== '') {
@@ -2389,6 +2432,55 @@ final class ConversationGateway
             $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
         }
         $businessCandidate = trim((string) ($localProfile['business_candidate'] ?? ''));
+        if ($businessType === '' && $businessCandidate !== '') {
+            $resolution = $this->resolveUnknownBusinessWithGemini($text, $businessCandidate, $localProfile, $localState);
+            $status = (string) ($resolution['status'] ?? '');
+            if ($status === 'MATCHED') {
+                $resolvedType = $this->normalizeBusinessType((string) ($resolution['canonical_business_type'] ?? ''));
+                if ($resolvedType !== '') {
+                    $localProfile['business_type'] = $resolvedType;
+                    $businessType = $resolvedType;
+                    unset($localProfile['business_candidate']);
+                    unset($localState['unknown_business_notice_sent']);
+                    $localState['business_resolution_last_candidate'] = $businessCandidate;
+                    $localState['business_resolution_last_status'] = 'MATCHED';
+                    $localState['business_resolution_last_at'] = date('c');
+
+                    $resolvedNeeds = is_array($resolution['needs_normalized'] ?? null) ? $resolution['needs_normalized'] : [];
+                    if (!empty($resolvedNeeds) && empty($localProfile['needs_scope'])) {
+                        $mergedNeeds = $this->mergeScopeLabels([], array_map('strval', $resolvedNeeds));
+                        if (!empty($mergedNeeds)) {
+                            $localProfile['needs_scope_items'] = $mergedNeeds;
+                            $localProfile['needs_scope'] = implode(', ', $mergedNeeds);
+                        }
+                    }
+                    $resolvedDocs = is_array($resolution['documents_normalized'] ?? null) ? $resolution['documents_normalized'] : [];
+                    if (!empty($resolvedDocs) && empty($localProfile['documents_scope'])) {
+                        $mergedDocs = $this->mergeScopeLabels([], array_map('strval', $resolvedDocs));
+                        if (!empty($mergedDocs)) {
+                            $localProfile['documents_scope_items'] = $mergedDocs;
+                            $localProfile['documents_scope'] = implode(', ', $mergedDocs);
+                        }
+                    }
+
+                    $label = $this->domainLabelByBusinessType($resolvedType);
+                    $businessResolvedNote = 'Entendi tu negocio como "' . $label . '". '
+                        . 'Si no es correcto, dime: "no, cambiemos el tipo de negocio".';
+                    $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                }
+            } elseif ($status === 'NEEDS_CLARIFICATION') {
+                $question = trim((string) ($resolution['clarifying_question'] ?? ''));
+                if ($question === '') {
+                    $question = 'Para ubicar bien tu negocio, dime en una frase que vendes o fabricas.';
+                }
+                $localState['active_task'] = 'builder_onboarding';
+                $localState['onboarding_step'] = 'business_type';
+                $localState['business_resolution_last_candidate'] = $businessCandidate;
+                $localState['business_resolution_last_status'] = 'NEEDS_CLARIFICATION';
+                $localState['business_resolution_last_at'] = date('c');
+                return ['action' => 'ask_user', 'reply' => $question, 'state' => $localState];
+            }
+        }
         if ($businessType === '') {
             $localState['active_task'] = 'builder_onboarding';
             $localState['onboarding_step'] = 'business_type';
@@ -2457,6 +2549,9 @@ final class ConversationGateway
             if (!empty($captured)) {
                 $reply = 'Ya tome nota de ' . implode(' y ', $captured) . '.' . "\n" . $reply;
             }
+            if ($businessResolvedNote !== '') {
+                $reply = $businessResolvedNote . "\n" . $reply;
+            }
             return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
         }
 
@@ -2495,6 +2590,9 @@ final class ConversationGateway
             $localState['onboarding_step'] = 'needs_scope';
             $reply = 'Paso 3: que necesitas controlar primero en tu negocio?' . "\n"
                 . 'Ejemplos: citas, ordenes de trabajo, inventario, facturacion, pagos.';
+            if ($businessResolvedNote !== '') {
+                $reply = $businessResolvedNote . "\n" . $reply;
+            }
             return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
         }
 
@@ -2522,6 +2620,9 @@ final class ConversationGateway
             $localState['onboarding_step'] = 'documents_scope';
             $reply = 'Paso 4: que documentos necesitas usar?' . "\n"
                 . 'Ejemplos: factura, orden de trabajo, historia clinica, cotizacion, recibo de pago.';
+            if ($businessResolvedNote !== '') {
+                $reply = $businessResolvedNote . "\n" . $reply;
+            }
             return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
         }
 
@@ -2604,6 +2705,9 @@ final class ConversationGateway
             $localState['active_task'] = 'builder_onboarding';
             $localState['onboarding_step'] = 'confirm_scope';
             $reply = $this->buildRequirementsSummaryReply($businessType, $localProfile, $plan);
+            if ($businessResolvedNote !== '') {
+                $reply = $businessResolvedNote . "\n" . $reply;
+            }
             if (!$this->isAffirmativeReply($text)) {
                 return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
             }
@@ -2906,6 +3010,7 @@ final class ConversationGateway
 
     private function detectBusinessType(string $text): string
     {
+        $text = $this->stripNegatedBusinessMentions($text);
         if (str_contains($text, 'taller automotriz') || (str_contains($text, 'automotriz') && str_contains($text, 'taller'))) {
             return 'taller_automotriz';
         }
@@ -2992,6 +3097,11 @@ final class ConversationGateway
             'hotel' => 'hotel_turismo',
             'hostal' => 'hotel_turismo',
             'agro' => 'agropecuario',
+            'bolso' => 'retail_tienda',
+            'bolsos' => 'retail_tienda',
+            'marroquineria' => 'retail_tienda',
+            'modisteria' => 'retail_tienda',
+            'confeccion' => 'retail_tienda',
             'servicio' => 'servicios_mantenimiento',
             'mantenimiento' => 'servicios_mantenimiento',
             'producto' => 'retail_tienda',
@@ -3014,6 +3124,7 @@ final class ConversationGateway
         $patterns = [
             '/(?:mi\\s+)?(?:empresa|negocio|programa|app)\\s+(?:de|para)\\s+([a-z0-9_\\-\\s]{3,80})/iu',
             '/(?:tengo\\s+una\\s+empresa\\s+de|me\\s+dedico\\s+a|trabajo\\s+en)\\s+([a-z0-9_\\-\\s]{3,80})/iu',
+            '/(?:fabrico|confecciono|vendo|produzco)\\s+([a-z0-9_\\-\\s]{3,80})/iu',
         ];
 
         foreach ($patterns as $pattern) {
@@ -3101,6 +3212,147 @@ final class ConversationGateway
             return 'retail_tienda';
         }
         return $businessType;
+    }
+
+    private function domainLabelByBusinessType(string $businessType): string
+    {
+        $profile = $this->findDomainProfile($this->normalizeBusinessType($businessType));
+        $label = trim((string) ($profile['label'] ?? ''));
+        if ($label !== '') {
+            return $label;
+        }
+        $businessType = trim($businessType);
+        if ($businessType === '') {
+            return 'tu negocio';
+        }
+        return ucfirst(str_replace('_', ' ', $businessType));
+    }
+
+    private function resolveUnknownBusinessWithGemini(string $text, string $candidate, array $profile, array $state): array
+    {
+        $candidate = trim($candidate);
+        if ($candidate === '') {
+            return [];
+        }
+        $hasGemini = trim((string) getenv('GEMINI_API_KEY')) !== '';
+        if (!$hasGemini) {
+            return [];
+        }
+
+        $lastCandidate = trim((string) ($state['business_resolution_last_candidate'] ?? ''));
+        $lastStatus = trim((string) ($state['business_resolution_last_status'] ?? ''));
+        $lastAtRaw = trim((string) ($state['business_resolution_last_at'] ?? ''));
+        $lastAt = $lastAtRaw !== '' ? strtotime($lastAtRaw) : false;
+        if (
+            $lastCandidate !== ''
+            && $this->normalize($lastCandidate) === $this->normalize($candidate)
+            && $lastStatus !== ''
+            && $lastAt !== false
+            && (time() - $lastAt) < 900
+        ) {
+            return [
+                'status' => $lastStatus,
+            ];
+        }
+
+        $playbook = $this->loadDomainPlaybook();
+        $profiles = is_array($playbook['profiles'] ?? null) ? $playbook['profiles'] : [];
+        $knownProfiles = [];
+        foreach ($profiles as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $key = trim((string) ($item['key'] ?? ''));
+            if ($key !== '') {
+                $knownProfiles[] = $key;
+            }
+        }
+        $knownProfiles = array_values(array_unique($knownProfiles));
+
+        $promptContract = [
+            'ROLE' => 'Domain Classification Assistant',
+            'CONTEXT' => [
+                'known_profiles' => $knownProfiles,
+                'language' => 'es-CO',
+                'goal' => 'clasificar tipo de negocio y necesidades iniciales sin inventar',
+            ],
+            'INPUT' => [
+                'user_text' => $text,
+                'business_candidate' => $candidate,
+                'current_profile' => (string) ($profile['business_type'] ?? ''),
+                'onboarding_step' => (string) ($state['onboarding_step'] ?? ''),
+                'known_needs' => is_array($profile['needs_scope_items'] ?? null) ? array_values((array) $profile['needs_scope_items']) : [],
+                'known_documents' => is_array($profile['documents_scope_items'] ?? null) ? array_values((array) $profile['documents_scope_items']) : [],
+            ],
+            'CONSTRAINTS' => [
+                'no_invent_data' => true,
+                'no_execute_actions' => true,
+                'one_question_max_if_missing' => true,
+                'prefer_known_profiles' => true,
+            ],
+            'OUTPUT_FORMAT' => [
+                'status' => 'MATCHED|NEW_BUSINESS|NEEDS_CLARIFICATION|INVALID_REQUEST',
+                'confidence' => '0.0-1.0',
+                'canonical_business_type' => '<known_profile_or_empty>',
+                'business_candidate' => '<texto_normalizado>',
+                'reason_short' => '<breve>',
+                'needs_normalized' => ['<item>'],
+                'documents_normalized' => ['<item>'],
+                'clarifying_question' => '<si aplica>',
+            ],
+            'FAIL_RULES' => [
+                'if_confidence_below' => 0.7,
+                'return_on_low_confidence' => 'NEEDS_CLARIFICATION',
+            ],
+        ];
+
+        $capsule = [
+            'intent' => 'BUSINESS_TYPE_DISCOVERY',
+            'entity' => '',
+            'entity_contract_min' => ['required' => [], 'types' => []],
+            'state' => ['collected' => [], 'missing' => []],
+            'user_message' => $text,
+            'policy' => [
+                'requires_strict_json' => true,
+                'max_output_tokens' => 500,
+                'latency_budget_ms' => 2500,
+            ],
+            'prompt_contract' => $promptContract,
+        ];
+
+        try {
+            $router = new LLMRouter();
+            $llm = $router->chat($capsule, ['mode' => 'gemini', 'temperature' => 0.1]);
+            $json = is_array($llm['json'] ?? null) ? (array) $llm['json'] : [];
+            if (empty($json)) {
+                return ['status' => 'INVALID_RESPONSE'];
+            }
+            $status = strtoupper(trim((string) ($json['status'] ?? '')));
+            $allowed = ['MATCHED', 'NEW_BUSINESS', 'NEEDS_CLARIFICATION', 'INVALID_REQUEST'];
+            if (!in_array($status, $allowed, true)) {
+                $status = 'INVALID_RESPONSE';
+            }
+
+            $resolved = [
+                'status' => $status,
+                'confidence' => (float) ($json['confidence'] ?? 0.0),
+                'canonical_business_type' => (string) ($json['canonical_business_type'] ?? ''),
+                'business_candidate' => (string) ($json['business_candidate'] ?? ''),
+                'reason_short' => (string) ($json['reason_short'] ?? ''),
+                'needs_normalized' => is_array($json['needs_normalized'] ?? null) ? array_values((array) $json['needs_normalized']) : [],
+                'documents_normalized' => is_array($json['documents_normalized'] ?? null) ? array_values((array) $json['documents_normalized']) : [],
+                'clarifying_question' => (string) ($json['clarifying_question'] ?? ''),
+                'provider_used' => (string) ($llm['provider'] ?? 'gemini'),
+            ];
+
+            if ($resolved['status'] === 'MATCHED' && $resolved['confidence'] < 0.7) {
+                $resolved['status'] = 'NEEDS_CLARIFICATION';
+            }
+
+            return $resolved;
+        } catch (\Throwable $e) {
+            return ['status' => 'ERROR', 'error' => $e->getMessage()];
+        }
     }
 
     private function findDomainProfile(string $businessType, array $playbook = []): array
@@ -5012,6 +5264,24 @@ private function parseEntityFromCrudText(string $text): string
                     return ['action' => 'ask_user', 'reply' => $route['ask'], 'intent' => $intentName, 'active_task' => $action];
                 }
                 return ['action' => 'respond_local', 'reply' => 'Dime el ID del proyecto para cambiar.', 'intent' => $intentName];
+            case 'FLOW_CANCEL':
+            case 'FLOW_RESTART':
+            case 'FLOW_BACK':
+            case 'FLOW_RESUME':
+                $flowText = match ($action) {
+                    'FLOW_CANCEL' => 'cancelar',
+                    'FLOW_RESTART' => 'reiniciar',
+                    'FLOW_BACK' => 'atras',
+                    default => 'retomar',
+                };
+                $flowState = $state;
+                $flowRoute = $this->routeFlowControl($flowText, $flowState, $profile, $mode, $tenantId, $userId);
+                if (empty($flowRoute)) {
+                    return [];
+                }
+                $flowRoute['intent'] = $intentName;
+                $flowRoute['state_patch'] = $flowState;
+                return $flowRoute;
             default:
                 return [];
         }
@@ -5083,6 +5353,13 @@ private function parseEntityFromCrudText(string $text): string
             $reply .= "\nFlujo sugerido: " . $flowHint;
         }
         $pendingCommand = $this->buildBuilderGuidancePendingCommand($topic, $text, $state, $lexicon);
+        if (!empty($pendingCommand) && is_array($pendingCommand)) {
+            $commandRule = $this->feedbackRuleForCommand($training, (string) ($pendingCommand['command'] ?? ''));
+            if ((bool) ($commandRule['require_extra_confirmation'] ?? false)) {
+                $reply .= "\nAntes de ejecutar, confirma que esta accion aplica exactamente a tu caso. "
+                    . 'Si quieres ajustar, responde "atras".';
+            }
+        }
 
         return [
             'action' => !empty($pendingCommand) || str_contains($reply, '?') ? 'ask_user' : 'respond_local',
@@ -5131,6 +5408,18 @@ private function parseEntityFromCrudText(string $text): string
         }
 
         return $merged;
+    }
+
+    private function feedbackRuleForCommand(array $training, string $command): array
+    {
+        $command = strtolower(trim($command));
+        if ($command === '') {
+            return [];
+        }
+        $rules = is_array($training['feedback_rules'] ?? null) ? $training['feedback_rules'] : [];
+        $byCommand = is_array($rules['commands'] ?? null) ? $rules['commands'] : [];
+        $rule = $byCommand[$command] ?? [];
+        return is_array($rule) ? $rule : [];
     }
 
     private function guidanceIntentByTopic(string $topic): string
@@ -5194,6 +5483,49 @@ private function parseEntityFromCrudText(string $text): string
             return 'PERFORMANCE';
         }
         return '';
+    }
+
+    private function stripNegatedBusinessMentions(string $text): string
+    {
+        $clean = preg_replace('/\\bno\\s+soy\\s+(?:un|una)?\\s*[a-z0-9_\\-\\s]{2,40}(?:,|\\.|;|\\by\\b|\\bpero\\b)?/iu', ' ', $text);
+        if (!is_string($clean)) {
+            return $text;
+        }
+        $clean = preg_replace('/\\s+/', ' ', trim($clean)) ?? trim($clean);
+        return $clean !== '' ? $clean : $text;
+    }
+
+    private function isBusinessTypeRejectedByUser(string $text, string $existingBusinessType): bool
+    {
+        if ($existingBusinessType === '') {
+            return false;
+        }
+        if (preg_match('/\\bno\\s+soy\\b/u', $text) !== 1 && preg_match('/\\bno\\s+es\\b/u', $text) !== 1) {
+            return false;
+        }
+
+        $needles = [$existingBusinessType];
+        $profile = $this->findDomainProfile($this->normalizeBusinessType($existingBusinessType));
+        $label = trim((string) ($profile['label'] ?? ''));
+        if ($label !== '') {
+            $needles[] = $label;
+        }
+        $aliases = is_array($profile['aliases'] ?? null) ? $profile['aliases'] : [];
+        foreach ($aliases as $alias) {
+            $needle = trim((string) $alias);
+            if ($needle !== '') {
+                $needles[] = $needle;
+            }
+        }
+
+        $normalizedText = $this->normalize($text);
+        foreach ($needles as $needle) {
+            $normalizedNeedle = $this->normalize((string) $needle);
+            if ($normalizedNeedle !== '' && str_contains($normalizedText, $normalizedNeedle)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function findBuilderGuidanceByTopic(array $guides, string $topic): array
@@ -5340,6 +5672,72 @@ private function parseEntityFromCrudText(string $text): string
         return '';
     }
 
+    private function routeFlowRuntimeExpiry(string $text, array &$state, string $mode, array $profile): array
+    {
+        if ($mode !== 'builder') {
+            return [];
+        }
+
+        $runtime = $this->normalizeFlowRuntime(is_array($state['flow_runtime'] ?? null) ? $state['flow_runtime'] : []);
+        $step = trim((string) ($state['onboarding_step'] ?? ($runtime['current_step'] ?? '')));
+        if ($step === '') {
+            return [];
+        }
+
+        $lastActivityRaw = (string) ($runtime['last_activity_at'] ?? '');
+        if ($lastActivityRaw === '') {
+            return [];
+        }
+
+        $lastActivityAt = strtotime($lastActivityRaw);
+        if ($lastActivityAt === false) {
+            return [];
+        }
+
+        $ttlSeconds = $this->flowRuntimeTtlSeconds();
+        if ($ttlSeconds <= 0 || (time() - $lastActivityAt) < $ttlSeconds) {
+            return [];
+        }
+
+        $intent = $this->detectFlowControlIntent($text);
+        if ($intent !== '') {
+            return [];
+        }
+
+        $alreadyNotified = (bool) ($state['flow_expiry_notice_sent'] ?? false);
+        if ($alreadyNotified) {
+            return [];
+        }
+
+        $runtime['paused'] = true;
+        $runtime['expired_at'] = date('c');
+        $runtime['last_activity_at'] = date('c');
+        $state['flow_runtime'] = $runtime;
+        $state['active_task'] = null;
+        $state['flow_expiry_notice_sent'] = true;
+
+        return [
+            'action' => 'ask_user',
+            'intent' => 'FLOW_RUNTIME_EXPIRED',
+            'reply' => 'Tu flujo quedo en pausa por inactividad en el paso "' . $step . '".' . "\n"
+                . 'Responde "retomar" para continuar o "reiniciar" para empezar de cero.',
+            'active_task' => null,
+            'collected' => [
+                'expired_step' => $step,
+                'flow_ttl_seconds' => (string) $ttlSeconds,
+            ],
+        ];
+    }
+
+    private function flowRuntimeTtlSeconds(): int
+    {
+        $ttlMinutes = (int) (getenv('FLOW_RUNTIME_TTL_MINUTES') ?: 180);
+        if ($ttlMinutes < 1) {
+            $ttlMinutes = 1;
+        }
+        return $ttlMinutes * 60;
+    }
+
     private function routeFlowControl(
         string $text,
         array &$state,
@@ -5352,6 +5750,7 @@ private function parseEntityFromCrudText(string $text): string
         if ($intent === '') {
             return [];
         }
+        $state['flow_expiry_notice_sent'] = false;
 
         if ($intent === 'cancel') {
             $hadPending = is_array($state['builder_pending_command'] ?? null);
@@ -5527,21 +5926,66 @@ private function parseEntityFromCrudText(string $text): string
 
     private function detectFlowControlIntent(string $text): string
     {
-        if (preg_match('/^(cancelar|cancelar operaci[oó]n|olvidalo|olvi[dð]alo|ya no|salir|abortar|detener|no quiero hacer esto|dejalo asi|dejarlo asi)$/u', $text) === 1) {
+        $normalized = trim((string) (preg_replace('/\s+/', ' ', strtolower($this->normalize($text))) ?? ''));
+        if ($normalized === '') {
+            return '';
+        }
+
+        $cancelWords = [
+            'cancelar',
+            'cancelar operacion',
+            'olvidalo',
+            'ya no',
+            'salir',
+            'abortar',
+            'detener',
+            'no quiero hacer esto',
+            'dejalo asi',
+            'dejarlo asi',
+            'menu principal',
+        ];
+        if (in_array($normalized, $cancelWords, true)) {
             return 'cancel';
         }
-        if (preg_match('/^(atras|atr[aá]s|volver|volver atras|volver atr[aá]s|regresar|paso anterior)$/u', $text) === 1) {
+
+        $backWords = [
+            'atras',
+            'volver',
+            'volver atras',
+            'regresar',
+            'paso anterior',
+        ];
+        if (in_array($normalized, $backWords, true)) {
             return 'back';
         }
-        if (preg_match('/^(reiniciar|empezar de nuevo|volver al inicio|comenzar de cero|reset|limpiar chat)$/u', $text) === 1) {
+
+        $restartWords = [
+            'reiniciar',
+            'empezar de nuevo',
+            'volver al inicio',
+            'comenzar de cero',
+            'reset',
+            'limpiar chat',
+        ];
+        if (in_array($normalized, $restartWords, true)) {
             return 'restart';
         }
-        if (preg_match('/^(retomar|continuar|continuemos|reanudar|resume|seguir donde quede|donde quedamos)$/u', $text) === 1) {
+
+        $resumeWords = [
+            'retomar',
+            'continuar',
+            'continuemos',
+            'reanudar',
+            'resume',
+            'seguir donde quede',
+            'donde quedamos',
+        ];
+        if (in_array($normalized, $resumeWords, true)) {
             return 'resume';
         }
+
         return '';
     }
-
     private function popPreviousOnboardingStep(array &$state): string
     {
         $runtime = $this->normalizeFlowRuntime(is_array($state['flow_runtime'] ?? null) ? $state['flow_runtime'] : []);
@@ -5640,6 +6084,7 @@ private function parseEntityFromCrudText(string $text): string
             $stats[$commandKey]['not_helpful'] = (int) ($stats[$commandKey]['not_helpful'] ?? 0) + 1;
         }
         $this->memory->saveTenantMemory($tenantId, 'flow_feedback_stats', $stats);
+        $this->recordFeedbackRuleOverride($tenantId, $commandKey, $helpful, $stats[$commandKey]);
 
         return [
             'action' => 'respond_local',
@@ -5906,6 +6351,11 @@ private function parseEntityFromCrudText(string $text): string
             'sector_key' => $sectorKey,
             'dry_run' => true,
         ];
+        $feedbackRules = $this->loadTenantTrainingOverrides($tenantId);
+        $commandRules = is_array($feedbackRules['feedback_rules']['commands'] ?? null)
+            ? $feedbackRules['feedback_rules']['commands']
+            : [];
+        $installRule = is_array($commandRules['installplaybook'] ?? null) ? $commandRules['installplaybook'] : [];
         $replyLines = [];
         $replyLines[] = 'Entiendo tu necesidad en ' . strtolower($this->humanizeSectorKey($sectorKey)) . '.';
         if ($diagnosis !== '') {
@@ -5916,6 +6366,9 @@ private function parseEntityFromCrudText(string $text): string
         }
         if ($miniApp !== '') {
             $replyLines[] = 'Mini-app sugerida: ' . str_replace('_', ' ', $miniApp) . '.';
+        }
+        if ((bool) ($installRule['require_extra_confirmation'] ?? false)) {
+            $replyLines[] = 'Antes de instalar, te confirmo que no toca datos existentes; solo agrega estructura guiada.';
         }
         $replyLines[] = 'Tengo una plantilla experta para ' . $sectorKey . '. Quieres instalarla?';
 
@@ -6749,35 +7202,67 @@ private function parseEntityFromCrudText(string $text): string
         return $legacy;
     }
 
+    private function recordFeedbackRuleOverride(string $tenantId, string $commandKey, bool $helpful, array $stats): void
+    {
+        $overrides = $this->loadTenantTrainingOverrides($tenantId);
+        if (!isset($overrides['feedback_rules']) || !is_array($overrides['feedback_rules'])) {
+            $overrides['feedback_rules'] = ['commands' => []];
+        }
+        if (!isset($overrides['feedback_rules']['commands']) || !is_array($overrides['feedback_rules']['commands'])) {
+            $overrides['feedback_rules']['commands'] = [];
+        }
+
+        $total = (int) ($stats['total'] ?? 0);
+        $helpfulCount = (int) ($stats['helpful'] ?? 0);
+        $notHelpfulCount = (int) ($stats['not_helpful'] ?? 0);
+        $requireExtra = $total >= 3 && $notHelpfulCount > $helpfulCount;
+
+        $overrides['feedback_rules']['commands'][$commandKey] = [
+            'total' => $total,
+            'helpful' => $helpfulCount,
+            'not_helpful' => $notHelpfulCount,
+            'last_helpful' => $helpful,
+            'require_extra_confirmation' => $requireExtra,
+            'updated_at' => date('c'),
+        ];
+        $overrides['updated'] = date('Y-m-d');
+
+        $this->memory->saveTenantMemory($tenantId, 'training_overrides', $overrides);
+    }
+
     private function applyTrainingOverrides(array $training, array $overrides): array
     {
         if (empty($overrides)) {
             return $training;
         }
-        if (empty($overrides['intents']) || empty($training['intents'])) {
-            return $training;
-        }
-        foreach ($training['intents'] as &$intent) {
-            $name = (string) ($intent['name'] ?? '');
-            if ($name === '' || empty($overrides['intents'][$name]['utterances'])) {
-                continue;
-            }
-            $existing = $intent['utterances'] ?? [];
-            $extras = $overrides['intents'][$name]['utterances'] ?? [];
-            if (!is_array($existing)) {
-                $existing = [];
-            }
-            if (!is_array($extras)) {
-                $extras = [];
-            }
-            foreach ($extras as $u) {
-                if (!in_array($u, $existing, true)) {
-                    $existing[] = $u;
+        if (!empty($overrides['intents']) && !empty($training['intents'])) {
+            foreach ($training['intents'] as &$intent) {
+                $name = (string) ($intent['name'] ?? '');
+                if ($name === '' || empty($overrides['intents'][$name]['utterances'])) {
+                    continue;
                 }
+                $existing = $intent['utterances'] ?? [];
+                $extras = $overrides['intents'][$name]['utterances'] ?? [];
+                if (!is_array($existing)) {
+                    $existing = [];
+                }
+                if (!is_array($extras)) {
+                    $extras = [];
+                }
+                foreach ($extras as $u) {
+                    if (!in_array($u, $existing, true)) {
+                        $existing[] = $u;
+                    }
+                }
+                $intent['utterances'] = $existing;
             }
-            $intent['utterances'] = $existing;
+            unset($intent);
         }
-        unset($intent);
+
+        if (!empty($overrides['feedback_rules']) && is_array($overrides['feedback_rules'])) {
+            $existingRules = is_array($training['feedback_rules'] ?? null) ? $training['feedback_rules'] : [];
+            $training['feedback_rules'] = array_replace_recursive($existingRules, $overrides['feedback_rules']);
+        }
         return $training;
     }
 
@@ -6922,9 +7407,13 @@ private function parseEntityFromCrudText(string $text): string
             'builder_completed_entities' => [],
             'builder_completed_forms' => [],
             'unknown_business_notice_sent' => false,
+            'business_resolution_last_candidate' => null,
+            'business_resolution_last_status' => null,
+            'business_resolution_last_at' => null,
             'last_action' => null,
             'dialog' => null,
             'flow_runtime' => $this->flowRuntimeDefaults(),
+            'flow_expiry_notice_sent' => false,
             'feedback_pending' => null,
             'feedback_log' => [],
             'last_messages' => [],
@@ -7060,8 +7549,10 @@ private function parseEntityFromCrudText(string $text): string
                 $runtime['started_at'] = $now;
             }
             $runtime['paused'] = false;
+            $runtime['last_activity_at'] = $now;
+        } elseif (empty($runtime['last_activity_at'])) {
+            $runtime['last_activity_at'] = $now;
         }
-        $runtime['last_activity_at'] = $now;
         $state['flow_runtime'] = $runtime;
         return $state;
     }
@@ -7789,5 +8280,6 @@ private function parseEntityFromCrudText(string $text): string
         return trim($value, '_');
     }
 }
+
 
 

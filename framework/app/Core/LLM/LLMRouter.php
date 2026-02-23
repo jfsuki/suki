@@ -127,6 +127,16 @@ final class LLMRouter
 
     private function buildPrompt(array $capsule): string
     {
+        if (!empty($capsule['prompt_contract']) && is_array($capsule['prompt_contract'])) {
+            $payload = json_encode(
+                $capsule['prompt_contract'],
+                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_PRETTY_PRINT
+            );
+            if (is_string($payload) && $payload !== '') {
+                return $payload;
+            }
+        }
+
         $parts = [];
         $parts[] = 'Usuario: ' . ($capsule['user_message'] ?? '');
         if (!empty($capsule['entity'])) {

@@ -22,6 +22,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('builder_onboarding_flow', fn() => $this->checkBuilderOnboardingFlow());
         $tests[] = $this->wrap('builder_guidance', fn() => $this->checkBuilderGuidance());
         $tests[] = $this->wrap('flow_control', fn() => $this->checkFlowControl());
+        $tests[] = $this->wrap('domain_training_sync', fn() => $this->checkDomainTrainingSync());
         $tests[] = $this->wrap('intent_router', fn() => $this->checkIntentRouter());
         $tests[] = $this->wrap('command_bus', fn() => $this->checkCommandBus());
         $tests[] = $this->wrap('observability_metrics', fn() => $this->checkObservabilityMetrics());
@@ -273,6 +274,23 @@ final class UnitTestRunner
         }
         if ((string) ($restart['state']['onboarding_step'] ?? '') !== 'business_type') {
             throw new \RuntimeException('Flow restart debe volver a business_type.');
+        }
+    }
+
+    private function checkDomainTrainingSync(): void
+    {
+        $php = PHP_BINARY ?: 'php';
+        $script = dirname(__DIR__, 2) . '/scripts/sync_domain_training.php';
+        if (!is_file($script)) {
+            throw new \RuntimeException('Script de sync no encontrado.');
+        }
+
+        $cmd = escapeshellarg($php) . ' ' . escapeshellarg($script) . ' --check';
+        $output = [];
+        $code = 0;
+        exec($cmd, $output, $code);
+        if ($code !== 0) {
+            throw new \RuntimeException('Drift entre domain_playbooks y conversation_training_base.');
         }
     }
 
