@@ -90,10 +90,14 @@ final class UnitTestRunner
             throw new \RuntimeException('Guard builder/use no bloquea correctamente.');
         }
 
-        $statePath = PROJECT_ROOT . '/storage/tenants/default/agent_state/'
-            . $projectId . '__builder__' . $user . '.json';
-        if (!is_file($statePath)) {
-            throw new \RuntimeException('No se creo estado por project+mode+user.');
+        $memory = new SqlMemoryRepository();
+        $state = $memory->getUserMemory('default', $user, 'state::' . $projectId . '::builder', []);
+        if (empty($state)) {
+            throw new \RuntimeException('No se creo estado SQL por project+mode+user.');
+        }
+        $working = $memory->getUserMemory('default', $user, 'working_memory::' . $projectId . '::builder', []);
+        if (empty($working)) {
+            throw new \RuntimeException('No se guardo working memory SQL para builder.');
         }
     }
 }

@@ -43,10 +43,14 @@
   - ConversationGateway now validates/persists working memory snapshot using `framework/contracts/agents/WORKING_MEMORY_SCHEMA.json`.
 - Conversational QA hardening:
   - Added `framework/tests/chat_real_20.php` (20 real conversation suites builder/app).
-  - Post QA gate now runs `chat_real_20` and then `reset_test_project` before `db_health`.
+  - Post QA gate now runs `chat_real_20` before `db_health`.
 - Baseline integration contracts restored:
   - `project/contracts/integrations/alanube_main.integration.json`
   - `project/contracts/invoices/facturas_co.invoice.json`
+- Memory persistence hardening:
+  - `MemoryRepositoryInterface` + `SqlMemoryRepository` added.
+  - ConversationGateway stores state/profile/working-memory in SQL multi-tenant tables.
+  - Legacy JSON migration script added: `framework/scripts/migrate_memory_json_to_sql.php`.
 
 ## Execution checklist
 - [x] Summary dependency ordering stable

@@ -241,3 +241,15 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Baseline de contratos externos restaurado:
   - `project/contracts/integrations/alanube_main.integration.json`
   - `project/contracts/invoices/facturas_co.invoice.json`
+
+## Checkpoint (2026-02-23, memoria SQL multi-tenant)
+- Refactor anti "God Class" de persistencia:
+  - nuevo contrato `MemoryRepositoryInterface`.
+  - implementacion `SqlMemoryRepository` (tablas `mem_global`, `mem_tenant`, `mem_user`, `chat_log`).
+- `ConversationGateway` ahora usa inyeccion de repositorio SQL:
+  - estado y working memory se guardan en `mem_user` por `tenant + project + mode + user`.
+  - perfil/glosario/research se guardan en `mem_user` y `mem_tenant`.
+  - chat logs de corto plazo se guardan en `chat_log`.
+- Compatibilidad y migracion:
+  - fallback de lectura legacy JSON (solo lectura) para no romper sesiones viejas.
+  - nuevo script `framework/scripts/migrate_memory_json_to_sql.php` para migrar datos historicos.

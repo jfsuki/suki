@@ -46,6 +46,19 @@ Mapeo de "mensaje -> accion JSON" para ahorrar tokens.
 - Index: `(tenant_id, intent_hash, updated_at)`
 - TTL corto (7-30 dias).
 
+## Estado implementado (2026-02-23)
+- Repositorio SQL multi-tenant activo para memoria conversacional:
+  - `framework/app/Core/MemoryRepositoryInterface.php`
+  - `framework/app/Core/SqlMemoryRepository.php`
+- `ConversationGateway` usa SQL para:
+  - `state` y `working_memory` por `tenant + project + mode + user`
+  - `profile` (mem_user)
+  - `glossary` y `research_queue` (mem_tenant)
+  - logs de corto plazo (chat_log)
+- Migracion legacy JSON -> SQL:
+  - `php framework/scripts/migrate_memory_json_to_sql.php --dry-run`
+  - `php framework/scripts/migrate_memory_json_to_sql.php`
+
 ## Portero inteligente (ahorro de tokens)
 1) **Nivel 0**: reglas/regex locales (saldo, listar, total).
 2) **Nivel 1**: clasificador ligero (intencion, entidad).

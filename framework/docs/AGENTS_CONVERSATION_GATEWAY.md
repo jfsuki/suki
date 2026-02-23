@@ -67,22 +67,20 @@ framework/contracts/agents/latam_es_col_conversation_lexicon.json
 ```
 Uso: estandariza palabras de negocio no tecnico (ej: planilla->tabla, columna->campo, fila->registro, sumatoria->formula) antes de clasificar.
 
-## Memoria por tenant
-Ruta:
-```
-project/storage/tenants/{tenantId}/
-  agent_state/{project}__{mode}__{user}.json
-  lexicon.json
-  dialog_policy.json
-  training_overrides.json
-  country_language_overrides.json
-  telemetry/YYYY-MM-DD.log.jsonl
-```
+## Memoria por tenant (SQL first)
+Persistencia principal:
+- `mem_global` (reglas compartidas)
+- `mem_tenant` (lexicon, policy, research, overrides)
+- `mem_user` (profile, state, working_memory)
+- `chat_log` (short-term logs)
 
-Memoria compartida:
-```
-project/storage/chat/research/{tenantId}.json
-```
+Clave de estado en SQL:
+- `state::{project}::{mode}` sobre `mem_user` por `tenant_id + user_id`
+- `working_memory::{project}::{mode}` sobre `mem_user`
+
+Compatibilidad:
+- si hay JSON legacy en `project/storage/*`, el gateway los lee una vez y los rehidrata en SQL.
+- migracion masiva: `framework/scripts/migrate_memory_json_to_sql.php`.
 
 ## Context Capsule minimo
 ```

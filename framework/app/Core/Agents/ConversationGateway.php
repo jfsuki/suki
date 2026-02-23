@@ -4,9 +4,10 @@
 namespace App\Core\Agents;
 
 use App\Core\ContractsCatalog;
-use App\Core\ChatMemoryStore;
 use App\Core\EntityRegistry;
+use App\Core\MemoryRepositoryInterface;
 use App\Core\ProjectRegistry;
+use App\Core\SqlMemoryRepository;
 use Opis\JsonSchema\Validator;
 use RuntimeException;
 
@@ -15,7 +16,7 @@ final class ConversationGateway
     private string $projectRoot;
     private EntityRegistry $entities;
     private ContractsCatalog $catalog;
-    private ChatMemoryStore $memory;
+    private MemoryRepositoryInterface $memory;
     private DialogStateEngine $dialogState;
     private array $trainingBaseCache = [];
     private ?array $confusionBaseCache = null;
@@ -27,18 +28,21 @@ final class ConversationGateway
     private string $contextProjectId = 'default';
     private string $contextMode = 'app';
     private string $contextProfileUser = 'anon';
+    private string $contextTenantId = 'default';
+    private string $contextUserId = 'anon';
+    private string $contextSessionId = 'default__app__anon';
     private ?ProjectRegistry $projectRegistry = null;
     private ?array $scopedEntityNamesCache = null;
     private ?array $scopedFormNamesCache = null;
     private ?object $workingMemorySchemaCache = null;
 
-    public function __construct(?string $projectRoot = null)
+    public function __construct(?string $projectRoot = null, ?MemoryRepositoryInterface $memory = null)
     {
         $this->projectRoot = $projectRoot
             ?? (defined('PROJECT_ROOT') ? PROJECT_ROOT : dirname(__DIR__, 3) . '/project');
         $this->entities = new EntityRegistry();
         $this->catalog = new ContractsCatalog($this->projectRoot);
-        $this->memory = new ChatMemoryStore($this->projectRoot);
+        $this->memory = $memory ?? new SqlMemoryRepository();
         $this->dialogState = new DialogStateEngine();
     }
 
@@ -49,21 +53,28 @@ final class ConversationGateway
         $mode = strtolower(trim($mode)) === 'builder' ? 'builder' : 'app';
         $this->contextProjectId = $projectId !== '' ? $projectId : 'default';
         $this->contextMode = $mode;
+        $this->contextTenantId = $tenantId;
+        $this->contextUserId = $userId;
+        $this->contextSessionId = $this->sessionKey($tenantId, $this->contextProjectId, $mode, $userId);
         $this->contextProfileUser = $this->profileUserKey($userId);
         $this->scopedEntityNamesCache = null;
         $this->scopedFormNamesCache = null;
 
         $raw = trim($message);
+        $this->appendShortTermLog('in', $raw, [
+            'mode' => $mode,
+            'project_id' => $this->contextProjectId,
+        ]);
         $training = $this->loadTrainingBase($tenantId);
         $normalizedBase = $this->normalize($raw);
 
         $state = $this->loadState($tenantId, $userId, $this->contextProjectId, $mode);
         $lexicon = $this->loadLexicon($tenantId);
-        $glossary = $this->memory->getGlossary($tenantId);
+        $glossary = $this->getGlossary($tenantId);
         if (!empty($glossary)) {
             $lexicon = $this->mergeLexicon($lexicon, $glossary);
         }
-        $profile = $this->memory->getProfile($tenantId, $this->contextProfileUser);
+        $profile = $this->getProfile($tenantId, $this->contextProfileUser);
         $state = $this->syncDialogState($state, $mode, $profile);
         $normalized = $this->normalizeWithTraining($raw, $training, $tenantId, $profile, $mode);
         $policy = $this->loadPolicy($tenantId);
@@ -641,7 +652,7 @@ final class ConversationGateway
         $this->contextProfileUser = $this->profileUserKey($userId);
 
         $state = $this->loadState($tenantId, $userId, $projectId, $mode);
-        $profile = $this->memory->getProfile($tenantId, $this->profileUserKey($userId));
+        $profile = $this->getProfile($tenantId, $this->profileUserKey($userId));
         $commandName = (string) ($command['command'] ?? '');
         $entity = $this->normalizeEntityForSchema((string) ($command['entity'] ?? ''));
 
@@ -1999,7 +2010,7 @@ final class ConversationGateway
         }
 
         if (!empty($localProfile)) {
-            $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+            $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
         }
 
         $owner = (string) ($localProfile['owner_name'] ?? '');
@@ -2007,7 +2018,7 @@ final class ConversationGateway
         if (in_array($businessType, ['mixto', 'contado', 'credito'], true)) {
             $businessType = '';
             unset($localProfile['business_type']);
-            $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+            $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
         }
         $businessCandidate = trim((string) ($localProfile['business_candidate'] ?? ''));
         if ($businessType === '') {
@@ -2070,7 +2081,7 @@ final class ConversationGateway
                 $captured[] = 'documentos';
             }
             if (!empty($captured)) {
-                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
             }
             $localState['active_task'] = 'builder_onboarding';
             $localState['onboarding_step'] = 'operation_model';
@@ -2096,7 +2107,7 @@ final class ConversationGateway
             $needsItems = !empty($needsItemsDetected) ? $needsItemsDetected : $this->extractNeedItems($text, $businessType);
             if ($this->isReferenceToPreviousScope($text) && !empty($localProfile['needs_scope'])) {
                 $localProfile['needs_scope'] = (string) $localProfile['needs_scope'];
-                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
             } elseif ($this->isOnboardingMetaAnswer($text) && empty($needsItems)) {
                 $reply = 'En este paso necesito que me digas que quieres controlar primero.' . "\n"
                     . 'Ejemplo: ' . $this->buildNeedsScopeExample($businessType, $localProfile) . '.';
@@ -2104,11 +2115,11 @@ final class ConversationGateway
             } elseif (!empty($needsItems)) {
                 $localProfile['needs_scope_items'] = $needsItems;
                 $localProfile['needs_scope'] = implode(', ', $needsItems);
-                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
             } else {
                 $localProfile['needs_scope'] = $this->sanitizeRequirementText($text);
                 unset($localProfile['needs_scope_items']);
-                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
             }
         }
         if (empty($localProfile['needs_scope'])) {
@@ -2123,7 +2134,7 @@ final class ConversationGateway
             $documentItems = !empty($documentsItemsDetected) ? $documentsItemsDetected : $this->extractDocumentItems($text);
             if ($this->isReferenceToPreviousScope($text) && !empty($localProfile['documents_scope'])) {
                 $localProfile['documents_scope'] = (string) $localProfile['documents_scope'];
-                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
             } elseif ($this->isOnboardingMetaAnswer($text) && empty($documentItems)) {
                 $reply = 'En este paso necesito los documentos que vas a usar.' . "\n"
                     . 'Ejemplo: ' . $this->buildDocumentsScopeExample($businessType, $localProfile) . '.';
@@ -2131,11 +2142,11 @@ final class ConversationGateway
             } elseif (!empty($documentItems)) {
                 $localProfile['documents_scope_items'] = $documentItems;
                 $localProfile['documents_scope'] = implode(', ', $documentItems);
-                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
             } else {
                 $localProfile['documents_scope'] = $this->sanitizeRequirementText($text);
                 unset($localProfile['documents_scope_items']);
-                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
             }
         }
         if (empty($localProfile['documents_scope'])) {
@@ -2201,14 +2212,14 @@ final class ConversationGateway
                     $adjusted = true;
                 }
                 if ($adjusted) {
-                    $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                    $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
                     unset($localState['analysis_approved']);
                     $reply = $this->buildRequirementsSummaryReply($businessType, $localProfile, $plan);
                     return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
                 }
             }
             if ($this->isNegativeReply($text)) {
-                $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
                 $localState['onboarding_step'] = 'needs_scope';
                 unset($localState['analysis_approved']);
                 $reply = 'Listo, ajustamos el alcance.' . "\n"
@@ -4989,7 +5000,7 @@ private function parseEntityFromCrudText(string $text): string
             $updated['preferred_style'] = 'breve';
             $reply = 'Listo, usare respuestas mas cortas.';
         }
-        $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $updated);
+        $this->saveProfile($tenantId, $this->profileUserKey($userId), $updated);
         return ['profile' => $updated, 'reply' => $reply];
     }
 
@@ -5004,7 +5015,7 @@ private function parseEntityFromCrudText(string $text): string
             $updated['notes'][] = $note;
             $updated['notes'] = array_values(array_unique(array_slice($updated['notes'], -10)));
         }
-        $this->memory->saveProfile($tenantId, $this->profileUserKey($userId), $updated);
+        $this->saveProfile($tenantId, $this->profileUserKey($userId), $updated);
         return ['profile' => $updated, 'reply' => 'Listo, lo guardo para entenderte mejor.'];
     }
 
@@ -5014,7 +5025,7 @@ private function parseEntityFromCrudText(string $text): string
         if ($candidate === '') {
             return;
         }
-        $this->memory->appendResearchTopic(
+        $this->appendResearchTopic(
             $tenantId,
             $candidate,
             $userId,
@@ -5101,7 +5112,7 @@ private function parseEntityFromCrudText(string $text): string
         if ($entity === '') {
             return;
         }
-        $glossary = $this->memory->getGlossary($tenantId);
+        $glossary = $this->getGlossary($tenantId);
         if (!is_array($glossary)) {
             $glossary = [];
         }
@@ -5121,7 +5132,7 @@ private function parseEntityFromCrudText(string $text): string
                 $glossary['field_aliases'][$alias] = $field;
             }
         }
-        $this->memory->saveGlossary($tenantId, $glossary);
+        $this->saveGlossary($tenantId, $glossary);
     }
 
     private function mergeLexicon(array $base, array $extra): array
@@ -5140,13 +5151,13 @@ private function parseEntityFromCrudText(string $text): string
     private function loadTrainingBase(string $tenantId = 'default'): array
     {
         $path = $this->trainingBasePath();
-        $overridePath = $this->trainingOverridesPath($tenantId);
         $baseMtime = is_file($path) ? (int) @filemtime($path) : 0;
-        $overrideMtime = is_file($overridePath) ? (int) @filemtime($overridePath) : 0;
+        $overrides = $this->loadTenantTrainingOverrides($tenantId);
+        $overrideHash = sha1(json_encode($overrides, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: '');
         $cacheKey = $this->safe($tenantId);
         if (isset($this->trainingBaseCache[$cacheKey])) {
             $cached = $this->trainingBaseCache[$cacheKey];
-            if (($cached['base_mtime'] ?? 0) === $baseMtime && ($cached['override_mtime'] ?? 0) === $overrideMtime) {
+            if (($cached['base_mtime'] ?? 0) === $baseMtime && ($cached['override_hash'] ?? '') === $overrideHash) {
                 return $cached['data'] ?? [];
             }
         }
@@ -5154,7 +5165,7 @@ private function parseEntityFromCrudText(string $text): string
             $this->trainingBaseCache[$cacheKey] = [
                 'data' => [],
                 'base_mtime' => $baseMtime,
-                'override_mtime' => $overrideMtime
+                'override_hash' => $overrideHash,
             ];
             return [];
         }
@@ -5163,18 +5174,18 @@ private function parseEntityFromCrudText(string $text): string
             $this->trainingBaseCache[$cacheKey] = [
                 'data' => [],
                 'base_mtime' => $baseMtime,
-                'override_mtime' => $overrideMtime
+                'override_hash' => $overrideHash,
             ];
             return [];
         }
         $raw = ltrim($raw, "\xEF\xBB\xBF");
         $decoded = json_decode($raw, true);
         $training = is_array($decoded) ? $decoded : [];
-        $training = $this->applyTrainingOverrides($training, $overridePath);
+        $training = $this->applyTrainingOverrides($training, $overrides);
         $this->trainingBaseCache[$cacheKey] = [
             'data' => $training,
             'base_mtime' => $baseMtime,
-            'override_mtime' => $overrideMtime
+            'override_hash' => $overrideHash,
         ];
         return $training;
     }
@@ -5227,7 +5238,13 @@ private function parseEntityFromCrudText(string $text): string
             'global' => ['typo_rules' => [], 'synonyms' => []],
             'countries' => [],
         ]);
-        $tenant = is_file($tenantPath) ? $this->readJson($tenantPath, []) : [];
+        $tenant = $this->memory->getTenantMemory($tenantId, 'country_language_overrides', []);
+        if (empty($tenant) && is_file($tenantPath)) {
+            $tenant = $this->readJson($tenantPath, []);
+            if (!empty($tenant)) {
+                $this->memory->saveTenantMemory($tenantId, 'country_language_overrides', $tenant);
+            }
+        }
 
         if (!empty($tenant['global']) && is_array($tenant['global'])) {
             $baseGlobal = is_array($base['global'] ?? null) ? $base['global'] : [];
@@ -5302,17 +5319,29 @@ private function parseEntityFromCrudText(string $text): string
         return $frameworkRoot . '/contracts/agents/conversation_training_base.json';
     }
 
-    private function trainingOverridesPath(string $tenantId): string
+    private function loadTenantTrainingOverrides(string $tenantId): array
     {
-        return $this->projectRoot . '/storage/tenants/' . $this->safe($tenantId) . '/training_overrides.json';
+        $stored = $this->memory->getTenantMemory($tenantId, 'training_overrides', []);
+        if (!empty($stored)) {
+            return $stored;
+        }
+
+        $path = $this->projectRoot . '/storage/tenants/' . $this->safe($tenantId) . '/training_overrides.json';
+        if (!is_file($path)) {
+            return [];
+        }
+        $legacy = $this->readJson($path, []);
+        if (!empty($legacy)) {
+            $this->memory->saveTenantMemory($tenantId, 'training_overrides', $legacy);
+        }
+        return $legacy;
     }
 
-    private function applyTrainingOverrides(array $training, string $overridePath): array
+    private function applyTrainingOverrides(array $training, array $overrides): array
     {
-        if (!is_file($overridePath)) {
+        if (empty($overrides)) {
             return $training;
         }
-        $overrides = $this->readJson($overridePath, []);
         if (empty($overrides['intents']) || empty($training['intents'])) {
             return $training;
         }
@@ -5417,6 +5446,12 @@ private function parseEntityFromCrudText(string $text): string
 
     private function result(string $action, string $reply, ?array $command, ?array $llmRequest, array $state, array $telemetry): array
     {
+        $this->appendShortTermLog('out', $reply, [
+            'action' => $action,
+            'intent' => (string) ($telemetry['intent'] ?? ''),
+            'entity' => (string) ($telemetry['entity'] ?? ''),
+            'resolved_locally' => (bool) ($telemetry['resolved_locally'] ?? false),
+        ]);
         return [
             'action' => $action,
             'reply' => $reply,
@@ -5461,7 +5496,6 @@ private function parseEntityFromCrudText(string $text): string
 
     private function loadState(string $tenantId, string $userId, string $projectId = 'default', string $mode = 'app'): array
     {
-        $path = $this->statePath($tenantId, $projectId, $mode, $userId);
         $default = [
             'active_task' => null,
             'intent' => null,
@@ -5482,28 +5516,44 @@ private function parseEntityFromCrudText(string $text): string
             'summary' => null,
         ];
 
-        if (is_file($path)) {
-            return $this->readJson($path, $default);
+        $userKey = $this->stateUserKey($userId);
+        $stateKey = $this->stateMemoryKey($projectId, $mode);
+        $stored = $this->memory->getUserMemory($tenantId, $userKey, $stateKey, []);
+        if (!empty($stored)) {
+            return $this->mergeStateDefaults($default, $stored);
         }
 
+        // Legacy fallback (json files): read once, persist to SQL, then continue in SQL.
+        $path = $this->statePath($tenantId, $projectId, $mode, $userId);
+        if (is_file($path)) {
+            $legacyScoped = $this->readJson($path, $default);
+            $merged = $this->mergeStateDefaults($default, $legacyScoped);
+            $this->memory->saveUserMemory($tenantId, $userKey, $stateKey, $merged);
+            return $merged;
+        }
         $legacyPath = $this->legacyStatePath($tenantId, $userId);
         if (is_file($legacyPath)) {
             $legacy = $this->readJson($legacyPath, $default);
-            $this->writeJson($path, $legacy);
-            return $legacy;
+            $merged = $this->mergeStateDefaults($default, $legacy);
+            $this->memory->saveUserMemory($tenantId, $userKey, $stateKey, $merged);
+            return $merged;
         }
 
-        return $this->readJson($path, $default);
+        return $default;
     }
 
     private function saveState(string $tenantId, string $userId, array $state): void
     {
-        $profile = $this->memory->getProfile($tenantId, $this->profileUserKey($userId));
+        $profile = $this->getProfile($tenantId, $this->profileUserKey($userId));
         $state = $this->syncDialogState($state, $this->contextMode, $profile);
         $state['working_memory_validated_at'] = date('c');
         $this->validateAndPersistWorkingMemory($tenantId, $userId, $state, $profile);
-        $path = $this->statePath($tenantId, $this->contextProjectId, $this->contextMode, $userId);
-        $this->writeJson($path, $state);
+        $this->memory->saveUserMemory(
+            $tenantId,
+            $this->stateUserKey($userId),
+            $this->stateMemoryKey($this->contextProjectId, $this->contextMode),
+            $state
+        );
     }
 
     private function validateAndPersistWorkingMemory(string $tenantId, string $userId, array $state, array $profile): void
@@ -5521,7 +5571,17 @@ private function parseEntityFromCrudText(string $text): string
             $message = $error ? (string) $error->message() : 'Working memory invalida';
             throw new RuntimeException('Working memory invalida: ' . $message);
         }
-        $this->writeJson($this->workingMemoryPath($tenantId, $this->contextProjectId, $this->contextMode, $userId), $snapshot);
+        $this->memory->saveUserMemory(
+            $tenantId,
+            $this->stateUserKey($userId),
+            $this->workingMemoryKey($this->contextProjectId, $this->contextMode),
+            $snapshot
+        );
+    }
+
+    private function mergeStateDefaults(array $default, array $stored): array
+    {
+        return array_merge($default, $stored);
     }
 
     private function buildWorkingMemorySnapshot(string $tenantId, string $userId, array $state, array $profile): array
@@ -5632,15 +5692,8 @@ private function parseEntityFromCrudText(string $text): string
         return $decoded;
     }
 
-    private function workingMemoryPath(string $tenantId, string $projectId, string $mode, string $userId): string
-    {
-        $key = $this->safe($projectId) . '__' . $this->safe($mode) . '__' . $this->safe($userId);
-        return $this->tenantPath($tenantId) . '/working_memory/' . $key . '.json';
-    }
-
     private function loadLexicon(string $tenantId): array
     {
-        $path = $this->tenantPath($tenantId) . '/lexicon.json';
         $default = [
             'synonyms' => [],
             'shortcuts' => [],
@@ -5657,20 +5710,48 @@ private function parseEntityFromCrudText(string $text): string
                 'correo' => 'email',
             ],
         ];
-        return $this->readJson($path, $default);
+        $stored = $this->memory->getTenantMemory($tenantId, 'lexicon', []);
+        if (!empty($stored)) {
+            return $this->mergeLexicon($default, $stored);
+        }
+
+        // Legacy fallback from JSON file, then persist into SQL memory.
+        $path = $this->tenantPath($tenantId) . '/lexicon.json';
+        if (is_file($path)) {
+            $legacy = $this->readJson($path, $default);
+            $merged = $this->mergeLexicon($default, $legacy);
+            $this->memory->saveTenantMemory($tenantId, 'lexicon', $merged);
+            return $merged;
+        }
+
+        return $default;
     }
 
     private function loadPolicy(string $tenantId): array
     {
-        $path = $this->tenantPath($tenantId) . '/dialog_policy.json';
-        return $this->readJson($path, [
+        $default = [
             'ask_style' => 'short',
             'confirm_delete' => true,
             'max_questions_before_llm' => 2,
             'latency_budget_ms' => 1200,
             'max_output_tokens' => 400,
             'question_templates' => [],
-        ]);
+        ];
+        $stored = $this->memory->getTenantMemory($tenantId, 'dialog_policy', []);
+        if (!empty($stored)) {
+            return array_merge($default, $stored);
+        }
+
+        // Legacy fallback from JSON file, then persist into SQL memory.
+        $path = $this->tenantPath($tenantId) . '/dialog_policy.json';
+        if (is_file($path)) {
+            $legacy = $this->readJson($path, $default);
+            $merged = array_merge($default, $legacy);
+            $this->memory->saveTenantMemory($tenantId, 'dialog_policy', $merged);
+            return $merged;
+        }
+
+        return $default;
     }
 
     private function loadDomainPlaybook(): array
@@ -5960,6 +6041,183 @@ private function parseEntityFromCrudText(string $text): string
         sort($result, SORT_STRING);
         $this->scopedFormNamesCache = $result;
         return $result;
+    }
+
+    private function getProfile(string $tenantId, string $profileUserKey): array
+    {
+        $profile = $this->memory->getUserMemory($tenantId, $profileUserKey, 'profile', []);
+        if (!empty($profile)) {
+            return $profile;
+        }
+
+        $legacyPath = $this->projectRoot
+            . '/storage/chat/profiles/'
+            . $this->safe($tenantId)
+            . '__'
+            . $this->safe($profileUserKey)
+            . '.json';
+        if (!is_file($legacyPath)) {
+            return [];
+        }
+        $legacy = $this->readJson($legacyPath, []);
+        if (!empty($legacy)) {
+            $this->memory->saveUserMemory($tenantId, $profileUserKey, 'profile', $legacy);
+        }
+        return $legacy;
+    }
+
+    private function saveProfile(string $tenantId, string $profileUserKey, array $profile): void
+    {
+        $this->memory->saveUserMemory($tenantId, $profileUserKey, 'profile', $profile);
+    }
+
+    private function getGlossary(string $tenantId): array
+    {
+        $glossary = $this->memory->getTenantMemory($tenantId, 'glossary', []);
+        if (!empty($glossary)) {
+            return $glossary;
+        }
+
+        $legacyPath = $this->projectRoot . '/storage/chat/glossary/' . $this->safe($tenantId) . '.json';
+        if (!is_file($legacyPath)) {
+            return [];
+        }
+        $legacy = $this->readJson($legacyPath, []);
+        if (!empty($legacy)) {
+            $this->memory->saveTenantMemory($tenantId, 'glossary', $legacy);
+        }
+        return $legacy;
+    }
+
+    private function saveGlossary(string $tenantId, array $glossary): void
+    {
+        $this->memory->saveTenantMemory($tenantId, 'glossary', $glossary);
+    }
+
+    private function appendResearchTopic(string $tenantId, string $topic, string $userId, string $sampleText): array
+    {
+        $topic = trim($topic);
+        if ($topic === '') {
+            return [];
+        }
+
+        $queue = $this->memory->getTenantMemory($tenantId, 'research_queue', ['topics' => []]);
+        if (empty($queue)) {
+            $legacyPath = $this->projectRoot . '/storage/chat/research/' . $this->safe($tenantId) . '.json';
+            if (is_file($legacyPath)) {
+                $queue = $this->readJson($legacyPath, ['topics' => []]);
+            }
+        }
+        $topics = is_array($queue['topics'] ?? null) ? $queue['topics'] : [];
+        $key = mb_strtolower($topic, 'UTF-8');
+        $now = date('c');
+        $found = null;
+
+        foreach ($topics as $idx => $entry) {
+            $entryTopic = mb_strtolower((string) ($entry['topic'] ?? ''), 'UTF-8');
+            if ($entryTopic === $key) {
+                $found = $idx;
+                break;
+            }
+        }
+
+        if ($found === null) {
+            $topics[] = [
+                'topic' => $topic,
+                'count' => 1,
+                'status' => 'pending_research',
+                'first_seen' => $now,
+                'last_seen' => $now,
+                'last_user' => $userId,
+                'samples' => [$sampleText],
+            ];
+            $entry = $topics[array_key_last($topics)];
+        } else {
+            $entry = $topics[$found];
+            $entry['count'] = (int) ($entry['count'] ?? 0) + 1;
+            $entry['status'] = (string) ($entry['status'] ?? 'pending_research');
+            $entry['last_seen'] = $now;
+            $entry['last_user'] = $userId;
+            $samples = is_array($entry['samples'] ?? null) ? $entry['samples'] : [];
+            if ($sampleText !== '' && !in_array($sampleText, $samples, true)) {
+                $samples[] = $sampleText;
+            }
+            if (count($samples) > 5) {
+                $samples = array_slice($samples, -5);
+            }
+            $entry['samples'] = $samples;
+            $topics[$found] = $entry;
+        }
+
+        usort(
+            $topics,
+            static fn(array $a, array $b): int => ((int) ($b['count'] ?? 0)) <=> ((int) ($a['count'] ?? 0))
+        );
+        if (count($topics) > 200) {
+            $topics = array_slice($topics, 0, 200);
+        }
+
+        $queue['topics'] = array_values($topics);
+        $this->memory->saveTenantMemory($tenantId, 'research_queue', $queue);
+        return $entry;
+    }
+
+    private function appendShortTermLog(string $direction, string $message, array $meta = []): void
+    {
+        $message = trim($message);
+        if ($message === '') {
+            return;
+        }
+        try {
+            $this->memory->appendShortTermMemory(
+                $this->contextTenantId,
+                $this->stateUserKey($this->contextUserId),
+                $this->contextSessionId,
+                'chat',
+                $direction,
+                $message,
+                $meta
+            );
+        } catch (\Throwable $e) {
+            // Never block conversation for telemetry storage.
+        }
+    }
+
+    private function sessionKey(string $tenantId, string $projectId, string $mode, string $userId): string
+    {
+        return $this->safe($tenantId) . '__' . $this->safe($projectId) . '__' . $this->safe($mode) . '__' . $this->safe($userId);
+    }
+
+    private function stateUserKey(string $userId): string
+    {
+        $safeUser = $this->safe($userId);
+        return $safeUser !== '' ? $safeUser : 'anon';
+    }
+
+    private function stateMemoryKey(string $projectId, string $mode): string
+    {
+        $safeProject = $this->safe($projectId);
+        $safeMode = $this->safe($mode);
+        if ($safeProject === '') {
+            $safeProject = 'default';
+        }
+        if ($safeMode === '') {
+            $safeMode = 'app';
+        }
+        return 'state::' . $safeProject . '::' . $safeMode;
+    }
+
+    private function workingMemoryKey(string $projectId, string $mode): string
+    {
+        $safeProject = $this->safe($projectId);
+        $safeMode = $this->safe($mode);
+        if ($safeProject === '') {
+            $safeProject = 'default';
+        }
+        if ($safeMode === '') {
+            $safeMode = 'app';
+        }
+        return 'working_memory::' . $safeProject . '::' . $safeMode;
     }
 
     private function statePath(string $tenantId, string $projectId, string $mode, string $userId): string
