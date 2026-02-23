@@ -258,6 +258,23 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
   - chat logs de corto plazo se guardan en `chat_log`.
 - Compatibilidad y migracion:
   - fallback de lectura legacy JSON (solo lectura) para no romper sesiones viejas.
+
+## Checkpoint (2026-02-23, P2 kickoff observabilidad + canonical)
+- Observabilidad operativa integrada al runtime:
+  - `TelemetryService` + `SqlMetricsRepository` registran metricas por `tenant_id + project_id`.
+  - eventos guardados:
+    - latencia por intent (`ops_intent_metrics`)
+    - latencia/bloqueo por comando (`ops_command_metrics`)
+    - errores guardrail (`ops_guardrail_events`)
+    - tokens/costo (`ops_token_usage`)
+- Transicion DB canónica para proyectos nuevos:
+  - `ProjectRegistry` agrega `storage_model` por proyecto (`legacy|canonical`).
+  - feature flag `DB_CANONICAL_NEW_PROJECTS` define default para nuevos proyectos.
+  - `TableNamespace` respeta `storage_model` y activa key canónica en migraciones.
+  - runtime tenant-scoped en modo canonical agrega scope `app_id` (repositorio CRUD, migrador, grids, dashboard).
+- Pruebas dedicadas agregadas:
+  - `framework/tests/observability_metrics_test.php`
+  - `framework/tests/canonical_storage_new_project_test.php`
   - nuevo script `framework/scripts/migrate_memory_json_to_sql.php` para migrar datos historicos.
 
 ## Checkpoint (2026-02-23, inicio refactor estructural P0)

@@ -12,6 +12,8 @@ final class DashboardEngine
     private EntityRegistry $registry;
     private SummaryCalculator $summary;
     private ?int $tenantId;
+    private bool $canonicalScoped;
+    private string $appId;
 
     public function __construct(
         ?ContractRepository $contracts = null,
@@ -23,6 +25,8 @@ final class DashboardEngine
         $this->registry = $registry ?? new EntityRegistry();
         $this->summary = $summary ?? new SummaryCalculator();
         $this->tenantId = $tenantId ?? TenantContext::getTenantId();
+        $this->canonicalScoped = StorageModel::isCanonical();
+        $this->appId = StorageModel::appId();
     }
 
     public function build(string $formKey, string $dashboardKey, ?string $entityName = null): array
@@ -157,6 +161,10 @@ final class DashboardEngine
         if (!empty($entity['table']['tenantScoped']) && $this->tenantId !== null) {
             $sql .= " WHERE tenant_id = :tenant_id";
             $params['tenant_id'] = $this->tenantId;
+            if ($this->canonicalScoped) {
+                $sql .= " AND app_id = :app_id";
+                $params['app_id'] = $this->appId;
+            }
         }
         return $this->fetchSum($sql, $params);
     }
@@ -175,6 +183,10 @@ final class DashboardEngine
         if (!empty($entity['table']['tenantScoped']) && $this->tenantId !== null) {
             $sql .= " WHERE tenant_id = :tenant_id";
             $params['tenant_id'] = $this->tenantId;
+            if ($this->canonicalScoped) {
+                $sql .= " AND app_id = :app_id";
+                $params['app_id'] = $this->appId;
+            }
         }
         return $this->fetchSum($sql, $params);
     }
@@ -194,6 +206,10 @@ final class DashboardEngine
         if (!empty($entity['table']['tenantScoped']) && $this->tenantId !== null) {
             $sql .= " WHERE tenant_id = :tenant_id";
             $params['tenant_id'] = $this->tenantId;
+            if ($this->canonicalScoped) {
+                $sql .= " AND app_id = :app_id";
+                $params['app_id'] = $this->appId;
+            }
         }
         $sql .= " LIMIT 200";
 

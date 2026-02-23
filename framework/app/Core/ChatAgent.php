@@ -19,6 +19,7 @@ final class ChatAgent
     private ?ConversationGateway $gateway = null;
     private ?LLMRouter $llmRouter = null;
     private ?Telemetry $telemetry = null;
+    private ?TelemetryService $telemetryService = null;
     private ?IntentRouter $intentRouter = null;
     private ?CommandBus $commandBus = null;
     private FormWizard $wizard;
@@ -37,6 +38,7 @@ final class ChatAgent
 
     public function handle(array $payload): array
     {
+        $requestStartedAt = microtime(true);
         $text = trim((string) ($payload['message'] ?? $payload['text'] ?? ''));
         $channel = trim((string) ($payload['channel'] ?? 'local'));
         $sessionId = trim((string) ($payload['session_id'] ?? 'sess_' . time()));
@@ -117,7 +119,21 @@ final class ChatAgent
                 putenv('TENANT_KEY=' . $tenantId);
             }
         }
-        $registry->ensureProject($projectId, $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', $userId);
+        $registry->ensureProject(
+            $projectId,
+            $manifest['name'] ?? 'Proyecto',
+            $manifest['status'] ?? 'draft',
+            $manifest['tenant_mode'] ?? 'shared',
+            $userId,
+            (string) ($manifest['storage_model'] ?? '')
+        );
+        $projectMeta = $registry->getProject($projectId) ?? [];
+        $storageModel = StorageModel::normalize((string) ($projectMeta['storage_model'] ?? StorageModel::LEGACY));
+        putenv('PROJECT_STORAGE_MODEL=' . $storageModel);
+        putenv('DB_STORAGE_MODEL=' . $storageModel);
+        putenv('PROJECT_ID=' . $projectId);
+        StorageModel::clearCache();
+        TableNamespace::clearCache();
         $registry->touchUser($userId, $role, $mode === 'builder' ? 'creator' : 'app', $tenantId);
         $registry->assignUserToProject($projectId, $userId, $role);
         $registry->touchSession($sessionId, $userId, $projectId, $tenantId, $channel);
@@ -168,10 +184,24 @@ final class ChatAgent
                 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
                 'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
             ]));
+            try {
+                $this->telemetryService()->recordIntentMetric([
+                    'tenant_id' => $tenantId,
+                    'project_id' => $projectId,
+                    'mode' => $mode,
+                    'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
+                    'action' => $action,
+                    'latency_ms' => $this->latencyMs($requestStartedAt),
+                    'status' => 'success',
+                ]);
+            } catch (\Throwable $e) {
+                // observability must not block chat response
+            }
             return $reply;
         }
 
         if ($route->isCommand()) {
+            $commandStartedAt = microtime(true);
             $commandPayload = $route->command();
             try {
                 $reply = $this->dispatchCommandPayload($commandPayload, $channel, $sessionId, $userId, $mode);
@@ -207,6 +237,32 @@ final class ChatAgent
                     'error' => $rawError,
                 ]);
             }
+            $commandName = (string) ($commandPayload['command'] ?? 'unknown');
+            $commandStatus = (string) ($reply['status'] ?? 'error');
+            $commandReply = (string) ($reply['reply'] ?? '');
+            $blockedByGuardrail = $commandStatus !== 'success' && $this->looksLikeGuardrailMessage($commandReply);
+            try {
+                $this->telemetryService()->recordCommandMetric([
+                    'tenant_id' => $tenantId,
+                    'project_id' => $projectId,
+                    'mode' => $mode,
+                    'command_name' => $commandName,
+                    'latency_ms' => $this->latencyMs($commandStartedAt),
+                    'status' => $commandStatus,
+                    'blocked' => $blockedByGuardrail ? 1 : 0,
+                ]);
+                if ($blockedByGuardrail) {
+                    $this->telemetryService()->recordGuardrailEvent([
+                        'tenant_id' => $tenantId,
+                        'project_id' => $projectId,
+                        'mode' => $mode,
+                        'guardrail' => 'mode_guard',
+                        'reason' => $commandReply,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                // observability must not block chat response
+            }
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
                 'message' => $text,
                 'resolved_locally' => true,
@@ -218,6 +274,19 @@ final class ChatAgent
                 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
                 'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
             ]));
+            try {
+                $this->telemetryService()->recordIntentMetric([
+                    'tenant_id' => $tenantId,
+                    'project_id' => $projectId,
+                    'mode' => $mode,
+                    'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
+                    'action' => $action,
+                    'latency_ms' => $this->latencyMs($requestStartedAt),
+                    'status' => $commandStatus,
+                ]);
+            } catch (\Throwable $e) {
+                // observability must not block chat response
+            }
             return $reply;
         }
 
@@ -225,6 +294,19 @@ final class ChatAgent
             try {
                 $llmResult = $this->llmRouter()->chat($route->llmRequest());
             } catch (\Throwable $e) {
+                try {
+                    $this->telemetryService()->recordIntentMetric([
+                        'tenant_id' => $tenantId,
+                        'project_id' => $projectId,
+                        'mode' => $mode,
+                        'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
+                        'action' => $action,
+                        'latency_ms' => $this->latencyMs($requestStartedAt),
+                        'status' => 'error',
+                    ]);
+                } catch (\Throwable $ignored) {
+                    // observability must not block chat response
+                }
                 return $this->reply('IA no disponible. Usa comandos simples.', $channel, $sessionId, $userId);
             }
             $provider = $llmResult['provider'] ?? 'llm';
@@ -243,6 +325,27 @@ final class ChatAgent
                 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
                 'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
             ]));
+            try {
+                $this->telemetryService()->recordIntentMetric([
+                    'tenant_id' => $tenantId,
+                    'project_id' => $projectId,
+                    'mode' => $mode,
+                    'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
+                    'action' => $action,
+                    'latency_ms' => $this->latencyMs($requestStartedAt),
+                    'status' => 'success',
+                ]);
+                $this->telemetryService()->recordTokenUsage([
+                    'tenant_id' => $tenantId,
+                    'project_id' => $projectId,
+                    'provider' => (string) $provider,
+                    'prompt_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
+                    'completion_tokens' => (int) ($usage['completion_tokens'] ?? 0),
+                    'total_tokens' => (int) ($usage['total_tokens'] ?? 0),
+                ]);
+            } catch (\Throwable $ignored) {
+                // observability must not block chat response
+            }
 
             $json = $llmResult['json'] ?? null;
             if (is_array($json)) {
@@ -265,6 +368,19 @@ final class ChatAgent
             'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
             'status' => 'error',
         ]));
+        try {
+            $this->telemetryService()->recordIntentMetric([
+                'tenant_id' => $tenantId,
+                'project_id' => $projectId,
+                'mode' => $mode,
+                'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
+                'action' => 'error',
+                'latency_ms' => $this->latencyMs($requestStartedAt),
+                'status' => 'error',
+            ]);
+        } catch (\Throwable $ignored) {
+            // observability must not block chat response
+        }
         return $this->reply('No entendi. Puedes decir: crear cliente nombre=Juan nit=123', $channel, $sessionId, $userId, 'error');
     }
 
@@ -1074,6 +1190,14 @@ final class ChatAgent
         return $this->telemetry;
     }
 
+    private function telemetryService(): TelemetryService
+    {
+        if (!$this->telemetryService) {
+            $this->telemetryService = new TelemetryService(new SqlMetricsRepository());
+        }
+        return $this->telemetryService;
+    }
+
     private function intentRouter(): IntentRouter
     {
         if (!$this->intentRouter) {
@@ -1106,6 +1230,34 @@ final class ChatAgent
             ));
         }
         return $this->commandBus;
+    }
+
+    private function latencyMs(float $startedAt): int
+    {
+        return (int) max(0, round((microtime(true) - $startedAt) * 1000));
+    }
+
+    private function looksLikeGuardrailMessage(string $reply): bool
+    {
+        $reply = mb_strtolower(trim($reply), 'UTF-8');
+        if ($reply === '') {
+            return false;
+        }
+
+        $patterns = [
+            'modo app',
+            'modo creador',
+            'chat creador',
+            'chat de la app',
+            'debe ser agregada por el creador',
+            'permisos insuficientes',
+        ];
+        foreach ($patterns as $pattern) {
+            if (str_contains($reply, $pattern)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function dispatchCommandPayload(
@@ -1151,7 +1303,8 @@ final class ChatAgent
                             (string) ($manifest['name'] ?? 'Proyecto'),
                             (string) ($manifest['status'] ?? 'draft'),
                             (string) ($manifest['tenant_mode'] ?? 'shared'),
-                            $ctxUserId
+                            $ctxUserId,
+                            (string) ($manifest['storage_model'] ?? '')
                         );
                         $registry->registerEntity($projectId, $entityName, 'chat');
                     } catch (\Throwable $e) {
@@ -1167,7 +1320,8 @@ final class ChatAgent
                             (string) ($manifest['name'] ?? 'Proyecto'),
                             (string) ($manifest['status'] ?? 'draft'),
                             (string) ($manifest['tenant_mode'] ?? 'shared'),
-                            $ctxUserId
+                            $ctxUserId,
+                            (string) ($manifest['storage_model'] ?? '')
                         );
                     } catch (\Throwable $e) {
                         // best effort registry sync

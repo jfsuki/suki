@@ -17,6 +17,8 @@ class BaseRepository
     protected bool $tenantScoped;
     protected bool $softDelete;
     protected ?int $tenantId;
+    protected bool $canonicalScoped;
+    protected string $appId;
     protected array $allowedColumns = [];
 
     public function __construct(array $entity, ?PDO $db = null, ?int $tenantId = null)
@@ -33,6 +35,8 @@ class BaseRepository
         $this->tenantScoped = (bool) ($entity['table']['tenantScoped'] ?? false);
         $this->softDelete = (bool) ($entity['table']['softDelete'] ?? false);
         $this->tenantId = $tenantId ?? TenantContext::getTenantId();
+        $this->canonicalScoped = $this->tenantScoped && StorageModel::isCanonical();
+        $this->appId = StorageModel::appId();
 
         if ($this->logicalTable === '') {
             throw new InvalidArgumentException('Tabla de entidad requerida.');
@@ -49,6 +53,9 @@ class BaseRepository
         $payload = $this->filterData($data);
         if ($this->tenantScoped && $this->tenantId !== null) {
             $payload['tenant_id'] = $this->tenantId;
+        }
+        if ($this->canonicalScoped) {
+            $payload['app_id'] = $this->appId;
         }
 
         $qb = $this->newQuery();
@@ -105,6 +112,9 @@ class BaseRepository
             if ($this->tenantScoped && $column === 'tenant_id') {
                 continue;
             }
+            if ($this->canonicalScoped && $column === 'app_id') {
+                continue;
+            }
             if (!in_array($column, $this->allowedColumns, true)) {
                 continue;
             }
@@ -126,6 +136,9 @@ class BaseRepository
             if (in_array('tenant_id', $this->allowedColumns, true)) {
                 $qb->where('tenant_id', '=', $this->tenantId);
             }
+        }
+        if ($this->canonicalScoped && in_array('app_id', $this->allowedColumns, true)) {
+            $qb->where('app_id', '=', $this->appId);
         }
     }
 
@@ -159,6 +172,9 @@ class BaseRepository
             if ($this->tenantScoped && $key === 'tenant_id') {
                 continue;
             }
+            if ($this->canonicalScoped && $key === 'app_id') {
+                continue;
+            }
             if ($this->timestamps && ($key === 'created_at' || $key === 'updated_at')) {
                 continue;
             }
@@ -178,6 +194,9 @@ class BaseRepository
         $columns[] = $this->primaryKey;
         if ($this->tenantScoped) {
             $columns[] = 'tenant_id';
+            if ($this->canonicalScoped) {
+                $columns[] = 'app_id';
+            }
         }
         if ($this->timestamps) {
             $columns[] = 'created_at';

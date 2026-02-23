@@ -175,6 +175,7 @@ class EntityMigrator
         $timestamps = (bool) ($entity['table']['timestamps'] ?? false);
         $softDelete = (bool) ($entity['table']['softDelete'] ?? false);
         $tenantScoped = (bool) ($entity['table']['tenantScoped'] ?? false);
+        $canonicalScoped = $tenantScoped && StorageModel::isCanonical();
 
         $fields = is_array($entity['fields'] ?? null) ? $entity['fields'] : [];
         $columns = [];
@@ -209,6 +210,9 @@ class EntityMigrator
 
         if ($tenantScoped && !isset($used['tenant_id'])) {
             $columns[] = "tenant_id INT NOT NULL";
+        }
+        if ($canonicalScoped && !isset($used['app_id'])) {
+            $columns[] = "app_id VARCHAR(120) NOT NULL";
         }
         if ($timestamps) {
             if (!isset($used['created_at'])) {
@@ -245,6 +249,9 @@ class EntityMigrator
 
             if ($tenantScoped && !isset($gridUsed['tenant_id'])) {
                 $gridColumns[] = "tenant_id INT NOT NULL";
+            }
+            if ($canonicalScoped && !isset($gridUsed['app_id'])) {
+                $gridColumns[] = "app_id VARCHAR(120) NOT NULL";
             }
 
             foreach ($fields as $field) {

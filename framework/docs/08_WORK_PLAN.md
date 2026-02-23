@@ -125,6 +125,27 @@
 - Canal externo bootstrap:
   - endpoint `channels/telegram/webhook` conectado a `ChatAgent` con sesion estable por `chat_id`.
 
+## P2 kickoff update (2026-02-23)
+- Observabilidad operativa SQL (multi-tenant/proyecto):
+  - nuevos componentes: `TelemetryService`, `MetricsRepositoryInterface`, `SqlMetricsRepository`.
+  - nuevas tablas en registry DB: `ops_intent_metrics`, `ops_command_metrics`, `ops_guardrail_events`, `ops_token_usage`.
+  - `ChatAgent` ahora registra:
+    - latencia/status por intent,
+    - latencia/status/bloqueos por comando,
+    - eventos de guardrail,
+    - tokens + costo estimado por proveedor.
+- Transicion canónica DB (proyectos nuevos):
+  - `ProjectRegistry` soporta `storage_model` (`legacy|canonical`) por proyecto.
+  - feature flag `DB_CANONICAL_NEW_PROJECTS=1` activa `canonical` para proyectos nuevos.
+  - `TableNamespace` respeta `storage_model`:
+    - `legacy` mantiene namespace fisico por proyecto,
+    - `canonical` usa tabla logica + migration key canonica.
+  - scope `app_id` agregado para entidades/grids tenant-scoped en modo `canonical` (migrador + repositorio + runtime CRUD/dashboard).
+- Pruebas dedicadas P2:
+  - `framework/tests/observability_metrics_test.php`
+  - `framework/tests/canonical_storage_new_project_test.php`
+  - integradas al `UnitTestRunner` (`observability_metrics`, `canonical_storage_new_project`).
+
 ## Execution checklist
 - [x] Summary dependency ordering stable
 - [x] Framework/project separation (paths + webroots)

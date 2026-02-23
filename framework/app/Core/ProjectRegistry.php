@@ -19,9 +19,18 @@ final class ProjectRegistry
         $this->ensureSchema();
     }
 
-    public function ensureProject(string $projectId, string $name, string $status = 'draft', string $tenantMode = 'shared', string $ownerUserId = ''): void
+    public function ensureProject(
+        string $projectId,
+        string $name,
+        string $status = 'draft',
+        string $tenantMode = 'shared',
+        string $ownerUserId = '',
+        string $storageModel = ''
+    ): void
     {
-        $stmt = $this->db->prepare('INSERT OR IGNORE INTO projects (id, name, status, tenant_mode, owner_user_id, created_at, updated_at) VALUES (:id, :name, :status, :tenant_mode, :owner, :created, :updated)');
+        $existing = $this->getProject($projectId);
+        $resolvedStorageModel = $this->resolveStorageModel($storageModel, $existing);
+        $stmt = $this->db->prepare('INSERT OR IGNORE INTO projects (id, name, status, tenant_mode, owner_user_id, storage_model, created_at, updated_at) VALUES (:id, :name, :status, :tenant_mode, :owner, :storage_model, :created, :updated)');
         $now = date('Y-m-d H:i:s');
         $stmt->execute([
             ':id' => $projectId,
@@ -29,16 +38,18 @@ final class ProjectRegistry
             ':status' => $status,
             ':tenant_mode' => $tenantMode,
             ':owner' => $ownerUserId,
+            ':storage_model' => $resolvedStorageModel,
             ':created' => $now,
             ':updated' => $now,
         ]);
 
-        $stmt = $this->db->prepare('UPDATE projects SET name = :name, status = :status, tenant_mode = :tenant_mode, updated_at = :updated WHERE id = :id');
+        $stmt = $this->db->prepare('UPDATE projects SET name = :name, status = :status, tenant_mode = :tenant_mode, storage_model = :storage_model, updated_at = :updated WHERE id = :id');
         $stmt->execute([
             ':id' => $projectId,
             ':name' => $name,
             ':status' => $status,
             ':tenant_mode' => $tenantMode,
+            ':storage_model' => $resolvedStorageModel,
             ':updated' => $now,
         ]);
     }
@@ -258,13 +269,13 @@ final class ProjectRegistry
 
     public function listProjects(): array
     {
-        $stmt = $this->db->query('SELECT id, name, status, tenant_mode, owner_user_id, updated_at FROM projects ORDER BY updated_at DESC');
+        $stmt = $this->db->query('SELECT id, name, status, tenant_mode, storage_model, owner_user_id, updated_at FROM projects ORDER BY updated_at DESC');
         return $stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
     }
 
     public function getProject(string $projectId): ?array
     {
-        $stmt = $this->db->prepare('SELECT id, name, status, tenant_mode, owner_user_id, updated_at FROM projects WHERE id = :id');
+        $stmt = $this->db->prepare('SELECT id, name, status, tenant_mode, storage_model, owner_user_id, updated_at FROM projects WHERE id = :id');
         $stmt->execute([':id' => $projectId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
@@ -379,16 +390,27 @@ final class ProjectRegistry
     {
         $manifestPath = $this->projectRoot() . '/contracts/app.manifest.json';
         if (!is_file($manifestPath)) {
-            return ['id' => 'default', 'name' => 'Proyecto', 'status' => 'draft', 'tenant_mode' => 'shared'];
+            return [
+                'id' => 'default',
+                'name' => 'Proyecto',
+                'status' => 'draft',
+                'tenant_mode' => 'shared',
+                'storage_model' => StorageModel::LEGACY,
+            ];
         }
         $raw = file_get_contents($manifestPath);
         $data = is_string($raw) ? json_decode($raw, true) : null;
         $app = is_array($data) ? ($data['app'] ?? []) : [];
+        $storageModel = StorageModel::normalize((string) ($app['storage_model'] ?? $data['storage_model'] ?? ''));
+        if ($storageModel === StorageModel::LEGACY && empty($app['storage_model']) && empty($data['storage_model'])) {
+            $storageModel = $this->isCanonicalNewProjectsEnabled() ? StorageModel::CANONICAL : StorageModel::LEGACY;
+        }
         return [
             'id' => (string) ($app['id'] ?? 'default'),
             'name' => (string) ($app['name'] ?? 'Proyecto'),
             'status' => (string) ($app['status'] ?? 'draft'),
             'tenant_mode' => (string) ($app['tenant_mode'] ?? 'shared'),
+            'storage_model' => $storageModel,
         ];
     }
 
@@ -399,10 +421,12 @@ final class ProjectRegistry
             name TEXT,
             status TEXT,
             tenant_mode TEXT,
+            storage_model TEXT DEFAULT \'legacy\',
             owner_user_id TEXT,
             created_at TEXT,
             updated_at TEXT
         )');
+        $this->ensureProjectsStorageModelColumn();
         $this->db->exec('CREATE TABLE IF NOT EXISTS users (
             id TEXT PRIMARY KEY,
             label TEXT,
@@ -465,12 +489,71 @@ final class ProjectRegistry
 
     private function defaultPath(): string
     {
+        $override = trim((string) (getenv('PROJECT_REGISTRY_DB_PATH') ?: ''));
+        if ($override !== '') {
+            $dir = dirname($override);
+            if (!is_dir($dir)) {
+                mkdir($dir, 0775, true);
+            }
+            return $override;
+        }
         $root = $this->projectRoot();
         $dir = $root . '/storage/meta';
         if (!is_dir($dir)) {
             mkdir($dir, 0775, true);
         }
         return $dir . '/project_registry.sqlite';
+    }
+
+    private function ensureProjectsStorageModelColumn(): void
+    {
+        $driver = (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlite') {
+            $stmt = $this->db->query('PRAGMA table_info(projects)');
+            $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+            foreach ($rows as $row) {
+                if ((string) ($row['name'] ?? '') === 'storage_model') {
+                    return;
+                }
+            }
+            $this->db->exec("ALTER TABLE projects ADD COLUMN storage_model TEXT DEFAULT 'legacy'");
+            return;
+        }
+
+        if ($driver === 'mysql') {
+            $stmt = $this->db->query(
+                "SELECT COUNT(*) AS total
+                 FROM information_schema.columns
+                 WHERE table_schema = DATABASE()
+                   AND table_name = 'projects'
+                   AND column_name = 'storage_model'"
+            );
+            $exists = (int) ($stmt ? $stmt->fetchColumn() : 0);
+            if ($exists === 0) {
+                $this->db->exec("ALTER TABLE projects ADD COLUMN storage_model VARCHAR(40) NOT NULL DEFAULT 'legacy'");
+            }
+        }
+    }
+
+    private function resolveStorageModel(string $requestedModel, ?array $existingProject = null): string
+    {
+        $rawRequested = strtolower(trim($requestedModel));
+        if ($rawRequested !== '') {
+            return StorageModel::normalize($rawRequested);
+        }
+
+        if (is_array($existingProject)) {
+            $current = StorageModel::normalize((string) ($existingProject['storage_model'] ?? ''));
+            return $current !== '' ? $current : StorageModel::LEGACY;
+        }
+
+        return $this->isCanonicalNewProjectsEnabled() ? StorageModel::CANONICAL : StorageModel::LEGACY;
+    }
+
+    private function isCanonicalNewProjectsEnabled(): bool
+    {
+        $raw = strtolower(trim((string) (getenv('DB_CANONICAL_NEW_PROJECTS') ?: '0')));
+        return in_array($raw, ['1', 'true', 'yes', 'on'], true);
     }
 
     private function projectRoot(): string

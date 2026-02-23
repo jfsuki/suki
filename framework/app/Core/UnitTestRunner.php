@@ -24,6 +24,8 @@ final class UnitTestRunner
         $tests[] = $this->wrap('flow_control', fn() => $this->checkFlowControl());
         $tests[] = $this->wrap('intent_router', fn() => $this->checkIntentRouter());
         $tests[] = $this->wrap('command_bus', fn() => $this->checkCommandBus());
+        $tests[] = $this->wrap('observability_metrics', fn() => $this->checkObservabilityMetrics());
+        $tests[] = $this->wrap('canonical_storage_new_project', fn() => $this->checkCanonicalStorageNewProject());
 
         $summary = [
             'passed' => count(array_filter($tests, fn($t) => $t['status'] === 'pass')),
@@ -407,5 +409,100 @@ final class UnitTestRunner
         }
 
         throw new \RuntimeException('CommandBus debe fallar comando desconocido.');
+    }
+
+    private function checkObservabilityMetrics(): void
+    {
+        $tmpDir = dirname(__DIR__, 2) . '/tests/tmp';
+        if (!is_dir($tmpDir)) {
+            mkdir($tmpDir, 0775, true);
+        }
+        $dbPath = $tmpDir . '/unit_observability.sqlite';
+        if (is_file($dbPath)) {
+            unlink($dbPath);
+        }
+        $repo = new SqlMetricsRepository(null, $dbPath);
+        $service = new TelemetryService($repo);
+
+        $service->recordIntentMetric([
+            'tenant_id' => 'default',
+            'project_id' => 'unit_obs',
+            'mode' => 'builder',
+            'intent' => 'APP_CREATE',
+            'action' => 'ask_user',
+            'latency_ms' => 70,
+            'status' => 'success',
+        ]);
+        $service->recordCommandMetric([
+            'tenant_id' => 'default',
+            'project_id' => 'unit_obs',
+            'mode' => 'app',
+            'command_name' => 'CreateEntity',
+            'latency_ms' => 25,
+            'status' => 'error',
+            'blocked' => 1,
+        ]);
+        $service->recordGuardrailEvent([
+            'tenant_id' => 'default',
+            'project_id' => 'unit_obs',
+            'mode' => 'app',
+            'guardrail' => 'mode_guard',
+            'reason' => 'blocked by mode',
+        ]);
+        $service->recordTokenUsage([
+            'tenant_id' => 'default',
+            'project_id' => 'unit_obs',
+            'provider' => 'gemini',
+            'prompt_tokens' => 90,
+            'completion_tokens' => 30,
+            'total_tokens' => 120,
+        ]);
+
+        $summary = $service->summary('default', 'unit_obs', 7);
+        if ((int) ($summary['intent_metrics']['count'] ?? 0) < 1) {
+            throw new \RuntimeException('Observability: intent metric not persisted.');
+        }
+        if ((int) ($summary['command_metrics']['blocked'] ?? 0) < 1) {
+            throw new \RuntimeException('Observability: blocked command metric missing.');
+        }
+        if ((int) ($summary['guardrail_events']['count'] ?? 0) < 1) {
+            throw new \RuntimeException('Observability: guardrail event missing.');
+        }
+        if ((int) ($summary['token_usage']['total_tokens'] ?? 0) < 120) {
+            throw new \RuntimeException('Observability: token usage not persisted.');
+        }
+    }
+
+    private function checkCanonicalStorageNewProject(): void
+    {
+        $tmpDir = dirname(__DIR__, 2) . '/tests/tmp';
+        if (!is_dir($tmpDir)) {
+            mkdir($tmpDir, 0775, true);
+        }
+        $registryPath = $tmpDir . '/unit_canonical_registry.sqlite';
+        if (is_file($registryPath)) {
+            unlink($registryPath);
+        }
+
+        putenv('PROJECT_REGISTRY_DB_PATH=' . $registryPath);
+        putenv('DB_CANONICAL_NEW_PROJECTS=1');
+        putenv('DB_NAMESPACE_BY_PROJECT=1');
+
+        StorageModel::clearCache();
+        TableNamespace::clearCache();
+
+        $registry = new ProjectRegistry($registryPath);
+        $registry->ensureProject('unit_can_app', 'Unit Canonical');
+        $project = $registry->getProject('unit_can_app') ?? [];
+        if ((string) ($project['storage_model'] ?? '') !== 'canonical') {
+            throw new \RuntimeException('Canonical storage model was not persisted for new project.');
+        }
+
+        StorageModel::clearCache();
+        TableNamespace::clearCache();
+        $table = TableNamespace::resolve('clientes', 'unit_can_app');
+        if ($table !== 'clientes') {
+            throw new \RuntimeException('Canonical project should resolve logical table without namespace.');
+        }
     }
 }

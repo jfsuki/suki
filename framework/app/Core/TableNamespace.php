@@ -7,8 +7,14 @@ use RuntimeException;
 
 final class TableNamespace
 {
+    /** @var array<string, string> */
+    private static array $storageModelCache = [];
+
     public static function enabled(): bool
     {
+        if (StorageModel::isCanonical()) {
+            return false;
+        }
         $raw = strtolower(trim((string) (getenv('DB_NAMESPACE_BY_PROJECT') ?: '0')));
         return in_array($raw, ['1', 'true', 'yes', 'on'], true);
     }
@@ -17,6 +23,9 @@ final class TableNamespace
     {
         $logical = self::sanitizeIdentifier($logicalTable);
         if (preg_match('/^p_[a-f0-9]{10}__/', $logical)) {
+            return $logical;
+        }
+        if (self::isCanonicalProject($projectId)) {
             return $logical;
         }
         if (!self::enabled()) {
@@ -43,6 +52,9 @@ final class TableNamespace
     public static function migrationKey(string $entityName, ?string $projectId = null): string
     {
         $entity = self::sanitizeIdentifier($entityName);
+        if (self::isCanonicalProject($projectId)) {
+            return 'canonical::' . self::normalizedProjectId($projectId) . '::' . $entity;
+        }
         if (!self::enabled()) {
             return $entity;
         }
@@ -71,6 +83,17 @@ final class TableNamespace
         return substr(hash('sha256', $projectId), 0, 10);
     }
 
+    private static function isCanonicalProject(?string $projectId = null): bool
+    {
+        $projectId = self::normalizedProjectId($projectId);
+        if (isset(self::$storageModelCache[$projectId])) {
+            return self::$storageModelCache[$projectId] === StorageModel::CANONICAL;
+        }
+        $model = StorageModel::current($projectId);
+        self::$storageModelCache[$projectId] = $model;
+        return $model === StorageModel::CANONICAL;
+    }
+
     private static function sanitizeIdentifier(string $value): string
     {
         $value = strtolower(trim($value));
@@ -83,5 +106,11 @@ final class TableNamespace
             $value = trim($value, '_');
         }
         return $value;
+    }
+
+    public static function clearCache(): void
+    {
+        self::$storageModelCache = [];
+        StorageModel::clearCache();
     }
 }

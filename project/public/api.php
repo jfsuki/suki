@@ -824,7 +824,14 @@ if ($route === 'entity/save') {
         try {
             $registry = new ProjectRegistry();
             $manifest = $registry->resolveProjectFromManifest();
-            $registry->ensureProject($manifest['id'] ?? 'default', $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', '');
+            $registry->ensureProject(
+                $manifest['id'] ?? 'default',
+                $manifest['name'] ?? 'Proyecto',
+                $manifest['status'] ?? 'draft',
+                $manifest['tenant_mode'] ?? 'shared',
+                '',
+                (string) ($manifest['storage_model'] ?? '')
+            );
             $registry->registerEntity($manifest['id'] ?? 'default', $name, 'editor');
         } catch (\Throwable $e) {
             // ignore registry errors
@@ -861,7 +868,14 @@ if ($route === 'import/csv') {
         try {
             $registry = new ProjectRegistry();
             $manifest = $registry->resolveProjectFromManifest();
-            $registry->ensureProject($manifest['id'] ?? 'default', $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', '');
+            $registry->ensureProject(
+                $manifest['id'] ?? 'default',
+                $manifest['name'] ?? 'Proyecto',
+                $manifest['status'] ?? 'draft',
+                $manifest['tenant_mode'] ?? 'shared',
+                '',
+                (string) ($manifest['storage_model'] ?? '')
+            );
             $registry->registerEntity($manifest['id'] ?? 'default', $entity['name'] ?? 'entity', 'csv');
         } catch (\Throwable $e) {
             // ignore registry errors
@@ -883,7 +897,14 @@ if ($route === 'registry/status') {
     try {
         $registry = new ProjectRegistry();
         $manifest = $registry->resolveProjectFromManifest();
-        $registry->ensureProject($manifest['id'] ?? 'default', $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', '');
+        $registry->ensureProject(
+            $manifest['id'] ?? 'default',
+            $manifest['name'] ?? 'Proyecto',
+            $manifest['status'] ?? 'draft',
+            $manifest['tenant_mode'] ?? 'shared',
+            '',
+            (string) ($manifest['storage_model'] ?? '')
+        );
         $projectId = resolveProjectId();
         if ($projectId === '') {
             $projectId = (string) ($manifest['id'] ?? 'default');
@@ -1012,7 +1033,14 @@ if ($route === 'registry/user') {
         $type = (string) ($payload['type'] ?? 'app');
         $tenantId = (string) ($payload['tenant_id'] ?? 'default');
         $label = (string) ($payload['label'] ?? $userId);
-        $registry->ensureProject($projectId, $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', $userId);
+        $registry->ensureProject(
+            $projectId,
+            $manifest['name'] ?? 'Proyecto',
+            $manifest['status'] ?? 'draft',
+            $manifest['tenant_mode'] ?? 'shared',
+            $userId,
+            (string) ($manifest['storage_model'] ?? '')
+        );
         $registry->touchUser($userId, $role, $type, $tenantId, $label);
         $registry->assignUserToProject($projectId, $userId, $role);
         respondJson($response, 'success', 'Usuario registrado', [
@@ -1076,7 +1104,14 @@ if ($route === 'registry/projects') {
     try {
         $registry = new ProjectRegistry();
         $manifest = $registry->resolveProjectFromManifest();
-        $registry->ensureProject($manifest['id'] ?? 'default', $manifest['name'] ?? 'Proyecto', $manifest['status'] ?? 'draft', $manifest['tenant_mode'] ?? 'shared', '');
+        $registry->ensureProject(
+            $manifest['id'] ?? 'default',
+            $manifest['name'] ?? 'Proyecto',
+            $manifest['status'] ?? 'draft',
+            $manifest['tenant_mode'] ?? 'shared',
+            '',
+            (string) ($manifest['storage_model'] ?? '')
+        );
         if (session_status() === PHP_SESSION_ACTIVE && empty($_SESSION['current_project_id'])) {
             $_SESSION['current_project_id'] = $manifest['id'] ?? 'default';
         }
@@ -1130,7 +1165,7 @@ if ($route === 'registry/project') {
         $status = (string) ($payload['status'] ?? 'draft');
         $tenantMode = (string) ($payload['tenant_mode'] ?? 'shared');
         $owner = (string) ($payload['owner_user_id'] ?? '');
-        $registry->ensureProject($id, $name, $status, $tenantMode, $owner);
+        $registry->ensureProject($id, $name, $status, $tenantMode, $owner, (string) ($payload['storage_model'] ?? ''));
         respondJson($response, 'success', 'Proyecto guardado', [
             'project_id' => $id,
         ]);

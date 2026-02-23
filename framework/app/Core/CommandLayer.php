@@ -11,6 +11,8 @@ class CommandLayer
     private EntityRegistry $registry;
     private EntityMigrator $migrator;
     private ?int $tenantId;
+    private bool $canonicalScoped;
+    private string $appId;
     private ValidationEngine $validator;
     private AuditLogger $audit;
 
@@ -24,6 +26,8 @@ class CommandLayer
         $this->registry = $registry ?? new EntityRegistry();
         $this->migrator = $migrator ?? new EntityMigrator($this->registry);
         $this->tenantId = $tenantId ?? TenantContext::getTenantId();
+        $this->canonicalScoped = StorageModel::isCanonical();
+        $this->appId = StorageModel::appId();
         $this->validator = $validator ?? new ValidationEngine();
         $this->audit = $audit ?? new AuditLogger();
     }
@@ -318,6 +322,7 @@ class CommandLayer
         $results = [];
         $gridFields = $this->gridFields($entity);
         $tenantScoped = (bool) ($entity['table']['tenantScoped'] ?? false);
+        $canonicalScoped = $tenantScoped && $this->canonicalScoped;
         $timestamps = (bool) ($entity['table']['timestamps'] ?? false);
 
         foreach (($entity['grids'] ?? []) as $gridDef) {
@@ -339,6 +344,9 @@ class CommandLayer
             $allowed[] = $fk;
             if ($tenantScoped) {
                 $allowed[] = 'tenant_id';
+                if ($canonicalScoped) {
+                    $allowed[] = 'app_id';
+                }
             }
             if ($timestamps) {
                 $allowed[] = 'created_at';
@@ -367,6 +375,9 @@ class CommandLayer
                 $payload[$fk] = $parentId;
                 if ($tenantScoped && $this->tenantId !== null) {
                     $payload['tenant_id'] = $this->tenantId;
+                    if ($canonicalScoped) {
+                        $payload['app_id'] = $this->appId;
+                    }
                 }
                 if ($timestamps) {
                     $now = date('Y-m-d H:i:s');
@@ -388,6 +399,7 @@ class CommandLayer
     private function replaceGrids(array $entity, int $parentId, array $grids): void
     {
         $tenantScoped = (bool) ($entity['table']['tenantScoped'] ?? false);
+        $canonicalScoped = $tenantScoped && $this->canonicalScoped;
         foreach (($entity['grids'] ?? []) as $gridDef) {
             $gridName = (string) ($gridDef['name'] ?? '');
             if ($gridName === '' || !isset($grids[$gridName])) {
@@ -404,6 +416,9 @@ class CommandLayer
             $allowed = [$fk];
             if ($tenantScoped) {
                 $allowed[] = 'tenant_id';
+                if ($canonicalScoped) {
+                    $allowed[] = 'app_id';
+                }
             }
 
             $qb = (new QueryBuilder(Database::connection(), $table))
@@ -411,6 +426,9 @@ class CommandLayer
             $qb->where($fk, '=', $parentId);
             if ($tenantScoped && $this->tenantId !== null) {
                 $qb->where('tenant_id', '=', $this->tenantId);
+                if ($canonicalScoped) {
+                    $qb->where('app_id', '=', $this->appId);
+                }
             }
             $qb->delete();
 
@@ -423,6 +441,7 @@ class CommandLayer
         $result = [];
         $gridFields = $this->gridFields($entity);
         $tenantScoped = (bool) ($entity['table']['tenantScoped'] ?? false);
+        $canonicalScoped = $tenantScoped && $this->canonicalScoped;
 
         foreach (($entity['grids'] ?? []) as $gridDef) {
             $gridName = (string) ($gridDef['name'] ?? '');
@@ -438,6 +457,9 @@ class CommandLayer
             $allowed[] = $fk;
             if ($tenantScoped) {
                 $allowed[] = 'tenant_id';
+                if ($canonicalScoped) {
+                    $allowed[] = 'app_id';
+                }
             }
 
             $qb = (new QueryBuilder(Database::connection(), $table))
@@ -446,6 +468,9 @@ class CommandLayer
 
             if ($tenantScoped && $this->tenantId !== null) {
                 $qb->where('tenant_id', '=', $this->tenantId);
+                if ($canonicalScoped) {
+                    $qb->where('app_id', '=', $this->appId);
+                }
             }
 
             $result[$gridName] = $qb->get();
