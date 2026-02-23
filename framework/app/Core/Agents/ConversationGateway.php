@@ -5,7 +5,9 @@ namespace App\Core\Agents;
 
 use App\Core\ContractsCatalog;
 use App\Core\EntityRegistry;
+use App\Core\BuilderOnboardingFlow;
 use App\Core\MemoryRepositoryInterface;
+use App\Core\ModeGuardPolicy;
 use App\Core\ProjectRegistry;
 use App\Core\SqlMemoryRepository;
 use Opis\JsonSchema\Validator;
@@ -17,6 +19,8 @@ final class ConversationGateway
     private EntityRegistry $entities;
     private ContractsCatalog $catalog;
     private MemoryRepositoryInterface $memory;
+    private ModeGuardPolicy $modeGuardPolicy;
+    private BuilderOnboardingFlow $builderOnboardingFlow;
     private DialogStateEngine $dialogState;
     private array $trainingBaseCache = [];
     private ?array $confusionBaseCache = null;
@@ -43,6 +47,8 @@ final class ConversationGateway
         $this->entities = new EntityRegistry();
         $this->catalog = new ContractsCatalog($this->projectRoot);
         $this->memory = $memory ?? new SqlMemoryRepository();
+        $this->modeGuardPolicy = new ModeGuardPolicy();
+        $this->builderOnboardingFlow = new BuilderOnboardingFlow();
         $this->dialogState = new DialogStateEngine();
     }
 
@@ -474,18 +480,19 @@ final class ConversationGateway
 
         $classification = $this->classify($normalized);
 
-        if ($mode !== 'builder' && $this->hasBuildSignals($normalized)) {
-            $reply = 'Eso se hace en el Creador de apps. Abre el chat creador para crear tablas o formularios.';
-            $state = $this->updateState($state, $raw, $reply, null, null, [], null);
-            $this->saveState($tenantId, $userId, $state);
-            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('build_guard', true));
-        }
         $isPlaybookBuilderRequest = !empty($this->parseInstallPlaybookRequest($normalized)['matched']);
-        if ($mode === 'builder' && $this->hasRuntimeCrudSignals($normalized) && !$this->hasBuildSignals($normalized) && !$isPlaybookBuilderRequest) {
-            $reply = 'Estas en el Creador. Aqui definimos estructura (tablas/formularios). Para registrar datos usa el chat de la app.';
+        $modeGuardDecision = $this->modeGuardPolicy->evaluate(
+            $mode,
+            $this->hasBuildSignals($normalized),
+            $this->hasRuntimeCrudSignals($normalized),
+            $isPlaybookBuilderRequest
+        );
+        if (is_array($modeGuardDecision)) {
+            $reply = (string) ($modeGuardDecision['reply'] ?? '');
+            $telemetry = (string) ($modeGuardDecision['telemetry'] ?? 'mode_guard');
             $state = $this->updateState($state, $raw, $reply, null, null, [], null);
             $this->saveState($tenantId, $userId, $state);
-            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('use_guard', true));
+            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry($telemetry, true));
         }
 
         if ($mode === 'builder') {
@@ -2144,43 +2151,58 @@ final class ConversationGateway
 
     private function handleBuilderOnboarding(string $text, array $state, array $profile, string $tenantId, string $userId): ?array
     {
-        $active = (string) ($state['active_task'] ?? '');
-        $isOnboarding = $active === 'builder_onboarding';
-        $trigger = $this->isBuilderOnboardingTrigger($text);
-        $businessHint = $this->detectBusinessType($text) !== '';
-        $playbookInstall = $this->parseInstallPlaybookRequest($text);
-        $playbookRoute = $this->classifyWithPlaybookIntents($text, $profile);
-        $playbookAction = (string) ($playbookRoute['action'] ?? '');
-        $playbookConfidence = (float) ($playbookRoute['confidence'] ?? 0.0);
-        if (!empty($playbookInstall['matched'])) {
-            return null;
-        }
-        if (
-            str_starts_with($playbookAction, 'APPLY_PLAYBOOK_')
-            && $playbookConfidence >= 0.72
-            && !$trigger
-        ) {
-            return null;
-        }
-        if ($this->isFormListQuestion($text)) {
-            return ['action' => 'respond_local', 'reply' => $this->buildFormList(), 'state' => $state];
-        }
-        if ($this->isEntityListQuestion($text)) {
-            return ['action' => 'respond_local', 'reply' => $this->buildEntityList(), 'state' => $state];
-        }
-        if (
-            $this->isBuilderProgressQuestion($text)
-            || str_contains($text, 'estado del proyecto')
-            || str_contains($text, 'status del proyecto')
-            || str_contains($text, 'estatus del proyecto')
-            || str_contains($text, 'resumen del proyecto')
-        ) {
-            return ['action' => 'respond_local', 'reply' => $this->buildProjectStatus(), 'state' => $state];
-        }
-        if (!$isOnboarding && !$trigger && !$businessHint) {
-            return null;
-        }
+        return $this->builderOnboardingFlow->handle(
+            $text,
+            $state,
+            $profile,
+            $tenantId,
+            $userId,
+            [
+                'parseInstallPlaybookRequest' => fn(string $value): array => $this->parseInstallPlaybookRequest($value),
+                'classifyWithPlaybookIntents' => fn(string $value, array $context): array => $this->classifyWithPlaybookIntents($value, $context),
+                'isBuilderOnboardingTrigger' => fn(string $value): bool => $this->isBuilderOnboardingTrigger($value),
+                'detectBusinessType' => fn(string $value): string => $this->detectBusinessType($value),
+                'isFormListQuestion' => fn(string $value): bool => $this->isFormListQuestion($value),
+                'buildFormList' => fn(): string => $this->buildFormList(),
+                'isEntityListQuestion' => fn(string $value): bool => $this->isEntityListQuestion($value),
+                'buildEntityList' => fn(): string => $this->buildEntityList(),
+                'isBuilderProgressQuestion' => fn(string $value): bool => $this->isBuilderProgressQuestion($value),
+                'buildProjectStatus' => fn(): string => $this->buildProjectStatus(),
+            ],
+            function (
+                string $innerText,
+                array $innerState,
+                array $innerProfile,
+                string $innerTenantId,
+                string $innerUserId,
+                bool $isOnboarding,
+                bool $trigger,
+                bool $businessHint
+            ): ?array {
+                return $this->handleBuilderOnboardingCore(
+                    $innerText,
+                    $innerState,
+                    $innerProfile,
+                    $innerTenantId,
+                    $innerUserId,
+                    $isOnboarding,
+                    $trigger,
+                    $businessHint
+                );
+            }
+        );
+    }
 
+    private function handleBuilderOnboardingCore(
+        string $text,
+        array $state,
+        array $profile,
+        string $tenantId,
+        string $userId,
+        bool $isOnboarding,
+        bool $trigger,
+        bool $businessHint
+    ): ?array {
         if ($isOnboarding && $this->isBuilderActionMessage($text) && !$trigger) {
             return null;
         }

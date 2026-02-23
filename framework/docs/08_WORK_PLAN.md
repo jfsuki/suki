@@ -58,6 +58,10 @@
   - New project knowledge mirror: `project/contracts/knowledge/domain_playbooks.json`.
   - Builder command interno: instalacion de playbooks sin terminal (`InstallPlaybook`).
   - Worker de autoaprendizaje promueve `agent_shared_knowledge` -> `training_overrides`.
+- P0 structural extraction (2026-02-23):
+  - `ModeGuardPolicy` extraido para centralizar bloqueo BUILD/USE.
+  - `BuilderOnboardingFlow` extraido como puerta de entrada del onboarding builder.
+  - pruebas dedicadas agregadas: `framework/tests/mode_guard_policy_test.php` y `framework/tests/builder_onboarding_flow_test.php`.
 
 ## Execution checklist
 - [x] Summary dependency ordering stable

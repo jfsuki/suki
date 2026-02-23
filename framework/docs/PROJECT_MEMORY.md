@@ -259,3 +259,14 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Compatibilidad y migracion:
   - fallback de lectura legacy JSON (solo lectura) para no romper sesiones viejas.
   - nuevo script `framework/scripts/migrate_memory_json_to_sql.php` para migrar datos historicos.
+
+## Checkpoint (2026-02-23, inicio refactor estructural P0)
+- Extraccion incremental sin ruptura:
+  - nuevo `framework/app/Core/ModeGuardPolicy.php` para reglas BUILD/USE.
+  - nuevo `framework/app/Core/BuilderOnboardingFlow.php` para puerta de entrada del onboarding.
+  - `ConversationGateway` delega en estas capas y mantiene la logica core existente.
+- QA de regresion:
+  - `run`, `chat_acid`, `chat_golden`, `chat_real_20`, `db_health` y `qa_gate post` en verde.
+- Pruebas dedicadas nuevas:
+  - `framework/tests/mode_guard_policy_test.php`
+  - `framework/tests/builder_onboarding_flow_test.php`
