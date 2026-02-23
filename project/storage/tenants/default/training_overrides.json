@@ -1,4 +1,62 @@
 {
-    "intents": [],
-    "updated": "2026-02-21"
+    "intents": {
+        "PROJECT_STATUS": {
+            "utterances": [
+                "dame el estado del proyecto",
+                "dame estado del proyecto",
+                "que playbooks hay"
+            ]
+        },
+        "FORM_LIST": {
+            "utterances": [
+                "que formularios"
+            ]
+        },
+        "USER_CREATE": {
+            "utterances": [
+                "crear usuario usuario real20 user 1771814937 rol vendedor clave 1234",
+                "crear usuario usuario real20 user 1771815129 rol vendedor clave 1234",
+                "crear usuario usuario real20 user 1771816545 rol vendedor clave 1234",
+                "crear usuario usuario real20 user 1771816640 rol vendedor clave 1234",
+                "crear usuario usuario real20 user 1771816844 rol vendedor clave 1234",
+                "crear usuario usuario real20 user 1771818100 rol vendedor clave 1234",
+                "crear usuario usuario real20 user 1771818270 rol vendedor clave 1234",
+                "crear usuario usuario real20 user 1771818395 rol vendedor clave 1234"
+            ]
+        },
+        "AUTH_LOGIN": {
+            "utterances": [
+                "iniciar sesion usuario real20 user 1771814937 clave 1234",
+                "iniciar sesion usuario real20 user 1771815129 clave 1234",
+                "iniciar sesion usuario real20 user 1771816545 clave 1234",
+                "iniciar sesion usuario real20 user 1771816640 clave 1234",
+                "iniciar sesion usuario real20 user 1771816844 clave 1234",
+                "iniciar sesion usuario real20 user 1771818100 clave 1234",
+                "iniciar sesion usuario real20 user 1771818270 clave 1234",
+                "iniciar sesion usuario real20 user 1771818395 clave 1234"
+            ]
+        },
+        "APP_CAPABILITIES": {
+            "utterances": [
+                "que puedo hacer aca",
+                "que opciones tengo",
+                "ahora q otra vas hacer",
+                "a puedo hacer con este programa",
+                "que opcines puedo usar"
+            ]
+        },
+        "SOLVE_UNIT_CONVERSION": {
+            "utterances": [
+                "pierdo plata con los cables y vendo por metros",
+                "mi negocio es ferreteria y vendo por metros",
+                "tengo ferreteria compro por rollo y vendo por metro pierdo plata con cables"
+            ]
+        },
+        "APP_CREATE": {
+            "utterances": [
+                "por donde quedamos"
+            ]
+        }
+    },
+    "updated": "2026-02-23"
 }
