@@ -1,0 +1,20 @@
+{
+  "type": "invoice",
+  "version": "1.0",
+  "provider": "Alanube",
+  "country": "CO",
+  "entity": "facturas",
+  "integration_id": "alanube_main",
+  "emit_endpoint": "/documents",
+  "status_endpoint": "/documents/{id}",
+  "cancel_endpoint": "/documents/{id}/cancel",
+  "mapping": {
+    "document": {},
+    "sender": {},
+    "buyer": {},
+    "totals": {},
+    "items": {
+      "source_grid": "factura_items"
+    }
+  }
+}

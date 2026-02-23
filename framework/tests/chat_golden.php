@@ -5,6 +5,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/autoload.php';
 
 use App\Core\ChatAgent;
+use App\Core\Database;
 
 $agent = new ChatAgent();
 $runId = (string) time();
@@ -75,5 +76,43 @@ if ($json !== false) {
     file_put_contents($tmpDir . '/chat_golden_result.json', $json);
 }
 
+cleanupGoldenArtifacts($entity);
+
 echo $json . PHP_EOL;
+exit(($report['summary']['ok'] ?? false) ? 0 : 1);
+
+function cleanupGoldenArtifacts(string $entity): void
+{
+    $projectRoot = realpath(__DIR__ . '/../..' . '/project') ?: dirname(__DIR__, 2) . '/project';
+    @unlink($projectRoot . '/contracts/entities/' . $entity . '.entity.json');
+    @unlink($projectRoot . '/contracts/forms/' . $entity . '.form.json');
+    if (preg_match('/_(\d+)$/', $entity, $m) === 1) {
+        $runId = (string) ($m[1] ?? '');
+        if ($runId !== '') {
+            @unlink($projectRoot . '/storage/tenants/default/agent_state/golden_proj__app__golden_' . $runId . '.json');
+            @unlink($projectRoot . '/storage/tenants/default/agent_state/golden_proj__builder__golden_' . $runId . '.json');
+            @unlink($projectRoot . '/storage/chat/profiles/default__golden_proj__app__golden_' . $runId . '.json');
+            @unlink($projectRoot . '/storage/chat/profiles/default__golden_proj__builder__golden_' . $runId . '.json');
+        }
+    }
+
+    try {
+        $pdo = Database::connection();
+        $stmt = $pdo->query("SHOW TABLES LIKE '%" . $entity . "%'");
+        $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_NUM) : [];
+        foreach ($rows as $row) {
+            $table = (string) ($row[0] ?? '');
+            if ($table === '' || preg_match('/^[a-zA-Z0-9_]+$/', $table) !== 1) {
+                continue;
+            }
+            $pdo->exec('DROP TABLE IF EXISTS `' . $table . '`');
+        }
+
+        $cleanup = $pdo->prepare('DELETE FROM schema_migrations WHERE id LIKE :id');
+        $cleanup->bindValue(':id', '%' . $entity . '%');
+        $cleanup->execute();
+    } catch (\Throwable $e) {
+        // no-op: cleanup is best-effort to keep QA gate deterministic.
+    }
+}
 

@@ -29,7 +29,7 @@ $deleteByGlob = static function (string $pattern) use (&$summary): void {
     }
 };
 
-$prefixes = ['demo_', 'golden_', 'acid_', 'tmp_', 'test_'];
+$prefixes = ['demo_', 'tmp_', 'test_', 'real20_'];
 foreach ($prefixes as $prefix) {
     $deleteByGlob($projectRoot . '/contracts/entities/' . $prefix . '*.entity.json');
     $deleteByGlob($projectRoot . '/contracts/forms/' . $prefix . '*.form.json');
@@ -37,28 +37,19 @@ foreach ($prefixes as $prefix) {
 }
 
 $storagePatterns = [
-    $projectRoot . '/storage/chat/profiles/default__acid_*',
     $projectRoot . '/storage/chat/profiles/default__demo_*',
-    $projectRoot . '/storage/chat/profiles/default__golden_*',
-    $projectRoot . '/storage/chat/profiles/default__u_test_*',
-    $projectRoot . '/storage/chat/profiles/default__u_manual_*',
-    $projectRoot . '/storage/chat/profiles/default__u_builder_*',
-    $projectRoot . '/storage/chat/profiles/default__u_reg*',
-    $projectRoot . '/storage/chat/profiles/default__default__*',
-    $projectRoot . '/storage/chat/profiles/default__suki_erp__*',
-    $projectRoot . '/storage/chat/profiles/default__builder_demo.json',
-    $projectRoot . '/storage/tenants/default/agent_state/default__app__acid_*',
-    $projectRoot . '/storage/tenants/default/agent_state/default__builder__acid_*',
+    $projectRoot . '/storage/chat/profiles/default__tmp_*',
+    $projectRoot . '/storage/chat/profiles/default__test_*',
+    $projectRoot . '/storage/chat/profiles/default__real20_*',
+    $projectRoot . '/storage/tenants/default/agent_state/default__builder__tmp_*',
+    $projectRoot . '/storage/tenants/default/agent_state/default__app__tmp_*',
     $projectRoot . '/storage/tenants/default/agent_state/default__builder__demo_*',
     $projectRoot . '/storage/tenants/default/agent_state/default__app__demo_*',
-    $projectRoot . '/storage/tenants/default/agent_state/golden_proj__*',
-    $projectRoot . '/storage/tenants/default/agent_state/suki_erp__app__golden_*',
-    $projectRoot . '/storage/tenants/default/agent_state/suki_erp__builder__golden_*',
-    $projectRoot . '/storage/tenants/default/agent_state/suki_erp__app__u_*',
-    $projectRoot . '/storage/tenants/default/agent_state/suki_erp__builder__u_*',
-    $projectRoot . '/storage/tenants/default/agent_state/suki_erp__app__user_demo.json',
-    $projectRoot . '/storage/tenants/default/agent_state/suki_erp__builder__builder_demo.json',
-    $projectRoot . '/storage/reports/chat_acid_*.json',
+    $projectRoot . '/storage/tenants/default/agent_state/default__builder__test_*',
+    $projectRoot . '/storage/tenants/default/agent_state/default__app__test_*',
+    $projectRoot . '/storage/tenants/default/agent_state/default__builder__real20_*',
+    $projectRoot . '/storage/tenants/default/agent_state/default__app__real20_*',
+    $projectRoot . '/storage/reports/chat_real_20_*.json',
 ];
 
 foreach ($storagePatterns as $pattern) {
@@ -78,7 +69,7 @@ try {
         $summary['dropped_tables'][] = $safe;
     };
 
-    foreach (['demo_%', 'golden_%', 'acid_%', 'tmp_%', 'test_%'] as $like) {
+    foreach (['demo_%', 'tmp_%', 'test_%', 'real20_%'] as $like) {
         $stmt = $pdo->query("SHOW TABLES LIKE '{$like}'");
         if (!$stmt) {
             continue;
@@ -101,13 +92,13 @@ try {
             if ($table === '') {
                 continue;
             }
-            if (preg_match('/^p_[a-f0-9]{10}__(demo_|golden_|acid_|tmp_|test_)/', $table)) {
+            if (preg_match('/^p_[a-f0-9]{10}__(demo_|tmp_|test_|real20_)/', $table)) {
                 $dropTable($pdo, $table);
             }
         }
     }
 
-    foreach (['demo_%', 'golden_%', 'acid_%', 'tmp_%', 'test_%'] as $like) {
+    foreach (['demo_%', 'tmp_%', 'test_%', 'real20_%'] as $like) {
         $stmt = $pdo->prepare('DELETE FROM schema_migrations WHERE id LIKE :id');
         $stmt->bindValue(':id', 'default::' . str_replace('%', '', $like) . '%');
         $stmt->execute();
@@ -123,7 +114,7 @@ try {
         try {
             $rdb = new PDO('sqlite:' . $registryDbPath);
             $rdb->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-            $patterns = ['demo_%', 'golden_%', 'acid_%', 'tmp_%', 'test_%'];
+            $patterns = ['demo_%', 'tmp_%', 'test_%', 'real20_%'];
             foreach ($patterns as $pattern) {
                 $rdb->prepare('DELETE FROM chat_sessions WHERE session_id LIKE :pattern')->execute([':pattern' => $pattern]);
                 $rdb->prepare('DELETE FROM users WHERE id LIKE :pattern')->execute([':pattern' => $pattern]);
@@ -133,8 +124,6 @@ try {
                 $rdb->prepare('DELETE FROM deploys WHERE project_id LIKE :pattern')->execute([':pattern' => $pattern]);
                 $rdb->prepare('DELETE FROM projects WHERE id LIKE :pattern')->execute([':pattern' => $pattern]);
             }
-            // clean known test session prefixes not covered by leading pattern.
-            $rdb->exec("DELETE FROM chat_sessions WHERE session_id LIKE 'golden_session_%' OR session_id LIKE 'acid_%'");
         } catch (Throwable $cleanupError) {
             $summary['registry_db_cleanup_error'] = $cleanupError->getMessage();
         }

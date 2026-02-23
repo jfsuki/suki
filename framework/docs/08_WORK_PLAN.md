@@ -38,6 +38,16 @@
 - Tests passed (acid + manual)
 - No rewrite
 
+## P0 closure update (2026-02-23)
+- Runtime validation connected:
+  - ConversationGateway now validates/persists working memory snapshot using `framework/contracts/agents/WORKING_MEMORY_SCHEMA.json`.
+- Conversational QA hardening:
+  - Added `framework/tests/chat_real_20.php` (20 real conversation suites builder/app).
+  - Post QA gate now runs `chat_real_20` and then `reset_test_project` before `db_health`.
+- Baseline integration contracts restored:
+  - `project/contracts/integrations/alanube_main.integration.json`
+  - `project/contracts/invoices/facturas_co.invoice.json`
+
 ## Execution checklist
 - [x] Summary dependency ordering stable
 - [x] Framework/project separation (paths + webroots)

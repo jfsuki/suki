@@ -1,0 +1,20 @@
+{
+  "id": "alanube_main",
+  "type": "e-invoicing",
+  "provider": "Alanube",
+  "country": "CO",
+  "environment": "sandbox",
+  "base_url": "https://api.alanube.co",
+  "enabled": false,
+  "auth": {
+    "type": "bearer",
+    "token_env": "ALANUBE_TOKEN"
+  },
+  "webhooks": [
+    "documents.emissionFinished"
+  ],
+  "metadata": {
+    "tenant_id": "default",
+    "notes": "Baseline sandbox integration contract"
+  }
+}

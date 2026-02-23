@@ -230,3 +230,14 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
   - no prometer capacidades no activas en registry real,
   - toda accion externa via flujo canonico `Intent -> Action -> Adapter -> Resultado`,
   - sandbox/produccion por tenant y auditoria obligatoria por accion.
+
+## Checkpoint (2026-02-23, cierre P0 tecnico)
+- Runtime schema de memoria conectado en `ConversationGateway`:
+  - cada guardado valida un snapshot con `WORKING_MEMORY_SCHEMA.json`,
+  - snapshot persistido por `tenant + project + mode + user`.
+- QA post endurecido:
+  - nueva suite `chat_real_20.php` (20 conversaciones reales builder/app),
+  - post gate ejecuta reset de artefactos de pruebas antes de `db_health`.
+- Baseline de contratos externos restaurado:
+  - `project/contracts/integrations/alanube_main.integration.json`
+  - `project/contracts/invoices/facturas_co.invoice.json`

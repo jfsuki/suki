@@ -7,6 +7,7 @@ use App\Core\ContractsCatalog;
 use App\Core\ChatMemoryStore;
 use App\Core\EntityRegistry;
 use App\Core\ProjectRegistry;
+use Opis\JsonSchema\Validator;
 use RuntimeException;
 
 final class ConversationGateway
@@ -29,6 +30,7 @@ final class ConversationGateway
     private ?ProjectRegistry $projectRegistry = null;
     private ?array $scopedEntityNamesCache = null;
     private ?array $scopedFormNamesCache = null;
+    private ?object $workingMemorySchemaCache = null;
 
     public function __construct(?string $projectRoot = null)
     {
@@ -5498,8 +5500,142 @@ private function parseEntityFromCrudText(string $text): string
     {
         $profile = $this->memory->getProfile($tenantId, $this->profileUserKey($userId));
         $state = $this->syncDialogState($state, $this->contextMode, $profile);
+        $state['working_memory_validated_at'] = date('c');
+        $this->validateAndPersistWorkingMemory($tenantId, $userId, $state, $profile);
         $path = $this->statePath($tenantId, $this->contextProjectId, $this->contextMode, $userId);
         $this->writeJson($path, $state);
+    }
+
+    private function validateAndPersistWorkingMemory(string $tenantId, string $userId, array $state, array $profile): void
+    {
+        $snapshot = $this->buildWorkingMemorySnapshot($tenantId, $userId, $state, $profile);
+        $schema = $this->workingMemorySchema();
+        $payload = json_decode(json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        if (!is_object($payload)) {
+            throw new RuntimeException('No se pudo preparar working memory para validacion.');
+        }
+        $validator = new Validator();
+        $result = $validator->validate($payload, $schema);
+        if (!$result->isValid()) {
+            $error = $result->error();
+            $message = $error ? (string) $error->message() : 'Working memory invalida';
+            throw new RuntimeException('Working memory invalida: ' . $message);
+        }
+        $this->writeJson($this->workingMemoryPath($tenantId, $this->contextProjectId, $this->contextMode, $userId), $snapshot);
+    }
+
+    private function buildWorkingMemorySnapshot(string $tenantId, string $userId, array $state, array $profile): array
+    {
+        $messages = [];
+        $history = is_array($state['last_messages'] ?? null) ? (array) $state['last_messages'] : [];
+        foreach (array_slice($history, -4) as $turn) {
+            if (!is_array($turn)) {
+                continue;
+            }
+            if (isset($turn['role'], $turn['text'])) {
+                $messages[] = [
+                    'role' => (string) $turn['role'],
+                    'text' => (string) $turn['text'],
+                ];
+                continue;
+            }
+            $u = trim((string) ($turn['u'] ?? ''));
+            $a = trim((string) ($turn['a'] ?? ''));
+            if ($u !== '') {
+                $messages[] = ['role' => 'user', 'text' => $u];
+            }
+            if ($a !== '') {
+                $messages[] = ['role' => 'assistant', 'text' => $a];
+            }
+        }
+
+        $actions = $this->contextMode === 'builder'
+            ? ['project_status', 'create_entity', 'create_form', 'suggest_fields', 'builder_help']
+            : ['app_status', 'create_record', 'query_records', 'read_record', 'update_record', 'delete_record'];
+
+        $pendingConfirmations = [];
+        if (is_array($state['builder_pending_command'] ?? null)) {
+            $pendingConfirmations[] = (string) (($state['builder_pending_command']['command'] ?? '') ?: 'pending_command');
+        }
+
+        $dialog = is_array($state['dialog'] ?? null) ? (array) $state['dialog'] : [];
+        $lastAction = is_array($state['last_action'] ?? null) ? (array) $state['last_action'] : [];
+
+        return [
+            'meta' => [
+                'version' => '1.0',
+                'updated_at' => date('c'),
+                'tenant_id' => $tenantId !== '' ? $tenantId : 'default',
+                'project_id' => $this->contextProjectId !== '' ? $this->contextProjectId : 'default',
+                'user_id' => $userId !== '' ? $userId : 'anon',
+                'mode' => $this->contextMode === 'builder' ? 'builder' : 'app',
+            ],
+            'identity' => [
+                'business_type' => $profile['business_type'] ?? null,
+                'payment_model' => $profile['operation_model'] ?? ($profile['payment_model'] ?? null),
+                'language_profile' => is_array($profile['language_profile'] ?? null)
+                    ? (array) $profile['language_profile']
+                    : ['locale' => 'es-CO'],
+            ],
+            'conversation' => [
+                'active_intent' => $state['intent'] ?? null,
+                'requested_slot' => $state['requested_slot'] ?? null,
+                'missing_slots' => array_values(array_map('strval', (array) ($state['missing'] ?? []))),
+                'last_messages' => $messages,
+            ],
+            'build_state' => [
+                'checklist_step' => $dialog['current_step_id'] ?? null,
+                'plan_summary' => $state['summary'] ?? null,
+                'pending_confirmations' => array_values(array_filter(array_map('strval', $pendingConfirmations))),
+            ],
+            'use_state' => [
+                'last_entity' => $state['entity'] ?? null,
+                'last_action' => isset($lastAction['command']) ? (string) $lastAction['command'] : null,
+            ],
+            'capabilities' => [
+                'entities' => $this->scopedEntityNames(),
+                'forms' => $this->scopedFormNames(),
+                'actions' => $actions,
+            ],
+            'safety' => [
+                'mode_guard' => true,
+                'permission_guard' => true,
+                'entity_exists_guard' => true,
+            ],
+            'telemetry' => [
+                'local_resolved_count' => (int) ($state['local_resolved_count'] ?? 0),
+                'llm_calls_count' => (int) ($state['llm_calls_count'] ?? 0),
+                'loop_guard_hits' => (int) ($state['pending_loop_counter'] ?? 0),
+            ],
+        ];
+    }
+
+    private function workingMemorySchema(): object
+    {
+        if (is_object($this->workingMemorySchemaCache)) {
+            return $this->workingMemorySchemaCache;
+        }
+        $frameworkRoot = defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__, 3);
+        $path = $frameworkRoot . '/contracts/agents/WORKING_MEMORY_SCHEMA.json';
+        if (!is_file($path)) {
+            throw new RuntimeException('Schema de working memory no existe: ' . $path);
+        }
+        $raw = file_get_contents($path);
+        if (!is_string($raw) || trim($raw) === '') {
+            throw new RuntimeException('Schema de working memory vacio.');
+        }
+        $decoded = json_decode($raw);
+        if (!is_object($decoded)) {
+            throw new RuntimeException('Schema de working memory invalido.');
+        }
+        $this->workingMemorySchemaCache = $decoded;
+        return $decoded;
+    }
+
+    private function workingMemoryPath(string $tenantId, string $projectId, string $mode, string $userId): string
+    {
+        $key = $this->safe($projectId) . '__' . $this->safe($mode) . '__' . $this->safe($userId);
+        return $this->tenantPath($tenantId) . '/working_memory/' . $key . '.json';
     }
 
     private function loadLexicon(string $tenantId): array

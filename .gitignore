@@ -2,3 +2,5 @@
 /framework/tests/tmp/*.json
 /framework/tests/*_result.json
 /project/storage/backups/
+/project/storage/tenants/*/working_memory/
+/project/storage/tenants/*/telemetry/*.log.jsonl

@@ -35,6 +35,7 @@ if ($mode === 'post') {
         ['name' => 'run', 'cmd' => 'php framework/tests/run.php', 'parser' => 'run'],
         ['name' => 'chat_acid', 'cmd' => 'php framework/tests/chat_acid.php', 'parser' => 'chat_acid'],
         ['name' => 'chat_golden', 'cmd' => 'php framework/tests/chat_golden.php', 'parser' => 'chat_golden'],
+        ['name' => 'chat_real_20', 'cmd' => 'php framework/tests/chat_real_20.php', 'parser' => 'chat_real_20'],
         ['name' => 'db_health', 'cmd' => 'php framework/tests/db_health.php', 'parser' => 'db_health'],
     ];
 }
@@ -108,6 +109,11 @@ function parseStepOutput(string $parser, string $output): bool
     }
 
     if ($parser === 'chat_golden') {
+        $summary = $json['summary'] ?? null;
+        return is_array($summary) && (($summary['ok'] ?? false) === true);
+    }
+
+    if ($parser === 'chat_real_20') {
         $summary = $json['summary'] ?? null;
         return is_array($summary) && (($summary['ok'] ?? false) === true);
     }
