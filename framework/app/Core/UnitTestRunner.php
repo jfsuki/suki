@@ -21,6 +21,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('mode_guard_policy', fn() => $this->checkModeGuardPolicy());
         $tests[] = $this->wrap('builder_onboarding_flow', fn() => $this->checkBuilderOnboardingFlow());
         $tests[] = $this->wrap('builder_guidance', fn() => $this->checkBuilderGuidance());
+        $tests[] = $this->wrap('flow_control', fn() => $this->checkFlowControl());
         $tests[] = $this->wrap('intent_router', fn() => $this->checkIntentRouter());
         $tests[] = $this->wrap('command_bus', fn() => $this->checkCommandBus());
 
@@ -233,6 +234,43 @@ final class UnitTestRunner
         }
         if ((string) ($performanceConfirm['command']['command'] ?? '') !== 'CreateIndex') {
             throw new \RuntimeException('Confirmacion de guidance de performance debe ejecutar CreateIndex.');
+        }
+    }
+
+    private function checkFlowControl(): void
+    {
+        $gateway = new \App\Core\Agents\ConversationGateway();
+        $user = 'flow_' . time();
+        $projectId = 'flow_proj';
+
+        $start = $gateway->handle('default', $user, 'quiero crear una app', 'builder', $projectId);
+        $startReply = (string) ($start['reply'] ?? '');
+        if (stripos($startReply, 'Paso 1') === false) {
+            throw new \RuntimeException('Flow control test requiere onboarding inicial.');
+        }
+
+        $cancel = $gateway->handle('default', $user, 'cancelar', 'builder', $projectId);
+        if ((string) ($cancel['action'] ?? '') !== 'respond_local') {
+            throw new \RuntimeException('Flow cancel debe responder localmente.');
+        }
+        if (($cancel['state']['active_task'] ?? null) !== null) {
+            throw new \RuntimeException('Flow cancel debe pausar tarea activa.');
+        }
+
+        $resume = $gateway->handle('default', $user, 'retomar', 'builder', $projectId);
+        if ((string) ($resume['action'] ?? '') !== 'ask_user') {
+            throw new \RuntimeException('Flow resume debe retomar como pregunta guiada.');
+        }
+        if (stripos((string) ($resume['reply'] ?? ''), 'Retomamos') === false) {
+            throw new \RuntimeException('Flow resume debe informar retoma de paso.');
+        }
+
+        $restart = $gateway->handle('default', $user, 'reiniciar', 'builder', $projectId);
+        if ((string) ($restart['action'] ?? '') !== 'ask_user') {
+            throw new \RuntimeException('Flow restart debe guiar desde paso 1.');
+        }
+        if ((string) ($restart['state']['onboarding_step'] ?? '') !== 'business_type') {
+            throw new \RuntimeException('Flow restart debe volver a business_type.');
         }
     }
 

@@ -77,6 +77,7 @@ if ($manifestError) {
         'integrations/alanube/test',
         'integrations/alanube/save',
         'integrations/alanube/webhook',
+        'channels/telegram/webhook',
     ];
     if (in_array($route, $allowedWithoutManifest, true)) {
         // allow integration setup even if manifest missing
@@ -178,6 +179,41 @@ function sanitizeKey(string $value): string
     $clean = preg_replace('/[^a-zA-Z0-9_-]/', '_', $value);
     $clean = $clean !== null ? $clean : $value;
     return $clean !== '' ? $clean : 'default';
+}
+
+function sendTelegramMessage(string $token, string $chatId, string $text): array
+{
+    if ($token === '') {
+        return ['ok' => false, 'error' => 'TELEGRAM_BOT_TOKEN_MISSING'];
+    }
+    if ($chatId === '') {
+        return ['ok' => false, 'error' => 'TELEGRAM_CHAT_ID_MISSING'];
+    }
+
+    $url = 'https://api.telegram.org/bot' . $token . '/sendMessage';
+    $payload = [
+        'chat_id' => $chatId,
+        'text' => $text !== '' ? $text : 'OK',
+    ];
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        return ['ok' => false, 'error' => 'TELEGRAM_PAYLOAD_INVALID'];
+    }
+
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\n",
+            'content' => $json,
+            'timeout' => 12,
+        ],
+    ]);
+    $raw = @file_get_contents($url, false, $context);
+    if ($raw === false) {
+        return ['ok' => false, 'error' => 'TELEGRAM_SEND_FAILED'];
+    }
+    $decoded = json_decode($raw, true);
+    return is_array($decoded) ? $decoded : ['ok' => false, 'error' => 'TELEGRAM_RESPONSE_INVALID'];
 }
 
 function contractEntityNames(): array
@@ -547,6 +583,100 @@ if ($route === 'chat/message') {
         respondJson($response, 'error', $e->getMessage(), [], 500);
         return;
     }
+}
+
+if ($route === 'channels/telegram/webhook') {
+    $payload = requestData();
+    $expectedSecret = (string) (getenv('TELEGRAM_WEBHOOK_SECRET') ?: '');
+    $receivedSecret = (string) ($_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '');
+    if ($expectedSecret !== '' && !hash_equals($expectedSecret, $receivedSecret)) {
+        respondJson($response, 'error', 'Telegram webhook secret invalido', [], 401);
+        return;
+    }
+
+    $update = is_array($payload) ? $payload : [];
+    $messageNode = is_array($update['message'] ?? null) ? (array) $update['message'] : [];
+    if (empty($messageNode) && is_array($update['edited_message'] ?? null)) {
+        $messageNode = (array) $update['edited_message'];
+    }
+    $callback = is_array($update['callback_query'] ?? null) ? (array) $update['callback_query'] : [];
+    if (empty($messageNode) && !empty($callback['message']) && is_array($callback['message'])) {
+        $messageNode = (array) $callback['message'];
+    }
+
+    $chatId = trim((string) ($messageNode['chat']['id'] ?? ''));
+    $text = trim((string) ($messageNode['text'] ?? ($callback['data'] ?? '')));
+    if ($chatId === '') {
+        respondJson($response, 'success', 'Telegram update ignorado', ['ignored' => true]);
+        return;
+    }
+
+    $mode = 'app';
+    if (preg_match('/^\\/builder\\b/i', $text) === 1) {
+        $mode = 'builder';
+        $text = trim((string) (preg_replace('/^\\/builder\\b/i', '', $text) ?? $text));
+    } elseif (preg_match('/^\\/app\\b/i', $text) === 1) {
+        $mode = 'app';
+        $text = trim((string) (preg_replace('/^\\/app\\b/i', '', $text) ?? $text));
+    }
+    if ($text === '' || preg_match('/^\\/(start|help)$/i', $text) === 1) {
+        $text = 'hola';
+    }
+
+    $tenantId = trim((string) (getenv('TELEGRAM_DEFAULT_TENANT') ?: 'default'));
+    if ($tenantId === '') {
+        $tenantId = 'default';
+    }
+    $projectId = trim((string) (getenv('TELEGRAM_DEFAULT_PROJECT') ?: ''));
+    if ($projectId === '') {
+        try {
+            $registry = new ProjectRegistry();
+            $manifest = $registry->resolveProjectFromManifest();
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        } catch (\Throwable $e) {
+            $projectId = 'default';
+        }
+    }
+    $safeChat = sanitizeKey($chatId);
+    $chatPayload = [
+        'message' => $text,
+        'mode' => $mode,
+        'channel' => 'telegram',
+        'tenant_id' => $tenantId,
+        'project_id' => $projectId !== '' ? $projectId : 'default',
+        'user_id' => 'tg:' . $safeChat,
+        'session_id' => 'tg:' . $safeChat . ':' . $mode,
+    ];
+
+    setTenantContext($chatPayload);
+    try {
+        $agent = new \App\Core\ChatAgent();
+        $result = $agent->handle($chatPayload);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+
+    $replyText = trim((string) ($result['data']['reply'] ?? $result['message'] ?? 'OK'));
+    if ($replyText === '') {
+        $replyText = 'OK';
+    }
+    $token = trim((string) (getenv('TELEGRAM_BOT_TOKEN') ?: ''));
+    $delivery = sendTelegramMessage($token, $chatId, $replyText);
+    $delivered = (bool) ($delivery['ok'] ?? false);
+    $httpCode = $delivered ? 200 : 502;
+    respondJson(
+        $response,
+        $delivered ? 'success' : 'error',
+        $delivered ? 'Mensaje Telegram entregado' : 'No se pudo enviar respuesta a Telegram',
+        [
+            'mode' => $mode,
+            'chat_id' => $chatId,
+            'delivery' => $delivery,
+        ],
+        $httpCode
+    );
+    return;
 }
 
 if ($route === 'chat/help') {

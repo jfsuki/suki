@@ -114,6 +114,17 @@
   - `ensureField` (agrega columna FK si falta)
   - `ensureIndex` (crea indice idempotente).
 
+## Runtime update (2026-02-23, flow control profesional)
+- Se agrega control de navegacion global:
+  - `cancelar`, `atras`, `reiniciar`, `retomar`.
+- Se formaliza persistencia de flujo (`flow_runtime`) para retoma por paso exacto.
+- Se agrega `feedback_pending` + captura `me sirvio` / `no me sirvio` para cerrar loop de calidad.
+- Pruebas:
+  - `UnitTestRunner::checkFlowControl`.
+  - `framework/tests/flow_control_test.php`.
+- Canal externo bootstrap:
+  - endpoint `channels/telegram/webhook` conectado a `ChatAgent` con sesion estable por `chat_id`.
+
 ## Execution checklist
 - [x] Summary dependency ordering stable
 - [x] Framework/project separation (paths + webroots)

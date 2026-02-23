@@ -1,7 +1,7 @@
 {
     "meta": {
         "name": "suki_conversation_training_base",
-        "version": "0.3.8",
+        "version": "0.3.9",
         "language": "es-CO",
         "timezone": "America/Bogota",
         "created": "2026-02-18",
@@ -2625,6 +2625,90 @@
                 ]
             },
             "disambiguation_prompt": "Quieres que te instale esta plantilla en el Creador de apps?"
+        },
+        {
+            "name": "FLOW_CONTROL_CANCEL",
+            "description": "Cancelar el flujo actual, accion pendiente o salir de asistente guiado.",
+            "action": "FLOW_CANCEL",
+            "required_entities": [],
+            "optional_entities": [],
+            "utterances": [
+                "cancelar",
+                "cancelar operacion",
+                "olvidalo",
+                "ya no",
+                "salir",
+                "abortar",
+                "detener",
+                "no quiero hacer esto",
+                "dejalo asi",
+                "atras",
+                "volver",
+                "menu principal"
+            ],
+            "slot_filling": [],
+            "examples": [],
+            "notes": [
+                "Debe cancelar sin ejecutar accion pendiente."
+            ],
+            "response_style": {
+                "tone": "neutro",
+                "length": "muy breve",
+                "format": "confirmacion"
+            },
+            "disambiguation_prompt": "Listo, cancele. Quieres retomar despues?"
+        },
+        {
+            "name": "FLOW_CONTROL_RESTART",
+            "description": "Reiniciar conversacion o flujo desde cero sin romper perfil base.",
+            "action": "FLOW_RESTART",
+            "required_entities": [],
+            "optional_entities": [],
+            "utterances": [
+                "reiniciar",
+                "empezar de nuevo",
+                "volver al inicio",
+                "comenzar de cero",
+                "reset",
+                "limpiar chat"
+            ],
+            "slot_filling": [],
+            "examples": [],
+            "notes": [
+                "Debe limpiar estado operativo y mantener seguridad por modo."
+            ],
+            "response_style": {
+                "tone": "neutro",
+                "length": "muy breve",
+                "format": "confirmacion"
+            },
+            "disambiguation_prompt": "Listo, reinicie. Seguimos desde el paso 1?"
+        },
+        {
+            "name": "FLOW_CONTROL_RESUME",
+            "description": "Retomar flujo pausado o conversacion abierta.",
+            "action": "FLOW_RESUME",
+            "required_entities": [],
+            "optional_entities": [],
+            "utterances": [
+                "retomar",
+                "continuar",
+                "reanudar",
+                "donde quedamos",
+                "seguir donde quede",
+                "resume"
+            ],
+            "slot_filling": [],
+            "examples": [],
+            "notes": [
+                "Debe retomar paso exacto si existe estado persistido."
+            ],
+            "response_style": {
+                "tone": "neutro",
+                "length": "breve",
+                "format": "estado + siguiente paso"
+            },
+            "disambiguation_prompt": "Retomo el ultimo paso pendiente?"
         }
     ],
     "lookup_tables": {

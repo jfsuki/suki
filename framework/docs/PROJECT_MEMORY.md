@@ -322,3 +322,17 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - `EntityMigrator` incorpora operaciones incrementales:
   - `ensureField(...)` para `ALTER TABLE ADD COLUMN` seguro.
   - `ensureIndex(...)` para creacion idempotente de indices.
+
+## Checkpoint (2026-02-23, flow control + retoma + telegram bootstrap)
+- Control global de navegacion en `ConversationGateway`:
+  - `cancelar`, `atras`, `reiniciar`, `retomar`.
+  - funciona por encima de onboarding/guidance para evitar flujos atrapados.
+- Persistencia de flujo con `flow_runtime` en estado:
+  - `flow_key`, `current_step`, `step_history`, `paused`, `last_activity_at`.
+  - permite retomar paso exacto tras pausas largas.
+- Feedback loop operativo (builder):
+  - tras `CreateRelation`, `CreateIndex`, `InstallPlaybook` pide confirmacion de utilidad.
+  - captura frases `me sirvio` / `no me sirvio` y agrega estadistica por comando en memoria tenant.
+- Conector inicial Telegram:
+  - nuevo endpoint `POST /api/channels/telegram/webhook`.
+  - valida secret opcional (`TELEGRAM_WEBHOOK_SECRET`), mapea `user_id/session_id` estables y responde por Bot API.

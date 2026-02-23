@@ -146,6 +146,57 @@ final class ConversationGateway
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('dialog_checklist', true));
         }
 
+        $flowControlRoute = $this->routeFlowControl($normalizedBase, $state, $profile, $mode, $tenantId, $userId);
+        if (!empty($flowControlRoute)) {
+            $reply = (string) ($flowControlRoute['reply'] ?? 'Listo.');
+            $state = $this->updateState(
+                $state,
+                $raw,
+                $reply,
+                (string) ($flowControlRoute['intent'] ?? 'flow_control'),
+                $flowControlRoute['entity'] ?? null,
+                $flowControlRoute['collected'] ?? [],
+                $flowControlRoute['active_task'] ?? ($state['active_task'] ?? null)
+            );
+            if (!empty($flowControlRoute['state_patch']) && is_array($flowControlRoute['state_patch'])) {
+                foreach ($flowControlRoute['state_patch'] as $key => $value) {
+                    $state[$key] = $value;
+                }
+            }
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result(
+                (string) ($flowControlRoute['action'] ?? 'respond_local'),
+                $reply,
+                null,
+                null,
+                $state,
+                $this->telemetry('flow_control', true, $flowControlRoute)
+            );
+        }
+
+        $feedbackRoute = $this->routeFeedbackLoop($normalizedBase, $state, $mode, $tenantId, $userId);
+        if (!empty($feedbackRoute)) {
+            $reply = (string) ($feedbackRoute['reply'] ?? 'Gracias.');
+            $state = $this->updateState(
+                $state,
+                $raw,
+                $reply,
+                (string) ($feedbackRoute['intent'] ?? 'feedback_loop'),
+                null,
+                $feedbackRoute['collected'] ?? [],
+                $feedbackRoute['active_task'] ?? ($state['active_task'] ?? null)
+            );
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result(
+                (string) ($feedbackRoute['action'] ?? 'respond_local'),
+                $reply,
+                null,
+                null,
+                $state,
+                $this->telemetry('feedback_loop', true, $feedbackRoute)
+            );
+        }
+
         $calcPromptRoute = $this->handleBuilderCalculatedPrompt(
             $normalizedBase,
             $raw,
@@ -661,6 +712,14 @@ final class ConversationGateway
                 $state['active_task'] = 'builder_onboarding';
                 $state['onboarding_step'] = 'plan_ready';
             }
+
+            if (in_array($commandName, ['CreateRelation', 'CreateIndex', 'InstallPlaybook'], true)) {
+                $state['feedback_pending'] = [
+                    'command' => $commandName,
+                    'entity' => $entity,
+                    'asked_at' => date('c'),
+                ];
+            }
         }
         $this->contextProjectId = $projectId;
         $this->contextMode = $mode;
@@ -757,6 +816,11 @@ final class ConversationGateway
 
         if ($commandName === 'CreateForm') {
             return $this->buildBuilderPlanProgressReply($state, $profile, false);
+        }
+
+        if (in_array($commandName, ['CreateRelation', 'CreateIndex', 'InstallPlaybook'], true)) {
+            return 'Si te sirvio este paso, escribe: "me sirvio".' . "\n"
+                . 'Si no te sirvio, escribe: "no me sirvio".';
         }
 
         return '';
@@ -5276,6 +5340,322 @@ private function parseEntityFromCrudText(string $text): string
         return '';
     }
 
+    private function routeFlowControl(
+        string $text,
+        array &$state,
+        array $profile,
+        string $mode,
+        string $tenantId,
+        string $userId
+    ): array {
+        $intent = $this->detectFlowControlIntent($text);
+        if ($intent === '') {
+            return [];
+        }
+
+        if ($intent === 'cancel') {
+            $hadPending = is_array($state['builder_pending_command'] ?? null);
+            if ($hadPending) {
+                $this->clearBuilderPendingCommand($state);
+            }
+            if ($mode === 'builder') {
+                $runtime = $this->normalizeFlowRuntime(is_array($state['flow_runtime'] ?? null) ? $state['flow_runtime'] : []);
+                if (($state['active_task'] ?? '') === 'builder_onboarding' || !empty($state['onboarding_step'])) {
+                    $runtime['paused'] = true;
+                }
+                $runtime['last_activity_at'] = date('c');
+                $state['flow_runtime'] = $runtime;
+                $state['active_task'] = null;
+                $state['requested_slot'] = null;
+                $state['missing'] = [];
+                $state['feedback_pending'] = null;
+                $reply = $hadPending
+                    ? 'Listo, cancele la accion pendiente. Cuando quieras seguimos.'
+                    : 'Listo, flujo cancelado. Cuando quieras retomamos.';
+            } else {
+                $state['active_task'] = null;
+                $state['requested_slot'] = null;
+                $state['missing'] = [];
+                $state['feedback_pending'] = null;
+                $reply = 'Listo, cancele el flujo actual.';
+            }
+            return [
+                'action' => 'respond_local',
+                'intent' => 'FLOW_CONTROL_CANCEL',
+                'reply' => $reply,
+                'active_task' => $state['active_task'] ?? null,
+            ];
+        }
+
+        if ($intent === 'restart') {
+            if ($mode === 'builder') {
+                $this->clearBuilderPendingCommand($state);
+                $state['builder_calc_prompt'] = null;
+                $state['builder_formula_notes'] = [];
+                $state['builder_plan'] = null;
+                $state['analysis_approved'] = null;
+                $state['active_task'] = 'builder_onboarding';
+                $state['onboarding_step'] = 'business_type';
+                $state['entity'] = null;
+                $state['collected'] = [];
+                $state['missing'] = [];
+                $state['requested_slot'] = null;
+                $state['flow_runtime'] = $this->flowRuntimeDefaults();
+                $state['feedback_pending'] = null;
+                return [
+                    'action' => 'ask_user',
+                    'intent' => 'FLOW_CONTROL_RESTART',
+                    'reply' => 'Listo, reinicie el flujo.' . "\n" . $this->buildOnboardingPromptForStep('business_type', $profile, $state),
+                    'active_task' => 'builder_onboarding',
+                ];
+            }
+
+            $state['active_task'] = null;
+            $state['requested_slot'] = null;
+            $state['missing'] = [];
+            return [
+                'action' => 'respond_local',
+                'intent' => 'FLOW_CONTROL_RESTART',
+                'reply' => 'Listo, reinicie esta conversacion.',
+                'active_task' => null,
+            ];
+        }
+
+        if ($intent === 'back') {
+            if ($mode !== 'builder') {
+                return [
+                    'action' => 'respond_local',
+                    'intent' => 'FLOW_CONTROL_BACK',
+                    'reply' => 'En app no manejo pasos de creacion. Si quieres, digo tu ultimo estado.',
+                ];
+            }
+
+            if (is_array($state['builder_pending_command'] ?? null)) {
+                $this->clearBuilderPendingCommand($state);
+                $state['active_task'] = 'builder_onboarding';
+                return [
+                    'action' => 'ask_user',
+                    'intent' => 'FLOW_CONTROL_BACK',
+                    'reply' => 'Listo, quite la accion pendiente. Dime que quieres ajustar.',
+                    'active_task' => 'builder_onboarding',
+                ];
+            }
+
+            $previousStep = $this->popPreviousOnboardingStep($state);
+            if ($previousStep === '') {
+                return [
+                    'action' => 'respond_local',
+                    'intent' => 'FLOW_CONTROL_BACK',
+                    'reply' => 'No tengo un paso anterior para volver.',
+                    'active_task' => $state['active_task'] ?? null,
+                ];
+            }
+
+            $state['active_task'] = 'builder_onboarding';
+            $state['onboarding_step'] = $previousStep;
+            if ($previousStep !== 'plan_ready') {
+                unset($state['analysis_approved']);
+            }
+            $runtime = $this->normalizeFlowRuntime(is_array($state['flow_runtime'] ?? null) ? $state['flow_runtime'] : []);
+            $runtime['current_step'] = $previousStep;
+            $runtime['paused'] = false;
+            $runtime['last_activity_at'] = date('c');
+            $state['flow_runtime'] = $runtime;
+
+            return [
+                'action' => 'ask_user',
+                'intent' => 'FLOW_CONTROL_BACK',
+                'reply' => 'Volvimos al paso anterior.' . "\n" . $this->buildOnboardingPromptForStep($previousStep, $profile, $state),
+                'active_task' => 'builder_onboarding',
+            ];
+        }
+
+        if ($intent === 'resume') {
+            if ($mode !== 'builder') {
+                $last = is_array($state['last_action'] ?? null) ? (array) $state['last_action'] : [];
+                if (!empty($last)) {
+                    return [
+                        'action' => 'respond_local',
+                        'intent' => 'FLOW_CONTROL_RESUME',
+                        'reply' => $this->buildLastActionReply($state, $mode),
+                    ];
+                }
+                return [
+                    'action' => 'respond_local',
+                    'intent' => 'FLOW_CONTROL_RESUME',
+                    'reply' => 'No hay flujo pendiente en app. Dime la accion que quieres ejecutar.',
+                ];
+            }
+
+            if (is_array($state['builder_pending_command'] ?? null)) {
+                return [
+                    'action' => 'ask_user',
+                    'intent' => 'FLOW_CONTROL_RESUME',
+                    'reply' => 'Retomamos esta accion pendiente:' . "\n" . $this->buildPendingPreviewReply((array) $state['builder_pending_command']),
+                    'active_task' => 'create_table',
+                ];
+            }
+
+            $runtime = $this->normalizeFlowRuntime(is_array($state['flow_runtime'] ?? null) ? $state['flow_runtime'] : []);
+            $step = trim((string) ($state['onboarding_step'] ?? ($runtime['current_step'] ?? '')));
+            if ($step === '') {
+                return [
+                    'action' => 'respond_local',
+                    'intent' => 'FLOW_CONTROL_RESUME',
+                    'reply' => 'No tengo un flujo pendiente. Si quieres empezamos uno nuevo.',
+                    'active_task' => $state['active_task'] ?? null,
+                ];
+            }
+
+            $state['active_task'] = 'builder_onboarding';
+            $state['onboarding_step'] = $step;
+            $runtime['paused'] = false;
+            $runtime['flow_key'] = $runtime['flow_key'] ?: 'SECTOR_DISCOVERY_BASE';
+            $runtime['current_step'] = $step;
+            $runtime['last_activity_at'] = date('c');
+            $state['flow_runtime'] = $runtime;
+            return [
+                'action' => 'ask_user',
+                'intent' => 'FLOW_CONTROL_RESUME',
+                'reply' => 'Retomamos donde quedamos (' . $step . ').' . "\n" . $this->buildOnboardingPromptForStep($step, $profile, $state),
+                'active_task' => 'builder_onboarding',
+            ];
+        }
+
+        return [];
+    }
+
+    private function detectFlowControlIntent(string $text): string
+    {
+        if (preg_match('/^(cancelar|cancelar operaci[oó]n|olvidalo|olvi[dð]alo|ya no|salir|abortar|detener|no quiero hacer esto|dejalo asi|dejarlo asi)$/u', $text) === 1) {
+            return 'cancel';
+        }
+        if (preg_match('/^(atras|atr[aá]s|volver|volver atras|volver atr[aá]s|regresar|paso anterior)$/u', $text) === 1) {
+            return 'back';
+        }
+        if (preg_match('/^(reiniciar|empezar de nuevo|volver al inicio|comenzar de cero|reset|limpiar chat)$/u', $text) === 1) {
+            return 'restart';
+        }
+        if (preg_match('/^(retomar|continuar|continuemos|reanudar|resume|seguir donde quede|donde quedamos)$/u', $text) === 1) {
+            return 'resume';
+        }
+        return '';
+    }
+
+    private function popPreviousOnboardingStep(array &$state): string
+    {
+        $runtime = $this->normalizeFlowRuntime(is_array($state['flow_runtime'] ?? null) ? $state['flow_runtime'] : []);
+        $history = array_values((array) ($runtime['step_history'] ?? []));
+        if (!empty($history)) {
+            $previous = (string) array_pop($history);
+            $runtime['step_history'] = $history;
+            $state['flow_runtime'] = $runtime;
+            return $previous;
+        }
+
+        $current = trim((string) ($state['onboarding_step'] ?? ($runtime['current_step'] ?? '')));
+        $map = [
+            'operation_model' => 'business_type',
+            'needs_scope' => 'operation_model',
+            'documents_scope' => 'needs_scope',
+            'confirm_scope' => 'documents_scope',
+            'plan_ready' => 'confirm_scope',
+        ];
+        return (string) ($map[$current] ?? '');
+    }
+
+    private function buildOnboardingPromptForStep(string $step, array $profile, array $state): string
+    {
+        $step = trim($step);
+        $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
+        return match ($step) {
+            'business_type' => 'Paso 1: responde solo una opcion: servicios, productos o ambos.',
+            'operation_model' => 'Paso 2: como manejas pagos? contado, credito o mixto.',
+            'needs_scope' => 'Paso 3: que necesitas controlar primero en tu negocio?' . "\n"
+                . 'Ejemplos: ' . $this->buildNeedsScopeExample($businessType, $profile) . '.',
+            'documents_scope' => 'Paso 4: que documentos necesitas usar?' . "\n"
+                . 'Ejemplos: ' . $this->buildDocumentsScopeExample($businessType, $profile) . '.',
+            'confirm_scope' => $this->buildRequirementsSummaryReply($businessType, $profile, $this->buildBusinessPlan($businessType, $profile)),
+            'plan_ready' => $this->buildBuilderPlanProgressReply($state, $profile, true),
+            default => 'Dime tu siguiente paso y lo retomamos.',
+        };
+    }
+
+    private function routeFeedbackLoop(string $text, array &$state, string $mode, string $tenantId, string $userId): array
+    {
+        if ($mode !== 'builder') {
+            return [];
+        }
+        if (is_array($state['builder_pending_command'] ?? null)) {
+            return [];
+        }
+        $pending = is_array($state['feedback_pending'] ?? null) ? (array) $state['feedback_pending'] : [];
+        if (empty($pending)) {
+            return [];
+        }
+
+        $normalized = trim(preg_replace('/\s+/', ' ', strtolower($text)) ?? strtolower($text));
+        $helpful = null;
+        if (preg_match('/^(me sirvio|si me sirvio|si sirvio)$/u', $normalized) === 1) {
+            $helpful = true;
+        } elseif (preg_match('/^(no me sirvio|no sirvio)$/u', $normalized) === 1) {
+            $helpful = false;
+        }
+
+        if ($helpful === null) {
+            if ($this->isQuestionLike($text)) {
+                return [
+                    'action' => 'ask_user',
+                    'intent' => 'FLOW_FEEDBACK_PENDING',
+                    'reply' => 'Antes de seguir, confirma feedback de este paso: "me sirvio" o "no me sirvio".',
+                    'active_task' => $state['active_task'] ?? null,
+                ];
+            }
+            return [];
+        }
+
+        $entry = [
+            'command' => (string) ($pending['command'] ?? ''),
+            'entity' => (string) ($pending['entity'] ?? ''),
+            'helpful' => $helpful,
+            'at' => date('c'),
+        ];
+        $log = is_array($state['feedback_log'] ?? null) ? (array) $state['feedback_log'] : [];
+        $log[] = $entry;
+        if (count($log) > 50) {
+            $log = array_slice($log, -50);
+        }
+        $state['feedback_log'] = $log;
+        $state['feedback_pending'] = null;
+
+        $stats = $this->memory->getTenantMemory($tenantId, 'flow_feedback_stats', []);
+        $commandKey = strtolower((string) ($entry['command'] ?? 'unknown'));
+        if (!isset($stats[$commandKey]) || !is_array($stats[$commandKey])) {
+            $stats[$commandKey] = ['total' => 0, 'helpful' => 0, 'not_helpful' => 0];
+        }
+        $stats[$commandKey]['total'] = (int) ($stats[$commandKey]['total'] ?? 0) + 1;
+        if ($helpful) {
+            $stats[$commandKey]['helpful'] = (int) ($stats[$commandKey]['helpful'] ?? 0) + 1;
+        } else {
+            $stats[$commandKey]['not_helpful'] = (int) ($stats[$commandKey]['not_helpful'] ?? 0) + 1;
+        }
+        $this->memory->saveTenantMemory($tenantId, 'flow_feedback_stats', $stats);
+
+        return [
+            'action' => 'respond_local',
+            'intent' => 'FLOW_FEEDBACK_CAPTURED',
+            'reply' => $helpful
+                ? 'Perfecto, gracias por confirmar. Seguimos.'
+                : 'Gracias por avisar. Ajusto el siguiente paso para mejorarlo.',
+            'collected' => [
+                'feedback_command' => (string) ($entry['command'] ?? ''),
+                'feedback_helpful' => $helpful ? 'yes' : 'no',
+                'feedback_user' => $userId,
+            ],
+            'active_task' => $state['active_task'] ?? null,
+        ];
+    }
+
     private function classifyWithTraining(string $text, array $training, array $profile = []): array
     {
         $intents = $training['intents'] ?? [];
@@ -6544,6 +6924,9 @@ private function parseEntityFromCrudText(string $text): string
             'unknown_business_notice_sent' => false,
             'last_action' => null,
             'dialog' => null,
+            'flow_runtime' => $this->flowRuntimeDefaults(),
+            'feedback_pending' => null,
+            'feedback_log' => [],
             'last_messages' => [],
             'summary' => null,
         ];
@@ -6576,6 +6959,7 @@ private function parseEntityFromCrudText(string $text): string
 
     private function saveState(string $tenantId, string $userId, array $state): void
     {
+        $state = $this->syncFlowRuntimeState($state);
         $profile = $this->getProfile($tenantId, $this->profileUserKey($userId));
         $state = $this->syncDialogState($state, $this->contextMode, $profile);
         $state['working_memory_validated_at'] = date('c');
@@ -6613,7 +6997,73 @@ private function parseEntityFromCrudText(string $text): string
 
     private function mergeStateDefaults(array $default, array $stored): array
     {
-        return array_merge($default, $stored);
+        $merged = array_merge($default, $stored);
+        $merged['flow_runtime'] = $this->normalizeFlowRuntime($merged['flow_runtime'] ?? []);
+        if (!is_array($merged['feedback_log'] ?? null)) {
+            $merged['feedback_log'] = [];
+        }
+        if (isset($merged['feedback_pending']) && !is_array($merged['feedback_pending']) && $merged['feedback_pending'] !== null) {
+            $merged['feedback_pending'] = null;
+        }
+        return $merged;
+    }
+
+    private function flowRuntimeDefaults(): array
+    {
+        return [
+            'flow_key' => null,
+            'current_step' => null,
+            'step_history' => [],
+            'started_at' => null,
+            'last_activity_at' => null,
+            'paused' => false,
+        ];
+    }
+
+    private function normalizeFlowRuntime(array $runtime): array
+    {
+        $defaults = $this->flowRuntimeDefaults();
+        $merged = array_merge($defaults, $runtime);
+        if (!is_array($merged['step_history'] ?? null)) {
+            $merged['step_history'] = [];
+        }
+        $merged['step_history'] = array_values(array_filter(
+            array_map(static fn($v): string => trim((string) $v), (array) $merged['step_history']),
+            static fn(string $v): bool => $v !== ''
+        ));
+        if (count($merged['step_history']) > 20) {
+            $merged['step_history'] = array_slice($merged['step_history'], -20);
+        }
+        $merged['paused'] = (bool) ($merged['paused'] ?? false);
+        return $merged;
+    }
+
+    private function syncFlowRuntimeState(array $state): array
+    {
+        $runtime = $this->normalizeFlowRuntime(is_array($state['flow_runtime'] ?? null) ? $state['flow_runtime'] : []);
+        $now = date('c');
+        $activeTask = (string) ($state['active_task'] ?? '');
+        $onboardingStep = trim((string) ($state['onboarding_step'] ?? ''));
+        $shouldTrack = $this->contextMode === 'builder'
+            && ($activeTask === 'builder_onboarding' || ($onboardingStep !== '' && !(bool) ($runtime['paused'] ?? false)));
+        if ($shouldTrack) {
+            $runtime['flow_key'] = 'SECTOR_DISCOVERY_BASE';
+            $step = $onboardingStep !== '' ? $onboardingStep : (string) ($runtime['current_step'] ?? 'business_type');
+            $prevStep = (string) ($runtime['current_step'] ?? '');
+            if ($prevStep !== '' && $prevStep !== $step) {
+                $history = (array) ($runtime['step_history'] ?? []);
+                $history[] = $prevStep;
+                $runtime['step_history'] = array_values(array_slice(array_filter($history, static fn($v): bool => (string) $v !== ''), -20));
+            }
+            $runtime['current_step'] = $step;
+            if (empty($runtime['started_at'])) {
+                $runtime['started_at'] = $now;
+            }
+            $runtime['paused'] = false;
+        }
+        $runtime['last_activity_at'] = $now;
+        $state['flow_runtime'] = $runtime;
+        return $state;
     }
 
     private function buildWorkingMemorySnapshot(string $tenantId, string $userId, array $state, array $profile): array
