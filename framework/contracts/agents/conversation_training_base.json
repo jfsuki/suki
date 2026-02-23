@@ -1,7 +1,7 @@
 {
     "meta": {
         "name": "suki_conversation_training_base",
-        "version": "0.3.9",
+        "version": "0.3.10",
         "language": "es-CO",
         "timezone": "America/Bogota",
         "created": "2026-02-18",
@@ -18,7 +18,8 @@
             "v0.3.6: +solver_intents sectoriales (APPLY_PLAYBOOK_*) para enrutar dolores de negocio.",
             "v0.3.7: +solver_intents iglesia/educacion/servicios_pro y +flujos de consultoria para playbooks extendidos.",
             "v0.3.8: +builder_guidance estructurado y sincronizado con domain_playbooks para respuestas guiadas data-driven.",
-            "v0.3.9: solver_intents y builder_guidance sincronizados desde domain_playbooks (single source)."
+            "v0.3.9: solver_intents y builder_guidance sincronizados desde domain_playbooks (single source).",
+            "v0.3.10: +intents USER_CORRECTION e INTEGRATION_SETUP para correccion adaptativa e inicio de integraciones API."
         ]
     },
     "routing": {
@@ -2737,6 +2738,60 @@
                 "format": "estado + siguiente paso"
             },
             "disambiguation_prompt": "Volvemos al paso anterior del flujo?"
+        },
+        {
+            "name": "USER_CORRECTION",
+            "description": "El usuario corrige una clasificacion o resumen previo del asistente.",
+            "action": "USER_CORRECTION",
+            "required_entities": [],
+            "optional_entities": [],
+            "utterances": [
+                "no es asi",
+                "eso no",
+                "te equivocaste",
+                "no soy ese negocio",
+                "soy otra cosa",
+                "cambiemos el tipo de negocio",
+                "no, corrijamos"
+            ],
+            "slot_filling": [],
+            "examples": [],
+            "notes": [
+                "Debe invalidar la hipotesis actual y pedir una frase concreta del negocio."
+            ],
+            "response_style": {
+                "tone": "neutro",
+                "length": "breve",
+                "format": "confirmacion + siguiente pregunta minima"
+            },
+            "disambiguation_prompt": "Entendido. Dime en una frase que vendes o fabricas."
+        },
+        {
+            "name": "INTEGRATION_SETUP",
+            "description": "Iniciar configuracion guiada de integracion API a partir de documentacion OpenAPI/Swagger.",
+            "action": "INTEGRATION_SETUP",
+            "required_entities": [],
+            "optional_entities": [],
+            "utterances": [
+                "conectar con shopify",
+                "integrar api de pagos",
+                "quiero integrar una api",
+                "configurar webhook de proveedor",
+                "conectar sistema externo",
+                "integracion por openapi",
+                "tengo la documentacion swagger"
+            ],
+            "slot_filling": [],
+            "examples": [],
+            "notes": [
+                "Debe pedir URL/archivo de documentacion y proponer contrato antes de guardar."
+            ],
+            "response_style": {
+                "tone": "claro, cercano, profesional",
+                "length": "breve",
+                "format": "pregunta minima + siguiente paso"
+            },
+            "disambiguation_prompt": "Comparte la URL OpenAPI/Swagger y el nombre de la integracion."
         }
     ],
     "lookup_tables": {

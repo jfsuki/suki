@@ -2371,6 +2371,76 @@ final class ConversationGateway
         $localState = $state;
         $currentStep = (string) ($localState['onboarding_step'] ?? '');
 
+        if (
+            (string) ($localState['active_task'] ?? '') === 'business_research_confirmation'
+            && is_array($localState['dynamic_playbook_proposal'] ?? null)
+            && !empty($localState['dynamic_playbook_proposal'])
+        ) {
+            $proposal = (array) $localState['dynamic_playbook_proposal'];
+            $candidateLabel = trim((string) ($proposal['candidate'] ?? 'tu negocio'));
+            $needsList = is_array($proposal['needs'] ?? null) ? array_values((array) $proposal['needs']) : [];
+            $docsList = is_array($proposal['documents'] ?? null) ? array_values((array) $proposal['documents']) : [];
+
+            if ($this->isAffirmativeReply($text)) {
+                $dynamicKey = 'dynamic_' . $this->safe($candidateLabel !== '' ? $candidateLabel : 'custom');
+                if ($dynamicKey === 'dynamic_') {
+                    $dynamicKey = 'dynamic_custom';
+                }
+                $localProfile['business_type'] = $dynamicKey;
+                $localProfile['business_label'] = $candidateLabel !== '' ? $candidateLabel : 'Negocio personalizado';
+                if (!empty($needsList)) {
+                    $localProfile['needs_scope_items'] = $needsList;
+                    $localProfile['needs_scope'] = implode(', ', $needsList);
+                }
+                if (!empty($docsList)) {
+                    $localProfile['documents_scope_items'] = $docsList;
+                    $localProfile['documents_scope'] = implode(', ', $docsList);
+                }
+                unset($localProfile['business_candidate']);
+                $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+
+                $localState['proposed_profile'] = $dynamicKey;
+                $localState['dynamic_playbook'] = $proposal;
+                $localState['dynamic_playbook_proposal'] = null;
+                $localState['business_resolution_last_candidate'] = $candidateLabel;
+                $localState['business_resolution_last_status'] = 'CONFIRMED_NEW_BUSINESS';
+                $localState['business_resolution_last_result'] = [
+                    'status' => 'CONFIRMED_NEW_BUSINESS',
+                    'business_candidate' => $candidateLabel,
+                    'needs_normalized' => $needsList,
+                    'documents_normalized' => $docsList,
+                ];
+                $localState['business_resolution_last_at'] = date('c');
+                $localState['resolution_attempts'] = 0;
+                $localState['analysis_approved'] = null;
+                $localState['active_task'] = 'builder_onboarding';
+                $localState['onboarding_step'] = 'operation_model';
+
+                $reply = 'Perfecto. Confirmado: negocio de ' . ($candidateLabel !== '' ? $candidateLabel : 'tipo personalizado') . "\n"
+                    . 'Paso 2: como manejas pagos? contado, credito o mixto.';
+                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+            }
+
+            if ($this->isNegativeReply($text)) {
+                $localState['dynamic_playbook_proposal'] = null;
+                $localState['proposed_profile'] = null;
+                $localState['resolution_attempts'] = (int) ($localState['resolution_attempts'] ?? 0) + 1;
+                $localState['active_task'] = 'builder_onboarding';
+                $localState['onboarding_step'] = 'business_type';
+                $reply = 'Entendido, lo ajustamos.' . "\n"
+                    . 'Dime en una frase que vendes o fabricas para ubicar mejor tu negocio.';
+                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+            }
+
+            $needsPreview = !empty($needsList) ? implode(', ', array_slice($needsList, 0, 3)) : 'clientes, operaciones y ventas';
+            $docsPreview = !empty($docsList) ? implode(', ', array_slice($docsList, 0, 3)) : 'factura, orden y cotizacion';
+            $reply = 'Investigue tu negocio de "' . $candidateLabel . '".' . "\n"
+                . 'Parece que necesitas: ' . $needsPreview . '.' . "\n"
+                . 'Documentos clave: ' . $docsPreview . '.' . "\n"
+                . 'Es correcto? Responde si o no.';
+            return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+        }
+
         $name = $this->extractPersonName($text);
         if ($name !== '') {
             $localProfile['owner_name'] = $name;
@@ -2385,6 +2455,10 @@ final class ConversationGateway
         if ($explicitBusinessRejection) {
             $business = '';
             unset($localProfile['business_type']);
+            $localState['proposed_profile'] = null;
+            $localState['analysis_approved'] = null;
+            $localState['dynamic_playbook_proposal'] = null;
+            $localState['resolution_attempts'] = (int) ($localState['resolution_attempts'] ?? 0) + 1;
         }
         if ($business === '' && (string) ($localState['onboarding_step'] ?? '') === 'business_type') {
             $scopeChoice = $this->detectBusinessScopeChoice($text);
@@ -2404,8 +2478,12 @@ final class ConversationGateway
             $localProfile['business_type'] = $business;
             unset($localProfile['business_candidate']);
             unset($localState['unknown_business_notice_sent']);
+            $localState['proposed_profile'] = $business;
+            $localState['resolution_attempts'] = 0;
+            $localState['dynamic_playbook_proposal'] = null;
             $localState['business_resolution_last_candidate'] = null;
             $localState['business_resolution_last_status'] = null;
+            $localState['business_resolution_last_result'] = null;
         }
         $unknownBusinessCandidate = $this->detectUnknownBusinessCandidate($text, $business);
         if ($unknownBusinessCandidate !== '') {
@@ -2432,9 +2510,22 @@ final class ConversationGateway
             $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
         }
         $businessCandidate = trim((string) ($localProfile['business_candidate'] ?? ''));
+        $playbookData = $this->loadDomainPlaybook();
+        $unknownProtocol = is_array($playbookData['unknown_business_protocol'] ?? null)
+            ? (array) $playbookData['unknown_business_protocol']
+            : [];
+        $llmThreshold = (float) ($unknownProtocol['llm_confidence_threshold'] ?? 0.85);
+        if ($llmThreshold < 0.5 || $llmThreshold > 0.99) {
+            $llmThreshold = 0.85;
+        }
+
         if ($businessType === '' && $businessCandidate !== '') {
             $resolution = $this->resolveUnknownBusinessWithGemini($text, $businessCandidate, $localProfile, $localState);
-            $status = (string) ($resolution['status'] ?? '');
+            $status = strtoupper(trim((string) ($resolution['status'] ?? '')));
+            $confidence = (float) ($resolution['confidence'] ?? 0.0);
+            if ($status === 'MATCHED' && $confidence < $llmThreshold) {
+                $status = 'NEEDS_CLARIFICATION';
+            }
             if ($status === 'MATCHED') {
                 $resolvedType = $this->normalizeBusinessType((string) ($resolution['canonical_business_type'] ?? ''));
                 if ($resolvedType !== '') {
@@ -2442,8 +2533,12 @@ final class ConversationGateway
                     $businessType = $resolvedType;
                     unset($localProfile['business_candidate']);
                     unset($localState['unknown_business_notice_sent']);
+                    $localState['proposed_profile'] = $resolvedType;
+                    $localState['resolution_attempts'] = 0;
+                    $localState['dynamic_playbook_proposal'] = null;
                     $localState['business_resolution_last_candidate'] = $businessCandidate;
                     $localState['business_resolution_last_status'] = 'MATCHED';
+                    $localState['business_resolution_last_result'] = $resolution;
                     $localState['business_resolution_last_at'] = date('c');
 
                     $resolvedNeeds = is_array($resolution['needs_normalized'] ?? null) ? $resolution['needs_normalized'] : [];
@@ -2468,6 +2563,39 @@ final class ConversationGateway
                         . 'Si no es correcto, dime: "no, cambiemos el tipo de negocio".';
                     $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
                 }
+            } elseif ($status === 'NEW_BUSINESS') {
+                $needsList = is_array($resolution['needs_normalized'] ?? null)
+                    ? array_values(array_filter(array_map('strval', (array) $resolution['needs_normalized'])))
+                    : [];
+                $docsList = is_array($resolution['documents_normalized'] ?? null)
+                    ? array_values(array_filter(array_map('strval', (array) $resolution['documents_normalized'])))
+                    : [];
+                if (empty($needsList)) {
+                    $needsList = ['inventario', 'produccion', 'ventas'];
+                }
+                if (empty($docsList)) {
+                    $docsList = ['factura', 'orden de trabajo', 'cotizacion'];
+                }
+
+                $localState['active_task'] = 'business_research_confirmation';
+                $localState['onboarding_step'] = 'business_type';
+                $localState['proposed_profile'] = null;
+                $localState['resolution_attempts'] = (int) ($localState['resolution_attempts'] ?? 0) + 1;
+                $localState['dynamic_playbook_proposal'] = [
+                    'candidate' => $businessCandidate,
+                    'needs' => $needsList,
+                    'documents' => $docsList,
+                ];
+                $localState['business_resolution_last_candidate'] = $businessCandidate;
+                $localState['business_resolution_last_status'] = 'NEW_BUSINESS';
+                $localState['business_resolution_last_result'] = $resolution;
+                $localState['business_resolution_last_at'] = date('c');
+
+                $reply = 'He investigado tu negocio de "' . $businessCandidate . '".' . "\n"
+                    . 'Parece que necesitas: ' . implode(', ', array_slice($needsList, 0, 3)) . '.' . "\n"
+                    . 'Documentos clave: ' . implode(', ', array_slice($docsList, 0, 3)) . '.' . "\n"
+                    . 'Es correcto? Responde si o no.';
+                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
             } elseif ($status === 'NEEDS_CLARIFICATION') {
                 $question = trim((string) ($resolution['clarifying_question'] ?? ''));
                 if ($question === '') {
@@ -2475,10 +2603,17 @@ final class ConversationGateway
                 }
                 $localState['active_task'] = 'builder_onboarding';
                 $localState['onboarding_step'] = 'business_type';
+                $localState['resolution_attempts'] = (int) ($localState['resolution_attempts'] ?? 0) + 1;
                 $localState['business_resolution_last_candidate'] = $businessCandidate;
                 $localState['business_resolution_last_status'] = 'NEEDS_CLARIFICATION';
+                $localState['business_resolution_last_result'] = $resolution;
                 $localState['business_resolution_last_at'] = date('c');
                 return ['action' => 'ask_user', 'reply' => $question, 'state' => $localState];
+            } elseif ($status !== '') {
+                $localState['business_resolution_last_candidate'] = $businessCandidate;
+                $localState['business_resolution_last_status'] = $status;
+                $localState['business_resolution_last_result'] = $resolution;
+                $localState['business_resolution_last_at'] = date('c');
             }
         }
         if ($businessType === '') {
@@ -2486,6 +2621,12 @@ final class ConversationGateway
             $localState['onboarding_step'] = 'business_type';
             $greet = $owner !== '' ? 'Perfecto, ' . $owner . '. ' : 'Perfecto. ';
             $alreadyNotified = (bool) ($localState['unknown_business_notice_sent'] ?? false);
+            $unknownEnabled = (bool) ($unknownProtocol['enabled'] ?? true);
+            $template = trim((string) ($unknownProtocol['message_template'] ?? 'No tengo plantilla exacta para "{business}" todavia. Ya lo registre para investigarlo y compartirlo con todos los agentes.'));
+            $nextStepQuestion = trim((string) ($unknownProtocol['next_step_question'] ?? 'Para avanzar rapido, dime si manejas productos, servicios o ambos.'));
+            if ($nextStepQuestion === '') {
+                $nextStepQuestion = 'Para avanzar rapido, dime si manejas productos, servicios o ambos.';
+            }
             $isOnboardingQuestion = $isOnboarding
                 && ($this->isQuestionLike($text) || $this->isEntityListQuestion($text) || $this->isClarificationRequest($text))
                 && !$this->isBuilderActionMessage($text)
@@ -2496,12 +2637,21 @@ final class ConversationGateway
                     . 'Si vendes y tambien atiendes servicios, responde: ambos.';
                 return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
             }
-            if ($businessCandidate !== '' && !$alreadyNotified) {
-                $reply = $greet
-                    . 'No tengo plantilla exacta para "' . $businessCandidate . '" todavia. '
-                    . 'Ya lo registre para investigarlo y compartirlo con todos los agentes.'
-                    . "\n"
-                    . 'Paso 1: para empezar rapido, dime si manejas productos, servicios o ambos.';
+
+            $attempts = (int) ($localState['resolution_attempts'] ?? 0);
+            $maxCorrectionAttempts = (int) ($unknownProtocol['max_correction_attempts'] ?? 2);
+            if ($maxCorrectionAttempts < 1 || $maxCorrectionAttempts > 6) {
+                $maxCorrectionAttempts = 2;
+            }
+            if ($attempts >= $maxCorrectionAttempts) {
+                $reply = 'Para evitar confusiones, dime en una frase exacta que vendes o fabricas.' . "\n"
+                    . 'Ejemplo: "fabrico bolsos" o "vendo repuestos".';
+                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+            }
+
+            if ($businessCandidate !== '' && !$alreadyNotified && $unknownEnabled) {
+                $message = str_replace('{business}', $businessCandidate, $template);
+                $reply = $greet . $message . "\n" . $nextStepQuestion;
                 $localState['unknown_business_notice_sent'] = true;
             } else {
                 $reply = $greet
@@ -2511,7 +2661,6 @@ final class ConversationGateway
             }
             return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
         }
-
         if (empty($localProfile['operation_model'])) {
             $captured = [];
             $needsDraft = $this->extractNeedItems($text, $businessType);
@@ -2698,6 +2847,8 @@ final class ConversationGateway
             if ($this->isAffirmativeReply($text)) {
                 $localState['analysis_approved'] = true;
                 $localState['onboarding_step'] = 'plan_ready';
+                $localState['confirm_scope_last_hash'] = null;
+                $localState['confirm_scope_repeats'] = 0;
             }
         }
 
@@ -2708,6 +2859,23 @@ final class ConversationGateway
             if ($businessResolvedNote !== '') {
                 $reply = $businessResolvedNote . "\n" . $reply;
             }
+
+            $digest = sha1($reply);
+            $prevDigest = (string) ($localState['confirm_scope_last_hash'] ?? '');
+            $repeats = (int) ($localState['confirm_scope_repeats'] ?? 0);
+            $repeats = $prevDigest !== '' && $prevDigest === $digest ? ($repeats + 1) : 1;
+            $localState['confirm_scope_last_hash'] = $digest;
+            $localState['confirm_scope_repeats'] = $repeats;
+
+            if (!$this->isAffirmativeReply($text) && $repeats > 2) {
+                unset($localState['analysis_approved']);
+                $localState['onboarding_step'] = 'business_type';
+                $localState['resolution_attempts'] = (int) ($localState['resolution_attempts'] ?? 0) + 1;
+                $reply = 'Para evitar un bucle, vamos a recalibrar tu negocio.' . "\n"
+                    . 'Dime en una frase exacta que vendes o fabricas.';
+                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+            }
+
             if (!$this->isAffirmativeReply($text)) {
                 return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
             }
@@ -3234,28 +3402,51 @@ final class ConversationGateway
         if ($candidate === '') {
             return [];
         }
+
+        $playbook = $this->loadDomainPlaybook();
+        $unknownProtocol = is_array($playbook['unknown_business_protocol'] ?? null)
+            ? (array) $playbook['unknown_business_protocol']
+            : [];
+        $enabled = (bool) ($unknownProtocol['enabled'] ?? true);
+        if (!$enabled) {
+            return [];
+        }
+
         $hasGemini = trim((string) getenv('GEMINI_API_KEY')) !== '';
         if (!$hasGemini) {
             return [];
+        }
+
+        $dedupeTtlSeconds = (int) ($unknownProtocol['llm_dedupe_ttl_seconds'] ?? 900);
+        if ($dedupeTtlSeconds < 60 || $dedupeTtlSeconds > 86400) {
+            $dedupeTtlSeconds = 900;
+        }
+
+        $confidenceThreshold = (float) ($unknownProtocol['llm_confidence_threshold'] ?? 0.85);
+        if ($confidenceThreshold < 0.5 || $confidenceThreshold > 0.99) {
+            $confidenceThreshold = 0.85;
         }
 
         $lastCandidate = trim((string) ($state['business_resolution_last_candidate'] ?? ''));
         $lastStatus = trim((string) ($state['business_resolution_last_status'] ?? ''));
         $lastAtRaw = trim((string) ($state['business_resolution_last_at'] ?? ''));
         $lastAt = $lastAtRaw !== '' ? strtotime($lastAtRaw) : false;
+        $lastResult = is_array($state['business_resolution_last_result'] ?? null)
+            ? (array) $state['business_resolution_last_result']
+            : [];
         if (
             $lastCandidate !== ''
             && $this->normalize($lastCandidate) === $this->normalize($candidate)
             && $lastStatus !== ''
             && $lastAt !== false
-            && (time() - $lastAt) < 900
+            && (time() - $lastAt) < $dedupeTtlSeconds
         ) {
-            return [
-                'status' => $lastStatus,
-            ];
+            if (!empty($lastResult)) {
+                return $lastResult;
+            }
+            return ['status' => $lastStatus];
         }
 
-        $playbook = $this->loadDomainPlaybook();
         $profiles = is_array($playbook['profiles'] ?? null) ? $playbook['profiles'] : [];
         $knownProfiles = [];
         foreach ($profiles as $item) {
@@ -3301,7 +3492,7 @@ final class ConversationGateway
                 'clarifying_question' => '<si aplica>',
             ],
             'FAIL_RULES' => [
-                'if_confidence_below' => 0.7,
+                'if_confidence_below' => $confidenceThreshold,
                 'return_on_low_confidence' => 'NEEDS_CLARIFICATION',
             ],
         ];
@@ -3345,7 +3536,10 @@ final class ConversationGateway
                 'provider_used' => (string) ($llm['provider'] ?? 'gemini'),
             ];
 
-            if ($resolved['status'] === 'MATCHED' && $resolved['confidence'] < 0.7) {
+            if ($resolved['status'] === 'MATCHED' && $resolved['confidence'] < $confidenceThreshold) {
+                $resolved['status'] = 'NEEDS_CLARIFICATION';
+            }
+            if ($resolved['status'] === 'NEW_BUSINESS' && $resolved['confidence'] < 0.65) {
                 $resolved['status'] = 'NEEDS_CLARIFICATION';
             }
 
@@ -3354,7 +3548,6 @@ final class ConversationGateway
             return ['status' => 'ERROR', 'error' => $e->getMessage()];
         }
     }
-
     private function findDomainProfile(string $businessType, array $playbook = []): array
     {
         if ($businessType === '') {
@@ -5129,6 +5322,34 @@ private function parseEntityFromCrudText(string $text): string
     private function routeTraining(string $text, array $training, array $profile = [], string $tenantId = 'default', string $userId = 'anon', array $state = [], array $lexicon = [], string $mode = 'app'): array
     {
         $route = [];
+        if ($mode === 'builder' && (string) ($state['active_task'] ?? '') === 'integration_setup') {
+            if (preg_match('/https?:\/\/[a-z0-9\.\-\/_\?&=%#]+/i', $text, $m) === 1) {
+                $docUrl = trim((string) ($m[0] ?? ''));
+                $pairs = $this->parseKeyValues($text);
+                $apiName = trim((string) ($pairs['api'] ?? $pairs['nombre'] ?? $pairs['integracion'] ?? 'api_externa'));
+                if ($apiName === '') {
+                    $apiName = 'api_externa';
+                }
+                return [
+                    'action' => 'ask_user',
+                    'reply' => 'Perfecto. Recibi la documentacion: ' . $docUrl . "\n"
+                        . 'Siguiente paso: analizo base_url, autenticacion y endpoints CRUD para proponerte el contrato de integracion.',
+                    'intent' => 'INTEGRATION_SETUP',
+                    'active_task' => 'integration_setup',
+                    'collected' => [
+                        'doc_url' => $docUrl,
+                        'api_name' => $apiName,
+                    ],
+                ];
+            }
+            return [
+                'action' => 'ask_user',
+                'reply' => 'Sigo en configuracion de integracion. Comparte la URL OpenAPI/Swagger (o archivo) y el nombre de la integracion.',
+                'intent' => 'INTEGRATION_SETUP',
+                'active_task' => 'integration_setup',
+            ];
+        }
+
         if (!empty($training) && !empty($training['intents'])) {
             $route = $this->classifyWithTraining($text, $training, $profile);
         }
@@ -5153,6 +5374,8 @@ private function parseEntityFromCrudText(string $text): string
             'CRUD_GUIDE',
             'USER_PROFILE_LEARN',
             'TRAINING_MEMORY_UPDATE',
+            'USER_CORRECTION',
+            'INTEGRATION_SETUP',
             'AUTH_LOGIN',
             'USER_CREATE',
             'PROJECT_SWITCH',
@@ -5241,6 +5464,55 @@ private function parseEntityFromCrudText(string $text): string
             case 'TRAINING_MEMORY_UPDATE':
                 $updated = $this->storeMemoryNote($profile, $text, $tenantId, $userId);
                 return ['action' => 'respond_local', 'reply' => $updated['reply'], 'intent' => $intentName];
+            case 'USER_CORRECTION':
+                return [
+                    'action' => 'ask_user',
+                    'reply' => 'Entendido, corrijamos el tipo de negocio. Dime en una frase que vendes o fabricas.',
+                    'intent' => $intentName,
+                    'active_task' => 'builder_onboarding',
+                    'state_patch' => [
+                        'active_task' => 'builder_onboarding',
+                        'onboarding_step' => 'business_type',
+                        'analysis_approved' => null,
+                        'proposed_profile' => null,
+                        'dynamic_playbook_proposal' => null,
+                        'resolution_attempts' => (int) (($state['resolution_attempts'] ?? 0) + 1),
+                    ],
+                ];
+            case 'INTEGRATION_SETUP':
+                if ($mode !== 'builder') {
+                    return [
+                        'action' => 'respond_local',
+                        'reply' => 'La configuracion de integraciones se hace en el Creador de apps.',
+                        'intent' => $intentName,
+                    ];
+                }
+                if (preg_match('/https?:\/\/[a-z0-9\.\-\/_\?&=%#]+/i', $text, $m) === 1) {
+                    $docUrl = trim((string) ($m[0] ?? ''));
+                    $pairs = $this->parseKeyValues($text);
+                    $apiName = trim((string) ($pairs['api'] ?? $pairs['nombre'] ?? $pairs['integracion'] ?? 'api_externa'));
+                    if ($apiName === '') {
+                        $apiName = 'api_externa';
+                    }
+                    $reply = 'Perfecto. Recibi la documentacion: ' . $docUrl . "\n"
+                        . 'Siguiente paso: analizo base_url, autenticacion y endpoints CRUD para proponerte el contrato de integracion.';
+                    return [
+                        'action' => 'ask_user',
+                        'reply' => $reply,
+                        'intent' => $intentName,
+                        'active_task' => 'integration_setup',
+                        'collected' => [
+                            'doc_url' => $docUrl,
+                            'api_name' => $apiName,
+                        ],
+                    ];
+                }
+                return [
+                    'action' => 'ask_user',
+                    'reply' => 'Para conectar una API, comparte la URL de la documentacion OpenAPI/Swagger (o archivo) y el nombre de la integracion.',
+                    'intent' => $intentName,
+                    'active_task' => 'integration_setup',
+                ];
             case 'AUTH_LOGIN':
                 $authParsed = $this->parseAuthLogin($text, $state);
                 if (!empty($authParsed['ask'])) {
@@ -7407,8 +7679,15 @@ private function parseEntityFromCrudText(string $text): string
             'builder_completed_entities' => [],
             'builder_completed_forms' => [],
             'unknown_business_notice_sent' => false,
+            'proposed_profile' => null,
+            'resolution_attempts' => 0,
+            'confirm_scope_last_hash' => null,
+            'confirm_scope_repeats' => 0,
+            'dynamic_playbook_proposal' => null,
+            'dynamic_playbook' => null,
             'business_resolution_last_candidate' => null,
             'business_resolution_last_status' => null,
+            'business_resolution_last_result' => null,
             'business_resolution_last_at' => null,
             'last_action' => null,
             'dialog' => null,
@@ -7494,6 +7773,14 @@ private function parseEntityFromCrudText(string $text): string
         if (isset($merged['feedback_pending']) && !is_array($merged['feedback_pending']) && $merged['feedback_pending'] !== null) {
             $merged['feedback_pending'] = null;
         }
+        if (isset($merged['dynamic_playbook_proposal']) && !is_array($merged['dynamic_playbook_proposal']) && $merged['dynamic_playbook_proposal'] !== null) {
+            $merged['dynamic_playbook_proposal'] = null;
+        }
+        if (isset($merged['dynamic_playbook']) && !is_array($merged['dynamic_playbook']) && $merged['dynamic_playbook'] !== null) {
+            $merged['dynamic_playbook'] = null;
+        }
+        $merged['resolution_attempts'] = (int) ($merged['resolution_attempts'] ?? 0);
+        $merged['confirm_scope_repeats'] = (int) ($merged['confirm_scope_repeats'] ?? 0);
         return $merged;
     }
 
@@ -7758,6 +8045,7 @@ private function parseEntityFromCrudText(string $text): string
                     'builder_guidance',
                     'guided_conversation_flows',
                     'discovery',
+                    'unknown_business_protocol',
                 ] as $key) {
                     if (isset($projectOverride[$key]) && is_array($projectOverride[$key])) {
                         $base[$key] = $projectOverride[$key];
@@ -8104,6 +8392,18 @@ private function parseEntityFromCrudText(string $text): string
         $queue = $this->memory->getTenantMemory($tenantId, 'research_queue', ['topics' => []]);
         if (empty($queue)) {
             $legacyPath = $this->projectRoot . '/storage/chat/research/' . $this->safe($tenantId) . '.json';
+            $playbook = $this->loadDomainPlaybook();
+            $unknownProtocol = is_array($playbook['unknown_business_protocol'] ?? null)
+                ? (array) $playbook['unknown_business_protocol']
+                : [];
+            $storePathTemplate = trim((string) ($unknownProtocol['store_path'] ?? ''));
+            if ($storePathTemplate !== '') {
+                $resolvedPath = str_replace('{tenant}', $this->safe($tenantId), $storePathTemplate);
+                if (!preg_match('/^[a-zA-Z]:[\\\\\\/]/', $resolvedPath) && !str_starts_with($resolvedPath, '/')) {
+                    $resolvedPath = dirname($this->projectRoot) . '/' . ltrim($resolvedPath, '/');
+                }
+                $legacyPath = $resolvedPath;
+            }
             if (is_file($legacyPath)) {
                 $queue = $this->readJson($legacyPath, ['topics' => []]);
             }

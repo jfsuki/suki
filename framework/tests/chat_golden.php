@@ -46,8 +46,22 @@ $correctionSteps = [
     [
         'mode' => 'builder',
         'message' => 'no soy una ferreteria, fabrico bolsos, mas parecido a modisteria',
-        'contains_any' => ['Entendi tu negocio', 'No tengo plantilla exacta', 'dime en una frase que vendes o fabricas'],
+        'contains_any' => ['Entendi tu negocio', 'No tengo plantilla exacta', 'dime en una frase que vendes o fabricas', 'He investigado tu negocio'],
         'not_contains' => 'Negocio: Ferreteria',
+    ],
+];
+$integrationUser = 'golden_integration_' . $runId;
+$integrationSession = 'golden_integration_sess_' . $runId;
+$integrationSteps = [
+    [
+        'mode' => 'builder',
+        'message' => 'integrar api de pagos',
+        'contains_any' => ['OpenAPI/Swagger', 'documentacion'],
+    ],
+    [
+        'mode' => 'builder',
+        'message' => 'api=pagosx https://docs.example.com/openapi.json',
+        'contains_any' => ['Recibi la documentacion', 'Siguiente paso: analizo'],
     ],
 ];
 
@@ -107,12 +121,42 @@ foreach ($correctionSteps as $idx => $step) {
     ];
 }
 
+$baseIntegration = [
+    'channel' => 'local',
+    'tenant_id' => 'default',
+    'project_id' => 'suki_erp',
+    'user_id' => $integrationUser,
+    'session_id' => $integrationSession,
+];
+foreach ($integrationSteps as $idx => $step) {
+    $payload = array_merge($baseIntegration, [
+        'mode' => $step['mode'],
+        'message' => $step['message'],
+    ]);
+    $out = $agent->handle($payload);
+    $reply = (string) ($out['data']['reply'] ?? '');
+    $pass = evaluateGoldenStep($reply, $step);
+    if ($pass) {
+        $ok++;
+    }
+    $results[] = [
+        'step' => count($steps) + count($correctionSteps) + $idx + 1,
+        'mode' => $step['mode'],
+        'message' => $step['message'],
+        'reply' => $reply,
+        'expected_contains' => $step['contains'] ?? null,
+        'expected_contains_any' => $step['contains_any'] ?? null,
+        'expected_not_contains' => $step['not_contains'] ?? null,
+        'ok' => $pass,
+    ];
+}
+
 $report = [
     'summary' => [
-        'ok' => $ok === (count($steps) + count($correctionSteps)),
+        'ok' => $ok === (count($steps) + count($correctionSteps) + count($integrationSteps)),
         'passed' => $ok,
-        'failed' => (count($steps) + count($correctionSteps)) - $ok,
-        'total' => count($steps) + count($correctionSteps),
+        'failed' => (count($steps) + count($correctionSteps) + count($integrationSteps)) - $ok,
+        'total' => count($steps) + count($correctionSteps) + count($integrationSteps),
         'entity' => $entity,
         'run_id' => $runId,
         'ran_at' => date('Y-m-d H:i:s'),

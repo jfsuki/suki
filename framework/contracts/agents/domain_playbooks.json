@@ -1345,6 +1345,9 @@
         "message_template": "No tengo plantilla exacta para \"{business}\" todavia. Ya lo registre para investigarlo y compartirlo con todos los agentes.",
         "store_path": "project/storage/chat/research/{tenant}.json",
         "next_step_question": "Para avanzar rapido, dime si manejas productos, servicios o ambos.",
+        "llm_confidence_threshold": 0.85,
+        "llm_dedupe_ttl_seconds": 900,
+        "max_correction_attempts": 2,
         "discovery_questions": [
             "Que informacion quieres guardar primero?",
             "Como cobras: contado, credito o mixto?",
