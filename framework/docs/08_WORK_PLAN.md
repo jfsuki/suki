@@ -102,6 +102,18 @@
   - importaciones, reportes/documentos, FE CO y seguridad.
 - `UnitTestRunner` agrega prueba `builder_guidance` para validar recomendacion de tipo `decimal` y relaciones interpoladas.
 
+## Runtime update (2026-02-23, guidance transaccional)
+- `ConversationGateway::routeBuilderGuidance` ahora emite `pending_command` para:
+  - `RELATIONS` / `MASTER_DETAIL` -> `CreateRelation`
+  - `PERFORMANCE` -> `CreateIndex`
+- Confirmacion `si` ejecuta comando por flujo transaccional existente (`builder_pending_command`).
+- Command bus extendido con handlers:
+  - `CreateRelationCommandHandler`
+  - `CreateIndexCommandHandler`
+- `EntityMigrator` agrega primitivas incrementales para materializar cambios de guidance:
+  - `ensureField` (agrega columna FK si falta)
+  - `ensureIndex` (crea indice idempotente).
+
 ## Execution checklist
 - [x] Summary dependency ordering stable
 - [x] Framework/project separation (paths + webroots)

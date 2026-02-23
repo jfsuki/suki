@@ -67,6 +67,101 @@ class EntityMigrator
         ];
     }
 
+    public function ensureField(string $entityName, array $field): array
+    {
+        $entityName = $this->sanitizeIdentifier($entityName);
+        $entity = $this->registry->get($entityName);
+        $table = $this->resolveEntityTable($entity);
+
+        $column = $this->sanitizeIdentifier((string) ($field['name'] ?? ''));
+        if ($column === '') {
+            throw new RuntimeException('Campo invalido para ensureField.');
+        }
+
+        if (!$this->tableExists($table)) {
+            return [
+                'entity' => $entityName,
+                'table' => $table,
+                'field' => $column,
+                'applied' => false,
+                'reason' => 'table_missing',
+            ];
+        }
+        if ($this->columnExists($table, $column)) {
+            return [
+                'entity' => $entityName,
+                'table' => $table,
+                'field' => $column,
+                'applied' => false,
+                'already_exists' => true,
+            ];
+        }
+
+        $definition = $this->columnDefinition($field, '', false)['sql'];
+        $sql = "ALTER TABLE {$table} ADD COLUMN {$definition};";
+        $this->db->exec($sql);
+
+        return [
+            'entity' => $entityName,
+            'table' => $table,
+            'field' => $column,
+            'applied' => true,
+            'sql' => $sql,
+        ];
+    }
+
+    public function ensureIndex(string $entityName, string $fieldName, bool $unique = false, ?string $indexName = null): array
+    {
+        $entityName = $this->sanitizeIdentifier($entityName);
+        $fieldName = $this->sanitizeIdentifier($fieldName);
+        $entity = $this->registry->get($entityName);
+        $table = $this->resolveEntityTable($entity);
+        $indexName = $this->sanitizeIdentifier($indexName !== null && $indexName !== '' ? $indexName : "idx_{$entityName}_{$fieldName}");
+
+        if (!$this->tableExists($table)) {
+            return [
+                'entity' => $entityName,
+                'table' => $table,
+                'index' => $indexName,
+                'field' => $fieldName,
+                'applied' => false,
+                'reason' => 'table_missing',
+            ];
+        }
+        if (!$this->columnExists($table, $fieldName)) {
+            return [
+                'entity' => $entityName,
+                'table' => $table,
+                'index' => $indexName,
+                'field' => $fieldName,
+                'applied' => false,
+                'reason' => 'field_missing',
+            ];
+        }
+        if ($this->indexExists($table, $indexName)) {
+            return [
+                'entity' => $entityName,
+                'table' => $table,
+                'index' => $indexName,
+                'field' => $fieldName,
+                'applied' => false,
+                'already_exists' => true,
+            ];
+        }
+
+        $sql = 'CREATE ' . ($unique ? 'UNIQUE ' : '') . "INDEX {$indexName} ON {$table} ({$fieldName});";
+        $this->db->exec($sql);
+
+        return [
+            'entity' => $entityName,
+            'table' => $table,
+            'index' => $indexName,
+            'field' => $fieldName,
+            'applied' => true,
+            'sql' => $sql,
+        ];
+    }
+
     private function buildCreateSql(array $entity): array
     {
         $logicalTable = (string) ($entity['table']['name'] ?? '');
@@ -220,6 +315,82 @@ class EntityMigrator
             throw new RuntimeException("Identificador invalido: {$name}");
         }
         return $name;
+    }
+
+    private function resolveEntityTable(array $entity): string
+    {
+        $logicalTable = (string) ($entity['table']['name'] ?? '');
+        if ($logicalTable === '') {
+            throw new RuntimeException('Entidad sin table.name.');
+        }
+        $logicalTable = $this->sanitizeIdentifier($logicalTable);
+        return $this->sanitizeIdentifier(TableNamespace::resolve($logicalTable));
+    }
+
+    private function columnExists(string $table, string $column): bool
+    {
+        $table = $this->sanitizeIdentifier($table);
+        $column = $this->sanitizeIdentifier($column);
+        $driver = (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+        if ($driver === 'mysql') {
+            $stmt = $this->db->prepare(
+                'SELECT COUNT(*) FROM information_schema.columns
+                 WHERE table_schema = DATABASE()
+                   AND table_name = :table
+                   AND column_name = :column'
+            );
+            $stmt->bindValue(':table', $table);
+            $stmt->bindValue(':column', $column);
+            $stmt->execute();
+            return ((int) $stmt->fetchColumn()) > 0;
+        }
+
+        if ($driver === 'sqlite') {
+            $stmt = $this->db->query("PRAGMA table_info({$table})");
+            $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+            foreach ($rows as $row) {
+                if ((string) ($row['name'] ?? '') === $column) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        return false;
+    }
+
+    private function indexExists(string $table, string $index): bool
+    {
+        $table = $this->sanitizeIdentifier($table);
+        $index = $this->sanitizeIdentifier($index);
+        $driver = (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+
+        if ($driver === 'mysql') {
+            $stmt = $this->db->prepare(
+                'SELECT COUNT(*) FROM information_schema.statistics
+                 WHERE table_schema = DATABASE()
+                   AND table_name = :table
+                   AND index_name = :index_name'
+            );
+            $stmt->bindValue(':table', $table);
+            $stmt->bindValue(':index_name', $index);
+            $stmt->execute();
+            return ((int) $stmt->fetchColumn()) > 0;
+        }
+
+        if ($driver === 'sqlite') {
+            $stmt = $this->db->query("PRAGMA index_list({$table})");
+            $rows = $stmt ? $stmt->fetchAll(PDO::FETCH_ASSOC) : [];
+            foreach ($rows as $row) {
+                if ((string) ($row['name'] ?? '') === $index) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        return false;
     }
 
     private function assertProjectTableLimit(array $entity): void

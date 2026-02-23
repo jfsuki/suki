@@ -410,6 +410,9 @@ final class ConversationGateway
         if (!empty($builderGuidanceRoute)) {
             $reply = (string) ($builderGuidanceRoute['reply'] ?? 'Listo.');
             $action = (string) ($builderGuidanceRoute['action'] ?? 'respond_local');
+            if (!empty($builderGuidanceRoute['pending_command']) && is_array($builderGuidanceRoute['pending_command'])) {
+                $this->setBuilderPendingCommand($state, (array) $builderGuidanceRoute['pending_command']);
+            }
             $state = $this->updateState(
                 $state,
                 $raw,
@@ -1228,6 +1231,19 @@ final class ConversationGateway
             return 'Voy a instalar la plantilla experta para ' . $sector . '.' . "\n"
                 . 'Responde "si" para instalarla o "no" para cancelarla.';
         }
+        if ($commandName === 'CreateRelation') {
+            $source = (string) ($command['source_entity'] ?? 'tabla_origen');
+            $target = (string) ($command['target_entity'] ?? 'tabla_destino');
+            $fk = (string) ($command['fk_field'] ?? ($source . '_id'));
+            return 'Voy a conectar ' . $target . ' con ' . $source . ' usando el campo ' . $fk . '.' . "\n"
+                . 'Responde "si" para aplicarlo o "no" para cambiarlo.';
+        }
+        if ($commandName === 'CreateIndex') {
+            $entity = (string) ($command['entity'] ?? 'tabla');
+            $field = (string) ($command['field'] ?? 'nombre');
+            return 'Voy a optimizar ' . $entity . ' con un indice en ' . $field . '.' . "\n"
+                . 'Responde "si" para aplicarlo o "no" para cambiarlo.';
+        }
         return 'Tengo una accion pendiente para continuar.' . "\n"
             . 'Responde "si" para ejecutarla o "no" para cambiarla.';
     }
@@ -1255,6 +1271,22 @@ final class ConversationGateway
                 . '- Voy a instalar la plantilla para ' . $sector . '.' . "\n"
                 . '- Responde "si" para instalarla o "no" para mantenerlo manual.';
         }
+        if ($commandName === 'CreateRelation') {
+            $source = (string) ($command['source_entity'] ?? 'tabla_origen');
+            $target = (string) ($command['target_entity'] ?? 'tabla_destino');
+            $fk = (string) ($command['fk_field'] ?? ($source . '_id'));
+            return 'Te explico facil:' . "\n"
+                . '- Voy a relacionar ' . $target . ' con ' . $source . '.' . "\n"
+                . '- Creare el campo ' . $fk . ' para guardar la referencia.' . "\n"
+                . '- Responde "si" para aplicarlo o "no" para cambiar la relacion.';
+        }
+        if ($commandName === 'CreateIndex') {
+            $entity = (string) ($command['entity'] ?? 'tabla');
+            $field = (string) ($command['field'] ?? 'nombre');
+            return 'Te explico facil:' . "\n"
+                . '- Voy a crear un indice en ' . $entity . '.' . $field . ' para acelerar busquedas.' . "\n"
+                . '- Responde "si" para aplicarlo o "no" para elegir otro campo.';
+        }
         return 'Te explico facil: tengo una accion pendiente.' . "\n"
             . 'Responde "si" para seguir o "no" para cambiar.';
     }
@@ -1281,6 +1313,12 @@ final class ConversationGateway
             'command' => (string) ($command['command'] ?? ''),
             'entity' => (string) ($command['entity'] ?? ''),
             'fields' => is_array($command['fields'] ?? null) ? $command['fields'] : [],
+            'source_entity' => (string) ($command['source_entity'] ?? ''),
+            'target_entity' => (string) ($command['target_entity'] ?? ''),
+            'fk_field' => (string) ($command['fk_field'] ?? ''),
+            'field' => (string) ($command['field'] ?? ''),
+            'index_name' => (string) ($command['index_name'] ?? ''),
+            'sector_key' => (string) ($command['sector_key'] ?? ''),
         ];
         $json = json_encode($base, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
@@ -4927,12 +4965,6 @@ private function parseEntityFromCrudText(string $text): string
             return [];
         }
 
-        $activeTask = (string) ($state['active_task'] ?? '');
-        $onboardingStep = (string) ($state['onboarding_step'] ?? '');
-        if ($activeTask === 'builder_onboarding' && $onboardingStep !== '' && !in_array($onboardingStep, ['plan_ready', 'confirm_scope'], true)) {
-            return [];
-        }
-
         $guides = $this->loadBuilderGuidance($training);
         if (empty($guides)) {
             return [];
@@ -4961,6 +4993,14 @@ private function parseEntityFromCrudText(string $text): string
         }
 
         if (empty($bestGuide)) {
+            $fallbackTopic = $this->detectBuilderGuidanceTopicFallback($text);
+            if ($fallbackTopic !== '') {
+                $bestGuide = $this->findBuilderGuidanceByTopic($guides, $fallbackTopic);
+                $bestTrigger = '__fallback__';
+            }
+        }
+
+        if (empty($bestGuide)) {
             return [];
         }
 
@@ -4978,9 +5018,10 @@ private function parseEntityFromCrudText(string $text): string
         if ($flowHint !== '') {
             $reply .= "\nFlujo sugerido: " . $flowHint;
         }
+        $pendingCommand = $this->buildBuilderGuidancePendingCommand($topic, $text, $state, $lexicon);
 
         return [
-            'action' => str_contains($reply, '?') ? 'ask_user' : 'respond_local',
+            'action' => !empty($pendingCommand) || str_contains($reply, '?') ? 'ask_user' : 'respond_local',
             'reply' => $reply,
             'intent' => $this->guidanceIntentByTopic($topic),
             'active_task' => 'builder_guidance',
@@ -4988,6 +5029,7 @@ private function parseEntityFromCrudText(string $text): string
                 'topic' => $topic,
                 'trigger' => $bestTrigger,
             ],
+            'pending_command' => $pendingCommand,
         ];
     }
 
@@ -5034,6 +5076,74 @@ private function parseEntityFromCrudText(string $text): string
             return 'BUILDER_GUIDANCE';
         }
         return 'BUILDER_GUIDANCE_' . $topic;
+    }
+
+    private function buildBuilderGuidancePendingCommand(string $topic, string $text, array $state, array $lexicon): array
+    {
+        $topic = strtoupper(trim($topic));
+        if ($topic === 'RELATIONS' || $topic === 'MASTER_DETAIL') {
+            $tables = $this->detectRelationTablesFromText($text, $state, $lexicon);
+            $source = $this->normalizeEntityForSchema((string) ($tables['tabla_A'] ?? ''));
+            $target = $this->normalizeEntityForSchema((string) ($tables['tabla_B'] ?? ''));
+            if ($source === '' || $target === '' || $source === $target) {
+                return [];
+            }
+
+            return [
+                'command' => 'CreateRelation',
+                'source_entity' => $source,
+                'target_entity' => $target,
+                'relation_type' => $topic === 'MASTER_DETAIL' ? 'hasMany' : 'belongsTo',
+                'fk_field' => $source . '_id',
+            ];
+        }
+
+        if ($topic === 'PERFORMANCE') {
+            $entity = $this->detectGuidanceEntityFromText($text, $state, $lexicon);
+            $field = $this->detectGuidanceFieldFromText($text);
+            if ($entity === '' || $field === '') {
+                return [];
+            }
+
+            return [
+                'command' => 'CreateIndex',
+                'entity' => $entity,
+                'field' => $field,
+                'index_name' => 'idx_' . $entity . '_' . $field,
+            ];
+        }
+
+        return [];
+    }
+
+    private function detectBuilderGuidanceTopicFallback(string $text): string
+    {
+        if (
+            preg_match('/\\b(conectar|relacionar|vincular|unir)\\b/u', $text) === 1
+            && preg_match('/\\b(con|y)\\b/u', $text) === 1
+        ) {
+            return 'RELATIONS';
+        }
+        if (
+            preg_match('/\\b(lent[ao]|lento|optimizar|indice|busqueda|b\\x{00fa}squeda)\\b/u', $text) === 1
+        ) {
+            return 'PERFORMANCE';
+        }
+        return '';
+    }
+
+    private function findBuilderGuidanceByTopic(array $guides, string $topic): array
+    {
+        $topic = strtoupper(trim($topic));
+        foreach ($guides as $guide) {
+            if (!is_array($guide)) {
+                continue;
+            }
+            if (strtoupper(trim((string) ($guide['topic'] ?? ''))) === $topic) {
+                return $guide;
+            }
+        }
+        return [];
     }
 
     private function renderBuilderGuidanceTemplate(string $template, string $text, array $state, array $lexicon): string
@@ -5087,6 +5197,29 @@ private function parseEntityFromCrudText(string $text): string
             'tabla_A' => $tableA,
             'tabla_B' => $tableB,
         ];
+    }
+
+    private function detectGuidanceEntityFromText(string $text, array $state, array $lexicon): string
+    {
+        $matches = [];
+        if (preg_match('/(?:tabla|lista|entidad)\\s+([a-z0-9_]+)/u', $text, $matches) === 1) {
+            $entity = $this->normalizeEntityForSchema((string) ($matches[1] ?? ''));
+            if ($entity !== '') {
+                return $entity;
+            }
+        }
+
+        $entity = $this->normalizeEntityForSchema($this->detectEntity($text, $lexicon, $state));
+        if ($entity !== '') {
+            return $entity;
+        }
+
+        $stateEntity = $this->normalizeEntityForSchema((string) ($state['entity'] ?? ''));
+        if ($stateEntity !== '') {
+            return $stateEntity;
+        }
+
+        return 'clientes';
     }
 
     private function detectGuidanceFieldFromText(string $text): string

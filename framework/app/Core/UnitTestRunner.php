@@ -204,6 +204,36 @@ final class UnitTestRunner
         if (stripos($relationReply, 'clientes') === false || stripos($relationReply, 'ventas') === false) {
             throw new \RuntimeException('Builder guidance de relaciones debe interpolar tablas.');
         }
+        $relationPending = is_array($relation['state']['builder_pending_command'] ?? null)
+            ? (array) $relation['state']['builder_pending_command']
+            : [];
+        if ((string) ($relationPending['command'] ?? '') !== 'CreateRelation') {
+            throw new \RuntimeException('Builder guidance de relaciones debe crear pending command transaccional.');
+        }
+
+        $relationConfirm = $gateway->handle('default', $user, 'si', 'builder', $projectId);
+        if ((string) ($relationConfirm['action'] ?? '') !== 'execute_command') {
+            throw new \RuntimeException('Confirmacion de guidance de relaciones debe ejecutar comando.');
+        }
+        if ((string) ($relationConfirm['command']['command'] ?? '') !== 'CreateRelation') {
+            throw new \RuntimeException('Confirmacion de guidance de relaciones debe ejecutar CreateRelation.');
+        }
+
+        $performance = $gateway->handle('default', $user, 'la busqueda es muy lenta en tabla clientes por nombre', 'builder', $projectId);
+        $performancePending = is_array($performance['state']['builder_pending_command'] ?? null)
+            ? (array) $performance['state']['builder_pending_command']
+            : [];
+        if ((string) ($performancePending['command'] ?? '') !== 'CreateIndex') {
+            throw new \RuntimeException('Builder guidance de performance debe crear pending command transaccional.');
+        }
+
+        $performanceConfirm = $gateway->handle('default', $user, 'si', 'builder', $projectId);
+        if ((string) ($performanceConfirm['action'] ?? '') !== 'execute_command') {
+            throw new \RuntimeException('Confirmacion de guidance de performance debe ejecutar comando.');
+        }
+        if ((string) ($performanceConfirm['command']['command'] ?? '') !== 'CreateIndex') {
+            throw new \RuntimeException('Confirmacion de guidance de performance debe ejecutar CreateIndex.');
+        }
     }
 
     private function checkIntentRouter(): void
@@ -230,6 +260,8 @@ final class UnitTestRunner
         $bus = new CommandBus();
         $bus->register(new CreateEntityCommandHandler());
         $bus->register(new CreateFormCommandHandler());
+        $bus->register(new CreateRelationCommandHandler());
+        $bus->register(new CreateIndexCommandHandler());
         $bus->register(new InstallPlaybookCommandHandler());
         $bus->register(new CrudCommandHandler());
         $bus->register(new MapCommandHandler(['AuthLogin'], static fn(array $command, array $context): array => [
@@ -274,6 +306,22 @@ final class UnitTestRunner
         );
         if ((string) ($resForm['status'] ?? '') !== 'error') {
             throw new \RuntimeException('CreateForm handler no respondio guard de modo app.');
+        }
+
+        $resRelation = $bus->dispatch(
+            ['command' => 'CreateRelation', 'source_entity' => 'clientes', 'target_entity' => 'ventas'],
+            array_merge($baseContext, ['mode' => 'app'])
+        );
+        if ((string) ($resRelation['status'] ?? '') !== 'error') {
+            throw new \RuntimeException('CreateRelation handler no respondio guard de modo app.');
+        }
+
+        $resIndex = $bus->dispatch(
+            ['command' => 'CreateIndex', 'entity' => 'clientes', 'field' => 'nombre'],
+            array_merge($baseContext, ['mode' => 'app'])
+        );
+        if ((string) ($resIndex['status'] ?? '') !== 'error') {
+            throw new \RuntimeException('CreateIndex handler no respondio guard de modo app.');
         }
 
         $resPlaybook = $bus->dispatch(

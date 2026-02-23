@@ -1088,6 +1088,8 @@ final class ChatAgent
             $this->commandBus = new CommandBus();
             $this->commandBus->register(new CreateEntityCommandHandler());
             $this->commandBus->register(new CreateFormCommandHandler());
+            $this->commandBus->register(new CreateRelationCommandHandler());
+            $this->commandBus->register(new CreateIndexCommandHandler());
             $this->commandBus->register(new InstallPlaybookCommandHandler());
             $this->commandBus->register(new CrudCommandHandler());
             $this->commandBus->register(new MapCommandHandler(

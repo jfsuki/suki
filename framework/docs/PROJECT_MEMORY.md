@@ -310,3 +310,15 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Interpolacion dinamica soportada en plantillas (`{tabla_A}`, `{tabla_B}`, `{campo}`) con deteccion desde el texto del usuario.
 - Se agrega sugerencia de flujo usando `guided_conversation_flows` para mantener respuestas consistentes con onboarding.
 - `conversation_training_base.json` incorpora bloque `builder_guidance` sincronizado y refinado (money/phone/date/relations/performance/import/reportes/FE/seguridad).
+
+## Checkpoint (2026-02-23, guidance transaccional relaciones/performance)
+- `builder_guidance` ahora puede crear `builder_pending_command` transaccional para temas `RELATIONS`, `MASTER_DETAIL` y `PERFORMANCE`.
+- Confirmar con `si` en esos flujos dispara ejecucion de comandos reales:
+  - `CreateRelation` (agrega FK + `relations[]` en contrato objetivo).
+  - `CreateIndex` (registra indice en `extensions.indexes` y lo materializa en DB cuando aplica).
+- `ChatAgent` registra handlers dedicados:
+  - `CreateRelationCommandHandler`
+  - `CreateIndexCommandHandler`
+- `EntityMigrator` incorpora operaciones incrementales:
+  - `ensureField(...)` para `ALTER TABLE ADD COLUMN` seguro.
+  - `ensureIndex(...)` para creacion idempotente de indices.

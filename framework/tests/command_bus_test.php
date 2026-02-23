@@ -5,8 +5,10 @@ require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/autoload.php';
 
 use App\Core\CommandBus;
+use App\Core\CreateIndexCommandHandler;
 use App\Core\CreateEntityCommandHandler;
 use App\Core\CreateFormCommandHandler;
+use App\Core\CreateRelationCommandHandler;
 use App\Core\CrudCommandHandler;
 use App\Core\InstallPlaybookCommandHandler;
 use App\Core\MapCommandHandler;
@@ -14,6 +16,8 @@ use App\Core\MapCommandHandler;
 $bus = new CommandBus();
 $bus->register(new CreateEntityCommandHandler());
 $bus->register(new CreateFormCommandHandler());
+$bus->register(new CreateRelationCommandHandler());
+$bus->register(new CreateIndexCommandHandler());
 $bus->register(new InstallPlaybookCommandHandler());
 $bus->register(new CrudCommandHandler());
 $bus->register(new MapCommandHandler(['AuthLogin'], static fn(array $command, array $context): array => [
@@ -60,6 +64,22 @@ $formGuard = $bus->dispatch(
 );
 if ((string) ($formGuard['status'] ?? '') !== 'error') {
     $failures[] = 'CreateForm guard failed';
+}
+
+$relationGuard = $bus->dispatch(
+    ['command' => 'CreateRelation', 'source_entity' => 'clientes', 'target_entity' => 'ventas'],
+    array_merge($baseContext, ['mode' => 'app'])
+);
+if ((string) ($relationGuard['status'] ?? '') !== 'error') {
+    $failures[] = 'CreateRelation guard failed';
+}
+
+$indexGuard = $bus->dispatch(
+    ['command' => 'CreateIndex', 'entity' => 'clientes', 'field' => 'nombre'],
+    array_merge($baseContext, ['mode' => 'app'])
+);
+if ((string) ($indexGuard['status'] ?? '') !== 'error') {
+    $failures[] = 'CreateIndex guard failed';
 }
 
 $playbookGuard = $bus->dispatch(
