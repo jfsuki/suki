@@ -37,6 +37,7 @@ use App\Core\InvoiceMapper;
 use App\Core\Database;
 use App\Core\QueryBuilder;
 use App\Core\ProjectRegistry;
+use App\Core\TelemetryService;
 use App\Core\CapabilityGraph;
 use App\Core\Agents\ConversationQualityDashboard;
 
@@ -753,11 +754,46 @@ if ($route === 'chat/quality') {
     $tenantId = (string) ($payload['tenant_id'] ?? $_GET['tenant_id'] ?? getenv('TENANT_KEY') ?? getenv('TENANT_ID') ?? 'default');
     $tenantId = $tenantId !== '' ? $tenantId : 'default';
     $days = (int) ($payload['days'] ?? $_GET['days'] ?? 7);
+    $projectId = resolveProjectId($payload);
     try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        if ($projectId === '') {
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        }
         $quality = new ConversationQualityDashboard(PROJECT_ROOT);
         $report = $quality->build($tenantId, $days);
+        $ops = (new TelemetryService())->summary($tenantId, $projectId, $days);
+        $report['ops_summary'] = $ops;
         respondJson($response, 'success', 'Calidad conversacional', [
+            'tenant_id' => $tenantId,
+            'project_id' => $projectId,
             'report' => $report,
+        ]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
+if ($route === 'chat/ops-quality') {
+    $payload = requestData();
+    $tenantId = (string) ($payload['tenant_id'] ?? $_GET['tenant_id'] ?? getenv('TENANT_KEY') ?? getenv('TENANT_ID') ?? 'default');
+    $tenantId = $tenantId !== '' ? $tenantId : 'default';
+    $days = (int) ($payload['days'] ?? $_GET['days'] ?? 7);
+    $projectId = resolveProjectId($payload);
+    try {
+        $registry = new ProjectRegistry();
+        $manifest = $registry->resolveProjectFromManifest();
+        if ($projectId === '') {
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        }
+        $ops = (new TelemetryService())->summary($tenantId, $projectId, $days);
+        respondJson($response, 'success', 'Metricas operativas', [
+            'tenant_id' => $tenantId,
+            'project_id' => $projectId,
+            'days' => $days,
+            'ops_summary' => $ops,
         ]);
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 500);
@@ -918,12 +954,14 @@ if ($route === 'registry/status') {
         $capabilities = (new CapabilityGraph(PROJECT_ROOT))->build($projectId, 'app');
         $tenantId = (string) (getenv('TENANT_KEY') ?: getenv('TENANT_ID') ?: 'default');
         $quality = (new ConversationQualityDashboard(PROJECT_ROOT))->build($tenantId, 7);
+        $ops = (new TelemetryService())->summary($tenantId, $projectId, 7);
         respondJson($response, 'success', 'OK', [
             'project' => $project,
             'summary' => $summary,
             'sync' => $sync,
             'capabilities' => $capabilities,
             'chat_quality' => $quality['summary'] ?? [],
+            'ops_metrics' => $ops,
         ]);
         return;
     } catch (\Throwable $e) {

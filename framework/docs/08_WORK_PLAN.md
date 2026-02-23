@@ -145,6 +145,10 @@
   - `framework/tests/observability_metrics_test.php`
   - `framework/tests/canonical_storage_new_project_test.php`
   - integradas al `UnitTestRunner` (`observability_metrics`, `canonical_storage_new_project`).
+- Explotacion UI/API cerrada:
+  - `GET/POST /api/chat/quality` ahora incluye `ops_summary` desde `SqlMetricsRepository::summary(...)`.
+  - nuevo endpoint `GET/POST /api/chat/ops-quality` para consumo operativo puro.
+  - `chat_builder.html` y `chat_app.html` muestran p95 intent/comando, bloqueos guardrail, fallback LLM y tokens.
 
 ## Execution checklist
 - [x] Summary dependency ordering stable

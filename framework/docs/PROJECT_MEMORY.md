@@ -275,6 +275,10 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Pruebas dedicadas agregadas:
   - `framework/tests/observability_metrics_test.php`
   - `framework/tests/canonical_storage_new_project_test.php`
+- Explotacion operacional:
+  - endpoint `chat/quality` incorpora `ops_summary` (intent/comando/guardrails/tokens).
+  - endpoint `chat/ops-quality` expone resumen operativo por `tenant_id + project_id + days`.
+  - paneles `chat_builder` y `chat_app` muestran metricas operativas (p95, bloqueos, fallback, tokens).
   - nuevo script `framework/scripts/migrate_memory_json_to_sql.php` para migrar datos historicos.
 
 ## Checkpoint (2026-02-23, inicio refactor estructural P0)

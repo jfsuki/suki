@@ -344,8 +344,16 @@
 
         async function loadQuality() {
             const tenantId = tenantIdEl.value.trim() || 'default';
+            const projectId = projectIdEl.value.trim();
+            const qs = new URLSearchParams({
+                tenant_id: tenantId,
+                days: '7',
+            });
+            if (projectId) {
+                qs.set('project_id', projectId);
+            }
             try {
-                const res = await fetch(apiBase() + '/api/chat/quality?tenant_id=' + encodeURIComponent(tenantId) + '&days=7');
+                const res = await fetch(apiBase() + '/api/chat/quality?' + qs.toString());
                 const json = await res.json();
                 const report = json.data && json.data.report ? json.data.report : null;
                 if (!report || !report.summary) {
@@ -354,11 +362,15 @@
                     return;
                 }
                 const s = report.summary;
-                qualityTextEl.textContent = `Calidad: ${s.success_rate}% exito | ${s.unresolved_intents} no resueltas`;
+                const ops = report.ops_summary || {};
+                const i = ops.intent_metrics || {};
+                const c = ops.command_metrics || {};
+                qualityTextEl.textContent = `Calidad: ${s.success_rate}% exito | ${s.unresolved_intents} no resueltas | p95 intent ${i.p95_latency_ms || 0}ms | p95 cmd ${c.p95_latency_ms || 0}ms`;
                 const top = Array.isArray(report.unresolved_top) ? report.unresolved_top.slice(0, 3) : [];
+                const opsLine = `Guardrails: ${c.blocked || 0} bloqueos | Fallback LLM: ${i.fallback_llm || 0} | Tokens: ${(ops.token_usage && ops.token_usage.total_tokens) || 0}`;
                 qualityMetaEl.textContent = top.length
-                    ? ('Pendientes frecuentes: ' + top.map(x => `"${x.message}" (${x.count})`).join(' | '))
-                    : 'Sin pendientes frecuentes.';
+                    ? ('Pendientes frecuentes: ' + top.map(x => `"${x.message}" (${x.count})`).join(' | ') + ' | ' + opsLine)
+                    : ('Sin pendientes frecuentes. ' + opsLine);
             } catch (e) {
                 qualityTextEl.textContent = 'Calidad conversacional: error';
                 qualityMetaEl.textContent = '';
