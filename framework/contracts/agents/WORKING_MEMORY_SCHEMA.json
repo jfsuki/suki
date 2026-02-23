@@ -1,0 +1,227 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "suki://contracts/agents/WORKING_MEMORY_SCHEMA.json",
+  "title": "WorkingMemorySchema",
+  "type": "object",
+  "required": [
+    "meta",
+    "identity",
+    "conversation",
+    "build_state",
+    "use_state",
+    "capabilities",
+    "safety",
+    "telemetry"
+  ],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "required": [
+        "version",
+        "updated_at",
+        "tenant_id",
+        "project_id",
+        "user_id",
+        "mode"
+      ],
+      "properties": {
+        "version": {
+          "type": "string"
+        },
+        "updated_at": {
+          "type": "string"
+        },
+        "tenant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "project_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "user_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "mode": {
+          "type": "string",
+          "enum": [
+            "builder",
+            "app"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "identity": {
+      "type": "object",
+      "properties": {
+        "business_type": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "payment_model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "language_profile": {
+          "type": "object"
+        }
+      },
+      "additionalProperties": true
+    },
+    "conversation": {
+      "type": "object",
+      "required": [
+        "active_intent",
+        "requested_slot",
+        "missing_slots",
+        "last_messages"
+      ],
+      "properties": {
+        "active_intent": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "requested_slot": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "missing_slots": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "last_messages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "role": {
+                "type": "string"
+              },
+              "text": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "role",
+              "text"
+            ],
+            "additionalProperties": true
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "build_state": {
+      "type": "object",
+      "properties": {
+        "checklist_step": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "plan_summary": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "pending_confirmations": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "use_state": {
+      "type": "object",
+      "properties": {
+        "last_entity": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_action": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "additionalProperties": true
+    },
+    "capabilities": {
+      "type": "object",
+      "properties": {
+        "entities": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "forms": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "actions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": true
+    },
+    "safety": {
+      "type": "object",
+      "properties": {
+        "mode_guard": {
+          "type": "boolean"
+        },
+        "permission_guard": {
+          "type": "boolean"
+        },
+        "entity_exists_guard": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": true
+    },
+    "telemetry": {
+      "type": "object",
+      "properties": {
+        "local_resolved_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "llm_calls_count": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "loop_guard_hits": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": true
+    }
+  },
+  "additionalProperties": true
+}

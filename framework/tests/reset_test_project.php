@@ -65,6 +65,8 @@ foreach ($storagePatterns as $pattern) {
     $deleteByGlob($pattern);
 }
 
+$deleteByGlob(__DIR__ . '/tmp/*.json');
+
 try {
     $pdo = Database::connection();
     $dropTable = static function (PDO $pdo, string $table) use (&$summary): void {

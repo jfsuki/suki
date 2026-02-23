@@ -67,7 +67,11 @@ $report = [
 
 $json = json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 if ($json !== false) {
-    file_put_contents(__DIR__ . '/chat_golden_result.json', $json);
+    $tmpDir = __DIR__ . '/tmp';
+    if (!is_dir($tmpDir)) {
+        @mkdir($tmpDir, 0777, true);
+    }
+    file_put_contents($tmpDir . '/chat_golden_result.json', $json);
 }
 
 echo $json . PHP_EOL;

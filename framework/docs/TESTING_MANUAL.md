@@ -22,7 +22,7 @@ php framework/tests/chat_api_single_demo.php
 ```
 Debe devolver `failed = 0` y `training_error = "No error"`.
 `chat_golden.php` y `chat_api_single_demo.php` deben devolver `summary.ok = true`.
-Reporte CLI: `framework/tests/chat_acid_result.json`
+Reporte CLI: `framework/tests/tmp/chat_acid_result.json`
 Reporte desde chat ("Probar sistema"): `project/storage/reports/chat_acid_default.json`
 
 ## 1) Configurar la base de datos

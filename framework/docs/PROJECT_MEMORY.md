@@ -4,6 +4,11 @@
 Build a low-code/AI-first platform that generates business apps from JSON contracts.
 Core principle: chat-first usage, visual UI only when needed (tables, reports, charts).
 
+## Canonical governance
+- Canonical memory source: `framework/docs/PROJECT_MEMORY_CANONICAL.md`.
+- Mandatory developer pre-check: `php framework/scripts/codex_self_check.php --strict`.
+- Temporary testing artifacts policy: only under `framework/tests/tmp/`.
+
 ## Vision (working memory, 2026-02-19)
 - Meta: generar apps ERP por conversacion (chat-first) con panel visual para lo necesario.
 - North star: cero tecnicismos, JSON-first, IA solo fallback, cambios incrementales.

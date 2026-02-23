@@ -207,7 +207,11 @@ $report = [
     'conversation' => $results,
 ];
 
-$outPath = __DIR__ . '/chat_api_single_demo_result.json';
+$tmpDir = __DIR__ . '/tmp';
+if (!is_dir($tmpDir)) {
+    @mkdir($tmpDir, 0777, true);
+}
+$outPath = $tmpDir . '/chat_api_single_demo_result.json';
 file_put_contents(
     $outPath,
     json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)

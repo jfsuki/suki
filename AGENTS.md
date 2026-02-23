@@ -1,12 +1,37 @@
-# AGENTS.md (SUKI)
+# AGENTS.md (SUKI / AI-AOS)
 
 Este archivo define como deben trabajar los agentes de desarrollo en este repo.
 No reemplaza reglas del negocio: las refuerza con retrieval-led + QA obligatorio.
+
+## SYSTEM IDENTITY (NON-NEGOTIABLE)
+- Este proyecto no es un chatbot ni una demo no-code.
+- Es un **AI Application Operating System (AI-AOS)**.
+- Chat = interfaz principal.
+- Execution Engine = autoridad unica de ejecucion.
+- La IA decide; nunca ejecuta directo fuera del motor y contratos.
+
+## MARKET OBJECTIVES (PRIORIDAD 1)
+1) Permitir a usuarios no tecnicos crear y operar apps reales por chat.
+2) Operar apps internas con seguridad en produccion.
+3) Integrar y operar software externo via APIs oficiales.
+4) Actuar como operador digital confiable (guiar + ejecutar + soportar).
+5) Reducir llamadas LLM con contratos, registry y memoria persistente.
+
+## DECISION HIERARCHY (MANDATORY)
+1) System identity y filosofia.
+2) Market objectives.
+3) Contract definitions.
+4) Execution engine constraints.
+5) Conversational UX.
+6) Implementation details.
+
+Si una decision viola una capa superior, es invalida.
 
 ## 1) Objetivo operativo
 - Entregar un generador de apps chat-first para usuarios no tecnicos.
 - Mantener compatibilidad: cambios incrementales, sin reescrituras.
 - Priorizar estabilidad en hosting compartido (cPanel) y costo bajo.
+- Mantener enfoque enterprise: auditable, seguro, escalable.
 
 ## 2) Flujo obligatorio (siempre)
 1) Analizar logica, riesgos y restricciones antes de codificar.
@@ -27,10 +52,19 @@ Antes de tocar chat, DB kernel, contratos o integraciones:
 
 Lectura minima recomendada:
 - `framework/docs/PROJECT_MEMORY.md`
+- `framework/docs/PROJECT_MEMORY_CANONICAL.md`
 - `framework/docs/08_WORK_PLAN.md`
 - `framework/docs/07_DATABASE_MODEL.md`
 - `framework/docs/AGENTS_CONVERSATION_GATEWAY.md`
+- `framework/docs/AGENT_SKILLS_MATRIX.md`
 - `framework/docs/HOSTING_MIGRATION_PLAN.md`
+- `framework/docs/CODEX_SELF_CHECKLIST.md`
+
+## 3.1) Pre-check obligatorio antes de cada cambio
+Ejecutar siempre:
+- `php framework/scripts/codex_self_check.php --strict`
+
+Si falla, no se implementa nada hasta corregir causa raiz.
 
 ## 4) Reglas no negociables
 - No renombrar ni romper llaves existentes de contratos.
@@ -39,6 +73,8 @@ Lectura minima recomendada:
 - En modo APP no crear estructura; en modo BUILDER no ejecutar CRUD de negocio.
 - Pregunta minima: 1 dato critico faltante por turno.
 - Respuestas para usuario no tecnico: cortas, claras y con siguiente paso concreto.
+- Nunca inventar capacidades no presentes en registry.
+- Nunca bypass de execution guards.
 
 ## 5) Calidad conversacional minima
 - Capacidades del agente deben salir del registry real, no texto fijo.
@@ -92,6 +128,7 @@ Skill local recomendada en este repo:
   - Velneo
   - Supabase
   - v0 / emergent-style builders
+  - Kore.ai
 
 ## 10) Estandar de respuesta al usuario final
 - Evitar tecnicismos innecesarios.
@@ -107,3 +144,20 @@ Cuando se modifique un archivo de gobierno (AGENTS/docs):
 - agregar solo capacidades faltantes (no borrar valor ya probado),
 - documentar vacios detectados y como se cubren,
 - validar que el nuevo texto no contradiga contratos ni pipeline actual.
+
+## 12) Disciplina obligatoria de versionado (git)
+- Identificar archivos clave antes de cambiar:
+  - contratos (`framework/contracts/*`, `project/contracts/*`)
+  - kernel/engine (`framework/app/Core/*`)
+  - docs de gobierno (`framework/docs/*`, `AGENTS.md`)
+  - scripts QA (`framework/scripts/*`, `framework/tests/*`)
+- Todo cambio exitoso debe cerrar con:
+  1) `git add` de archivos modificados,
+  2) commit con mensaje trazable,
+  3) push al remoto.
+- Si QA gate falla, no se permite push.
+
+## 13) Politica de artefactos temporales de testing
+- Todos los artefactos temporales viven solo en `framework/tests/tmp/`.
+- No crear ni mantener artefactos temporales fuera de esa carpeta.
+- La limpieza automatica solo puede tocar `framework/tests/tmp/` y artefactos de prueba declarados por prefijo.
