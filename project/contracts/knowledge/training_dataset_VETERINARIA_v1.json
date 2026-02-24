@@ -1,0 +1,1510 @@
+{
+    "batch_id": "VETERINARIA_v1",
+    "language": "es-CO",
+    "context_pack": {
+        "business_type": "veterinaria",
+        "country": "CO",
+        "currency": "COP",
+        "tax_regime": "rts_iva",
+        "payment_methods": [
+            "efectivo",
+            "transferencia",
+            "nequi",
+            "daviplata",
+            "tarjeta",
+            "credito"
+        ],
+        "document_flows": [
+            "cita -> atencion -> factura -> recaudo",
+            "compra -> ingreso inventario -> cuenta por pagar -> pago proveedor"
+        ],
+        "channels": [
+            "whatsapp",
+            "telegram",
+            "web_chat"
+        ],
+        "volume_profile": "80 facturas mes, 120 recaudos mes, 400 movimientos inventario mes",
+        "chart_of_accounts_min": [
+            {
+                "code": "110505",
+                "name": "Caja general"
+            },
+            {
+                "code": "111005",
+                "name": "Bancos"
+            },
+            {
+                "code": "130505",
+                "name": "Clientes nacionales"
+            },
+            {
+                "code": "143505",
+                "name": "Inventario mercancias"
+            },
+            {
+                "code": "240805",
+                "name": "IVA generado"
+            },
+            {
+                "code": "413595",
+                "name": "Ingresos por ventas"
+            }
+        ],
+        "posting_rules": [
+            {
+                "trigger": "factura_contado",
+                "debit_account": "110505",
+                "credit_account": "413595"
+            },
+            {
+                "trigger": "factura_credito",
+                "debit_account": "130505",
+                "credit_account": "413595"
+            },
+            {
+                "trigger": "recaudo_cliente",
+                "debit_account": "111005",
+                "credit_account": "130505"
+            }
+        ]
+    },
+    "intents_expansion": [
+        {
+            "intent": "ERP_FACTURA_VENTA",
+            "action": "ERP_INVOICE_SALES",
+            "utterances_explicit": [
+                "registrar factura",
+                "crear factura",
+                "hacer una factura",
+                "emitir factura",
+                "facturar venta",
+                "registrar factura de contado",
+                "registrar factura a credito",
+                "nueva factura",
+                "factura para cliente",
+                "factura de servicio",
+                "factura de producto",
+                "generar factura electronica",
+                "registrar factura ya",
+                "registrar factura por favor",
+                "necesito registrar factura",
+                "me ayudas a registrar factura",
+                "quiero registrar factura",
+                "puedes registrar factura",
+                "crear factura ya",
+                "crear factura por favor",
+                "necesito crear factura",
+                "me ayudas a crear factura",
+                "quiero crear factura",
+                "puedes crear factura",
+                "hacer una factura ya",
+                "hacer una factura por favor",
+                "necesito hacer una factura",
+                "me ayudas a hacer una factura",
+                "quiero hacer una factura",
+                "puedes hacer una factura",
+                "emitir factura ya",
+                "emitir factura por favor",
+                "necesito emitir factura",
+                "me ayudas a emitir factura",
+                "quiero emitir factura",
+                "puedes emitir factura",
+                "facturar venta ya",
+                "facturar venta por favor",
+                "necesito facturar venta",
+                "me ayudas a facturar venta",
+                "quiero facturar venta",
+                "puedes facturar venta",
+                "registrar factura de contado ya",
+                "registrar factura de contado por favor",
+                "necesito registrar factura de contado"
+            ],
+            "utterances_implicit": [
+                "me falta el soporte de esa venta",
+                "el cliente me pidio la factura",
+                "eso quedo vendido pero no esta en sistema",
+                "toca legalizar esa venta",
+                "me falta subir esa venta",
+                "falta el comprobante",
+                "eso va para facturacion",
+                "la DIAN pide ese documento",
+                "me falta el PDF de la venta",
+                "falta el XML de esa venta",
+                "me pasa que me falta el soporte de esa venta",
+                "ojo: me falta el soporte de esa venta",
+                "me falta el soporte de esa venta, ayudame",
+                "todavia me falta el soporte de esa venta",
+                "me pasa que el cliente me pidio la factura",
+                "ojo: el cliente me pidio la factura",
+                "el cliente me pidio la factura, ayudame",
+                "todavia el cliente me pidio la factura",
+                "me pasa que eso quedo vendido pero no esta en sistema",
+                "ojo: eso quedo vendido pero no esta en sistema",
+                "eso quedo vendido pero no esta en sistema, ayudame",
+                "todavia eso quedo vendido pero no esta en sistema",
+                "me pasa que toca legalizar esa venta",
+                "ojo: toca legalizar esa venta",
+                "toca legalizar esa venta, ayudame",
+                "todavia toca legalizar esa venta",
+                "me pasa que me falta subir esa venta",
+                "ojo: me falta subir esa venta",
+                "me falta subir esa venta, ayudame",
+                "todavia me falta subir esa venta",
+                "me pasa que falta el comprobante",
+                "ojo: falta el comprobante",
+                "falta el comprobante, ayudame",
+                "todavia falta el comprobante",
+                "me pasa que eso va para facturacion",
+                "ojo: eso va para facturacion",
+                "eso va para facturacion, ayudame",
+                "todavia eso va para facturacion",
+                "me pasa que la DIAN pide ese documento",
+                "ojo: la DIAN pide ese documento",
+                "la DIAN pide ese documento, ayudame",
+                "todavia la DIAN pide ese documento",
+                "me pasa que me falta el PDF de la venta",
+                "ojo: me falta el PDF de la venta",
+                "me falta el PDF de la venta, ayudame"
+            ],
+            "hard_negatives": [
+                "ver facturas",
+                "descargar factura",
+                "anular factura",
+                "editar factura",
+                "imprimir factura",
+                "nota credito",
+                "nota debito",
+                "ver ventas del mes",
+                "crear cliente",
+                "crear producto",
+                "registrar pago",
+                "cerrar caja",
+                "solo quiero ver facturas",
+                "necesito ver facturas, no crear",
+                "por ahora ver facturas",
+                "solo quiero descargar factura",
+                "necesito descargar factura, no crear",
+                "por ahora descargar factura",
+                "solo quiero anular factura",
+                "necesito anular factura, no crear",
+                "por ahora anular factura",
+                "solo quiero editar factura",
+                "necesito editar factura, no crear",
+                "por ahora editar factura",
+                "solo quiero imprimir factura",
+                "necesito imprimir factura, no crear",
+                "por ahora imprimir factura",
+                "solo quiero nota credito",
+                "necesito nota credito, no crear",
+                "por ahora nota credito",
+                "solo quiero nota debito",
+                "necesito nota debito, no crear",
+                "por ahora nota debito",
+                "solo quiero ver ventas del mes",
+                "necesito ver ventas del mes, no crear",
+                "por ahora ver ventas del mes",
+                "solo quiero crear cliente",
+                "necesito crear cliente, no crear",
+                "por ahora crear cliente",
+                "solo quiero crear producto",
+                "necesito crear producto, no crear",
+                "por ahora crear producto",
+                "solo quiero registrar pago",
+                "necesito registrar pago, no crear",
+                "por ahora registrar pago"
+            ],
+            "slots": [
+                {
+                    "name": "cliente",
+                    "required": true
+                },
+                {
+                    "name": "items",
+                    "required": true
+                },
+                {
+                    "name": "total",
+                    "required": true
+                },
+                {
+                    "name": "forma_pago",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "cliente",
+                    "question": "A nombre de que cliente debo crear la factura?"
+                },
+                {
+                    "missing_slot": "items",
+                    "question": "Que productos o servicios debo incluir?"
+                },
+                {
+                    "missing_slot": "total",
+                    "question": "Cual es el valor total a facturar?"
+                },
+                {
+                    "missing_slot": "forma_pago",
+                    "question": "La factura es de contado o credito?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo, la factura quedo registrada con cliente {cliente} y total {total}.",
+            "error_reply_template": "No pude registrar la factura porque falta {missing_slot}."
+        },
+        {
+            "intent": "ERP_ASIENTO_CONTABLE",
+            "action": "ERP_ACCOUNTING_JOURNAL",
+            "utterances_explicit": [
+                "registrar asiento contable",
+                "crear asiento contable",
+                "hacer asiento diario",
+                "contabilizar movimiento",
+                "registrar partida contable",
+                "crear poliza contable",
+                "asiento manual",
+                "asiento de ajuste",
+                "asiento de cierre",
+                "registrar asiento de ingreso",
+                "registrar asiento de gasto",
+                "asiento contable hoy",
+                "registrar asiento contable ya",
+                "registrar asiento contable por favor",
+                "necesito registrar asiento contable",
+                "me ayudas a registrar asiento contable",
+                "quiero registrar asiento contable",
+                "puedes registrar asiento contable",
+                "crear asiento contable ya",
+                "crear asiento contable por favor",
+                "necesito crear asiento contable",
+                "me ayudas a crear asiento contable",
+                "quiero crear asiento contable",
+                "puedes crear asiento contable",
+                "hacer asiento diario ya",
+                "hacer asiento diario por favor",
+                "necesito hacer asiento diario",
+                "me ayudas a hacer asiento diario",
+                "quiero hacer asiento diario",
+                "puedes hacer asiento diario",
+                "contabilizar movimiento ya",
+                "contabilizar movimiento por favor",
+                "necesito contabilizar movimiento",
+                "me ayudas a contabilizar movimiento",
+                "quiero contabilizar movimiento",
+                "puedes contabilizar movimiento",
+                "registrar partida contable ya",
+                "registrar partida contable por favor",
+                "necesito registrar partida contable",
+                "me ayudas a registrar partida contable",
+                "quiero registrar partida contable",
+                "puedes registrar partida contable",
+                "crear poliza contable ya",
+                "crear poliza contable por favor",
+                "necesito crear poliza contable"
+            ],
+            "utterances_implicit": [
+                "eso debe ir a contabilidad",
+                "falta pasar eso al diario",
+                "me falta la contrapartida",
+                "no esta cuadrando el libro",
+                "eso no quedo contabilizado",
+                "hay que llevarlo al PUC",
+                "falta debito y credito",
+                "necesito dejar el soporte contable",
+                "el contador pide el asiento",
+                "esto debe afectar cuentas",
+                "me pasa que eso debe ir a contabilidad",
+                "ojo: eso debe ir a contabilidad",
+                "eso debe ir a contabilidad, ayudame",
+                "todavia eso debe ir a contabilidad",
+                "me pasa que falta pasar eso al diario",
+                "ojo: falta pasar eso al diario",
+                "falta pasar eso al diario, ayudame",
+                "todavia falta pasar eso al diario",
+                "me pasa que me falta la contrapartida",
+                "ojo: me falta la contrapartida",
+                "me falta la contrapartida, ayudame",
+                "todavia me falta la contrapartida",
+                "me pasa que no esta cuadrando el libro",
+                "ojo: no esta cuadrando el libro",
+                "no esta cuadrando el libro, ayudame",
+                "todavia no esta cuadrando el libro",
+                "me pasa que eso no quedo contabilizado",
+                "ojo: eso no quedo contabilizado",
+                "eso no quedo contabilizado, ayudame",
+                "todavia eso no quedo contabilizado",
+                "me pasa que hay que llevarlo al PUC",
+                "ojo: hay que llevarlo al PUC",
+                "hay que llevarlo al PUC, ayudame",
+                "todavia hay que llevarlo al PUC",
+                "me pasa que falta debito y credito",
+                "ojo: falta debito y credito",
+                "falta debito y credito, ayudame",
+                "todavia falta debito y credito",
+                "me pasa que necesito dejar el soporte contable",
+                "ojo: necesito dejar el soporte contable",
+                "necesito dejar el soporte contable, ayudame",
+                "todavia necesito dejar el soporte contable",
+                "me pasa que el contador pide el asiento",
+                "ojo: el contador pide el asiento",
+                "el contador pide el asiento, ayudame"
+            ],
+            "hard_negatives": [
+                "ver balance",
+                "estado de resultados",
+                "reporte contable",
+                "registrar factura",
+                "registrar pago cliente",
+                "pagar proveedor",
+                "crear cliente",
+                "crear producto",
+                "ajustar inventario",
+                "ver usuarios",
+                "cambiar plan de cuentas",
+                "configurar impuestos",
+                "solo quiero ver balance",
+                "necesito ver balance, no crear",
+                "por ahora ver balance",
+                "solo quiero estado de resultados",
+                "necesito estado de resultados, no crear",
+                "por ahora estado de resultados",
+                "solo quiero reporte contable",
+                "necesito reporte contable, no crear",
+                "por ahora reporte contable",
+                "solo quiero registrar factura",
+                "necesito registrar factura, no crear",
+                "por ahora registrar factura",
+                "solo quiero registrar pago cliente",
+                "necesito registrar pago cliente, no crear",
+                "por ahora registrar pago cliente",
+                "solo quiero pagar proveedor",
+                "necesito pagar proveedor, no crear",
+                "por ahora pagar proveedor",
+                "solo quiero crear cliente",
+                "necesito crear cliente, no crear",
+                "por ahora crear cliente",
+                "solo quiero crear producto",
+                "necesito crear producto, no crear",
+                "por ahora crear producto",
+                "solo quiero ajustar inventario",
+                "necesito ajustar inventario, no crear",
+                "por ahora ajustar inventario",
+                "solo quiero ver usuarios",
+                "necesito ver usuarios, no crear",
+                "por ahora ver usuarios",
+                "solo quiero cambiar plan de cuentas",
+                "necesito cambiar plan de cuentas, no crear",
+                "por ahora cambiar plan de cuentas"
+            ],
+            "slots": [
+                {
+                    "name": "fecha",
+                    "required": true
+                },
+                {
+                    "name": "detalle",
+                    "required": true
+                },
+                {
+                    "name": "lineas_debito_credito",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "fecha",
+                    "question": "Que fecha debe tener el asiento?"
+                },
+                {
+                    "missing_slot": "detalle",
+                    "question": "Cual es el concepto corto del asiento?"
+                },
+                {
+                    "missing_slot": "lineas_debito_credito",
+                    "question": "Que cuentas debo debitar y acreditar con sus valores?"
+                }
+            ],
+            "confirm_required": true,
+            "success_reply_template": "Listo, registre el asiento {detalle} para la fecha {fecha}.",
+            "error_reply_template": "No pude registrar el asiento porque falta {missing_slot}."
+        },
+        {
+            "intent": "ERP_CAJAYBANCOS",
+            "action": "ERP_CASH_BANK",
+            "utterances_explicit": [
+                "registrar pago",
+                "registrar recaudo",
+                "crear recibo de caja",
+                "crear egreso",
+                "registrar abono",
+                "recibir pago de factura",
+                "registrar pago proveedor",
+                "registrar salida de caja",
+                "registrar ingreso a banco",
+                "registrar transferencia",
+                "registrar pago por nequi",
+                "registrar pago por daviplata",
+                "registrar pago ya",
+                "registrar pago por favor",
+                "necesito registrar pago",
+                "me ayudas a registrar pago",
+                "quiero registrar pago",
+                "puedes registrar pago",
+                "registrar recaudo ya",
+                "registrar recaudo por favor",
+                "necesito registrar recaudo",
+                "me ayudas a registrar recaudo",
+                "quiero registrar recaudo",
+                "puedes registrar recaudo",
+                "crear recibo de caja ya",
+                "crear recibo de caja por favor",
+                "necesito crear recibo de caja",
+                "me ayudas a crear recibo de caja",
+                "quiero crear recibo de caja",
+                "puedes crear recibo de caja",
+                "crear egreso ya",
+                "crear egreso por favor",
+                "necesito crear egreso",
+                "me ayudas a crear egreso",
+                "quiero crear egreso",
+                "puedes crear egreso",
+                "registrar abono ya",
+                "registrar abono por favor",
+                "necesito registrar abono",
+                "me ayudas a registrar abono",
+                "quiero registrar abono",
+                "puedes registrar abono",
+                "recibir pago de factura ya",
+                "recibir pago de factura por favor",
+                "necesito recibir pago de factura"
+            ],
+            "utterances_implicit": [
+                "me consignaron y falta dejarlo en sistema",
+                "ya me pagaron esa factura",
+                "falta registrar ese abono",
+                "salio plata de caja hoy",
+                "hicimos transferencia al proveedor",
+                "entro plata al banco",
+                "falta el soporte del pago",
+                "me pagaron por QR",
+                "hoy cobramos varias cuentas",
+                "se hizo un pago parcial",
+                "me pasa que me consignaron y falta dejarlo en sistema",
+                "ojo: me consignaron y falta dejarlo en sistema",
+                "me consignaron y falta dejarlo en sistema, ayudame",
+                "todavia me consignaron y falta dejarlo en sistema",
+                "me pasa que ya me pagaron esa factura",
+                "ojo: ya me pagaron esa factura",
+                "ya me pagaron esa factura, ayudame",
+                "todavia ya me pagaron esa factura",
+                "me pasa que falta registrar ese abono",
+                "ojo: falta registrar ese abono",
+                "falta registrar ese abono, ayudame",
+                "todavia falta registrar ese abono",
+                "me pasa que salio plata de caja hoy",
+                "ojo: salio plata de caja hoy",
+                "salio plata de caja hoy, ayudame",
+                "todavia salio plata de caja hoy",
+                "me pasa que hicimos transferencia al proveedor",
+                "ojo: hicimos transferencia al proveedor",
+                "hicimos transferencia al proveedor, ayudame",
+                "todavia hicimos transferencia al proveedor",
+                "me pasa que entro plata al banco",
+                "ojo: entro plata al banco",
+                "entro plata al banco, ayudame",
+                "todavia entro plata al banco",
+                "me pasa que falta el soporte del pago",
+                "ojo: falta el soporte del pago",
+                "falta el soporte del pago, ayudame",
+                "todavia falta el soporte del pago",
+                "me pasa que me pagaron por QR",
+                "ojo: me pagaron por QR",
+                "me pagaron por QR, ayudame",
+                "todavia me pagaron por QR",
+                "me pasa que hoy cobramos varias cuentas",
+                "ojo: hoy cobramos varias cuentas",
+                "hoy cobramos varias cuentas, ayudame"
+            ],
+            "hard_negatives": [
+                "ver extracto",
+                "conciliacion bancaria",
+                "cerrar caja",
+                "abrir caja",
+                "ver movimientos",
+                "crear factura",
+                "anular factura",
+                "crear cliente",
+                "crear producto",
+                "reporte de cartera",
+                "dashboard financiero",
+                "configurar medios de pago",
+                "solo quiero ver extracto",
+                "necesito ver extracto, no crear",
+                "por ahora ver extracto",
+                "solo quiero conciliacion bancaria",
+                "necesito conciliacion bancaria, no crear",
+                "por ahora conciliacion bancaria",
+                "solo quiero cerrar caja",
+                "necesito cerrar caja, no crear",
+                "por ahora cerrar caja",
+                "solo quiero abrir caja",
+                "necesito abrir caja, no crear",
+                "por ahora abrir caja",
+                "solo quiero ver movimientos",
+                "necesito ver movimientos, no crear",
+                "por ahora ver movimientos",
+                "solo quiero crear factura",
+                "necesito crear factura, no crear",
+                "por ahora crear factura",
+                "solo quiero anular factura",
+                "necesito anular factura, no crear",
+                "por ahora anular factura",
+                "solo quiero crear cliente",
+                "necesito crear cliente, no crear",
+                "por ahora crear cliente",
+                "solo quiero crear producto",
+                "necesito crear producto, no crear",
+                "por ahora crear producto",
+                "solo quiero reporte de cartera",
+                "necesito reporte de cartera, no crear",
+                "por ahora reporte de cartera",
+                "solo quiero dashboard financiero",
+                "necesito dashboard financiero, no crear",
+                "por ahora dashboard financiero"
+            ],
+            "slots": [
+                {
+                    "name": "tercero",
+                    "required": true
+                },
+                {
+                    "name": "monto",
+                    "required": true
+                },
+                {
+                    "name": "tipo_movimiento",
+                    "required": true
+                },
+                {
+                    "name": "medio_pago",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tercero",
+                    "question": "De que cliente o proveedor es este movimiento?"
+                },
+                {
+                    "missing_slot": "monto",
+                    "question": "Cual fue el valor exacto del pago o recaudo?"
+                },
+                {
+                    "missing_slot": "tipo_movimiento",
+                    "question": "Es un ingreso (recaudo) o una salida (pago)?"
+                },
+                {
+                    "missing_slot": "medio_pago",
+                    "question": "Que medio de pago se uso?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo, registre el movimiento {tipo_movimiento} por {monto}.",
+            "error_reply_template": "No pude registrar el movimiento porque falta {missing_slot}."
+        },
+        {
+            "intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "action": "APP_ENTITY_CREATE_CUSTOMER",
+            "utterances_explicit": [
+                "crear cliente",
+                "registrar cliente",
+                "nuevo cliente",
+                "agregar cliente",
+                "ingresar cliente",
+                "crear cliente empresa",
+                "crear cliente persona natural",
+                "registrar cliente con NIT",
+                "registrar cliente con cedula",
+                "guardar cliente",
+                "crear contacto cliente",
+                "alta de cliente",
+                "crear cliente ya",
+                "crear cliente por favor",
+                "necesito crear cliente",
+                "me ayudas a crear cliente",
+                "quiero crear cliente",
+                "puedes crear cliente",
+                "registrar cliente ya",
+                "registrar cliente por favor",
+                "necesito registrar cliente",
+                "me ayudas a registrar cliente",
+                "quiero registrar cliente",
+                "puedes registrar cliente",
+                "nuevo cliente ya",
+                "nuevo cliente por favor",
+                "necesito nuevo cliente",
+                "me ayudas a nuevo cliente",
+                "quiero nuevo cliente",
+                "puedes nuevo cliente",
+                "agregar cliente ya",
+                "agregar cliente por favor",
+                "necesito agregar cliente",
+                "me ayudas a agregar cliente",
+                "quiero agregar cliente",
+                "puedes agregar cliente",
+                "ingresar cliente ya",
+                "ingresar cliente por favor",
+                "necesito ingresar cliente",
+                "me ayudas a ingresar cliente",
+                "quiero ingresar cliente",
+                "puedes ingresar cliente",
+                "crear cliente empresa ya",
+                "crear cliente empresa por favor",
+                "necesito crear cliente empresa"
+            ],
+            "utterances_implicit": [
+                "voy a venderle a alguien nuevo",
+                "necesito guardar este comprador",
+                "me falta crear ese tercero",
+                "quiero dejar ese cliente en base",
+                "ese cliente aun no existe",
+                "necesito registrar los datos del cliente",
+                "el cliente es nuevo",
+                "falta el contacto para facturar",
+                "voy a abrir ficha de cliente",
+                "quiero dejar listo el cliente para ventas",
+                "me pasa que voy a venderle a alguien nuevo",
+                "ojo: voy a venderle a alguien nuevo",
+                "voy a venderle a alguien nuevo, ayudame",
+                "todavia voy a venderle a alguien nuevo",
+                "me pasa que necesito guardar este comprador",
+                "ojo: necesito guardar este comprador",
+                "necesito guardar este comprador, ayudame",
+                "todavia necesito guardar este comprador",
+                "me pasa que me falta crear ese tercero",
+                "ojo: me falta crear ese tercero",
+                "me falta crear ese tercero, ayudame",
+                "todavia me falta crear ese tercero",
+                "me pasa que quiero dejar ese cliente en base",
+                "ojo: quiero dejar ese cliente en base",
+                "quiero dejar ese cliente en base, ayudame",
+                "todavia quiero dejar ese cliente en base",
+                "me pasa que ese cliente aun no existe",
+                "ojo: ese cliente aun no existe",
+                "ese cliente aun no existe, ayudame",
+                "todavia ese cliente aun no existe",
+                "me pasa que necesito registrar los datos del cliente",
+                "ojo: necesito registrar los datos del cliente",
+                "necesito registrar los datos del cliente, ayudame",
+                "todavia necesito registrar los datos del cliente",
+                "me pasa que el cliente es nuevo",
+                "ojo: el cliente es nuevo",
+                "el cliente es nuevo, ayudame",
+                "todavia el cliente es nuevo",
+                "me pasa que falta el contacto para facturar",
+                "ojo: falta el contacto para facturar",
+                "falta el contacto para facturar, ayudame",
+                "todavia falta el contacto para facturar",
+                "me pasa que voy a abrir ficha de cliente",
+                "ojo: voy a abrir ficha de cliente",
+                "voy a abrir ficha de cliente, ayudame"
+            ],
+            "hard_negatives": [
+                "ver clientes",
+                "editar cliente",
+                "eliminar cliente",
+                "buscar cliente",
+                "crear proveedor",
+                "crear producto",
+                "crear factura",
+                "registrar pago",
+                "importar clientes",
+                "exportar clientes",
+                "segmentar clientes",
+                "reporte de clientes",
+                "solo quiero ver clientes",
+                "necesito ver clientes, no crear",
+                "por ahora ver clientes",
+                "solo quiero editar cliente",
+                "necesito editar cliente, no crear",
+                "por ahora editar cliente",
+                "solo quiero eliminar cliente",
+                "necesito eliminar cliente, no crear",
+                "por ahora eliminar cliente",
+                "solo quiero buscar cliente",
+                "necesito buscar cliente, no crear",
+                "por ahora buscar cliente",
+                "solo quiero crear proveedor",
+                "necesito crear proveedor, no crear",
+                "por ahora crear proveedor",
+                "solo quiero crear producto",
+                "necesito crear producto, no crear",
+                "por ahora crear producto",
+                "solo quiero crear factura",
+                "necesito crear factura, no crear",
+                "por ahora crear factura",
+                "solo quiero registrar pago",
+                "necesito registrar pago, no crear",
+                "por ahora registrar pago",
+                "solo quiero importar clientes",
+                "necesito importar clientes, no crear",
+                "por ahora importar clientes",
+                "solo quiero exportar clientes",
+                "necesito exportar clientes, no crear",
+                "por ahora exportar clientes",
+                "solo quiero segmentar clientes",
+                "necesito segmentar clientes, no crear",
+                "por ahora segmentar clientes"
+            ],
+            "slots": [
+                {
+                    "name": "nombre",
+                    "required": true
+                },
+                {
+                    "name": "documento",
+                    "required": true
+                },
+                {
+                    "name": "telefono",
+                    "required": false
+                },
+                {
+                    "name": "email",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "nombre",
+                    "question": "Cual es el nombre o razon social del cliente?"
+                },
+                {
+                    "missing_slot": "documento",
+                    "question": "Cual es el NIT o documento del cliente?"
+                },
+                {
+                    "missing_slot": "telefono",
+                    "question": "Quieres registrar telefono o whatsapp?"
+                },
+                {
+                    "missing_slot": "email",
+                    "question": "Quieres registrar correo electronico?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo, cliente {nombre} creado correctamente.",
+            "error_reply_template": "No pude crear el cliente porque falta {missing_slot}."
+        },
+        {
+            "intent": "APP_RUNTIME_CREATE_ITEM",
+            "action": "APP_ENTITY_CREATE_ITEM",
+            "utterances_explicit": [
+                "crear producto",
+                "crear servicio",
+                "registrar producto",
+                "registrar servicio",
+                "nuevo producto",
+                "nuevo servicio",
+                "agregar item",
+                "crear referencia",
+                "ingresar articulo",
+                "guardar producto",
+                "crear SKU",
+                "crear item de venta",
+                "crear producto ya",
+                "crear producto por favor",
+                "necesito crear producto",
+                "me ayudas a crear producto",
+                "quiero crear producto",
+                "puedes crear producto",
+                "crear servicio ya",
+                "crear servicio por favor",
+                "necesito crear servicio",
+                "me ayudas a crear servicio",
+                "quiero crear servicio",
+                "puedes crear servicio",
+                "registrar producto ya",
+                "registrar producto por favor",
+                "necesito registrar producto",
+                "me ayudas a registrar producto",
+                "quiero registrar producto",
+                "puedes registrar producto",
+                "registrar servicio ya",
+                "registrar servicio por favor",
+                "necesito registrar servicio",
+                "me ayudas a registrar servicio",
+                "quiero registrar servicio",
+                "puedes registrar servicio",
+                "nuevo producto ya",
+                "nuevo producto por favor",
+                "necesito nuevo producto",
+                "me ayudas a nuevo producto",
+                "quiero nuevo producto",
+                "puedes nuevo producto",
+                "nuevo servicio ya",
+                "nuevo servicio por favor",
+                "necesito nuevo servicio"
+            ],
+            "utterances_implicit": [
+                "voy a vender algo nuevo",
+                "ese item no existe en catalogo",
+                "me falta cargar esa referencia",
+                "quiero dejar ese servicio listo para facturar",
+                "necesito registrar ese articulo",
+                "falta crear ese SKU",
+                "quiero agregar ese producto al sistema",
+                "me falta el codigo de ese item",
+                "voy a abrir ficha del producto",
+                "quiero subir un nuevo servicio",
+                "me pasa que voy a vender algo nuevo",
+                "ojo: voy a vender algo nuevo",
+                "voy a vender algo nuevo, ayudame",
+                "todavia voy a vender algo nuevo",
+                "me pasa que ese item no existe en catalogo",
+                "ojo: ese item no existe en catalogo",
+                "ese item no existe en catalogo, ayudame",
+                "todavia ese item no existe en catalogo",
+                "me pasa que me falta cargar esa referencia",
+                "ojo: me falta cargar esa referencia",
+                "me falta cargar esa referencia, ayudame",
+                "todavia me falta cargar esa referencia",
+                "me pasa que quiero dejar ese servicio listo para facturar",
+                "ojo: quiero dejar ese servicio listo para facturar",
+                "quiero dejar ese servicio listo para facturar, ayudame",
+                "todavia quiero dejar ese servicio listo para facturar",
+                "me pasa que necesito registrar ese articulo",
+                "ojo: necesito registrar ese articulo",
+                "necesito registrar ese articulo, ayudame",
+                "todavia necesito registrar ese articulo",
+                "me pasa que falta crear ese SKU",
+                "ojo: falta crear ese SKU",
+                "falta crear ese SKU, ayudame",
+                "todavia falta crear ese SKU",
+                "me pasa que quiero agregar ese producto al sistema",
+                "ojo: quiero agregar ese producto al sistema",
+                "quiero agregar ese producto al sistema, ayudame",
+                "todavia quiero agregar ese producto al sistema",
+                "me pasa que me falta el codigo de ese item",
+                "ojo: me falta el codigo de ese item",
+                "me falta el codigo de ese item, ayudame",
+                "todavia me falta el codigo de ese item",
+                "me pasa que voy a abrir ficha del producto",
+                "ojo: voy a abrir ficha del producto",
+                "voy a abrir ficha del producto, ayudame"
+            ],
+            "hard_negatives": [
+                "ver productos",
+                "editar producto",
+                "eliminar producto",
+                "ajustar inventario",
+                "traslado de stock",
+                "lista de precios",
+                "crear cliente",
+                "crear factura",
+                "registrar pago",
+                "importar productos",
+                "reporte de productos",
+                "anular item",
+                "solo quiero ver productos",
+                "necesito ver productos, no crear",
+                "por ahora ver productos",
+                "solo quiero editar producto",
+                "necesito editar producto, no crear",
+                "por ahora editar producto",
+                "solo quiero eliminar producto",
+                "necesito eliminar producto, no crear",
+                "por ahora eliminar producto",
+                "solo quiero ajustar inventario",
+                "necesito ajustar inventario, no crear",
+                "por ahora ajustar inventario",
+                "solo quiero traslado de stock",
+                "necesito traslado de stock, no crear",
+                "por ahora traslado de stock",
+                "solo quiero lista de precios",
+                "necesito lista de precios, no crear",
+                "por ahora lista de precios",
+                "solo quiero crear cliente",
+                "necesito crear cliente, no crear",
+                "por ahora crear cliente",
+                "solo quiero crear factura",
+                "necesito crear factura, no crear",
+                "por ahora crear factura",
+                "solo quiero registrar pago",
+                "necesito registrar pago, no crear",
+                "por ahora registrar pago",
+                "solo quiero importar productos",
+                "necesito importar productos, no crear",
+                "por ahora importar productos",
+                "solo quiero reporte de productos",
+                "necesito reporte de productos, no crear",
+                "por ahora reporte de productos"
+            ],
+            "slots": [
+                {
+                    "name": "nombre_item",
+                    "required": true
+                },
+                {
+                    "name": "tipo_item",
+                    "required": true
+                },
+                {
+                    "name": "precio_venta",
+                    "required": true
+                },
+                {
+                    "name": "codigo",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "nombre_item",
+                    "question": "Como se llama el producto o servicio?"
+                },
+                {
+                    "missing_slot": "tipo_item",
+                    "question": "Es producto o servicio?"
+                },
+                {
+                    "missing_slot": "precio_venta",
+                    "question": "Cual es el precio de venta?"
+                },
+                {
+                    "missing_slot": "codigo",
+                    "question": "Quieres guardar codigo interno o SKU?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo, item {nombre_item} creado con precio {precio_venta}.",
+            "error_reply_template": "No pude crear el item porque falta {missing_slot}."
+        },
+        {
+            "intent": "APP_CREATE",
+            "action": "FRAMEWORK_APP_CREATE",
+            "utterances_explicit": [
+                "crear una app",
+                "quiero una app para mi negocio",
+                "ayudame a crear la app",
+                "crear sistema de ventas",
+                "crear app de facturacion",
+                "crear app de inventario",
+                "crear app para citas",
+                "crear app para reservas",
+                "armar mini ERP",
+                "crear app desde cero",
+                "montar una app",
+                "necesito el sistema para mi negocio",
+                "crear una app ya",
+                "crear una app por favor",
+                "necesito crear una app",
+                "me ayudas a crear una app",
+                "quiero crear una app",
+                "puedes crear una app",
+                "quiero una app para mi negocio ya",
+                "quiero una app para mi negocio por favor",
+                "necesito quiero una app para mi negocio",
+                "me ayudas a quiero una app para mi negocio",
+                "quiero quiero una app para mi negocio",
+                "puedes quiero una app para mi negocio",
+                "ayudame a crear la app ya",
+                "ayudame a crear la app por favor",
+                "necesito ayudame a crear la app",
+                "me ayudas a ayudame a crear la app",
+                "quiero ayudame a crear la app",
+                "puedes ayudame a crear la app",
+                "crear sistema de ventas ya",
+                "crear sistema de ventas por favor",
+                "necesito crear sistema de ventas",
+                "me ayudas a crear sistema de ventas",
+                "quiero crear sistema de ventas",
+                "puedes crear sistema de ventas",
+                "crear app de facturacion ya",
+                "crear app de facturacion por favor",
+                "necesito crear app de facturacion",
+                "me ayudas a crear app de facturacion",
+                "quiero crear app de facturacion",
+                "puedes crear app de facturacion",
+                "crear app de inventario ya",
+                "crear app de inventario por favor",
+                "necesito crear app de inventario"
+            ],
+            "utterances_implicit": [
+                "estoy cansado del excel",
+                "quiero organizar mejor mi negocio",
+                "necesito controlar ventas e inventario",
+                "quiero digitalizar mi operacion",
+                "me estoy enredando con cuentas y pagos",
+                "necesito algo para manejar clientes y facturas",
+                "quiero una solucion para mi tienda",
+                "me falta control de caja y cartera",
+                "quiero automatizar procesos",
+                "quiero empezar rapido sin codigo",
+                "me pasa que estoy cansado del excel",
+                "ojo: estoy cansado del excel",
+                "estoy cansado del excel, ayudame",
+                "todavia estoy cansado del excel",
+                "me pasa que quiero organizar mejor mi negocio",
+                "ojo: quiero organizar mejor mi negocio",
+                "quiero organizar mejor mi negocio, ayudame",
+                "todavia quiero organizar mejor mi negocio",
+                "me pasa que necesito controlar ventas e inventario",
+                "ojo: necesito controlar ventas e inventario",
+                "necesito controlar ventas e inventario, ayudame",
+                "todavia necesito controlar ventas e inventario",
+                "me pasa que quiero digitalizar mi operacion",
+                "ojo: quiero digitalizar mi operacion",
+                "quiero digitalizar mi operacion, ayudame",
+                "todavia quiero digitalizar mi operacion",
+                "me pasa que me estoy enredando con cuentas y pagos",
+                "ojo: me estoy enredando con cuentas y pagos",
+                "me estoy enredando con cuentas y pagos, ayudame",
+                "todavia me estoy enredando con cuentas y pagos",
+                "me pasa que necesito algo para manejar clientes y facturas",
+                "ojo: necesito algo para manejar clientes y facturas",
+                "necesito algo para manejar clientes y facturas, ayudame",
+                "todavia necesito algo para manejar clientes y facturas",
+                "me pasa que quiero una solucion para mi tienda",
+                "ojo: quiero una solucion para mi tienda",
+                "quiero una solucion para mi tienda, ayudame",
+                "todavia quiero una solucion para mi tienda",
+                "me pasa que me falta control de caja y cartera",
+                "ojo: me falta control de caja y cartera",
+                "me falta control de caja y cartera, ayudame",
+                "todavia me falta control de caja y cartera",
+                "me pasa que quiero automatizar procesos",
+                "ojo: quiero automatizar procesos",
+                "quiero automatizar procesos, ayudame"
+            ],
+            "hard_negatives": [
+                "registrar factura",
+                "registrar pago",
+                "crear cliente",
+                "crear producto",
+                "hacer reporte",
+                "ver dashboard",
+                "editar app existente",
+                "eliminar app",
+                "cambiar contrasena",
+                "ver usuarios",
+                "noticias de tecnologia",
+                "soporte tecnico",
+                "solo quiero registrar factura",
+                "necesito registrar factura, no crear",
+                "por ahora registrar factura",
+                "solo quiero registrar pago",
+                "necesito registrar pago, no crear",
+                "por ahora registrar pago",
+                "solo quiero crear cliente",
+                "necesito crear cliente, no crear",
+                "por ahora crear cliente",
+                "solo quiero crear producto",
+                "necesito crear producto, no crear",
+                "por ahora crear producto",
+                "solo quiero hacer reporte",
+                "necesito hacer reporte, no crear",
+                "por ahora hacer reporte",
+                "solo quiero ver dashboard",
+                "necesito ver dashboard, no crear",
+                "por ahora ver dashboard",
+                "solo quiero editar app existente",
+                "necesito editar app existente, no crear",
+                "por ahora editar app existente",
+                "solo quiero eliminar app",
+                "necesito eliminar app, no crear",
+                "por ahora eliminar app",
+                "solo quiero cambiar contrasena",
+                "necesito cambiar contrasena, no crear",
+                "por ahora cambiar contrasena",
+                "solo quiero ver usuarios",
+                "necesito ver usuarios, no crear",
+                "por ahora ver usuarios",
+                "solo quiero noticias de tecnologia",
+                "necesito noticias de tecnologia, no crear",
+                "por ahora noticias de tecnologia"
+            ],
+            "slots": [
+                {
+                    "name": "tipo_negocio",
+                    "required": true
+                },
+                {
+                    "name": "procesos_clave",
+                    "required": true
+                },
+                {
+                    "name": "documentos_clave",
+                    "required": true
+                },
+                {
+                    "name": "forma_pago",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tipo_negocio",
+                    "question": "Que tipo de negocio tienes?"
+                },
+                {
+                    "missing_slot": "procesos_clave",
+                    "question": "Que quieres controlar primero: ventas, inventario, pagos, citas o reservas?"
+                },
+                {
+                    "missing_slot": "documentos_clave",
+                    "question": "Que documentos necesitas desde el inicio?"
+                },
+                {
+                    "missing_slot": "forma_pago",
+                    "question": "Tus ventas son de contado, credito o mixto?"
+                }
+            ],
+            "confirm_required": true,
+            "success_reply_template": "Listo, configure el plan inicial de app para {tipo_negocio}.",
+            "error_reply_template": "No puedo crear la app porque falta {missing_slot}."
+        }
+    ],
+    "multi_turn_dialogues": [
+        {
+            "id": "mt_factura_01",
+            "scenario": "registro_factura_con_slot_filling",
+            "turns": [
+                {
+                    "user": "hazme la factura"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                },
+                {
+                    "user": "cliente juan perez"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                },
+                {
+                    "user": "servicio tecnico y repuesto"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:total"
+                },
+                {
+                    "user": "120000"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        },
+        {
+            "id": "mt_asiento_01",
+            "scenario": "asiento_contable_con_confirmacion",
+            "turns": [
+                {
+                    "user": "registrar asiento de cierre"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:fecha"
+                },
+                {
+                    "user": "2026-02-24"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:lineas_debito_credito"
+                },
+                {
+                    "user": "debito 413595 500000 credito 590505 500000"
+                },
+                {
+                    "assistant_expected_action": "ask_user_confirm"
+                },
+                {
+                    "user": "si"
+                },
+                {
+                    "assistant_expected_action": "ERP_ACCOUNTING_JOURNAL"
+                }
+            ]
+        },
+        {
+            "id": "mt_pago_01",
+            "scenario": "recaudo_implicito",
+            "turns": [
+                {
+                    "user": "me pagaron la 1008 por nequi"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:monto"
+                },
+                {
+                    "user": "380000"
+                },
+                {
+                    "assistant_expected_action": "ERP_CASH_BANK"
+                }
+            ]
+        },
+        {
+            "id": "mt_cliente_01",
+            "scenario": "crear_cliente_rapido",
+            "turns": [
+                {
+                    "user": "cliente nuevo para facturar"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:nombre"
+                },
+                {
+                    "user": "Maderas San Jorge"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:documento"
+                },
+                {
+                    "user": "901333222-1"
+                },
+                {
+                    "assistant_expected_action": "APP_ENTITY_CREATE_CUSTOMER"
+                }
+            ]
+        },
+        {
+            "id": "mt_item_01",
+            "scenario": "crear_producto_con_sku",
+            "turns": [
+                {
+                    "user": "agrega un producto nuevo"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:nombre_item"
+                },
+                {
+                    "user": "cable encauchetado 2x14"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:precio_venta"
+                },
+                {
+                    "user": "7800"
+                },
+                {
+                    "assistant_expected_action": "APP_ENTITY_CREATE_ITEM"
+                }
+            ]
+        },
+        {
+            "id": "mt_app_01",
+            "scenario": "descubrimiento_para_crear_app",
+            "turns": [
+                {
+                    "user": "necesito una app para mi negocio"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo_negocio"
+                },
+                {
+                    "user": "tienda de ropa"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:procesos_clave"
+                },
+                {
+                    "user": "inventario, ventas, pagos y reservas"
+                },
+                {
+                    "assistant_expected_action": "FRAMEWORK_APP_CREATE"
+                }
+            ]
+        },
+        {
+            "id": "mt_factura_ambiguo_07",
+            "scenario": "factura_vs_consulta",
+            "turns": [
+                {
+                    "user": "consultar factura 223"
+                },
+                {
+                    "assistant_expected_action": "NEEDS_DISAMBIGUATION"
+                },
+                {
+                    "user": "no, crear factura nueva"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                }
+            ]
+        },
+        {
+            "id": "mt_pago_ambiguo_08",
+            "scenario": "pago_sin_referencia",
+            "turns": [
+                {
+                    "user": "me pagaron por transferencia"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tercero"
+                },
+                {
+                    "user": "cliente maderas del norte"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:referencia_documento"
+                }
+            ]
+        },
+        {
+            "id": "mt_cliente_doc_09",
+            "scenario": "cliente_sin_documento",
+            "turns": [
+                {
+                    "user": "crear cliente nuevo"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo"
+                },
+                {
+                    "user": "empresa"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:nit_cc"
+                }
+            ]
+        },
+        {
+            "id": "mt_app_onboarding_10",
+            "scenario": "app_create_minimo",
+            "turns": [
+                {
+                    "user": "crear app para construccion"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:procesos_clave"
+                },
+                {
+                    "user": "cotizaciones, contratos, avances y facturacion"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:documentos_clave"
+                }
+            ]
+        }
+    ],
+    "emotion_cases": [
+        {
+            "emotion": "frustracion",
+            "user_samples": [
+                "otra vez lo mismo",
+                "siempre me pides lo mismo",
+                "esto no funciona",
+                "no me entiendes"
+            ],
+            "assistant_style": "calmo, empatico, directo",
+            "expected_next_step": "pedir un solo dato faltante con ejemplo corto"
+        },
+        {
+            "emotion": "duda",
+            "user_samples": [
+                "no se como hacerlo",
+                "que me recomiendas",
+                "no entiendo eso",
+                "me perdi"
+            ],
+            "assistant_style": "didactico, no tecnico, guiado",
+            "expected_next_step": "explicar en una linea y dar dos opciones"
+        },
+        {
+            "emotion": "urgencia",
+            "user_samples": [
+                "lo necesito ya",
+                "rapido por favor",
+                "esto es urgente",
+                "en 5 minutos me lo piden"
+            ],
+            "assistant_style": "ejecucion rapida, sin rodeos",
+            "expected_next_step": "capturar solo slots criticos y ejecutar"
+        }
+    ],
+    "qa_cases": [
+        {
+            "text": "me piden la factura de esa venta",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "falta pasar ese movimiento al diario",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "ya me pagaron por transferencia",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "voy a venderle a un cliente nuevo",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "ese servicio no existe en el catalogo",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "estoy cansado del excel, quiero app",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "consultar factura FV-100",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "NEEDS_DISAMBIGUATION"
+        },
+        {
+            "text": "anular un recaudo de ayer",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "NEEDS_DISAMBIGUATION"
+        },
+        {
+            "text": "editar cliente por NIT",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "NEEDS_DISAMBIGUATION"
+        },
+        {
+            "text": "subir catalogo por excel",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "NEEDS_DISAMBIGUATION"
+        },
+        {
+            "text": "crear app para veterinaria con citas y facturacion",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "registrar asiento por ajuste de caja con soporte",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "ya me pagaron la factura 908 por nequi",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "facturar venta de hoy con IVA 19",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "crear servicio nuevo para facturar",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear cliente empresa con NIT",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        }
+    ]
+}
