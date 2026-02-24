@@ -19,6 +19,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('gateway_local', fn() => $this->checkGateway());
         $tests[] = $this->wrap('gateway_golden', fn() => $this->checkGatewayGolden());
         $tests[] = $this->wrap('mode_context_isolation', fn() => $this->checkModeContextIsolation());
+        $tests[] = $this->wrap('business_reprofile_mid_flow', fn() => $this->checkBusinessReprofileMidFlow());
         $tests[] = $this->wrap('mode_guard_policy', fn() => $this->checkModeGuardPolicy());
         $tests[] = $this->wrap('builder_onboarding_flow', fn() => $this->checkBuilderOnboardingFlow());
         $tests[] = $this->wrap('builder_guidance', fn() => $this->checkBuilderGuidance());
@@ -146,6 +147,48 @@ final class UnitTestRunner
         }
         if (!empty($appProfile['business_type'] ?? '')) {
             throw new \RuntimeException('Perfil app no debe mezclar business_type de builder.');
+        }
+    }
+
+    private function checkBusinessReprofileMidFlow(): void
+    {
+        $gateway = new \App\Core\Agents\ConversationGateway();
+        $tenantId = 'default';
+        $user = 'reprofile_' . time();
+        $projectId = 'reprofile_proj';
+
+        $gateway->handle($tenantId, $user, 'mi negocio es una ferreteria', 'builder', $projectId);
+        $gateway->handle($tenantId, $user, 'mixto', 'builder', $projectId);
+        $gateway->handle($tenantId, $user, 'inventario, facturacion y pagos', 'builder', $projectId);
+        $gateway->handle($tenantId, $user, 'factura, cotizacion', 'builder', $projectId);
+
+        $switch = $gateway->handle(
+            $tenantId,
+            $user,
+            'hola necesito hacer una aplicacion para un almacen de corte laser',
+            'builder',
+            $projectId
+        );
+        $switchReply = mb_strtolower((string) ($switch['reply'] ?? ''), 'UTF-8');
+        if (str_contains($switchReply, 'negocio: ferreteria')) {
+            throw new \RuntimeException('No se permitio cambiar de negocio en flujo de confirmacion.');
+        }
+        $allowedSignals = ['corte laser', 'servicios de corte laser', 'paso 3', 'paso 2', 'productos, servicios o ambos', 'en este paso necesito'];
+        $matched = false;
+        foreach ($allowedSignals as $signal) {
+            if (str_contains($switchReply, $signal)) {
+                $matched = true;
+                break;
+            }
+        }
+        if (!$matched) {
+            throw new \RuntimeException('Cambio de negocio en confirmacion no produjo una salida valida.');
+        }
+
+        $reject = $gateway->handle($tenantId, $user, 'no soy ferrteria', 'builder', $projectId);
+        $rejectReply = mb_strtolower((string) ($reject['reply'] ?? ''), 'UTF-8');
+        if (str_contains($rejectReply, 'negocio: ferreteria')) {
+            throw new \RuntimeException('La correccion "no soy <negocio>" no limpio el resumen previo.');
         }
     }
 

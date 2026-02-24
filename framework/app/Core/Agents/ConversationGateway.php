@@ -2447,11 +2447,12 @@ final class ConversationGateway
         }
 
         $existingBusinessType = (string) ($localProfile['business_type'] ?? '');
-        $explicitBusinessChange = preg_match('/\b(cambiar|cambia|otro negocio|nuevo negocio|no soy|soy una|soy un|fabrico|me dedico)\b/u', $text) === 1;
+        $business = $this->detectBusinessType($text);
+        $businessShiftSignal = $this->shouldReprofileBusiness($text, $existingBusinessType, $business, $currentStep);
+        $explicitBusinessChange = preg_match('/\b(cambiar|cambia|otro negocio|nuevo negocio|no soy|soy una|soy un|fabrico|me dedico)\b/u', $text) === 1
+            || $businessShiftSignal;
         $explicitBusinessRejection = $this->isBusinessTypeRejectedByUser($text, $existingBusinessType);
         $businessResolvedNote = '';
-
-        $business = $this->detectBusinessType($text);
         if ($explicitBusinessRejection) {
             $business = '';
             unset($localProfile['business_type']);
@@ -2474,7 +2475,8 @@ final class ConversationGateway
                 }
             }
         }
-        if ($business !== '' && ($existingBusinessType === '' || $currentStep === 'business_type' || $explicitBusinessChange || $explicitBusinessRejection)) {
+        $businessChanged = $business !== '' && $this->normalizeBusinessType($business) !== $this->normalizeBusinessType($existingBusinessType);
+        if ($business !== '' && ($existingBusinessType === '' || $currentStep === 'business_type' || $explicitBusinessChange || $explicitBusinessRejection || $businessShiftSignal)) {
             $localProfile['business_type'] = $business;
             unset($localProfile['business_candidate']);
             unset($localState['unknown_business_notice_sent']);
@@ -2484,6 +2486,13 @@ final class ConversationGateway
             $localState['business_resolution_last_candidate'] = null;
             $localState['business_resolution_last_status'] = null;
             $localState['business_resolution_last_result'] = null;
+            if ($businessChanged) {
+                unset($localState['analysis_approved']);
+                $localState['confirm_scope_last_hash'] = null;
+                $localState['confirm_scope_repeats'] = 0;
+                unset($localProfile['needs_scope'], $localProfile['needs_scope_items'], $localProfile['documents_scope'], $localProfile['documents_scope_items']);
+                $localState['onboarding_step'] = !empty($localProfile['operation_model']) ? 'needs_scope' : 'operation_model';
+            }
         }
         $unknownBusinessCandidate = $this->detectUnknownBusinessCandidate($text, $business);
         if ($unknownBusinessCandidate !== '') {
@@ -5797,7 +5806,58 @@ private function parseEntityFromCrudText(string $text): string
                 return true;
             }
         }
+
+        $needleTokens = [];
+        foreach ($needles as $needle) {
+            $parts = preg_split('/[^a-z0-9]+/u', $this->normalize((string) $needle)) ?: [];
+            foreach ($parts as $part) {
+                $part = trim((string) $part);
+                if (strlen($part) >= 5) {
+                    $needleTokens[$part] = true;
+                }
+            }
+        }
+
+        if (!empty($needleTokens)) {
+            $textTokens = preg_split('/[^a-z0-9]+/u', $normalizedText) ?: [];
+            foreach ($textTokens as $token) {
+                $token = trim((string) $token);
+                if (strlen($token) < 5) {
+                    continue;
+                }
+                foreach (array_keys($needleTokens) as $needleToken) {
+                    if (levenshtein($token, $needleToken) <= 2) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        // If the user explicitly says "no soy/no es <algo>", treat it as business rejection
+        // even when the provided label has typos or does not match aliases exactly.
+        if (preg_match('/\b(?:no\s+soy|no\s+es)\s+[a-z0-9_\-\s]{3,40}\b/u', $normalizedText) === 1) {
+            return true;
+        }
+
         return false;
+    }
+
+    private function shouldReprofileBusiness(string $text, string $existingBusinessType, string $detectedBusinessType, string $currentStep): bool
+    {
+        $existing = $this->normalizeBusinessType($existingBusinessType);
+        $detected = $this->normalizeBusinessType($detectedBusinessType);
+        if ($existing === '' || $detected === '' || $existing === $detected) {
+            return false;
+        }
+        if ($currentStep === 'business_type') {
+            return true;
+        }
+
+        $normalizedText = $this->normalize($text);
+        return preg_match(
+            '/\b(no\s+soy|no\s+es|soy\s+una|soy\s+un|fabrico|fabricamos|me\s+dedico|vendo|vendemos|presto|prestamos|ofrezco|ofrecemos|negocio|empresa|almacen|tienda|app|aplicacion)\b/u',
+            $normalizedText
+        ) === 1;
     }
 
     private function findBuilderGuidanceByTopic(array $guides, string $topic): array
