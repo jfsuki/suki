@@ -12,6 +12,9 @@ final class UnitTestRunner
         $tests = [];
         $tests[] = $this->wrap('manifest', fn() => ManifestValidator::validateOrFail());
         $tests[] = $this->wrap('workflow_contract', fn() => $this->checkWorkflowContract());
+        $tests[] = $this->wrap('workflow_executor', fn() => $this->checkWorkflowExecutor());
+        $tests[] = $this->wrap('workflow_compiler', fn() => $this->checkWorkflowCompiler());
+        $tests[] = $this->wrap('workflow_repository', fn() => $this->checkWorkflowRepository());
         $tests[] = $this->wrap('entity_registry', fn() => (new EntityRegistry())->all());
         $tests[] = $this->wrap('form_contracts', fn() => (new ContractsCatalog())->forms());
         $tests[] = $this->wrap('db_connection', fn() => Database::connection()->getAttribute(\PDO::ATTR_DRIVER_NAME));
@@ -27,6 +30,10 @@ final class UnitTestRunner
         $tests[] = $this->wrap('builder_guidance', fn() => $this->checkBuilderGuidance());
         $tests[] = $this->wrap('flow_control', fn() => $this->checkFlowControl());
         $tests[] = $this->wrap('domain_training_sync', fn() => $this->checkDomainTrainingSync());
+        $tests[] = $this->wrap('openapi_importer', fn() => $this->checkOpenApiIntegrationImporter());
+        $tests[] = $this->wrap('api_security_guard', fn() => $this->checkApiSecurityGuard());
+        $tests[] = $this->wrap('workflow_api_e2e', fn() => $this->checkWorkflowApiE2E());
+        $tests[] = $this->wrap('security_channels_e2e', fn() => $this->checkSecurityChannelsE2E());
         $tests[] = $this->wrap('intent_router', fn() => $this->checkIntentRouter());
         $tests[] = $this->wrap('command_bus', fn() => $this->checkCommandBus());
         $tests[] = $this->wrap('observability_metrics', fn() => $this->checkObservabilityMetrics());
@@ -131,6 +138,123 @@ final class UnitTestRunner
         }
 
         throw new \RuntimeException('WorkflowValidator debe bloquear schema y semantica invalida.');
+    }
+
+    private function checkWorkflowExecutor(): void
+    {
+        $workflow = [
+            'meta' => [
+                'id' => 'wf_exec_unit',
+                'name' => 'Executor unit',
+                'status' => 'draft',
+                'revision' => 1,
+            ],
+            'nodes' => [
+                [
+                    'id' => 'n_input',
+                    'type' => 'input',
+                    'title' => 'Input',
+                    'runPolicy' => ['timeout_ms' => 10000, 'retry_max' => 0, 'token_budget' => 0],
+                ],
+                [
+                    'id' => 'n_generate',
+                    'type' => 'generate',
+                    'title' => 'Generate',
+                    'promptTemplate' => 'Cliente {{input.cliente}} total {{input.total}}',
+                    'runPolicy' => ['timeout_ms' => 10000, 'retry_max' => 0, 'token_budget' => 0],
+                ],
+                [
+                    'id' => 'n_output',
+                    'type' => 'output',
+                    'title' => 'Output',
+                    'runPolicy' => ['timeout_ms' => 10000, 'retry_max' => 0, 'token_budget' => 0],
+                ],
+            ],
+            'edges' => [
+                ['from' => 'n_input', 'to' => 'n_generate', 'mapping' => ['cliente' => 'output.cliente', 'total' => 'output.total']],
+                ['from' => 'n_generate', 'to' => 'n_output', 'mapping' => ['text' => 'output.text']],
+            ],
+            'assets' => [],
+            'theme' => ['presetName' => 'clean_business'],
+            'versioning' => ['revision' => 1, 'historyPointers' => []],
+        ];
+
+        $executor = new WorkflowExecutor();
+        $result = $executor->execute($workflow, ['cliente' => 'Ana', 'total' => 120000]);
+        if (!(bool) ($result['ok'] ?? false)) {
+            throw new \RuntimeException('WorkflowExecutor debe terminar en ok=true para caso valido.');
+        }
+        $final = is_array($result['final_output'] ?? null) ? (array) $result['final_output'] : [];
+        $text = (string) ($final['text'] ?? '');
+        if (!str_contains($text, 'Ana') || !str_contains($text, '120000')) {
+            throw new \RuntimeException('WorkflowExecutor no propago valores entre nodos.');
+        }
+        $traces = is_array($result['traces'] ?? null) ? (array) $result['traces'] : [];
+        if (count($traces) !== 3) {
+            throw new \RuntimeException('WorkflowExecutor debe emitir traza por nodo.');
+        }
+    }
+
+    private function checkWorkflowCompiler(): void
+    {
+        $compiler = new WorkflowCompiler();
+        $proposal = $compiler->compile('quiero un flujo para generar cotizacion y salida final');
+        if ((string) ($proposal['status'] ?? '') !== 'PROPOSAL_READY') {
+            throw new \RuntimeException('WorkflowCompiler debe producir PROPOSAL_READY.');
+        }
+        if (!(bool) ($proposal['needs_confirmation'] ?? false)) {
+            throw new \RuntimeException('WorkflowCompiler debe exigir confirmacion antes de aplicar.');
+        }
+        $contract = is_array($proposal['proposed_contract'] ?? null) ? (array) $proposal['proposed_contract'] : [];
+        WorkflowValidator::validateOrFail($contract);
+    }
+
+    private function checkWorkflowRepository(): void
+    {
+        $tmpProject = FRAMEWORK_ROOT . '/tests/tmp/workflow_repo_project';
+        if (!is_dir($tmpProject . '/contracts')) {
+            mkdir($tmpProject . '/contracts', 0775, true);
+        }
+        if (!is_dir($tmpProject . '/storage')) {
+            mkdir($tmpProject . '/storage', 0775, true);
+        }
+        $repo = new WorkflowRepository($tmpProject);
+        $workflowId = 'wf_repo_unit_' . time();
+        $contract = [
+            'meta' => [
+                'id' => $workflowId,
+                'name' => 'Repo unit',
+                'status' => 'draft',
+                'revision' => 1,
+            ],
+            'nodes' => [
+                [
+                    'id' => 'n_input',
+                    'type' => 'input',
+                    'title' => 'Input',
+                    'runPolicy' => ['timeout_ms' => 1000, 'retry_max' => 0, 'token_budget' => 0],
+                ],
+            ],
+            'edges' => [],
+            'assets' => [],
+            'theme' => ['presetName' => 'clean_business'],
+            'versioning' => ['revision' => 1, 'historyPointers' => []],
+        ];
+
+        $save = $repo->save($contract, 'unit_save');
+        if (((int) ($save['revision'] ?? 0)) < 1) {
+            throw new \RuntimeException('WorkflowRepository save debe devolver revision >= 1.');
+        }
+        $loaded = $repo->load($workflowId);
+        if ((string) ($loaded['meta']['id'] ?? '') !== $workflowId) {
+            throw new \RuntimeException('WorkflowRepository load devolvio id invalido.');
+        }
+        $loaded['meta']['name'] = 'Repo unit v2';
+        $repo->save($loaded, 'unit_save_2');
+        $history = $repo->history($workflowId);
+        if (count($history) < 2) {
+            throw new \RuntimeException('WorkflowRepository history debe registrar revisiones.');
+        }
     }
 
     private function checkGateway(): void
@@ -501,6 +625,77 @@ final class UnitTestRunner
         }
     }
 
+    private function checkOpenApiIntegrationImporter(): void
+    {
+        $openapi = [
+            'openapi' => '3.0.1',
+            'servers' => [['url' => 'https://api.payments.example.com/v1']],
+            'components' => [
+                'securitySchemes' => [
+                    'BearerAuth' => [
+                        'type' => 'http',
+                        'scheme' => 'bearer',
+                    ],
+                ],
+            ],
+            'paths' => [
+                '/charges' => [
+                    'post' => ['operationId' => 'createCharge', 'summary' => 'Create charge'],
+                    'get' => ['operationId' => 'listCharges', 'summary' => 'List charges'],
+                ],
+            ],
+        ];
+
+        $importer = new OpenApiIntegrationImporter();
+        $result = $importer->import([
+            'api_name' => 'paymentsx_unit',
+            'provider' => 'PaymentsX',
+            'country' => 'CO',
+            'environment' => 'sandbox',
+            'type' => 'payments',
+            'openapi' => $openapi,
+        ], false);
+
+        $contract = is_array($result['contract'] ?? null) ? (array) $result['contract'] : [];
+        if ((string) ($contract['id'] ?? '') !== 'paymentsx_unit') {
+            throw new \RuntimeException('OpenApiIntegrationImporter id invalido.');
+        }
+        if ((string) ($contract['auth']['type'] ?? '') !== 'bearer') {
+            throw new \RuntimeException('OpenApiIntegrationImporter debe detectar auth bearer.');
+        }
+        $endpoints = is_array($contract['metadata']['endpoints'] ?? null) ? (array) $contract['metadata']['endpoints'] : [];
+        if (count($endpoints) !== 2) {
+            throw new \RuntimeException('OpenApiIntegrationImporter debe extraer endpoints.');
+        }
+    }
+
+    private function checkApiSecurityGuard(): void
+    {
+        $guard = new ApiSecurityGuard();
+        $tmpDir = FRAMEWORK_ROOT . '/tests/tmp/security_guard_' . time();
+        if (!is_dir($tmpDir)) {
+            mkdir($tmpDir, 0775, true);
+        }
+
+        $unauth = $guard->enforce('entity/save', 'POST', ['REMOTE_ADDR' => '203.0.113.10'], [], [], $tmpDir);
+        if ((bool) ($unauth['ok'] ?? true)) {
+            throw new \RuntimeException('ApiSecurityGuard debe bloquear ruta protegida sin login.');
+        }
+
+        $session = ['auth_user' => ['id' => 'u1', 'tenant_id' => 'default'], 'csrf_token' => 'abc123'];
+        $ok = $guard->enforce(
+            'entity/save',
+            'POST',
+            ['REMOTE_ADDR' => '203.0.113.10', 'HTTP_X_CSRF_TOKEN' => 'abc123'],
+            $session,
+            [],
+            $tmpDir
+        );
+        if (!(bool) ($ok['ok'] ?? false)) {
+            throw new \RuntimeException('ApiSecurityGuard no acepto auth+csrf validos.');
+        }
+    }
+
     private function checkIntentRouter(): void
     {
         $router = new IntentRouter();
@@ -528,6 +723,8 @@ final class UnitTestRunner
         $bus->register(new CreateRelationCommandHandler());
         $bus->register(new CreateIndexCommandHandler());
         $bus->register(new InstallPlaybookCommandHandler());
+        $bus->register(new ImportIntegrationOpenApiCommandHandler());
+        $bus->register(new CompileWorkflowCommandHandler());
         $bus->register(new CrudCommandHandler());
         $bus->register(new MapCommandHandler(['AuthLogin'], static fn(array $command, array $context): array => [
             'status' => 'success',
@@ -624,6 +821,44 @@ final class UnitTestRunner
             throw new \RuntimeException('MapCommandHandler no mantiene compatibilidad para AuthLogin.');
         }
 
+        $resImport = $bus->dispatch(
+            [
+                'command' => 'ImportIntegrationOpenApi',
+                'api_name' => 'paymentsx_unit_bus',
+                'openapi_json' => json_encode([
+                    'openapi' => '3.0.1',
+                    'servers' => [['url' => 'https://api.payments.example.com/v1']],
+                    'components' => ['securitySchemes' => ['BearerAuth' => ['type' => 'http', 'scheme' => 'bearer']]],
+                    'paths' => ['/charges' => ['post' => ['operationId' => 'createCharge']]],
+                ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+                'dry_run' => true,
+            ],
+            array_merge($baseContext, [
+                'mode' => 'builder',
+                'openapi_importer' => new OpenApiIntegrationImporter(),
+            ])
+        );
+        if ((string) ($resImport['status'] ?? '') !== 'success') {
+            throw new \RuntimeException('ImportIntegrationOpenApi handler no respondio en dry_run builder.');
+        }
+
+        $resWorkflow = $bus->dispatch(
+            [
+                'command' => 'CompileWorkflow',
+                'text' => 'crear workflow para cotizacion',
+                'workflow_id' => 'wf_unit_bus_' . time(),
+                'apply' => false,
+            ],
+            array_merge($baseContext, [
+                'mode' => 'builder',
+                'workflow_compiler' => new WorkflowCompiler(),
+                'workflow_repository' => new WorkflowRepository(FRAMEWORK_ROOT . '/tests/tmp/workflow_repo_project_bus'),
+            ])
+        );
+        if ((string) ($resWorkflow['status'] ?? '') !== 'success') {
+            throw new \RuntimeException('CompileWorkflow handler no respondio en modo proposal.');
+        }
+
         try {
             $bus->dispatch(['command' => 'UnknownCommand'], []);
         } catch (\RuntimeException $e) {
@@ -698,6 +933,16 @@ final class UnitTestRunner
         }
     }
 
+    private function checkWorkflowApiE2E(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/workflow_api_e2e_test.php');
+    }
+
+    private function checkSecurityChannelsE2E(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/security_channels_e2e_test.php');
+    }
+
     private function checkCanonicalStorageNewProject(): void
     {
         $tmpDir = dirname(__DIR__, 2) . '/tests/tmp';
@@ -728,6 +973,18 @@ final class UnitTestRunner
         $table = TableNamespace::resolve('clientes', 'unit_can_app');
         if ($table !== 'clientes') {
             throw new \RuntimeException('Canonical project should resolve logical table without namespace.');
+        }
+    }
+
+    private function runExternalTestScript(string $scriptPath): void
+    {
+        $cmd = escapeshellarg(PHP_BINARY) . ' ' . escapeshellarg($scriptPath);
+        $output = [];
+        $exit = 0;
+        exec($cmd . ' 2>&1', $output, $exit);
+        if ($exit !== 0) {
+            $message = trim(implode("\n", $output));
+            throw new \RuntimeException($message !== '' ? $message : 'Test externo fallo: ' . basename($scriptPath));
         }
     }
 }

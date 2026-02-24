@@ -65,6 +65,17 @@ try {
     $failures[] = 'valid workflow should pass: ' . $e->getMessage();
 }
 
+$apiStyleWorkflow = $validWorkflow;
+$apiStyleWorkflow['nodes'][0]['inputsSchema'] = [];
+$apiStyleWorkflow['nodes'][0]['outputsSchema'] = [];
+$apiStyleWorkflow['nodes'][0]['modelConfig'] = [];
+$apiStyleWorkflow['nodes'][0]['uiHints'] = [];
+try {
+    WorkflowValidator::validateOrFail($apiStyleWorkflow);
+} catch (Throwable $e) {
+    $failures[] = 'workflow should accept API-style empty objects in node schemas: ' . $e->getMessage();
+}
+
 $invalidWorkflow = $validWorkflow;
 $invalidWorkflow['nodes'][0]['runPolicy']['timeout_ms'] = 0;
 try {

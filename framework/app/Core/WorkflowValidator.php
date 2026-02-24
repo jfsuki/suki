@@ -21,8 +21,9 @@ final class WorkflowValidator
             throw new RuntimeException('Schema de workflow invalido.');
         }
 
+        $normalized = self::normalizeForValidation($payload);
         try {
-            $payloadObject = json_decode(json_encode($payload, JSON_THROW_ON_ERROR), false, 512, JSON_THROW_ON_ERROR);
+            $payloadObject = json_decode(json_encode($normalized, JSON_THROW_ON_ERROR), false, 512, JSON_THROW_ON_ERROR);
         } catch (JsonException $e) {
             throw new RuntimeException('Workflow invalido: payload no serializable.', 0, $e);
         }
@@ -36,6 +37,34 @@ final class WorkflowValidator
         }
 
         self::validateSemanticsOrFail($payload);
+    }
+
+    /**
+     * Normaliza estructuras recibidas por API (JSON -> array asociativo) para campos
+     * que el schema define como object y suelen llegar como [] al decodificar.
+     *
+     * @return array<string, mixed>
+     */
+    private static function normalizeForValidation(array $payload): array
+    {
+        $nodeObjectFields = ['inputsSchema', 'modelConfig', 'outputsSchema', 'uiHints'];
+        $nodes = is_array($payload['nodes'] ?? null) ? (array) $payload['nodes'] : [];
+        foreach ($nodes as $index => $node) {
+            if (!is_array($node)) {
+                continue;
+            }
+            foreach ($nodeObjectFields as $field) {
+                if (!array_key_exists($field, $node)) {
+                    continue;
+                }
+                if (is_array($node[$field]) && $node[$field] === []) {
+                    $node[$field] = new \stdClass();
+                }
+            }
+            $nodes[$index] = $node;
+        }
+        $payload['nodes'] = $nodes;
+        return $payload;
     }
 
     private static function validateSemanticsOrFail(array $payload): void

@@ -3,5 +3,10 @@
     "label": "Dashboard",
     "url": "dashboard",
     "icon": "home"
+  },
+  {
+    "label": "Workflow Builder",
+    "url": "workflow_builder.html",
+    "icon": "git-branch"
   }
 ]

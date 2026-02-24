@@ -208,8 +208,76 @@
   - `framework/tests/unknown_business_discovery_test.php`.
   - `framework/tests/chat_golden.php` agrega escenario de correccion de negocio + discovery.
 
+## WB-1 runtime foundation (2026-02-24)
+- Executor DAG implementado:
+  - `framework/app/Core/WorkflowExecutor.php`.
+  - orden topologico por niveles, soporte de nodos (`input`, `generate`, `output`, `tool`, `transform`, `decision`).
+  - trazas estructuradas por nodo (`status`, `duration_ms`, `toolCalls`, `tokenUse`, `outputs`).
+- Explotacion API:
+  - `POST /api/workflow/execute`
+  - `POST /api/workflow/validate`
+- Pruebas:
+  - `framework/tests/workflow_executor_test.php`
+  - `UnitTestRunner::checkWorkflowExecutor`.
+
+## WB-2 compiler NL->contract diff (2026-02-24)
+- Compilador incremental implementado:
+  - `framework/app/Core/WorkflowCompiler.php`.
+  - salida en modo propuesta (`PROPOSAL_READY`, `changes[]`, `proposed_contract`, `needs_confirmation=true`).
+- Integracion runtime:
+  - `POST /api/workflow/compile`
+  - `POST /api/workflow/apply`
+  - comando interno `CompileWorkflow` + handler dedicado.
+  - en builder, `ConversationGateway` detecta solicitud de workflow y abre confirmacion transaccional.
+- Pruebas:
+  - `framework/tests/workflow_compiler_test.php`
+  - `framework/tests/chat_golden.php` agrega flujo de compilacion y guardado.
+
+## OpenAPI -> contract automation (2026-02-24)
+- Importador automatico implementado:
+  - `framework/app/Core/OpenApiIntegrationImporter.php`.
+  - detecta `base_url`, auth (`bearer/api_key/basic/oauth2/custom`) y endpoints.
+  - valida contrato final con `IntegrationValidator`.
+- Integracion por chat y API:
+  - comando `ImportIntegrationOpenApi` + handler.
+  - `INTEGRATION_SETUP` en `ConversationGateway` ahora crea `pending_command` transaccional.
+  - endpoint `POST /api/integrations/import_openapi`.
+- Hardening SSRF basico:
+  - bloqueo localhost/IP privada en `doc_url`,
+  - allowlist opcional por `OPENAPI_IMPORT_ALLOWED_HOSTS`.
+
+## WB-3/WB-4 baseline operativa (2026-02-24)
+- Persistencia/versionado:
+  - `framework/app/Core/WorkflowRepository.php` (save/list/load/history/restore).
+- Diff de revisiones:
+  - `workflow/diff` + `WorkflowRepository::diff(...)` para comparar nodos/aristas entre revisiones.
+- Remix/templates:
+  - `workflow/templates` + `workflow/remix`.
+  - templates base:
+    - `framework/contracts/workflows/templates/sales_quote.workflow.template.json`
+    - `framework/contracts/workflows/templates/daily_kpi.workflow.template.json`
+- UI baseline:
+  - nuevo `project/public/workflow_builder.html` (editor dual baseline: compile/apply/validate/execute/list/history/remix).
+
+## Seguridad y canales externos (2026-02-24)
+- Guard de API:
+  - `framework/app/Core/ApiSecurityGuard.php`.
+  - rate-limit por ruta (chat/channels/default),
+  - CSRF opcional por feature flag (`API_CSRF_ENFORCE=1`),
+  - auth enforcement para mutaciones sensibles.
+- IDOR baseline:
+  - `chat/message` bloquea `user_id/tenant_id/project_id` distintos a sesion autenticada.
+- Canal externo adicional:
+  - `channels/whatsapp/webhook` (verificacion + inbound -> `ChatAgent` + respuesta WhatsApp Cloud API).
+- E2E y hardening adicional:
+  - `requestData()` cacheado para permitir CSRF body/header consistente en guard de API.
+  - pruebas E2E nuevas:
+    - `framework/tests/workflow_api_e2e_test.php`
+    - `framework/tests/security_channels_e2e_test.php`
+
 ## Siguiente bloque recomendado
-- WB-1: executor DAG (orden topologico, paralelismo seguro y trazas por nodo).
+- WB-3 full visual graph: drag/drop real, conexiones con mouse y referencias tipadas `@` en inspector.
+- WB-4 advanced: diff visual entre revisiones y restauracion selectiva por nodo.
 
 ## Execution checklist
 - [x] Summary dependency ordering stable

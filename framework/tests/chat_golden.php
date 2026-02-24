@@ -61,7 +61,7 @@ $integrationSteps = [
     [
         'mode' => 'builder',
         'message' => 'api=pagosx https://docs.example.com/openapi.json',
-        'contains_any' => ['Recibi la documentacion', 'Siguiente paso: analizo'],
+        'contains_any' => ['crear el contrato de integracion', 'la importo', 'importarla'],
     ],
 ];
 $unknownUser = 'golden_unknown_' . $runId;
@@ -81,6 +81,20 @@ $unknownSteps = [
         'mode' => 'builder',
         'message' => 'quiero controlar produccion, inventario y facturacion',
         'contains_any' => ['Pregunta 2/', 'Pregunta 3/'],
+    ],
+];
+$workflowUser = 'golden_workflow_' . $runId;
+$workflowSession = 'golden_workflow_sess_' . $runId;
+$workflowSteps = [
+    [
+        'mode' => 'builder',
+        'message' => 'crear workflow para cotizacion de ventas ' . $runId,
+        'contains_any' => ['compilar este flujo', 'workflow y guardarlo'],
+    ],
+    [
+        'mode' => 'builder',
+        'message' => 'si',
+        'contains_any' => ['Workflow compilado y guardado', 'rev'],
     ],
 ];
 
@@ -200,12 +214,42 @@ foreach ($unknownSteps as $idx => $step) {
     ];
 }
 
+$baseWorkflow = [
+    'channel' => 'local',
+    'tenant_id' => 'default',
+    'project_id' => 'suki_erp',
+    'user_id' => $workflowUser,
+    'session_id' => $workflowSession,
+];
+foreach ($workflowSteps as $idx => $step) {
+    $payload = array_merge($baseWorkflow, [
+        'mode' => $step['mode'],
+        'message' => $step['message'],
+    ]);
+    $out = $agent->handle($payload);
+    $reply = (string) ($out['data']['reply'] ?? '');
+    $pass = evaluateGoldenStep($reply, $step);
+    if ($pass) {
+        $ok++;
+    }
+    $results[] = [
+        'step' => count($steps) + count($correctionSteps) + count($integrationSteps) + count($unknownSteps) + $idx + 1,
+        'mode' => $step['mode'],
+        'message' => $step['message'],
+        'reply' => $reply,
+        'expected_contains' => $step['contains'] ?? null,
+        'expected_contains_any' => $step['contains_any'] ?? null,
+        'expected_not_contains' => $step['not_contains'] ?? null,
+        'ok' => $pass,
+    ];
+}
+
 $report = [
     'summary' => [
-        'ok' => $ok === (count($steps) + count($correctionSteps) + count($integrationSteps) + count($unknownSteps)),
+        'ok' => $ok === (count($steps) + count($correctionSteps) + count($integrationSteps) + count($unknownSteps) + count($workflowSteps)),
         'passed' => $ok,
-        'failed' => (count($steps) + count($correctionSteps) + count($integrationSteps) + count($unknownSteps)) - $ok,
-        'total' => count($steps) + count($correctionSteps) + count($integrationSteps) + count($unknownSteps),
+        'failed' => (count($steps) + count($correctionSteps) + count($integrationSteps) + count($unknownSteps) + count($workflowSteps)) - $ok,
+        'total' => count($steps) + count($correctionSteps) + count($integrationSteps) + count($unknownSteps) + count($workflowSteps),
         'entity' => $entity,
         'run_id' => $runId,
         'ran_at' => date('Y-m-d H:i:s'),
@@ -239,6 +283,22 @@ function cleanupGoldenArtifacts(string $entity): void
             @unlink($projectRoot . '/storage/tenants/default/agent_state/golden_proj__builder__golden_' . $runId . '.json');
             @unlink($projectRoot . '/storage/chat/profiles/default__golden_proj__app__golden_' . $runId . '.json');
             @unlink($projectRoot . '/storage/chat/profiles/default__golden_proj__builder__golden_' . $runId . '.json');
+            $workflowContracts = glob($projectRoot . '/contracts/workflows/*' . $runId . '*.workflow.contract.json') ?: [];
+            foreach ($workflowContracts as $wfPath) {
+                @unlink($wfPath);
+            }
+            $workflowHistory = glob($projectRoot . '/storage/workflows/history/*' . $runId . '*') ?: [];
+            foreach ($workflowHistory as $historyDir) {
+                if (!is_dir($historyDir)) {
+                    @unlink($historyDir);
+                    continue;
+                }
+                $revFiles = glob($historyDir . '/*.json') ?: [];
+                foreach ($revFiles as $rev) {
+                    @unlink($rev);
+                }
+                @rmdir($historyDir);
+            }
         }
     }
 

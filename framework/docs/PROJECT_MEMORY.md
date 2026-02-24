@@ -410,3 +410,17 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - QA nuevo:
   - `framework/tests/unknown_business_discovery_test.php`
   - `framework/tests/chat_golden.php` agrega escenario de correccion de negocio + discovery.
+
+## Checkpoint (2026-02-24, WB hardening + E2E canales/API)
+- Cierre incremental WB-1/WB-2/WB-3/WB-4:
+  - executor/compile activos por API y por comando interno.
+  - repositorio workflow agrega `diff` entre revisiones para auditoria visual.
+  - `workflow_builder.html` agrega comparacion de revisiones.
+- Seguridad API reforzada:
+  - `requestData()` ahora cachea payload; `ApiSecurityGuard` recibe payload real para validacion CSRF en body/header.
+  - flujo `chat/message` mantiene bloqueo IDOR por `user_id/tenant_id/project_id` de sesion.
+- OpenAPI -> contract cerrado:
+  - endpoint `integrations/import_openapi` validado en E2E con bloqueo sin auth y exito autenticado (`persist=false` para dry run).
+- E2E operativos agregados:
+  - `framework/tests/workflow_api_e2e_test.php` (auth guard + compile/validate/execute).
+  - `framework/tests/security_channels_e2e_test.php` (OpenAPI auth, IDOR chat, Telegram secret, WhatsApp verify challenge).

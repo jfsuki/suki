@@ -39,6 +39,11 @@ use App\Core\QueryBuilder;
 use App\Core\ProjectRegistry;
 use App\Core\TelemetryService;
 use App\Core\CapabilityGraph;
+use App\Core\WorkflowRepository;
+use App\Core\WorkflowExecutor;
+use App\Core\WorkflowCompiler;
+use App\Core\OpenApiIntegrationImporter;
+use App\Core\ApiSecurityGuard;
 use App\Core\Agents\ConversationQualityDashboard;
 
 $route = trim($_GET['route'] ?? '');
@@ -79,6 +84,7 @@ if ($manifestError) {
         'integrations/alanube/save',
         'integrations/alanube/webhook',
         'channels/telegram/webhook',
+        'channels/whatsapp/webhook',
     ];
     if (in_array($route, $allowedWithoutManifest, true)) {
         // allow integration setup even if manifest missing
@@ -118,26 +124,39 @@ function stableTenantInt(string $tenantId): int
 
 function requestData(): array
 {
+    static $cacheReady = false;
+    static $cached = [];
+    if ($cacheReady) {
+        return $cached;
+    }
+
     $contentType = $_SERVER['CONTENT_TYPE'] ?? '';
     if (stripos($contentType, 'application/json') !== false) {
         $raw = file_get_contents('php://input');
         if ($raw !== false && $raw !== '') {
             $decoded = json_decode($raw, true);
-            return is_array($decoded) ? $decoded : [];
+            $cached = is_array($decoded) ? $decoded : [];
+            $cacheReady = true;
+            return $cached;
         }
     }
 
     if (!empty($_POST)) {
-        return $_POST;
+        $cached = $_POST;
+        $cacheReady = true;
+        return $cached;
     }
 
     $raw = file_get_contents('php://input');
     if ($raw !== false && $raw !== '') {
         $decoded = json_decode($raw, true);
-        return is_array($decoded) ? $decoded : [];
+        $cached = is_array($decoded) ? $decoded : [];
+        $cacheReady = true;
+        return $cached;
     }
 
-    return [];
+    $cacheReady = true;
+    return $cached;
 }
 
 function respondJson(Response $response, string $status, string $message, array $data = [], int $code = 200): void
@@ -215,6 +234,53 @@ function sendTelegramMessage(string $token, string $chatId, string $text): array
     }
     $decoded = json_decode($raw, true);
     return is_array($decoded) ? $decoded : ['ok' => false, 'error' => 'TELEGRAM_RESPONSE_INVALID'];
+}
+
+function sendWhatsAppMessage(string $token, string $phoneNumberId, string $to, string $text): array
+{
+    if ($token === '') {
+        return ['ok' => false, 'error' => 'WHATSAPP_TOKEN_MISSING'];
+    }
+    if ($phoneNumberId === '') {
+        return ['ok' => false, 'error' => 'WHATSAPP_PHONE_NUMBER_ID_MISSING'];
+    }
+    if ($to === '') {
+        return ['ok' => false, 'error' => 'WHATSAPP_TO_MISSING'];
+    }
+
+    $url = 'https://graph.facebook.com/v20.0/' . $phoneNumberId . '/messages';
+    $payload = [
+        'messaging_product' => 'whatsapp',
+        'to' => $to,
+        'type' => 'text',
+        'text' => [
+            'body' => $text !== '' ? $text : 'OK',
+        ],
+    ];
+    $json = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($json === false) {
+        return ['ok' => false, 'error' => 'WHATSAPP_PAYLOAD_INVALID'];
+    }
+
+    $context = stream_context_create([
+        'http' => [
+            'method' => 'POST',
+            'header' => "Content-Type: application/json\r\nAuthorization: Bearer {$token}\r\n",
+            'content' => $json,
+            'timeout' => 12,
+        ],
+    ]);
+    $raw = @file_get_contents($url, false, $context);
+    if ($raw === false) {
+        return ['ok' => false, 'error' => 'WHATSAPP_SEND_FAILED'];
+    }
+    $decoded = json_decode($raw, true);
+    if (!is_array($decoded)) {
+        return ['ok' => false, 'error' => 'WHATSAPP_RESPONSE_INVALID'];
+    }
+    $ok = isset($decoded['messages']) || isset($decoded['contacts']) || isset($decoded['id']);
+    $decoded['ok'] = $ok;
+    return $decoded;
 }
 
 function contractEntityNames(): array
@@ -466,6 +532,42 @@ if ($route === '') {
 // --------------------------------
 $method = strtoupper($_SERVER['REQUEST_METHOD'] ?? 'GET');
 
+if (empty($_SESSION['csrf_token'])) {
+    try {
+        $_SESSION['csrf_token'] = bin2hex(random_bytes(16));
+    } catch (\Throwable $e) {
+        $_SESSION['csrf_token'] = sha1((string) microtime(true));
+    }
+}
+
+if ($route === 'auth/csrf') {
+    respondJson($response, 'success', 'CSRF token', [
+        'csrf_token' => (string) ($_SESSION['csrf_token'] ?? ''),
+    ]);
+    return;
+}
+
+$securityGuard = new ApiSecurityGuard();
+$guardPayload = in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true) ? requestData() : [];
+$guard = $securityGuard->enforce(
+    $route,
+    $method,
+    $_SERVER,
+    is_array($_SESSION ?? null) ? $_SESSION : [],
+    $guardPayload,
+    PROJECT_ROOT . '/storage/security'
+);
+if (!(bool) ($guard['ok'] ?? false)) {
+    $code = (int) ($guard['code'] ?? 403);
+    $data = [];
+    if (isset($guard['retry_after'])) {
+        $data['retry_after'] = (int) $guard['retry_after'];
+        header('Retry-After: ' . (string) $data['retry_after']);
+    }
+    respondJson($response, 'error', (string) ($guard['message'] ?? 'Solicitud bloqueada por seguridad'), $data, $code);
+    return;
+}
+
 if (str_starts_with($route, 'contracts/')) {
     $parts = explode('/', $route);
     $type = $parts[1] ?? '';
@@ -557,6 +659,26 @@ if ($route === 'chat/message') {
     $payload = requestData();
     if (isset($_SESSION['auth_user']) && is_array($_SESSION['auth_user'])) {
         $auth = $_SESSION['auth_user'];
+        $authUserId = (string) ($auth['id'] ?? '');
+        $authTenantId = (string) ($auth['tenant_id'] ?? '');
+        $authProjectId = (string) ($auth['project_id'] ?? '');
+        $incomingUserId = (string) ($payload['user_id'] ?? '');
+        $incomingTenantId = (string) ($payload['tenant_id'] ?? '');
+        $incomingProjectId = (string) ($payload['project_id'] ?? '');
+
+        if ($incomingUserId !== '' && $authUserId !== '' && $incomingUserId !== $authUserId) {
+            respondJson($response, 'error', 'No puedes usar un user_id diferente al de tu sesion.', [], 403);
+            return;
+        }
+        if ($incomingTenantId !== '' && $authTenantId !== '' && $incomingTenantId !== $authTenantId) {
+            respondJson($response, 'error', 'No puedes usar un tenant_id diferente al de tu sesion.', [], 403);
+            return;
+        }
+        if ($incomingProjectId !== '' && $authProjectId !== '' && $incomingProjectId !== $authProjectId) {
+            respondJson($response, 'error', 'No puedes usar un project_id diferente al de tu sesion.', [], 403);
+            return;
+        }
+
         if (empty($payload['user_id'])) {
             $payload['user_id'] = $auth['id'] ?? '';
         }
@@ -680,6 +802,96 @@ if ($route === 'channels/telegram/webhook') {
     return;
 }
 
+if ($route === 'channels/whatsapp/webhook') {
+    if ($method === 'GET') {
+        $verifyMode = (string) ($_GET['hub_mode'] ?? $_GET['hub.mode'] ?? '');
+        $verifyToken = (string) ($_GET['hub_verify_token'] ?? $_GET['hub.verify_token'] ?? '');
+        $challenge = (string) ($_GET['hub_challenge'] ?? $_GET['hub.challenge'] ?? '');
+        $expectedToken = (string) (getenv('WHATSAPP_VERIFY_TOKEN') ?: '');
+        if ($verifyMode === 'subscribe' && $expectedToken !== '' && hash_equals($expectedToken, $verifyToken)) {
+            header('Content-Type: text/plain; charset=utf-8');
+            echo $challenge;
+            return;
+        }
+        respondJson($response, 'error', 'WhatsApp verify token invalido', [], 401);
+        return;
+    }
+
+    $payload = requestData();
+    $entry = is_array($payload['entry'] ?? null) ? (array) ($payload['entry'][0] ?? []) : [];
+    $changes = is_array($entry['changes'] ?? null) ? (array) ($entry['changes'][0] ?? []) : [];
+    $value = is_array($changes['value'] ?? null) ? (array) $changes['value'] : [];
+    $messages = is_array($value['messages'] ?? null) ? (array) $value['messages'] : [];
+    $message = is_array($messages[0] ?? null) ? (array) $messages[0] : [];
+    $from = trim((string) ($message['from'] ?? ''));
+    $textNode = is_array($message['text'] ?? null) ? (array) $message['text'] : [];
+    $text = trim((string) ($textNode['body'] ?? ''));
+
+    if ($from === '') {
+        respondJson($response, 'success', 'WhatsApp update ignorado', ['ignored' => true]);
+        return;
+    }
+    if ($text === '') {
+        $text = 'hola';
+    }
+
+    $tenantId = trim((string) (getenv('WHATSAPP_DEFAULT_TENANT') ?: 'default'));
+    if ($tenantId === '') {
+        $tenantId = 'default';
+    }
+    $projectId = trim((string) (getenv('WHATSAPP_DEFAULT_PROJECT') ?: ''));
+    if ($projectId === '') {
+        try {
+            $registry = new ProjectRegistry();
+            $manifest = $registry->resolveProjectFromManifest();
+            $projectId = (string) ($manifest['id'] ?? 'default');
+        } catch (\Throwable $e) {
+            $projectId = 'default';
+        }
+    }
+
+    $safeChat = sanitizeKey($from);
+    $chatPayload = [
+        'message' => $text,
+        'mode' => 'app',
+        'channel' => 'whatsapp',
+        'tenant_id' => $tenantId,
+        'project_id' => $projectId !== '' ? $projectId : 'default',
+        'user_id' => 'wa:' . $safeChat,
+        'session_id' => 'wa:' . $safeChat . ':app',
+    ];
+    setTenantContext($chatPayload);
+
+    try {
+        $agent = new \App\Core\ChatAgent();
+        $result = $agent->handle($chatPayload);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+
+    $replyText = trim((string) ($result['data']['reply'] ?? $result['message'] ?? 'OK'));
+    if ($replyText === '') {
+        $replyText = 'OK';
+    }
+    $token = trim((string) (getenv('WHATSAPP_CLOUD_TOKEN') ?: ''));
+    $phoneNumberId = trim((string) (getenv('WHATSAPP_PHONE_NUMBER_ID') ?: ''));
+    $delivery = sendWhatsAppMessage($token, $phoneNumberId, $from, $replyText);
+    $delivered = (bool) ($delivery['ok'] ?? false);
+
+    respondJson(
+        $response,
+        $delivered ? 'success' : 'error',
+        $delivered ? 'Mensaje WhatsApp entregado' : 'No se pudo enviar respuesta a WhatsApp',
+        [
+            'from' => $from,
+            'delivery' => $delivery,
+        ],
+        $delivered ? 200 : 502
+    );
+    return;
+}
+
 if ($route === 'chat/help') {
     $payload = requestData();
     setTenantContext($payload);
@@ -797,6 +1009,250 @@ if ($route === 'chat/ops-quality') {
         ]);
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
+if ($route === 'integrations/import_openapi') {
+    $payload = requestData();
+    try {
+        $importer = new OpenApiIntegrationImporter();
+        $persist = !isset($payload['persist']) || (bool) $payload['persist'];
+        $result = $importer->import($payload, $persist);
+        respondJson($response, 'success', 'Integracion importada desde OpenAPI', $result);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 400);
+    }
+    return;
+}
+
+if ($route === 'workflow/templates') {
+    try {
+        $repo = new WorkflowRepository();
+        respondJson($response, 'success', 'Templates de workflow', [
+            'templates' => $repo->templates(),
+        ]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
+if ($route === 'workflow/remix') {
+    $payload = requestData();
+    $templateId = (string) ($payload['template_id'] ?? $_GET['template_id'] ?? '');
+    $workflowId = (string) ($payload['workflow_id'] ?? $_GET['workflow_id'] ?? '');
+    if ($templateId === '' || $workflowId === '') {
+        respondJson($response, 'error', 'template_id y workflow_id son requeridos', [], 400);
+        return;
+    }
+    try {
+        $repo = new WorkflowRepository();
+        $save = $repo->remix($templateId, $workflowId);
+        respondJson($response, 'success', 'Workflow remix creado', $save);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 400);
+    }
+    return;
+}
+
+if ($route === 'workflow/list') {
+    try {
+        $repo = new WorkflowRepository();
+        respondJson($response, 'success', 'Workflows', [
+            'workflows' => $repo->list(),
+        ]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
+if ($route === 'workflow/get') {
+    $payload = requestData();
+    $workflowId = (string) ($payload['workflow_id'] ?? $_GET['workflow_id'] ?? '');
+    if ($workflowId === '') {
+        respondJson($response, 'error', 'workflow_id requerido', [], 400);
+        return;
+    }
+    try {
+        $repo = new WorkflowRepository();
+        $contract = $repo->load($workflowId);
+        respondJson($response, 'success', 'Workflow cargado', [
+            'workflow_id' => $workflowId,
+            'contract' => $contract,
+        ]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 404);
+    }
+    return;
+}
+
+if ($route === 'workflow/revisions') {
+    $payload = requestData();
+    $workflowId = (string) ($payload['workflow_id'] ?? $_GET['workflow_id'] ?? '');
+    if ($workflowId === '') {
+        respondJson($response, 'error', 'workflow_id requerido', [], 400);
+        return;
+    }
+    try {
+        $repo = new WorkflowRepository();
+        $rows = $repo->history($workflowId);
+        respondJson($response, 'success', 'Historial de workflow', [
+            'workflow_id' => $workflowId,
+            'revisions' => $rows,
+        ]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 404);
+    }
+    return;
+}
+
+if ($route === 'workflow/diff') {
+    $payload = requestData();
+    $workflowId = (string) ($payload['workflow_id'] ?? $_GET['workflow_id'] ?? '');
+    $fromRevision = (int) ($payload['from_revision'] ?? $_GET['from_revision'] ?? 0);
+    $toRevision = (int) ($payload['to_revision'] ?? $_GET['to_revision'] ?? 0);
+    if ($workflowId === '' || $fromRevision < 1 || $toRevision < 1) {
+        respondJson($response, 'error', 'workflow_id, from_revision y to_revision son requeridos', [], 400);
+        return;
+    }
+    try {
+        $repo = new WorkflowRepository();
+        $diff = $repo->diff($workflowId, $fromRevision, $toRevision);
+        respondJson($response, 'success', 'Diff de revisiones generado', $diff);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 400);
+    }
+    return;
+}
+
+if ($route === 'workflow/restore') {
+    $payload = requestData();
+    $workflowId = (string) ($payload['workflow_id'] ?? $_GET['workflow_id'] ?? '');
+    $revision = (int) ($payload['revision'] ?? $_GET['revision'] ?? 0);
+    if ($workflowId === '' || $revision < 1) {
+        respondJson($response, 'error', 'workflow_id y revision validos son requeridos', [], 400);
+        return;
+    }
+    try {
+        $repo = new WorkflowRepository();
+        $restored = $repo->restore($workflowId, $revision);
+        respondJson($response, 'success', 'Workflow restaurado', $restored);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 400);
+    }
+    return;
+}
+
+if ($route === 'workflow/validate') {
+    $payload = requestData();
+    $workflowId = (string) ($payload['workflow_id'] ?? $_GET['workflow_id'] ?? '');
+    $contract = is_array($payload['contract'] ?? null) ? (array) $payload['contract'] : [];
+    try {
+        if (empty($contract) && $workflowId !== '') {
+            $repo = new WorkflowRepository();
+            $contract = $repo->load($workflowId);
+        }
+        if (empty($contract)) {
+            respondJson($response, 'error', 'contract o workflow_id requerido', [], 400);
+            return;
+        }
+        \App\Core\WorkflowValidator::validateOrFail($contract);
+        respondJson($response, 'success', 'Workflow valido', [
+            'workflow_id' => (string) ($contract['meta']['id'] ?? $workflowId),
+        ]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 400);
+    }
+    return;
+}
+
+if ($route === 'workflow/compile') {
+    $payload = requestData();
+    $text = (string) ($payload['text'] ?? $payload['message'] ?? '');
+    $workflowId = (string) ($payload['workflow_id'] ?? '');
+    $current = is_array($payload['current_contract'] ?? null) ? (array) $payload['current_contract'] : [];
+    try {
+        if (empty($current) && $workflowId !== '') {
+            $repo = new WorkflowRepository();
+            if ($repo->exists($workflowId)) {
+                $current = $repo->load($workflowId);
+            }
+        }
+        $compiler = new WorkflowCompiler();
+        $proposal = $compiler->compile($text, $current);
+        respondJson($response, 'success', 'Propuesta de workflow lista', $proposal);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 400);
+    }
+    return;
+}
+
+if ($route === 'workflow/save') {
+    $payload = requestData();
+    $contract = is_array($payload['contract'] ?? null) ? (array) $payload['contract'] : [];
+    if (empty($contract)) {
+        respondJson($response, 'error', 'contract requerido', [], 400);
+        return;
+    }
+    try {
+        $repo = new WorkflowRepository();
+        $saved = $repo->save($contract, 'api_workflow_save');
+        respondJson($response, 'success', 'Workflow guardado', $saved);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 400);
+    }
+    return;
+}
+
+if ($route === 'workflow/apply') {
+    $payload = requestData();
+    $confirm = (bool) ($payload['confirm'] ?? false);
+    if (!$confirm) {
+        respondJson($response, 'error', 'confirm=true es requerido para aplicar propuesta', [], 400);
+        return;
+    }
+    $contract = is_array($payload['proposed_contract'] ?? null) ? (array) $payload['proposed_contract'] : [];
+    if (empty($contract)) {
+        respondJson($response, 'error', 'proposed_contract requerido', [], 400);
+        return;
+    }
+    try {
+        $repo = new WorkflowRepository();
+        $saved = $repo->save($contract, 'api_workflow_apply');
+        respondJson($response, 'success', 'Propuesta aplicada', $saved);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 400);
+    }
+    return;
+}
+
+if ($route === 'workflow/execute') {
+    $payload = requestData();
+    $workflowId = (string) ($payload['workflow_id'] ?? $_GET['workflow_id'] ?? '');
+    $contract = is_array($payload['contract'] ?? null) ? (array) $payload['contract'] : [];
+    $input = is_array($payload['input'] ?? null) ? (array) $payload['input'] : [];
+    try {
+        if (empty($contract) && $workflowId !== '') {
+            $repo = new WorkflowRepository();
+            $contract = $repo->load($workflowId);
+        }
+        if (empty($contract)) {
+            respondJson($response, 'error', 'contract o workflow_id requerido', [], 400);
+            return;
+        }
+        $executor = new WorkflowExecutor();
+        $result = $executor->execute($contract, $input, [
+            'tenant_id' => (string) ($_SESSION['auth_user']['tenant_id'] ?? 'default'),
+            'project_id' => resolveProjectId($payload),
+            'user_id' => (string) ($_SESSION['auth_user']['id'] ?? 'anon'),
+        ]);
+        $status = (bool) ($result['ok'] ?? false) ? 'success' : 'error';
+        $code = $status === 'success' ? 200 : 400;
+        respondJson($response, $status, $status === 'success' ? 'Workflow ejecutado' : 'Workflow fallo', $result, $code);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 400);
     }
     return;
 }

@@ -1,0 +1,93 @@
+{
+  "id": "sales_quote",
+  "label": "Cotizacion Rapida",
+  "description": "Captura datos del cliente y genera una cotizacion base.",
+  "contract": {
+    "meta": {
+      "id": "wf_sales_quote",
+      "name": "Workflow Cotizacion",
+      "status": "draft",
+      "revision": 1,
+      "created_at": "2026-02-24T00:00:00Z",
+      "updated_at": "2026-02-24T00:00:00Z"
+    },
+    "nodes": [
+      {
+        "id": "n_input",
+        "type": "input",
+        "title": "Captura Solicitud",
+        "inputsSchema": {},
+        "promptTemplate": "",
+        "modelConfig": {},
+        "toolsAllowed": [],
+        "outputsSchema": {},
+        "uiHints": {},
+        "runPolicy": {
+          "timeout_ms": 15000,
+          "retry_max": 0,
+          "token_budget": 0
+        }
+      },
+      {
+        "id": "n_generate",
+        "type": "generate",
+        "title": "Generar Cotizacion",
+        "inputsSchema": {},
+        "promptTemplate": "Genera una cotizacion breve para {{input.cliente}} con total {{input.total}}.",
+        "modelConfig": {},
+        "toolsAllowed": [],
+        "outputsSchema": {},
+        "uiHints": {},
+        "runPolicy": {
+          "timeout_ms": 15000,
+          "retry_max": 0,
+          "token_budget": 0
+        }
+      },
+      {
+        "id": "n_output",
+        "type": "output",
+        "title": "Salida",
+        "inputsSchema": {},
+        "promptTemplate": "",
+        "modelConfig": {},
+        "toolsAllowed": [],
+        "outputsSchema": {},
+        "uiHints": {},
+        "runPolicy": {
+          "timeout_ms": 15000,
+          "retry_max": 0,
+          "token_budget": 0
+        }
+      }
+    ],
+    "edges": [
+      {
+        "from": "n_input",
+        "to": "n_generate",
+        "mapping": {
+          "cliente": "output.cliente",
+          "total": "output.total"
+        }
+      },
+      {
+        "from": "n_generate",
+        "to": "n_output",
+        "mapping": {
+          "text": "output.text"
+        }
+      }
+    ],
+    "assets": [],
+    "theme": {
+      "presetName": "clean_business"
+    },
+    "versioning": {
+      "revision": 1,
+      "historyPointers": [
+        "rev_1"
+      ]
+    }
+  }
+}
+

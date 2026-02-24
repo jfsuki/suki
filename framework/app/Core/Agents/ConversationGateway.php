@@ -481,6 +481,33 @@ final class ConversationGateway
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('software_blueprint', true));
         }
 
+        $workflowRoute = $this->routeWorkflowBuilder($normalizedBase, $mode, $state);
+        if (!empty($workflowRoute)) {
+            $reply = (string) ($workflowRoute['reply'] ?? 'Listo.');
+            $action = (string) ($workflowRoute['action'] ?? 'ask_user');
+            if (!empty($workflowRoute['pending_command']) && is_array($workflowRoute['pending_command'])) {
+                $this->setBuilderPendingCommand($state, (array) $workflowRoute['pending_command']);
+            }
+            $state = $this->updateState(
+                $state,
+                $raw,
+                $reply,
+                $workflowRoute['intent'] ?? 'WORKFLOW_COMPILE',
+                null,
+                $workflowRoute['collected'] ?? [],
+                $workflowRoute['active_task'] ?? 'workflow_builder'
+            );
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result(
+                $action === 'respond_local' ? 'respond_local' : 'ask_user',
+                $reply,
+                null,
+                null,
+                $state,
+                $this->telemetry('workflow_builder', true, $workflowRoute)
+            );
+        }
+
         $builderGuidanceRoute = $this->routeBuilderGuidance($normalizedBase, $training, $state, $lexicon, $mode);
         if (!empty($builderGuidanceRoute)) {
             $reply = (string) ($builderGuidanceRoute['reply'] ?? 'Listo.');
@@ -1342,6 +1369,18 @@ final class ConversationGateway
             return 'Voy a optimizar ' . $entity . ' con un indice en ' . $field . '.' . "\n"
                 . 'Responde "si" para aplicarlo o "no" para cambiarlo.';
         }
+        if ($commandName === 'ImportIntegrationOpenApi') {
+            $apiName = (string) ($command['api_name'] ?? 'api_externa');
+            $docUrl = (string) ($command['doc_url'] ?? '');
+            return 'Voy a importar la integracion ' . $apiName . ' desde OpenAPI.' . "\n"
+                . ($docUrl !== '' ? 'Fuente: ' . $docUrl . "\n" : '')
+                . 'Responde "si" para crear el contrato o "no" para cambiarlo.';
+        }
+        if ($commandName === 'CompileWorkflow') {
+            $workflowId = (string) ($command['workflow_id'] ?? 'wf_nuevo');
+            return 'Voy a compilar tu descripcion en un workflow y guardarlo como borrador (' . $workflowId . ').' . "\n"
+                . 'Responde "si" para compilarlo o "no" para cambiar la descripcion.';
+        }
         return 'Tengo una accion pendiente para continuar.' . "\n"
             . 'Responde "si" para ejecutarla o "no" para cambiarla.';
     }
@@ -1385,6 +1424,19 @@ final class ConversationGateway
                 . '- Voy a crear un indice en ' . $entity . '.' . $field . ' para acelerar busquedas.' . "\n"
                 . '- Responde "si" para aplicarlo o "no" para elegir otro campo.';
         }
+        if ($commandName === 'ImportIntegrationOpenApi') {
+            $apiName = (string) ($command['api_name'] ?? 'api_externa');
+            return 'Te explico facil:' . "\n"
+                . '- Voy a leer el OpenAPI de ' . $apiName . '.' . "\n"
+                . '- Con eso creare el contrato de integracion con base_url, autenticacion y endpoints.' . "\n"
+                . '- Responde "si" para continuar o "no" para cambiar la fuente.';
+        }
+        if ($commandName === 'CompileWorkflow') {
+            return 'Te explico facil:' . "\n"
+                . '- Voy a convertir tu idea en nodos y conexiones de workflow.' . "\n"
+                . '- Luego lo guardare como borrador para que lo edites.' . "\n"
+                . '- Responde "si" para compilar o "no" para ajustar.';
+        }
         return 'Te explico facil: tengo una accion pendiente.' . "\n"
             . 'Responde "si" para seguir o "no" para cambiar.';
     }
@@ -1417,6 +1469,10 @@ final class ConversationGateway
             'field' => (string) ($command['field'] ?? ''),
             'index_name' => (string) ($command['index_name'] ?? ''),
             'sector_key' => (string) ($command['sector_key'] ?? ''),
+            'api_name' => (string) ($command['api_name'] ?? ''),
+            'doc_url' => (string) ($command['doc_url'] ?? ''),
+            'workflow_id' => (string) ($command['workflow_id'] ?? ''),
+            'text' => (string) ($command['text'] ?? ''),
         ];
         $json = json_encode($base, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($json === false) {
@@ -5514,16 +5570,27 @@ private function parseEntityFromCrudText(string $text): string
                 if ($apiName === '') {
                     $apiName = 'api_externa';
                 }
+                $pending = [
+                    'command' => 'ImportIntegrationOpenApi',
+                    'api_name' => $this->normalizeEntityForSchema($apiName),
+                    'doc_url' => $docUrl,
+                    'provider' => ucfirst(str_replace('_', ' ', $this->normalizeEntityForSchema($apiName))),
+                    'country' => (string) ($profile['country'] ?? 'CO'),
+                    'environment' => 'sandbox',
+                    'type' => 'custom',
+                    'dry_run' => false,
+                ];
                 return [
                     'action' => 'ask_user',
-                    'reply' => 'Perfecto. Recibi la documentacion: ' . $docUrl . "\n"
-                        . 'Siguiente paso: analizo base_url, autenticacion y endpoints CRUD para proponerte el contrato de integracion.',
+                    'reply' => 'Perfecto. Ya tengo la documentacion: ' . $docUrl . "\n"
+                        . 'Puedo importarla y crear el contrato de integracion automaticamente. ¿La importo?',
                     'intent' => 'INTEGRATION_SETUP',
                     'active_task' => 'integration_setup',
                     'collected' => [
                         'doc_url' => $docUrl,
                         'api_name' => $apiName,
                     ],
+                    'pending_command' => $pending,
                 ];
             }
             return [
@@ -5680,8 +5747,18 @@ private function parseEntityFromCrudText(string $text): string
                     if ($apiName === '') {
                         $apiName = 'api_externa';
                     }
-                    $reply = 'Perfecto. Recibi la documentacion: ' . $docUrl . "\n"
-                        . 'Siguiente paso: analizo base_url, autenticacion y endpoints CRUD para proponerte el contrato de integracion.';
+                    $pending = [
+                        'command' => 'ImportIntegrationOpenApi',
+                        'api_name' => $this->normalizeEntityForSchema($apiName),
+                        'doc_url' => $docUrl,
+                        'provider' => ucfirst(str_replace('_', ' ', $this->normalizeEntityForSchema($apiName))),
+                        'country' => (string) ($profile['country'] ?? 'CO'),
+                        'environment' => 'sandbox',
+                        'type' => 'custom',
+                        'dry_run' => false,
+                    ];
+                    $reply = 'Perfecto. Ya tengo la documentacion: ' . $docUrl . "\n"
+                        . 'Puedo importarla y crear el contrato de integracion automaticamente. ¿La importo?';
                     return [
                         'action' => 'ask_user',
                         'reply' => $reply,
@@ -5691,6 +5768,7 @@ private function parseEntityFromCrudText(string $text): string
                             'doc_url' => $docUrl,
                             'api_name' => $apiName,
                         ],
+                        'pending_command' => $pending,
                     ];
                 }
                 return [
@@ -5743,6 +5821,60 @@ private function parseEntityFromCrudText(string $text): string
             default:
                 return [];
         }
+    }
+
+    private function routeWorkflowBuilder(string $text, string $mode, array $state): array
+    {
+        if ($mode !== 'builder') {
+            return [];
+        }
+        if (!empty($state['builder_pending_command']) && is_array($state['builder_pending_command'])) {
+            return [];
+        }
+
+        $hasWorkflowKeyword = preg_match('/\b(workflow|flujo|dag|nodos)\b/u', $text) === 1;
+        $hasBuildVerb = preg_match('/\b(crear|compilar|armar|disenar|diseñar|generar)\b/u', $text) === 1;
+        if (!$hasWorkflowKeyword || !$hasBuildVerb) {
+            return [];
+        }
+
+        $workflowId = $this->deriveWorkflowId($text);
+        $pendingCommand = [
+            'command' => 'CompileWorkflow',
+            'workflow_id' => $workflowId,
+            'text' => $text,
+            'apply' => true,
+        ];
+
+        return [
+            'action' => 'ask_user',
+            'intent' => 'WORKFLOW_COMPILE',
+            'active_task' => 'workflow_builder',
+            'reply' => 'Puedo compilar este flujo en un contrato workflow y guardarlo como borrador. ¿Lo compilo ahora?',
+            'pending_command' => $pendingCommand,
+            'collected' => [
+                'workflow_id' => $workflowId,
+            ],
+        ];
+    }
+
+    private function deriveWorkflowId(string $text): string
+    {
+        $seed = trim($text);
+        $seed = preg_replace('/[^a-z0-9_\\-\\s]/iu', ' ', $seed) ?? $seed;
+        $seed = strtolower(trim(preg_replace('/\\s+/', '_', $seed) ?? $seed));
+        if ($seed === '') {
+            return 'wf_' . date('Ymd_His');
+        }
+        $seed = preg_replace('/_+/', '_', $seed) ?? $seed;
+        $seed = trim($seed, '_');
+        if ($seed === '') {
+            $seed = 'workflow';
+        }
+        if (!str_starts_with($seed, 'wf_')) {
+            $seed = 'wf_' . $seed;
+        }
+        return substr($seed, 0, 64);
     }
 
     private function routeBuilderGuidance(string $text, array $training, array $state, array $lexicon, string $mode): array

@@ -10,6 +10,11 @@ use App\Core\CreateEntityCommandHandler;
 use App\Core\CreateFormCommandHandler;
 use App\Core\CreateRelationCommandHandler;
 use App\Core\CrudCommandHandler;
+use App\Core\OpenApiIntegrationImporter;
+use App\Core\ImportIntegrationOpenApiCommandHandler;
+use App\Core\CompileWorkflowCommandHandler;
+use App\Core\WorkflowCompiler;
+use App\Core\WorkflowRepository;
 use App\Core\InstallPlaybookCommandHandler;
 use App\Core\MapCommandHandler;
 
@@ -19,6 +24,8 @@ $bus->register(new CreateFormCommandHandler());
 $bus->register(new CreateRelationCommandHandler());
 $bus->register(new CreateIndexCommandHandler());
 $bus->register(new InstallPlaybookCommandHandler());
+$bus->register(new ImportIntegrationOpenApiCommandHandler());
+$bus->register(new CompileWorkflowCommandHandler());
 $bus->register(new CrudCommandHandler());
 $bus->register(new MapCommandHandler(['AuthLogin'], static fn(array $command, array $context): array => [
     'status' => 'success',
@@ -104,6 +111,44 @@ $authResult = $bus->dispatch(
 );
 if ((string) ($authResult['status'] ?? '') !== 'success') {
     $failures[] = 'Map auth fallback failed';
+}
+
+$importResult = $bus->dispatch(
+    [
+        'command' => 'ImportIntegrationOpenApi',
+        'api_name' => 'paymentsx_unit_bus_test',
+        'openapi_json' => json_encode([
+            'openapi' => '3.0.1',
+            'servers' => [['url' => 'https://api.payments.example.com/v1']],
+            'components' => ['securitySchemes' => ['BearerAuth' => ['type' => 'http', 'scheme' => 'bearer']]],
+            'paths' => ['/charges' => ['post' => ['operationId' => 'createCharge']]],
+        ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+        'dry_run' => true,
+    ],
+    array_merge($baseContext, [
+        'mode' => 'builder',
+        'openapi_importer' => new OpenApiIntegrationImporter(),
+    ])
+);
+if ((string) ($importResult['status'] ?? '') !== 'success') {
+    $failures[] = 'ImportIntegrationOpenApi dry_run failed';
+}
+
+$workflowResult = $bus->dispatch(
+    [
+        'command' => 'CompileWorkflow',
+        'text' => 'crear workflow para cotizacion',
+        'workflow_id' => 'wf_bus_test_' . time(),
+        'apply' => false,
+    ],
+    array_merge($baseContext, [
+        'mode' => 'builder',
+        'workflow_compiler' => new WorkflowCompiler(),
+        'workflow_repository' => new WorkflowRepository(__DIR__ . '/tmp/workflow_repo_project_bus'),
+    ])
+);
+if ((string) ($workflowResult['status'] ?? '') !== 'success') {
+    $failures[] = 'CompileWorkflow proposal failed';
 }
 
 try {

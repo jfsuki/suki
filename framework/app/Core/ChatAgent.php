@@ -1215,6 +1215,8 @@ final class ChatAgent
             $this->commandBus->register(new CreateRelationCommandHandler());
             $this->commandBus->register(new CreateIndexCommandHandler());
             $this->commandBus->register(new InstallPlaybookCommandHandler());
+            $this->commandBus->register(new ImportIntegrationOpenApiCommandHandler());
+            $this->commandBus->register(new CompileWorkflowCommandHandler());
             $this->commandBus->register(new CrudCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
                 ['AuthLogin', 'AuthCreateUser'],
@@ -1293,6 +1295,10 @@ final class ChatAgent
                 'wizard' => $this->wizard,
                 'command_layer' => $this->command(),
                 'playbook_installer' => new PlaybookInstaller(),
+                'openapi_importer' => new OpenApiIntegrationImporter(),
+                'workflow_repository' => new WorkflowRepository(),
+                'workflow_executor' => new WorkflowExecutor(),
+                'workflow_compiler' => new WorkflowCompiler(),
                 'register_entity' => function (string $entityName, string $ctxUserId): void {
                     try {
                         $registry = new ProjectRegistry();
