@@ -374,3 +374,15 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Compatibilidad protegida:
   - sin ruptura de contratos actuales (`forms/grids/entities/integrations`),
   - evolucion incremental por fases WB-0..WB-4.
+
+## Checkpoint (2026-02-24, WB-0 tecnico en ejecucion)
+- Se crea el primer contrato tecnico de workflow:
+  - `framework/contracts/schemas/workflow.schema.json`.
+- Se habilita validacion backend contract-first:
+  - `framework/app/Core/WorkflowValidator.php`.
+- Se integra cobertura automatica:
+  - `framework/tests/workflow_contract_test.php`.
+  - `UnitTestRunner` incluye `workflow_contract`.
+- Resultado esperado de WB-0:
+  - contrato base validable, sin cambios en runtime productivo aun,
+  - compatibilidad actual de forms/grids sin regresion.

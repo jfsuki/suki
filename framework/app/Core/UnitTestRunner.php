@@ -11,6 +11,7 @@ final class UnitTestRunner
     {
         $tests = [];
         $tests[] = $this->wrap('manifest', fn() => ManifestValidator::validateOrFail());
+        $tests[] = $this->wrap('workflow_contract', fn() => $this->checkWorkflowContract());
         $tests[] = $this->wrap('entity_registry', fn() => (new EntityRegistry())->all());
         $tests[] = $this->wrap('form_contracts', fn() => (new ContractsCatalog())->forms());
         $tests[] = $this->wrap('db_connection', fn() => Database::connection()->getAttribute(\PDO::ATTR_DRIVER_NAME));
@@ -74,6 +75,49 @@ final class UnitTestRunner
         if (($result['command'] ?? '') !== 'CreateRecord') {
             throw new \RuntimeException('Parser local no reconoce CreateRecord.');
         }
+    }
+
+    private function checkWorkflowContract(): void
+    {
+        $valid = [
+            'meta' => [
+                'id' => 'wf_unit_v1',
+                'name' => 'Unit workflow',
+                'status' => 'draft',
+                'revision' => 1,
+            ],
+            'nodes' => [
+                [
+                    'id' => 'n_input',
+                    'type' => 'input',
+                    'title' => 'Capture',
+                    'runPolicy' => [
+                        'timeout_ms' => 10000,
+                        'retry_max' => 0,
+                        'token_budget' => 0,
+                    ],
+                ],
+            ],
+            'edges' => [],
+            'assets' => [],
+            'theme' => ['presetName' => 'clean_business'],
+            'versioning' => [
+                'revision' => 1,
+                'historyPointers' => [],
+            ],
+        ];
+
+        WorkflowValidator::validateOrFail($valid);
+
+        $invalid = $valid;
+        $invalid['nodes'][0]['runPolicy']['timeout_ms'] = 0;
+        try {
+            WorkflowValidator::validateOrFail($invalid);
+        } catch (\Throwable $e) {
+            return;
+        }
+
+        throw new \RuntimeException('WorkflowValidator debe bloquear timeout_ms invalido.');
     }
 
     private function checkGateway(): void

@@ -1,0 +1,204 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "WorkflowContract",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "meta",
+    "nodes",
+    "edges",
+    "assets",
+    "theme",
+    "versioning"
+  ],
+  "properties": {
+    "meta": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "name", "status", "revision"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9_\\-.]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["draft", "active", "archived"]
+        },
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "type", "title", "runPolicy"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_\\-.]+$"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "input",
+              "generate",
+              "output",
+              "tool",
+              "decision",
+              "transform"
+            ]
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "inputsSchema": {
+            "type": "object"
+          },
+          "promptTemplate": {
+            "type": "string"
+          },
+          "modelConfig": {
+            "type": "object"
+          },
+          "toolsAllowed": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "outputsSchema": {
+            "type": "object"
+          },
+          "uiHints": {
+            "type": "object"
+          },
+          "runPolicy": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": ["timeout_ms", "retry_max", "token_budget"],
+            "properties": {
+              "timeout_ms": {
+                "type": "integer",
+                "minimum": 1
+              },
+              "retry_max": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "token_budget": {
+                "type": "integer",
+                "minimum": 0
+              }
+            }
+          }
+        }
+      }
+    },
+    "edges": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["from", "to", "mapping"],
+        "properties": {
+          "from": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_\\-.]+$"
+          },
+          "to": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_\\-.]+$"
+          },
+          "mapping": {
+            "type": "object"
+          }
+        }
+      }
+    },
+    "assets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "kind", "uri", "mime", "label"],
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^[a-zA-Z0-9_\\-.]+$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["document", "image", "dataset", "text", "json", "audio", "video", "other"]
+          },
+          "uri": {
+            "type": "string",
+            "minLength": 1
+          },
+          "mime": {
+            "type": "string",
+            "minLength": 1
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "theme": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "presetName": {
+          "type": "string",
+          "minLength": 1
+        },
+        "generatedThemeId": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "anyOf": [
+        { "required": ["presetName"] },
+        { "required": ["generatedThemeId"] }
+      ]
+    },
+    "versioning": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["revision", "historyPointers"],
+      "properties": {
+        "revision": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "historyPointers": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    }
+  }
+}

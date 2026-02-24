@@ -167,6 +167,20 @@
   - validar presupuesto de tokens/costo por nodo/sesion,
   - observar p95 por nodo + errores de guardrail en SQL metrics.
 
+## WB-0 technical execution (2026-02-24)
+- Contrato canonico base implementado:
+  - schema nuevo `framework/contracts/schemas/workflow.schema.json`.
+  - valida `meta`, `nodes`, `edges`, `assets`, `theme`, `versioning`.
+- Validacion backend implementada:
+  - `framework/app/Core/WorkflowValidator.php`.
+  - validacion contract-first via JSON Schema (sin ejecutar runtime).
+- QA dedicada WB-0:
+  - `framework/tests/workflow_contract_test.php` (caso valido + invalido + compatibilidad schema repository).
+  - `UnitTestRunner` agrega `workflow_contract` al suite principal.
+- Estado:
+  - WB-0 base en verde.
+  - siguiente bloque: WB-0.1 (reglas semanticas DAG: nodos referenciados, ciclos, mapping tipado).
+
 ## Execution checklist
 - [x] Summary dependency ordering stable
 - [x] Framework/project separation (paths + webroots)
