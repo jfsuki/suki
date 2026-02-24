@@ -18,6 +18,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('chat_parser', fn() => $this->checkParser());
         $tests[] = $this->wrap('gateway_local', fn() => $this->checkGateway());
         $tests[] = $this->wrap('gateway_golden', fn() => $this->checkGatewayGolden());
+        $tests[] = $this->wrap('mode_context_isolation', fn() => $this->checkModeContextIsolation());
         $tests[] = $this->wrap('mode_guard_policy', fn() => $this->checkModeGuardPolicy());
         $tests[] = $this->wrap('builder_onboarding_flow', fn() => $this->checkBuilderOnboardingFlow());
         $tests[] = $this->wrap('builder_guidance', fn() => $this->checkBuilderGuidance());
@@ -107,6 +108,44 @@ final class UnitTestRunner
         $working = $memory->getUserMemory('default', $user, 'working_memory::' . $projectId . '::builder', []);
         if (empty($working)) {
             throw new \RuntimeException('No se guardo working memory SQL para builder.');
+        }
+    }
+
+    private function checkModeContextIsolation(): void
+    {
+        $gateway = new \App\Core\Agents\ConversationGateway();
+        $memory = new SqlMemoryRepository();
+        $tenantId = 'default';
+        $user = 'iso_' . time();
+        $projectId = 'iso_proj';
+
+        $gateway->handle($tenantId, $user, 'mi negocio es una ferreteria', 'builder', $projectId);
+        $gateway->handle($tenantId, $user, 'crear cliente nombre=Ana', 'app', $projectId);
+
+        $builderState = $memory->getUserMemory($tenantId, $user, 'state::' . $projectId . '::builder', []);
+        $appState = $memory->getUserMemory($tenantId, $user, 'state::' . $projectId . '::app', []);
+
+        if (empty($builderState)) {
+            throw new \RuntimeException('No se encontro estado builder para mismo usuario.');
+        }
+        if (empty($appState)) {
+            throw new \RuntimeException('No se encontro estado app para mismo usuario.');
+        }
+        if ((string) ($builderState['active_task'] ?? '') !== 'builder_onboarding') {
+            throw new \RuntimeException('Estado builder no quedo en flujo de creador.');
+        }
+        if (($appState['active_task'] ?? null) !== null) {
+            throw new \RuntimeException('Estado app no debe heredar task activa del builder.');
+        }
+
+        $builderProfile = $memory->getUserMemory($tenantId, $projectId . '__builder__' . $user, 'profile', []);
+        $appProfile = $memory->getUserMemory($tenantId, $projectId . '__app__' . $user, 'profile', []);
+
+        if ((string) ($builderProfile['business_type'] ?? '') === '') {
+            throw new \RuntimeException('Perfil builder no guardo business_type.');
+        }
+        if (!empty($appProfile['business_type'] ?? '')) {
+            throw new \RuntimeException('Perfil app no debe mezclar business_type de builder.');
         }
     }
 
