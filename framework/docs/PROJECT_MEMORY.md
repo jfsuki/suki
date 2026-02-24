@@ -435,3 +435,14 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
   - `framework/tests/security_state_repository_test.php`
   - `framework/tests/api_security_guard_test.php` (strict CSRF + central rate-limit)
   - `framework/tests/security_channels_e2e_test.php` (secret/firma/replay + CSRF strict en `integrations/import_openapi`).
+
+## Checkpoint (2026-02-24, P2.1 stress + p95/p99)
+- Brecha de performance cerrada con suite dedicada:
+  - `chat_stress` (carga conversacional con workers concurrentes).
+  - `channels_stress` (carga webhook Telegram/WhatsApp en dry-run).
+  - `perf_stress_report` (consolidado p95/p99).
+- Observabilidad operativa:
+  - `SqlMetricsRepository::summary` agrega `p99_latency_ms` en intent/command metrics.
+- QA operativa:
+  - `qa_gate post` acepta gate adicional de performance via `QA_INCLUDE_STRESS=1`.
+  - resultado validado en verde con p95/p99 bajo umbrales configurados.

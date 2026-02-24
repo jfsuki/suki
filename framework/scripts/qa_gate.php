@@ -38,6 +38,9 @@ if ($mode === 'post') {
         ['name' => 'chat_real_20', 'cmd' => 'php framework/tests/chat_real_20.php', 'parser' => 'chat_real_20'],
         ['name' => 'db_health', 'cmd' => 'php framework/tests/db_health.php', 'parser' => 'db_health'],
     ];
+    if ((string) (getenv('QA_INCLUDE_STRESS') ?: '0') === '1') {
+        $steps[] = ['name' => 'perf_stress', 'cmd' => 'php framework/tests/perf_stress_report.php', 'parser' => 'perf_stress'];
+    }
 }
 
 $report = [
@@ -119,6 +122,10 @@ function parseStepOutput(string $parser, string $output): bool
     }
 
     if ($parser === 'db_health') {
+        return (($json['ok'] ?? false) === true);
+    }
+
+    if ($parser === 'perf_stress') {
         return (($json['ok'] ?? false) === true);
     }
 

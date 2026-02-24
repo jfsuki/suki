@@ -291,6 +291,19 @@
   - `framework/tests/api_security_guard_test.php` (strict CSRF + central rate-limit)
   - `framework/tests/security_channels_e2e_test.php` (secret/firma/replay + CSRF strict en import OpenAPI)
 
+## P2.1 performance hardening (2026-02-24)
+- Observabilidad extendida:
+  - `SqlMetricsRepository::summary(...)` ahora expone `p99_latency_ms` para intents y comandos.
+- Suite de estres conversacional/canales:
+  - `framework/tests/chat_stress.php` + `framework/tests/chat_stress_worker.php`.
+  - `framework/tests/channels_stress.php` + `framework/tests/channels_stress_worker.php`.
+  - reporte consolidado `framework/tests/perf_stress_report.php`.
+- Gate opcional de performance:
+  - `qa_gate.php` ejecuta `perf_stress_report` cuando `QA_INCLUDE_STRESS=1`.
+- Variables de tunning:
+  - chat: `CHAT_STRESS_CONCURRENCY`, `CHAT_STRESS_ITERATIONS`, `CHAT_STRESS_P95_MAX_MS`, `CHAT_STRESS_P99_MAX_MS`, `CHAT_STRESS_MAX_ERROR_RATE`.
+  - canales: `CHANNEL_STRESS_CONCURRENCY`, `CHANNEL_STRESS_ITERATIONS`, `CHANNEL_STRESS_P95_MAX_MS`, `CHANNEL_STRESS_P99_MAX_MS`, `CHANNEL_STRESS_MAX_ERROR_RATE`.
+
 ## Siguiente bloque recomendado
 - WB-3 full visual graph: drag/drop real, conexiones con mouse y referencias tipadas `@` en inspector.
 - WB-4 advanced: diff visual entre revisiones y restauracion selectiva por nodo.

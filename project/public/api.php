@@ -844,6 +844,15 @@ if ($route === 'channels/telegram/webhook') {
     if ($replyText === '') {
         $replyText = 'OK';
     }
+    if ((string) (getenv('TELEGRAM_WEBHOOK_DRY_RUN') ?: '0') === '1') {
+        respondJson($response, 'success', 'Telegram webhook procesado (dry-run)', [
+            'mode' => $mode,
+            'chat_id' => $chatId,
+            'reply_preview' => $replyText,
+            'dry_run' => true,
+        ]);
+        return;
+    }
     $token = trim((string) (getenv('TELEGRAM_BOT_TOKEN') ?: ''));
     $delivery = sendTelegramMessage($token, $chatId, $replyText);
     $delivered = (bool) ($delivery['ok'] ?? false);
@@ -962,6 +971,20 @@ if ($route === 'channels/whatsapp/webhook') {
     $replyText = trim((string) ($result['data']['reply'] ?? $result['message'] ?? 'OK'));
     if ($replyText === '') {
         $replyText = 'OK';
+    }
+    if ((string) (getenv('WHATSAPP_WEBHOOK_DRY_RUN') ?: '0') === '1') {
+        respondJson(
+            $response,
+            'success',
+            'WhatsApp webhook procesado (dry-run)',
+            [
+                'from' => $from,
+                'reply_preview' => $replyText,
+                'dry_run' => true,
+            ],
+            200
+        );
+        return;
     }
     $token = trim((string) (getenv('WHATSAPP_CLOUD_TOKEN') ?: ''));
     $phoneNumberId = trim((string) (getenv('WHATSAPP_PHONE_NUMBER_ID') ?: ''));

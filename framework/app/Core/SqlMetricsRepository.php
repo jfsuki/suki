@@ -156,12 +156,14 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
                 'count' => count($intentRows),
                 'p50_latency_ms' => $this->percentile($intentLatency, 50),
                 'p95_latency_ms' => $this->percentile($intentLatency, 95),
+                'p99_latency_ms' => $this->percentile($intentLatency, 99),
                 'fallback_llm' => $intentFallback,
             ],
             'command_metrics' => [
                 'count' => count($commandRows),
                 'p50_latency_ms' => $this->percentile($commandLatency, 50),
                 'p95_latency_ms' => $this->percentile($commandLatency, 95),
+                'p99_latency_ms' => $this->percentile($commandLatency, 99),
                 'blocked' => count(array_filter($commandRows, static fn(array $r): bool => (int) ($r['blocked'] ?? 0) === 1)),
             ],
             'guardrail_events' => [

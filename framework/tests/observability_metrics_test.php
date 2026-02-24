@@ -82,11 +82,17 @@ $failures = [];
 if ((int) ($summary['intent_metrics']['count'] ?? 0) < 2) {
     $failures[] = 'intent metrics were not persisted';
 }
+if (!isset($summary['intent_metrics']['p99_latency_ms'])) {
+    $failures[] = 'intent p99 latency missing in summary';
+}
 if ((int) ($summary['intent_metrics']['fallback_llm'] ?? 0) < 1) {
     $failures[] = 'llm fallback metric missing';
 }
 if ((int) ($summary['command_metrics']['count'] ?? 0) < 2) {
     $failures[] = 'command metrics were not persisted';
+}
+if (!isset($summary['command_metrics']['p99_latency_ms'])) {
+    $failures[] = 'command p99 latency missing in summary';
 }
 if ((int) ($summary['command_metrics']['blocked'] ?? 0) < 1) {
     $failures[] = 'blocked command metric missing';
