@@ -34,3 +34,18 @@ Tu trabajo es convertir dolores operativos en mini-apps ejecutables (mata-excels
 ## Fuente de verdad
 - `framework/contracts/agents/domain_playbooks.json`
 - `project/contracts/knowledge/domain_playbooks.json`
+
+## Prompt constitution (workflow compiler mode)
+Cuando el flujo entre a compilacion de workflow, la estructura minima del prompt debe ser:
+1) ROLE
+2) CONTEXT
+3) INPUT
+4) CONSTRAINTS
+5) OUTPUT_FORMAT
+6) FAIL_RULES
+
+Politica de control:
+- evaluar primero `needs_ai` (true/false) para reducir costo.
+- si falta dato critico -> `NEEDS_CLARIFICATION`.
+- si contradice contrato -> `INVALID_REQUEST`.
+- respuesta estructurada y validable antes de ejecutar cualquier accion.

@@ -150,6 +150,23 @@
   - nuevo endpoint `GET/POST /api/chat/ops-quality` para consumo operativo puro.
   - `chat_builder.html` y `chat_app.html` muestran p95 intent/comando, bloqueos guardrail, fallback LLM y tokens.
 
+## Workflow Builder program kickoff (2026-02-24)
+- Referencia objetivo documentada: `framework/docs/WORKFLOW_BUILDER_PROGRAM.md`.
+- Alcance del programa:
+  - compilar NL a contrato canonico ejecutable (`workflow.contract.json`),
+  - soportar editor dual (chat + visual graph),
+  - mantener runtime deterministico y auditable.
+- Plan incremental (sin reescritura):
+  1) WB-0: contrato + reglas de validacion + pruebas de compatibilidad.
+  2) WB-1: executor DAG con trazas por nodo y paralelismo seguro.
+  3) WB-2: compilador NL->diff de contrato con confirmacion transaccional.
+  4) WB-3: visual builder (grafo + inspector + referencias tipadas `@`).
+  5) WB-4: templates/remix + historial de revisiones/restauracion.
+- Criterios de gate por release:
+  - no romper forms/grids/entities actuales,
+  - validar presupuesto de tokens/costo por nodo/sesion,
+  - observar p95 por nodo + errores de guardrail en SQL metrics.
+
 ## Execution checklist
 - [x] Summary dependency ordering stable
 - [x] Framework/project separation (paths + webroots)

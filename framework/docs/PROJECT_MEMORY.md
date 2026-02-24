@@ -357,3 +357,20 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Conector inicial Telegram:
   - nuevo endpoint `POST /api/channels/telegram/webhook`.
   - valida secret opcional (`TELEGRAM_WEBHOOK_SECRET`), mapea `user_id/session_id` estables y responde por Bot API.
+
+## Checkpoint (2026-02-24, workflow builder north star)
+- Se define programa formal `WORKFLOW_BUILDER_PROGRAM.md` como hoja de ruta unificada:
+  - benchmark funcional inspirado en Opal (NL->DAG, editor dual, debug por nodo, versionado, remix),
+  - diferenciador SUKI (ERP real con entidades/CRUD/persistencia/auditoria).
+- Decision arquitectonica consolidada:
+  - lenguaje natural compila a contrato canonico `workflow.contract.json` (diffable, portable),
+  - pipeline obligatorio `Plan -> Validate -> Execute`,
+  - runtime no inventa estructura; solo ejecuta revision validada.
+- Guardrails nuevos fijados en memoria:
+  - validacion tipada de referencias `@`,
+  - presupuesto de tokens/costo por nodo y sesion,
+  - allowlist de tools/actions por rol, app y entorno,
+  - trazabilidad por nodo para debug y observabilidad operativa.
+- Compatibilidad protegida:
+  - sin ruptura de contratos actuales (`forms/grids/entities/integrations`),
+  - evolucion incremental por fases WB-0..WB-4.

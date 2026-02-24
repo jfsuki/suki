@@ -1,6 +1,6 @@
 # PROJECT_MEMORY_CANONICAL
 
-Version: 2026-02-23
+Version: 2026-02-24
 Scope: Canonical memory and governance baseline for SUKI AI-AOS.
 
 ## 1) Canonical identity
@@ -112,3 +112,27 @@ If a decision conflicts with a higher level, it is invalid.
 - Operational token economy:
   - contexto minimo, vocabulario cerrado, resumen sobre replay historico,
   - dependencia de IA debe bajar con contratos/memoria/cache.
+
+## 13) Workflow Builder canon (2026-02-24)
+- Strategic reference: Opal-like workflow UX is valid as benchmark, not as copy.
+- Canonical rule: NL is compiled to contract diff first; NL never executes directly.
+- Mandatory pipeline:
+  1) Plan
+  2) Validate
+  3) Execute
+- Design-time vs runtime split is strict:
+  - design-time can propose/edit nodes/edges/assets;
+  - runtime can only execute validated workflow revision.
+- New canonical contract target: `workflow.contract.json` with:
+  - `nodes[]`, `edges[]`, `assets[]`, `theme`, `versioning`.
+- Typed references are mandatory:
+  - `@` selector inserts only valid typed outputs and auto-wires edges.
+- Guardrails before execution:
+  - schema/type validation,
+  - permission/tool allowlist validation,
+  - token/cost budget validation,
+  - auditability validation.
+- Runtime observability:
+  - per-node traces, p50/p95 latency, guardrail errors, token usage.
+- Compatibility rule:
+  - existing forms/grids/entities contracts remain valid and unchanged.

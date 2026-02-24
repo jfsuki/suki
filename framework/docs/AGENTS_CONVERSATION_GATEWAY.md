@@ -9,6 +9,17 @@ Objetivo: resolver conversaciones con costo minimo. Local-first, y LLM solo si e
 4) LLMRouter elige proveedor (Groq/Gemini/OpenRouter/Claude).
 5) Respuesta JSON pasa a Command Layer o a respuesta humana.
 
+## Roadmap de compilacion de workflows (2026-02-24)
+- Nuevo objetivo de mediano plazo: modo compilador NL -> contrato de workflow.
+- Regla dura:
+  - en design-time el gateway solo propone diffs de contrato,
+  - en runtime solo ejecuta revisiones validadas.
+- Pipeline objetivo:
+  1) Plan (intencion + alcance)
+  2) Validate (schema/tipos/permisos/budget)
+  3) Execute (DAG topologico, trazas por nodo)
+- Contrato objetivo: `workflow.contract.json` (ver `WORKFLOW_BUILDER_PROGRAM.md`).
+
 ## Mejoras P0/P1/P2 (2026-02-21)
 - P0 Dialogo por estados: `DialogStateEngine` para modo `builder` y `app` con checklist vivo.
   - Triggers: "paso actual", "checklist", "en que vamos", "que falta", "que sigue".
