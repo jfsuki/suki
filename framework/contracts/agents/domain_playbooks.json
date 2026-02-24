@@ -1352,7 +1352,28 @@
             "Que informacion quieres guardar primero?",
             "Como cobras: contado, credito o mixto?",
             "Que reporte necesitas primero (ventas, cartera, gastos o utilidad)?"
-        ]
+        ],
+        "technical_requirements_questions": [
+            "Cual es el objetivo principal de la app en una frase?",
+            "Que proceso completo quieres operar primero (inicio a fin)?",
+            "Que datos minimos necesitas capturar por registro?",
+            "Que documentos o comprobantes debes emitir primero?",
+            "Que indicador necesitas ver cada dia o semana?",
+            "Que regla critica no se puede romper en tu operacion?"
+        ],
+        "research_prompt_template": {
+            "goal": "Analizar negocio desconocido y devolver propuesta estructurada para mini-app ejecutable.",
+            "required_output_keys": [
+                "status",
+                "confidence",
+                "canonical_business_type",
+                "business_candidate",
+                "reason_short",
+                "needs_normalized",
+                "documents_normalized",
+                "clarifying_question"
+            ]
+        }
     },
     "software_build_route": [
         "Descubrir objetivo del negocio y proceso principal.",

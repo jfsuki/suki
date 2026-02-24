@@ -179,7 +179,37 @@
   - `UnitTestRunner` agrega `workflow_contract` al suite principal.
 - Estado:
   - WB-0 base en verde.
-  - siguiente bloque: WB-0.1 (reglas semanticas DAG: nodos referenciados, ciclos, mapping tipado).
+
+## WB-0.1 technical execution (2026-02-24)
+- Validacion semantica DAG activada en `WorkflowValidator`:
+  - bloquea `node.id` duplicados,
+  - bloquea `edges` hacia nodos inexistentes,
+  - bloquea self-loops,
+  - exige `mapping` no vacio y consistente,
+  - detecta ciclos por topological traversal (Kahn).
+- QA WB-0.1:
+  - `framework/tests/workflow_contract_test.php` agrega casos semanticos (edge invalido + ciclo).
+  - `UnitTestRunner::checkWorkflowContract` valida schema + semantica.
+
+## Conversational hardening for unknown businesses (2026-02-24)
+- Nuevo flujo guiado antes de crear app cuando no hay perfil exacto:
+  - tarea de estado `unknown_business_discovery`,
+  - cuestionario de requisitos (discovery + technical requirements),
+  - construccion de `technical_brief` y `technical_prompt` en estado.
+- `ConversationGateway`:
+  - corrige bucle de confirmacion por perfil errado con prioridad a correccion de usuario,
+  - evita sesgo de negocio previo durante investigacion (`unknown_business_force_research`),
+  - si Gemini no esta disponible, crea borrador local y pide confirmacion.
+- `BuilderOnboardingFlow`:
+  - respeta `unknown_business_discovery` como flujo activo y evita short-circuit por playbook.
+- Contratos de dominio:
+  - `unknown_business_protocol` ampliado con `technical_requirements_questions` y `research_prompt_template`.
+- Pruebas:
+  - `framework/tests/unknown_business_discovery_test.php`.
+  - `framework/tests/chat_golden.php` agrega escenario de correccion de negocio + discovery.
+
+## Siguiente bloque recomendado
+- WB-1: executor DAG (orden topologico, paralelismo seguro y trazas por nodo).
 
 ## Execution checklist
 - [x] Summary dependency ordering stable

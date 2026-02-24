@@ -21,6 +21,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('gateway_golden', fn() => $this->checkGatewayGolden());
         $tests[] = $this->wrap('mode_context_isolation', fn() => $this->checkModeContextIsolation());
         $tests[] = $this->wrap('business_reprofile_mid_flow', fn() => $this->checkBusinessReprofileMidFlow());
+        $tests[] = $this->wrap('unknown_business_discovery', fn() => $this->checkUnknownBusinessDiscovery());
         $tests[] = $this->wrap('mode_guard_policy', fn() => $this->checkModeGuardPolicy());
         $tests[] = $this->wrap('builder_onboarding_flow', fn() => $this->checkBuilderOnboardingFlow());
         $tests[] = $this->wrap('builder_guidance', fn() => $this->checkBuilderGuidance());
@@ -114,10 +115,22 @@ final class UnitTestRunner
         try {
             WorkflowValidator::validateOrFail($invalid);
         } catch (\Throwable $e) {
+            // expected
+        }
+
+        $invalidEdge = $valid;
+        $invalidEdge['edges'][] = [
+            'from' => 'n_input',
+            'to' => 'n_missing',
+            'mapping' => ['x' => 'output.text'],
+        ];
+        try {
+            WorkflowValidator::validateOrFail($invalidEdge);
+        } catch (\Throwable $e) {
             return;
         }
 
-        throw new \RuntimeException('WorkflowValidator debe bloquear timeout_ms invalido.');
+        throw new \RuntimeException('WorkflowValidator debe bloquear schema y semantica invalida.');
     }
 
     private function checkGateway(): void
@@ -233,6 +246,74 @@ final class UnitTestRunner
         $rejectReply = mb_strtolower((string) ($reject['reply'] ?? ''), 'UTF-8');
         if (str_contains($rejectReply, 'negocio: ferreteria')) {
             throw new \RuntimeException('La correccion "no soy <negocio>" no limpio el resumen previo.');
+        }
+    }
+
+    private function checkUnknownBusinessDiscovery(): void
+    {
+        $gateway = new \App\Core\Agents\ConversationGateway();
+        $tenantId = 'default';
+        $user = 'unknown_' . time();
+        $projectId = 'unknown_proj';
+
+        $gateway->handle(
+            $tenantId,
+            $user,
+            'quiero crear una app',
+            'builder',
+            $projectId
+        );
+        $start = $gateway->handle(
+            $tenantId,
+            $user,
+            'laboratorio de velas artesanales',
+            'builder',
+            $projectId
+        );
+        $startReply = mb_strtolower((string) ($start['reply'] ?? ''), 'UTF-8');
+        if ((string) ($start['action'] ?? '') !== 'ask_user') {
+            throw new \RuntimeException('Unknown business discovery debe iniciar en modo ask_user.');
+        }
+        if (!str_contains($startReply, 'pregunta 1/')) {
+            throw new \RuntimeException('Unknown business discovery debe iniciar cuestionario tecnico.');
+        }
+
+        $startState = is_array($start['state'] ?? null) ? (array) $start['state'] : [];
+        if ((string) ($startState['active_task'] ?? '') !== 'unknown_business_discovery') {
+            throw new \RuntimeException('Unknown business discovery debe activar tarea dedicada.');
+        }
+        $flow = is_array($startState['unknown_business_discovery'] ?? null)
+            ? (array) $startState['unknown_business_discovery']
+            : [];
+        $questions = is_array($flow['questions'] ?? null) ? array_values((array) $flow['questions']) : [];
+        if (count($questions) < 4) {
+            throw new \RuntimeException('Unknown business discovery requiere bloque amplio de preguntas.');
+        }
+
+        $result = $start;
+        $answerCount = count($questions);
+        for ($i = 0; $i < $answerCount; $i++) {
+            $result = $gateway->handle(
+                $tenantId,
+                $user,
+                'respuesta ' . ($i + 1) . ' proceso produccion, ventas, factura y control de calidad',
+                'builder',
+                $projectId
+            );
+        }
+
+        $finalReply = mb_strtolower((string) ($result['reply'] ?? ''), 'UTF-8');
+        if (!str_contains($finalReply, 'documento tecnico inicial')) {
+            throw new \RuntimeException('Unknown business discovery debe emitir documento tecnico inicial.');
+        }
+
+        $finalState = is_array($result['state'] ?? null) ? (array) $result['state'] : [];
+        $finalFlow = is_array($finalState['unknown_business_discovery'] ?? null)
+            ? (array) $finalState['unknown_business_discovery']
+            : [];
+        $technicalPrompt = trim((string) ($finalFlow['technical_prompt'] ?? ''));
+        if ($technicalPrompt === '') {
+            throw new \RuntimeException('Unknown business discovery debe guardar prompt tecnico para LLM.');
         }
     }
 

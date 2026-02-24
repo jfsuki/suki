@@ -2370,6 +2370,24 @@ final class ConversationGateway
         $localProfile = $profile;
         $localState = $state;
         $currentStep = (string) ($localState['onboarding_step'] ?? '');
+        $playbookData = $this->loadDomainPlaybook();
+        $unknownProtocol = is_array($playbookData['unknown_business_protocol'] ?? null)
+            ? (array) $playbookData['unknown_business_protocol']
+            : [];
+        $unknownDiscoveryNote = '';
+
+        $unknownDiscoveryRoute = $this->handleUnknownBusinessDiscoveryStep(
+            $text,
+            $localState,
+            $localProfile,
+            $unknownProtocol,
+            $tenantId,
+            $userId,
+            $unknownDiscoveryNote
+        );
+        if (!empty($unknownDiscoveryRoute)) {
+            return $unknownDiscoveryRoute;
+        }
 
         if (
             (string) ($localState['active_task'] ?? '') === 'business_research_confirmation'
@@ -2448,6 +2466,12 @@ final class ConversationGateway
 
         $existingBusinessType = (string) ($localProfile['business_type'] ?? '');
         $business = $this->detectBusinessType($text);
+        $forceUnknownResearch = (bool) ($localState['unknown_business_force_research'] ?? false);
+        if ($forceUnknownResearch) {
+            $business = '';
+            unset($localProfile['business_type']);
+            $localState['proposed_profile'] = null;
+        }
         $businessShiftSignal = $this->shouldReprofileBusiness($text, $existingBusinessType, $business, $currentStep);
         $explicitBusinessChange = preg_match('/\b(cambiar|cambia|otro negocio|nuevo negocio|no soy|soy una|soy un|fabrico|me dedico)\b/u', $text) === 1
             || $businessShiftSignal;
@@ -2461,7 +2485,11 @@ final class ConversationGateway
             $localState['dynamic_playbook_proposal'] = null;
             $localState['resolution_attempts'] = (int) ($localState['resolution_attempts'] ?? 0) + 1;
         }
-        if ($business === '' && (string) ($localState['onboarding_step'] ?? '') === 'business_type') {
+        if (
+            $business === ''
+            && (string) ($localState['onboarding_step'] ?? '') === 'business_type'
+            && !(bool) ($localState['unknown_business_force_research'] ?? false)
+        ) {
             $scopeChoice = $this->detectBusinessScopeChoice($text);
             if ($scopeChoice !== '') {
                 $scopeMap = [
@@ -2494,10 +2522,18 @@ final class ConversationGateway
                 $localState['onboarding_step'] = !empty($localProfile['operation_model']) ? 'needs_scope' : 'operation_model';
             }
         }
-        $unknownBusinessCandidate = $this->detectUnknownBusinessCandidate($text, $business);
+        $unknownBusinessCandidate = (bool) ($localState['unknown_business_force_research'] ?? false)
+            ? trim((string) ($localProfile['business_candidate'] ?? ''))
+            : $this->detectUnknownBusinessCandidate($text, $business);
         if ($unknownBusinessCandidate !== '') {
             $localProfile['business_candidate'] = $unknownBusinessCandidate;
             $this->registerUnknownBusinessCase($tenantId, $userId, $unknownBusinessCandidate, $text);
+            if ($this->shouldPrioritizeUnknownCandidate($text, (string) ($localProfile['business_type'] ?? ''), $unknownBusinessCandidate)) {
+                unset($localProfile['business_type']);
+                $business = '';
+                $localState['proposed_profile'] = null;
+                $localState['analysis_approved'] = null;
+            }
         }
         $operationModel = $this->detectOperationModel($text);
         if ($operationModel !== '') {
@@ -2519,16 +2555,17 @@ final class ConversationGateway
             $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
         }
         $businessCandidate = trim((string) ($localProfile['business_candidate'] ?? ''));
-        $playbookData = $this->loadDomainPlaybook();
-        $unknownProtocol = is_array($playbookData['unknown_business_protocol'] ?? null)
-            ? (array) $playbookData['unknown_business_protocol']
-            : [];
         $llmThreshold = (float) ($unknownProtocol['llm_confidence_threshold'] ?? 0.85);
         if ($llmThreshold < 0.5 || $llmThreshold > 0.99) {
             $llmThreshold = 0.85;
         }
 
         if ($businessType === '' && $businessCandidate !== '') {
+            $startUnknownDiscovery = $this->startUnknownBusinessDiscovery($businessCandidate, $localState, $unknownProtocol);
+            if (!empty($startUnknownDiscovery)) {
+                return $startUnknownDiscovery;
+            }
+            $localState['unknown_business_force_research'] = false;
             $resolution = $this->resolveUnknownBusinessWithGemini($text, $businessCandidate, $localProfile, $localState);
             $status = strtoupper(trim((string) ($resolution['status'] ?? '')));
             $confidence = (float) ($resolution['confidence'] ?? 0.0);
@@ -2570,6 +2607,9 @@ final class ConversationGateway
                     $label = $this->domainLabelByBusinessType($resolvedType);
                     $businessResolvedNote = 'Entendi tu negocio como "' . $label . '". '
                         . 'Si no es correcto, dime: "no, cambiemos el tipo de negocio".';
+                    if ($unknownDiscoveryNote !== '') {
+                        $businessResolvedNote = $unknownDiscoveryNote . "\n" . $businessResolvedNote;
+                    }
                     $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
                 }
             } elseif ($status === 'NEW_BUSINESS') {
@@ -2604,6 +2644,9 @@ final class ConversationGateway
                     . 'Parece que necesitas: ' . implode(', ', array_slice($needsList, 0, 3)) . '.' . "\n"
                     . 'Documentos clave: ' . implode(', ', array_slice($docsList, 0, 3)) . '.' . "\n"
                     . 'Es correcto? Responde si o no.';
+                if ($unknownDiscoveryNote !== '') {
+                    $reply = $unknownDiscoveryNote . "\n" . $reply;
+                }
                 return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
             } elseif ($status === 'NEEDS_CLARIFICATION') {
                 $question = trim((string) ($resolution['clarifying_question'] ?? ''));
@@ -2617,12 +2660,39 @@ final class ConversationGateway
                 $localState['business_resolution_last_status'] = 'NEEDS_CLARIFICATION';
                 $localState['business_resolution_last_result'] = $resolution;
                 $localState['business_resolution_last_at'] = date('c');
+                if ($unknownDiscoveryNote !== '') {
+                    $question = $unknownDiscoveryNote . "\n" . $question;
+                }
                 return ['action' => 'ask_user', 'reply' => $question, 'state' => $localState];
             } elseif ($status !== '') {
                 $localState['business_resolution_last_candidate'] = $businessCandidate;
                 $localState['business_resolution_last_status'] = $status;
                 $localState['business_resolution_last_result'] = $resolution;
                 $localState['business_resolution_last_at'] = date('c');
+
+                if ($unknownDiscoveryNote !== '' && in_array($status, ['LLM_NOT_AVAILABLE', 'ERROR', 'INVALID_RESPONSE', 'INVALID_REQUEST'], true)) {
+                    $draft = $this->buildUnknownBusinessLocalDraft($localState, $businessCandidate);
+                    $needsList = is_array($draft['needs'] ?? null) ? (array) $draft['needs'] : [];
+                    $docsList = is_array($draft['documents'] ?? null) ? (array) $draft['documents'] : [];
+
+                    $localState['active_task'] = 'business_research_confirmation';
+                    $localState['onboarding_step'] = 'business_type';
+                    $localState['proposed_profile'] = null;
+                    $localState['dynamic_playbook_proposal'] = [
+                        'candidate' => $businessCandidate,
+                        'needs' => $needsList,
+                        'documents' => $docsList,
+                    ];
+                    $localState['business_resolution_last_status'] = 'NEW_BUSINESS_LOCAL';
+                    $localState['business_resolution_last_result']['fallback'] = 'local_research_draft';
+
+                    $reply = $unknownDiscoveryNote . "\n"
+                        . 'No pude consultar IA externa en este momento, pero ya tengo un borrador funcional.' . "\n"
+                        . 'Necesidades sugeridas: ' . implode(', ', array_slice($needsList, 0, 3)) . '.' . "\n"
+                        . 'Documentos clave: ' . implode(', ', array_slice($docsList, 0, 3)) . '.' . "\n"
+                        . 'Es correcto? Responde si o no.';
+                    return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+                }
             }
         }
         if ($businessType === '') {
@@ -2667,6 +2737,9 @@ final class ConversationGateway
                     . 'Vamos paso a paso para crear tu app.'
                     . "\n"
                     . 'Paso 1: responde solo una opcion: servicios, productos o ambos.';
+            }
+            if ($unknownDiscoveryNote !== '') {
+                $reply = $unknownDiscoveryNote . "\n" . $reply;
             }
             return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
         }
@@ -3294,7 +3367,8 @@ final class ConversationGateway
 
     private function detectUnknownBusinessCandidate(string $text, string $detectedBusinessType): string
     {
-        if ($detectedBusinessType !== '') {
+        $normalizedDetected = $this->normalizeBusinessType($detectedBusinessType);
+        if ($normalizedDetected !== '' && !in_array($normalizedDetected, ['retail_tienda', 'servicios_mantenimiento'], true)) {
             return '';
         }
 
@@ -3311,12 +3385,98 @@ final class ConversationGateway
                 $candidate = trim($candidate, " .,:;!?");
                 $candidate = preg_replace('/\\b(que|quiero|necesito|hacer|crear|programa|app|sistema)\\b/iu', '', $candidate) ?? $candidate;
                 $candidate = preg_replace('/\\s+/', ' ', trim($candidate)) ?? $candidate;
-                if ($candidate !== '' && mb_strlen($candidate, 'UTF-8') >= 4) {
+                if (
+                    $candidate !== ''
+                    && mb_strlen($candidate, 'UTF-8') >= 4
+                    && !$this->isGenericBusinessCandidate($candidate)
+                ) {
                     return $candidate;
                 }
             }
         }
+
+        $fallback = trim((string) (preg_replace('/\s+/', ' ', $text) ?? $text));
+        $fallback = trim($fallback, " .,:;!?");
+        $genericReplies = ['servicios', 'productos', 'ambos', 'mixto', 'contado', 'credito'];
+        $isGenericOnboardingPhrase = preg_match('/\b(quiero|necesito|crear|hacer)\b/u', $fallback) === 1
+            && preg_match('/\b(app|aplicacion|programa|sistema)\b/u', $fallback) === 1
+            && preg_match('/\b(de|para)\b/u', $fallback) !== 1;
+        if (
+            $fallback !== ''
+            && !in_array($fallback, $genericReplies, true)
+            && !$this->isBuilderOnboardingTrigger($fallback)
+            && !$isGenericOnboardingPhrase
+            && mb_strlen($fallback, 'UTF-8') >= 8
+            && preg_match('/[=:]/', $fallback) !== 1
+            && preg_match('/^\p{L}+$/u', $fallback) !== 1
+            && !$this->isGenericBusinessCandidate($fallback)
+        ) {
+            return $fallback;
+        }
         return '';
+    }
+
+    private function isGenericBusinessCandidate(string $candidate): bool
+    {
+        $normalized = $this->normalize($candidate);
+        if ($normalized === '') {
+            return true;
+        }
+
+        $genericExact = [
+            'inventario',
+            'ventas',
+            'facturacion',
+            'contabilidad',
+            'compras',
+            'pagos',
+            'reportes',
+            'crm',
+            'app',
+            'programa',
+            'sistema',
+            'erp',
+            'clientes',
+            'productos',
+        ];
+        if (in_array($normalized, $genericExact, true)) {
+            return true;
+        }
+
+        $tokens = preg_split('/\s+/u', $normalized) ?: [];
+        $tokens = array_values(array_filter(array_map('trim', $tokens), static fn($value): bool => $value !== ''));
+        if (empty($tokens)) {
+            return true;
+        }
+
+        $genericTokens = [
+            'inventario',
+            'ventas',
+            'facturacion',
+            'contabilidad',
+            'compras',
+            'pagos',
+            'reportes',
+            'crm',
+            'erp',
+            'cliente',
+            'clientes',
+            'producto',
+            'productos',
+            'kardex',
+            'cartera',
+            'caja',
+        ];
+        foreach ($tokens as $token) {
+            if (mb_strlen($token, 'UTF-8') <= 2) {
+                continue;
+            }
+            if (!in_array($token, $genericTokens, true)) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private function detectOperationModel(string $text): string
@@ -3423,8 +3583,17 @@ final class ConversationGateway
 
         $hasGemini = trim((string) getenv('GEMINI_API_KEY')) !== '';
         if (!$hasGemini) {
-            return [];
+            return ['status' => 'LLM_NOT_AVAILABLE'];
         }
+
+        $discoveryState = is_array($state['unknown_business_discovery'] ?? null)
+            ? (array) $state['unknown_business_discovery']
+            : [];
+        $discoveryAnswers = is_array($discoveryState['answers'] ?? null)
+            ? array_values((array) $discoveryState['answers'])
+            : [];
+        $technicalPrompt = trim((string) ($discoveryState['technical_prompt'] ?? ''));
+        $technicalBrief = trim((string) ($discoveryState['technical_brief'] ?? ''));
 
         $dedupeTtlSeconds = (int) ($unknownProtocol['llm_dedupe_ttl_seconds'] ?? 900);
         if ($dedupeTtlSeconds < 60 || $dedupeTtlSeconds > 86400) {
@@ -3475,6 +3644,7 @@ final class ConversationGateway
                 'known_profiles' => $knownProfiles,
                 'language' => 'es-CO',
                 'goal' => 'clasificar tipo de negocio y necesidades iniciales sin inventar',
+                'has_discovery_answers' => !empty($discoveryAnswers),
             ],
             'INPUT' => [
                 'user_text' => $text,
@@ -3483,12 +3653,16 @@ final class ConversationGateway
                 'onboarding_step' => (string) ($state['onboarding_step'] ?? ''),
                 'known_needs' => is_array($profile['needs_scope_items'] ?? null) ? array_values((array) $profile['needs_scope_items']) : [],
                 'known_documents' => is_array($profile['documents_scope_items'] ?? null) ? array_values((array) $profile['documents_scope_items']) : [],
+                'discovery_answers' => $discoveryAnswers,
+                'technical_brief' => $technicalBrief,
+                'compiled_research_prompt' => $technicalPrompt,
             ],
             'CONSTRAINTS' => [
                 'no_invent_data' => true,
                 'no_execute_actions' => true,
                 'one_question_max_if_missing' => true,
                 'prefer_known_profiles' => true,
+                'use_discovery_answers_if_present' => true,
             ],
             'OUTPUT_FORMAT' => [
                 'status' => 'MATCHED|NEW_BUSINESS|NEEDS_CLARIFICATION|INVALID_REQUEST',
@@ -3543,6 +3717,7 @@ final class ConversationGateway
                 'documents_normalized' => is_array($json['documents_normalized'] ?? null) ? array_values((array) $json['documents_normalized']) : [],
                 'clarifying_question' => (string) ($json['clarifying_question'] ?? ''),
                 'provider_used' => (string) ($llm['provider'] ?? 'gemini'),
+                'used_compiled_prompt' => $technicalPrompt !== '',
             ];
 
             if ($resolved['status'] === 'MATCHED' && $resolved['confidence'] < $confidenceThreshold) {
@@ -5485,6 +5660,8 @@ private function parseEntityFromCrudText(string $text): string
                         'analysis_approved' => null,
                         'proposed_profile' => null,
                         'dynamic_playbook_proposal' => null,
+                        'unknown_business_discovery' => null,
+                        'unknown_business_force_research' => false,
                         'resolution_attempts' => (int) (($state['resolution_attempts'] ?? 0) + 1),
                     ],
                 ];
@@ -5764,6 +5941,377 @@ private function parseEntityFromCrudText(string $text): string
             return 'PERFORMANCE';
         }
         return '';
+    }
+
+    private function shouldPrioritizeUnknownCandidate(string $text, string $detectedBusinessType, string $candidate): bool
+    {
+        $candidate = trim($candidate);
+        if ($candidate === '') {
+            return false;
+        }
+
+        $normalizedDetected = $this->normalizeBusinessType($detectedBusinessType);
+        if (!in_array($normalizedDetected, ['', 'retail_tienda', 'servicios_mantenimiento'], true)) {
+            return false;
+        }
+
+        $normalizedText = $this->normalize($text);
+        $hasSpecializationSignal = preg_match(
+            '/\b(fabrico|fabricamos|fabricacion|manufacturo|manufactura|produccion|producimos|servicio\s+de|servicios\s+de|taller\s+de|estudio\s+de|planta\s+de|laboratorio\s+de|corte\s+laser)\b/u',
+            $normalizedText
+        ) === 1;
+        if (!$hasSpecializationSignal) {
+            return false;
+        }
+
+        $normalizedCandidate = $this->normalize($candidate);
+        $parts = preg_split('/\s+/u', $normalizedCandidate) ?: [];
+        $wordCount = count(array_values(array_filter($parts, static fn($value): bool => trim((string) $value) !== '')));
+        return $wordCount >= 2 || mb_strlen($candidate, 'UTF-8') >= 14;
+    }
+
+    private function discoveryQuestionsFromProtocol(array $unknownProtocol): array
+    {
+        $baseQuestions = [];
+        if (is_array($unknownProtocol['discovery_questions'] ?? null)) {
+            foreach ((array) $unknownProtocol['discovery_questions'] as $question) {
+                $value = trim((string) $question);
+                if ($value !== '') {
+                    $baseQuestions[] = $value;
+                }
+            }
+        }
+
+        $technicalQuestions = [];
+        if (is_array($unknownProtocol['technical_requirements_questions'] ?? null)) {
+            foreach ((array) $unknownProtocol['technical_requirements_questions'] as $question) {
+                $value = trim((string) $question);
+                if ($value !== '') {
+                    $technicalQuestions[] = $value;
+                }
+            }
+        }
+
+        $defaults = [
+            'Cual es el objetivo principal de la app en una frase?',
+            'Que proceso completo quieres operar primero (inicio a fin)?',
+            'Que datos minimos necesitas capturar por registro?',
+            'Que documentos o comprobantes debes emitir primero?',
+            'Que indicador necesitas ver cada dia o semana?',
+        ];
+
+        return $this->mergeScopeLabels(array_merge($baseQuestions, $technicalQuestions), $defaults);
+    }
+
+    private function startUnknownBusinessDiscovery(string $candidate, array &$state, array $unknownProtocol): ?array
+    {
+        $candidate = trim($candidate);
+        if ($candidate === '' || !(bool) ($unknownProtocol['enabled'] ?? true)) {
+            return null;
+        }
+
+        if ((string) ($state['active_task'] ?? '') === 'unknown_business_discovery') {
+            return null;
+        }
+
+        $existingFlow = is_array($state['unknown_business_discovery'] ?? null)
+            ? (array) $state['unknown_business_discovery']
+            : [];
+        if (!empty($existingFlow)) {
+            $existingCandidate = trim((string) ($existingFlow['candidate'] ?? ''));
+            $alreadyCompleted = trim((string) ($existingFlow['completed_at'] ?? '')) !== '';
+            if ($existingCandidate !== '' && $this->normalize($existingCandidate) === $this->normalize($candidate) && $alreadyCompleted) {
+                return null;
+            }
+        }
+
+        $questions = $this->discoveryQuestionsFromProtocol($unknownProtocol);
+        if (empty($questions)) {
+            return null;
+        }
+
+        $state['active_task'] = 'unknown_business_discovery';
+        $state['onboarding_step'] = 'business_type';
+        $state['unknown_business_discovery'] = [
+            'candidate' => $candidate,
+            'questions' => $questions,
+            'answers' => [],
+            'current_index' => 0,
+            'started_at' => date('c'),
+            'completed_at' => null,
+            'technical_prompt' => null,
+            'technical_brief' => null,
+        ];
+        $state['resolution_attempts'] = (int) ($state['resolution_attempts'] ?? 0) + 1;
+        $state['unknown_business_notice_sent'] = true;
+
+        $template = trim((string) ($unknownProtocol['message_template'] ?? 'No tengo plantilla exacta para "{business}" todavia. Ya lo registre para investigarlo y compartirlo con todos los agentes.'));
+        if ($template === '') {
+            $template = 'No tengo plantilla exacta para "{business}" todavia.';
+        }
+        $firstQuestion = trim((string) ($questions[0] ?? ''));
+        if ($firstQuestion === '') {
+            $firstQuestion = 'Que objetivo principal quieres resolver primero?';
+        }
+
+        $reply = str_replace('{business}', $candidate, $template) . "\n"
+            . 'Para disenar bien la solucion, te hare unas preguntas cortas antes de crear.' . "\n"
+            . 'Pregunta 1/' . count($questions) . ': ' . $firstQuestion;
+
+        return [
+            'action' => 'ask_user',
+            'reply' => $reply,
+            'state' => $state,
+        ];
+    }
+
+    private function handleUnknownBusinessDiscoveryStep(
+        string &$text,
+        array &$state,
+        array &$profile,
+        array $unknownProtocol,
+        string $tenantId,
+        string $userId,
+        string &$completionNote
+    ): ?array {
+        if ((string) ($state['active_task'] ?? '') !== 'unknown_business_discovery') {
+            return null;
+        }
+
+        $flow = is_array($state['unknown_business_discovery'] ?? null)
+            ? (array) $state['unknown_business_discovery']
+            : [];
+        if (empty($flow)) {
+            return null;
+        }
+
+        $questions = is_array($flow['questions'] ?? null) ? (array) $flow['questions'] : [];
+        if (empty($questions)) {
+            $questions = $this->discoveryQuestionsFromProtocol($unknownProtocol);
+        }
+        if (empty($questions)) {
+            $state['active_task'] = 'builder_onboarding';
+            $state['unknown_business_discovery'] = null;
+            return null;
+        }
+
+        $candidate = trim((string) ($flow['candidate'] ?? ($profile['business_candidate'] ?? '')));
+        if ($candidate === '') {
+            $candidate = trim((string) ($profile['business_candidate'] ?? ''));
+        }
+        if ($candidate === '') {
+            $state['active_task'] = 'builder_onboarding';
+            $state['unknown_business_discovery'] = null;
+            return null;
+        }
+
+        $answers = is_array($flow['answers'] ?? null) ? (array) $flow['answers'] : [];
+        $index = (int) ($flow['current_index'] ?? 0);
+        if ($index < 0) {
+            $index = 0;
+        }
+
+        if ($index < count($questions)) {
+            $answer = $this->sanitizeRequirementText($text);
+            if ($answer === '') {
+                $question = trim((string) ($questions[$index] ?? ''));
+                if ($question === '') {
+                    $question = 'Describe el proceso principal que quieres controlar.';
+                }
+                return [
+                    'action' => 'ask_user',
+                    'reply' => 'Necesito una respuesta corta para continuar.' . "\n"
+                        . 'Pregunta ' . ($index + 1) . '/' . count($questions) . ': ' . $question,
+                    'state' => $state,
+                ];
+            }
+
+            $answers[] = [
+                'question' => trim((string) ($questions[$index] ?? '')),
+                'answer' => $answer,
+            ];
+            $index++;
+        }
+
+        if ($index < count($questions)) {
+            $flow['answers'] = $answers;
+            $flow['current_index'] = $index;
+            $flow['questions'] = $questions;
+            $state['unknown_business_discovery'] = $flow;
+            $state['active_task'] = 'unknown_business_discovery';
+            $state['onboarding_step'] = 'business_type';
+
+            $question = trim((string) ($questions[$index] ?? ''));
+            if ($question === '') {
+                $question = 'Que proceso quieres controlar primero?';
+            }
+            return [
+                'action' => 'ask_user',
+                'reply' => 'Perfecto.' . "\n"
+                    . 'Pregunta ' . ($index + 1) . '/' . count($questions) . ': ' . $question,
+                'state' => $state,
+            ];
+        }
+
+        $brief = $this->buildUnknownBusinessTechnicalBrief($candidate, $answers);
+        $prompt = $this->buildUnknownBusinessResearchPrompt($candidate, $answers, $unknownProtocol, $profile, $state);
+        $flow['answers'] = $answers;
+        $flow['questions'] = $questions;
+        $flow['current_index'] = count($questions);
+        $flow['completed_at'] = date('c');
+        $flow['technical_prompt'] = $prompt;
+        $flow['technical_brief'] = $brief;
+        $state['unknown_business_discovery'] = $flow;
+        $state['active_task'] = 'builder_onboarding';
+        $state['onboarding_step'] = 'business_type';
+        $state['proposed_profile'] = null;
+        $state['unknown_business_force_research'] = true;
+
+        $profile['business_candidate'] = $candidate;
+        $this->saveProfile($tenantId, $this->profileUserKey($userId), $profile);
+
+        $text = $this->buildUnknownBusinessDiscoveryContextText($candidate, $answers);
+        $completionNote = 'Documento tecnico inicial listo para investigacion.' . "\n" . $brief;
+        return null;
+    }
+
+    private function buildUnknownBusinessTechnicalBrief(string $candidate, array $answers): string
+    {
+        $labels = [
+            'Objetivo',
+            'Proceso inicial',
+            'Datos minimos',
+            'Documentos',
+            'Indicador principal',
+            'Regla critica',
+        ];
+
+        $lines = [];
+        $lines[] = 'Documento tecnico inicial:';
+        $lines[] = 'Negocio candidato: ' . $candidate . '.';
+        foreach ($answers as $index => $pair) {
+            if (!is_array($pair)) {
+                continue;
+            }
+            $answer = trim((string) ($pair['answer'] ?? ''));
+            if ($answer === '') {
+                continue;
+            }
+            $label = $labels[$index] ?? ('Dato ' . ($index + 1));
+            $lines[] = '- ' . $label . ': ' . $answer . '.';
+        }
+        return implode("\n", $lines);
+    }
+
+    private function buildUnknownBusinessResearchPrompt(
+        string $candidate,
+        array $answers,
+        array $unknownProtocol,
+        array $profile,
+        array $state
+    ): string {
+        $template = is_array($unknownProtocol['research_prompt_template'] ?? null)
+            ? (array) $unknownProtocol['research_prompt_template']
+            : [];
+        $requiredKeys = is_array($template['required_output_keys'] ?? null)
+            ? array_values(array_filter(array_map('strval', (array) $template['required_output_keys'])))
+            : [
+                'status',
+                'confidence',
+                'canonical_business_type',
+                'business_candidate',
+                'reason_short',
+                'needs_normalized',
+                'documents_normalized',
+                'clarifying_question',
+            ];
+
+        $promptContract = [
+            'ROLE' => 'Senior Business Systems Analyst',
+            'CONTEXT' => [
+                'goal' => (string) ($template['goal'] ?? 'Analizar negocio desconocido y convertirlo en propuesta estructurada.'),
+                'language' => 'es-CO',
+                'profile_hint' => (string) ($profile['business_type'] ?? ''),
+                'onboarding_step' => (string) ($state['onboarding_step'] ?? ''),
+            ],
+            'INPUT' => [
+                'business_candidate' => $candidate,
+                'requirements_answers' => $answers,
+            ],
+            'CONSTRAINTS' => [
+                'no_invent_data' => true,
+                'one_question_max_if_missing' => true,
+                'output_json_only' => true,
+                'backward_compatible' => true,
+            ],
+            'OUTPUT_FORMAT' => [
+                'required_keys' => $requiredKeys,
+            ],
+            'FAIL_RULES' => [
+                'if_confidence_below' => 0.7,
+                'return_on_low_confidence' => 'NEEDS_CLARIFICATION',
+                'if_contract_conflict' => 'INVALID_REQUEST',
+            ],
+        ];
+
+        $payload = json_encode($promptContract, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        return is_string($payload) ? $payload : '';
+    }
+
+    private function buildUnknownBusinessDiscoveryContextText(string $candidate, array $answers): string
+    {
+        $parts = ['negocio ' . $candidate];
+        foreach ($answers as $pair) {
+            if (!is_array($pair)) {
+                continue;
+            }
+            $answer = trim((string) ($pair['answer'] ?? ''));
+            if ($answer === '') {
+                continue;
+            }
+            $parts[] = $answer;
+        }
+        return $this->normalize(implode(' ', $parts));
+    }
+
+    private function buildUnknownBusinessLocalDraft(array $state, string $candidate): array
+    {
+        $texts = [$this->normalize($candidate)];
+        $flow = is_array($state['unknown_business_discovery'] ?? null)
+            ? (array) $state['unknown_business_discovery']
+            : [];
+        $answers = is_array($flow['answers'] ?? null) ? (array) $flow['answers'] : [];
+        foreach ($answers as $pair) {
+            if (!is_array($pair)) {
+                continue;
+            }
+            $answer = $this->normalize((string) ($pair['answer'] ?? ''));
+            if ($answer !== '') {
+                $texts[] = $answer;
+            }
+        }
+
+        $needs = [];
+        $documents = [];
+        foreach ($texts as $itemText) {
+            if ($itemText === '') {
+                continue;
+            }
+            $needs = $this->mergeScopeLabels($needs, $this->extractNeedItems($itemText, ''));
+            $documents = $this->mergeScopeLabels($documents, $this->extractDocumentItems($itemText));
+        }
+
+        if (empty($needs)) {
+            $needs = ['inventario', 'ventas', 'pagos'];
+        }
+        if (empty($documents)) {
+            $documents = ['factura', 'orden de trabajo', 'cotizacion'];
+        }
+
+        return [
+            'needs' => array_values(array_slice($needs, 0, 6)),
+            'documents' => array_values(array_slice($documents, 0, 6)),
+        ];
     }
 
     private function stripNegatedBusinessMentions(string $text): string
@@ -7739,12 +8287,14 @@ private function parseEntityFromCrudText(string $text): string
             'builder_completed_entities' => [],
             'builder_completed_forms' => [],
             'unknown_business_notice_sent' => false,
+            'unknown_business_force_research' => false,
             'proposed_profile' => null,
             'resolution_attempts' => 0,
             'confirm_scope_last_hash' => null,
             'confirm_scope_repeats' => 0,
             'dynamic_playbook_proposal' => null,
             'dynamic_playbook' => null,
+            'unknown_business_discovery' => null,
             'business_resolution_last_candidate' => null,
             'business_resolution_last_status' => null,
             'business_resolution_last_result' => null,
@@ -7839,6 +8389,10 @@ private function parseEntityFromCrudText(string $text): string
         if (isset($merged['dynamic_playbook']) && !is_array($merged['dynamic_playbook']) && $merged['dynamic_playbook'] !== null) {
             $merged['dynamic_playbook'] = null;
         }
+        if (isset($merged['unknown_business_discovery']) && !is_array($merged['unknown_business_discovery']) && $merged['unknown_business_discovery'] !== null) {
+            $merged['unknown_business_discovery'] = null;
+        }
+        $merged['unknown_business_force_research'] = (bool) ($merged['unknown_business_force_research'] ?? false);
         $merged['resolution_attempts'] = (int) ($merged['resolution_attempts'] ?? 0);
         $merged['confirm_scope_repeats'] = (int) ($merged['confirm_scope_repeats'] ?? 0);
         return $merged;

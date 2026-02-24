@@ -19,6 +19,7 @@ final class BuilderOnboardingFlow
     ): ?array {
         $active = (string) ($state['active_task'] ?? '');
         $isOnboarding = $active === 'builder_onboarding';
+        $isUnknownDiscovery = $active === 'unknown_business_discovery';
         $trigger = (bool) ($ops['isBuilderOnboardingTrigger'])($text);
         $businessHint = ((string) ($ops['detectBusinessType'])($text)) !== '';
 
@@ -34,6 +35,7 @@ final class BuilderOnboardingFlow
             str_starts_with($playbookAction, 'APPLY_PLAYBOOK_')
             && $playbookConfidence >= 0.72
             && !$trigger
+            && !$isUnknownDiscovery
         ) {
             return null;
         }
@@ -54,11 +56,19 @@ final class BuilderOnboardingFlow
             return ['action' => 'respond_local', 'reply' => (string) ($ops['buildProjectStatus'])(), 'state' => $state];
         }
 
-        if (!$isOnboarding && !$trigger && !$businessHint) {
+        if (!$isOnboarding && !$isUnknownDiscovery && !$trigger && !$businessHint) {
             return null;
         }
 
-        return $coreHandler($text, $state, $profile, $tenantId, $userId, $isOnboarding, $trigger, $businessHint);
+        return $coreHandler(
+            $text,
+            $state,
+            $profile,
+            $tenantId,
+            $userId,
+            $isOnboarding || $isUnknownDiscovery,
+            $trigger,
+            $businessHint
+        );
     }
 }
-

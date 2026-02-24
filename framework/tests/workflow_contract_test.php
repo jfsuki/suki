@@ -74,6 +74,42 @@ try {
     // expected
 }
 
+$missingNodeEdge = $validWorkflow;
+$missingNodeEdge['edges'][] = [
+    'from' => 'n_input',
+    'to' => 'n_missing',
+    'mapping' => ['x' => 'output.y'],
+];
+try {
+    WorkflowValidator::validateOrFail($missingNodeEdge);
+    $failures[] = 'workflow should fail when edge references unknown node.';
+} catch (Throwable $e) {
+    // expected
+}
+
+$cyclicWorkflow = $validWorkflow;
+$cyclicWorkflow['nodes'][] = [
+    'id' => 'n_transform',
+    'type' => 'transform',
+    'title' => 'Transform data',
+    'runPolicy' => [
+        'timeout_ms' => 10000,
+        'retry_max' => 0,
+        'token_budget' => 0,
+    ],
+];
+$cyclicWorkflow['edges'] = [
+    ['from' => 'n_input', 'to' => 'n_transform', 'mapping' => ['a' => 'output.a']],
+    ['from' => 'n_transform', 'to' => 'n_output', 'mapping' => ['b' => 'output.b']],
+    ['from' => 'n_output', 'to' => 'n_input', 'mapping' => ['c' => 'output.c']],
+];
+try {
+    WorkflowValidator::validateOrFail($cyclicWorkflow);
+    $failures[] = 'workflow should fail when cycle exists.';
+} catch (Throwable $e) {
+    // expected
+}
+
 try {
     $repo = new ContractRepository();
     $schema = $repo->getSchema('workflow.schema');

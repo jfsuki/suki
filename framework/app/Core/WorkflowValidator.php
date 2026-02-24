@@ -34,5 +34,88 @@ final class WorkflowValidator
             $message = $error ? $error->message() : 'Workflow invalido';
             throw new RuntimeException($message);
         }
+
+        self::validateSemanticsOrFail($payload);
+    }
+
+    private static function validateSemanticsOrFail(array $payload): void
+    {
+        $nodes = is_array($payload['nodes'] ?? null) ? $payload['nodes'] : [];
+        $edges = is_array($payload['edges'] ?? null) ? $payload['edges'] : [];
+
+        $nodeMap = [];
+        foreach ($nodes as $index => $node) {
+            if (!is_array($node)) {
+                throw new RuntimeException('Workflow invalido: nodo no es objeto en posicion ' . $index . '.');
+            }
+            $nodeId = trim((string) ($node['id'] ?? ''));
+            if ($nodeId === '') {
+                throw new RuntimeException('Workflow invalido: nodo sin id en posicion ' . $index . '.');
+            }
+            if (isset($nodeMap[$nodeId])) {
+                throw new RuntimeException('Workflow invalido: id de nodo duplicado "' . $nodeId . '".');
+            }
+            $nodeMap[$nodeId] = true;
+        }
+
+        $adjacency = [];
+        $inDegree = [];
+        foreach (array_keys($nodeMap) as $nodeId) {
+            $adjacency[$nodeId] = [];
+            $inDegree[$nodeId] = 0;
+        }
+
+        foreach ($edges as $index => $edge) {
+            if (!is_array($edge)) {
+                throw new RuntimeException('Workflow invalido: edge no es objeto en posicion ' . $index . '.');
+            }
+            $from = trim((string) ($edge['from'] ?? ''));
+            $to = trim((string) ($edge['to'] ?? ''));
+            if (!isset($nodeMap[$from])) {
+                throw new RuntimeException('Workflow invalido: edge[' . $index . '] from "' . $from . '" no existe en nodes.');
+            }
+            if (!isset($nodeMap[$to])) {
+                throw new RuntimeException('Workflow invalido: edge[' . $index . '] to "' . $to . '" no existe en nodes.');
+            }
+            if ($from === $to) {
+                throw new RuntimeException('Workflow invalido: edge[' . $index . '] no puede conectar nodo consigo mismo.');
+            }
+            $mapping = $edge['mapping'] ?? null;
+            if (!is_array($mapping) || empty($mapping)) {
+                throw new RuntimeException('Workflow invalido: edge[' . $index . '] requiere mapping no vacio.');
+            }
+            foreach ($mapping as $targetKey => $sourcePath) {
+                $target = trim((string) $targetKey);
+                $source = trim((string) $sourcePath);
+                if ($target === '' || $source === '') {
+                    throw new RuntimeException('Workflow invalido: edge[' . $index . '] tiene mapping incompleto.');
+                }
+            }
+
+            $adjacency[$from][] = $to;
+            $inDegree[$to]++;
+        }
+
+        $queue = [];
+        foreach ($inDegree as $nodeId => $degree) {
+            if ($degree === 0) {
+                $queue[] = $nodeId;
+            }
+        }
+        $visited = 0;
+        while (!empty($queue)) {
+            $nodeId = array_shift($queue);
+            $visited++;
+            foreach ($adjacency[$nodeId] as $to) {
+                $inDegree[$to]--;
+                if ($inDegree[$to] === 0) {
+                    $queue[] = $to;
+                }
+            }
+        }
+
+        if ($visited !== count($nodeMap)) {
+            throw new RuntimeException('Workflow invalido: se detecto ciclo en el grafo DAG.');
+        }
     }
 }

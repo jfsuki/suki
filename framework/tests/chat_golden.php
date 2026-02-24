@@ -23,7 +23,7 @@ $steps = [
     [
         'mode' => 'builder',
         'message' => 'quiero crear una app para inventario',
-        'contains_any' => ['tipo de negocio', 'tipo de inventario', 'Paso 2', 'No tengo plantilla exacta', 'productos, servicios o ambos'],
+        'contains_any' => ['tipo de negocio', 'tipo de inventario', 'Paso 2', 'No tengo plantilla exacta', 'productos, servicios o ambos', 'servicios, productos o ambos'],
     ],
     ['mode' => 'builder', 'message' => 'tengo una ferreteria y pierdo plata con los cables', 'contains' => 'plantilla experta para FERRETERIA'],
     ['mode' => 'builder', 'message' => 'si', 'contains' => 'Playbook FERRETERIA validado en simulacion'],
@@ -62,6 +62,25 @@ $integrationSteps = [
         'mode' => 'builder',
         'message' => 'api=pagosx https://docs.example.com/openapi.json',
         'contains_any' => ['Recibi la documentacion', 'Siguiente paso: analizo'],
+    ],
+];
+$unknownUser = 'golden_unknown_' . $runId;
+$unknownSession = 'golden_unknown_sess_' . $runId;
+$unknownSteps = [
+    [
+        'mode' => 'builder',
+        'message' => 'quiero crear una app',
+        'contains_any' => ['Paso 1', 'productos, servicios o ambos'],
+    ],
+    [
+        'mode' => 'builder',
+        'message' => 'laboratorio de velas aromaticas',
+        'contains_any' => ['Pregunta 1/', 'No tengo plantilla exacta'],
+    ],
+    [
+        'mode' => 'builder',
+        'message' => 'quiero controlar produccion, inventario y facturacion',
+        'contains_any' => ['Pregunta 2/', 'Pregunta 3/'],
     ],
 ];
 
@@ -151,12 +170,42 @@ foreach ($integrationSteps as $idx => $step) {
     ];
 }
 
+$baseUnknown = [
+    'channel' => 'local',
+    'tenant_id' => 'default',
+    'project_id' => 'suki_erp',
+    'user_id' => $unknownUser,
+    'session_id' => $unknownSession,
+];
+foreach ($unknownSteps as $idx => $step) {
+    $payload = array_merge($baseUnknown, [
+        'mode' => $step['mode'],
+        'message' => $step['message'],
+    ]);
+    $out = $agent->handle($payload);
+    $reply = (string) ($out['data']['reply'] ?? '');
+    $pass = evaluateGoldenStep($reply, $step);
+    if ($pass) {
+        $ok++;
+    }
+    $results[] = [
+        'step' => count($steps) + count($correctionSteps) + count($integrationSteps) + $idx + 1,
+        'mode' => $step['mode'],
+        'message' => $step['message'],
+        'reply' => $reply,
+        'expected_contains' => $step['contains'] ?? null,
+        'expected_contains_any' => $step['contains_any'] ?? null,
+        'expected_not_contains' => $step['not_contains'] ?? null,
+        'ok' => $pass,
+    ];
+}
+
 $report = [
     'summary' => [
-        'ok' => $ok === (count($steps) + count($correctionSteps) + count($integrationSteps)),
+        'ok' => $ok === (count($steps) + count($correctionSteps) + count($integrationSteps) + count($unknownSteps)),
         'passed' => $ok,
-        'failed' => (count($steps) + count($correctionSteps) + count($integrationSteps)) - $ok,
-        'total' => count($steps) + count($correctionSteps) + count($integrationSteps),
+        'failed' => (count($steps) + count($correctionSteps) + count($integrationSteps) + count($unknownSteps)) - $ok,
+        'total' => count($steps) + count($correctionSteps) + count($integrationSteps) + count($unknownSteps),
         'entity' => $entity,
         'run_id' => $runId,
         'ran_at' => date('Y-m-d H:i:s'),

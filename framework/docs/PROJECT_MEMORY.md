@@ -386,3 +386,27 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Resultado esperado de WB-0:
   - contrato base validable, sin cambios en runtime productivo aun,
   - compatibilidad actual de forms/grids sin regresion.
+
+## Checkpoint (2026-02-24, WB-0.1 + onboarding adaptativo de negocio desconocido)
+- `WorkflowValidator` agrega validacion semantica DAG:
+  - ids de nodos unicos,
+  - edges solo entre nodos existentes,
+  - sin self-loop,
+  - mapping obligatorio por edge,
+  - deteccion de ciclos por recorrido topologico.
+- Cobertura WB-0.1:
+  - `framework/tests/workflow_contract_test.php` valida edge invalido y ciclo.
+  - `UnitTestRunner::checkWorkflowContract` valida schema + semantica.
+- Flujo conversacional para ideas nuevas fuera de base:
+  - `ConversationGateway` activa `unknown_business_discovery` con cuestionario tecnico antes de crear.
+  - genera `technical_brief` + `technical_prompt` para clasificacion externa (Gemini) o fallback local.
+  - evita sesgo de perfil previo con `unknown_business_force_research` y limpia estado en correcciones.
+- Contrato de dominio ampliado:
+  - `unknown_business_protocol.technical_requirements_questions`
+  - `unknown_business_protocol.research_prompt_template`
+  - sincronizado en:
+    - `framework/contracts/agents/domain_playbooks.json`
+    - `project/contracts/knowledge/domain_playbooks.json`
+- QA nuevo:
+  - `framework/tests/unknown_business_discovery_test.php`
+  - `framework/tests/chat_golden.php` agrega escenario de correccion de negocio + discovery.
