@@ -21,6 +21,7 @@ function runApiRouteE2E(string $helper, array $request): array
 }
 
 $failures = [];
+$runToken = (string) time();
 $authSession = [
     'auth_user' => [
         'id' => 'sec_e2e_user',
@@ -57,10 +58,36 @@ if (!is_array($openApiNoAuthJson) || ($openApiNoAuthJson['status'] ?? '') !== 'e
     $failures[] = 'integrations/import_openapi debe bloquear POST sin sesion.';
 }
 
+$csrfSession = $authSession;
+$csrfSession['csrf_token'] = 'csrf-sec-e2e';
+$openApiStrictNoCsrf = runApiRouteE2E($helper, [
+    'route' => 'integrations/import_openapi',
+    'method' => 'POST',
+    'env' => [
+        'API_SECURITY_STRICT' => '1',
+    ],
+    'session' => $csrfSession,
+    'payload' => [
+        'api_name' => 'payments_x',
+        'persist' => false,
+        'openapi_json' => json_encode($openApiSpec, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
+    ],
+]);
+$openApiStrictNoCsrfJson = $openApiStrictNoCsrf['json'];
+if (!is_array($openApiStrictNoCsrfJson) || ($openApiStrictNoCsrfJson['status'] ?? '') !== 'error' || !str_contains((string) ($openApiStrictNoCsrfJson['message'] ?? ''), 'CSRF')) {
+    $failures[] = 'integrations/import_openapi debe exigir CSRF en strict mode.';
+}
+
 $openApiAuth = runApiRouteE2E($helper, [
     'route' => 'integrations/import_openapi',
     'method' => 'POST',
-    'session' => $authSession,
+    'env' => [
+        'API_SECURITY_STRICT' => '1',
+    ],
+    'headers' => [
+        'X-CSRF-TOKEN' => 'csrf-sec-e2e',
+    ],
+    'session' => $csrfSession,
     'payload' => [
         'api_name' => 'payments_x',
         'persist' => false,
@@ -119,6 +146,33 @@ if (!is_array($telegramSecretJson) || ($telegramSecretJson['status'] ?? '') !== 
     $failures[] = 'channels/telegram/webhook debe validar secret cuando esta configurado.';
 }
 
+$telegramReplayA = runApiRouteE2E($helper, [
+    'route' => 'channels/telegram/webhook',
+    'method' => 'POST',
+    'payload' => [
+        'update_id' => (int) ('7' . $runToken),
+        'message' => [
+            'chat' => ['id' => 'tg-replay-chat'],
+            'text' => 'hola',
+        ],
+    ],
+]);
+$telegramReplayB = runApiRouteE2E($helper, [
+    'route' => 'channels/telegram/webhook',
+    'method' => 'POST',
+    'payload' => [
+        'update_id' => (int) ('7' . $runToken),
+        'message' => [
+            'chat' => ['id' => 'tg-replay-chat'],
+            'text' => 'hola',
+        ],
+    ],
+]);
+$telegramReplayJson = $telegramReplayB['json'];
+if (!is_array($telegramReplayJson) || ($telegramReplayJson['status'] ?? '') !== 'success' || !str_contains((string) ($telegramReplayJson['message'] ?? ''), 'duplicado')) {
+    $failures[] = 'channels/telegram/webhook debe ignorar replay por update_id.';
+}
+
 $whatsAppVerify = runApiRouteE2E($helper, [
     'route' => 'channels/whatsapp/webhook',
     'method' => 'GET',
@@ -135,10 +189,71 @@ if ($whatsAppVerify['raw'] !== '123456') {
     $failures[] = 'channels/whatsapp/webhook GET debe responder challenge cuando verify token es valido.';
 }
 
+$waPayload = [
+    'entry' => [
+        [
+            'changes' => [
+                [
+                    'value' => [
+                        'messages' => [
+                            [
+                                'id' => 'wamid.HARDEN_TEST_' . $runToken,
+                                'from' => '573000000000',
+                                'text' => ['body' => 'hola'],
+                            ],
+                        ],
+                    ],
+                ],
+            ],
+        ],
+    ],
+];
+$waSecret = 'wa-app-secret-demo';
+$waSig = 'sha256=' . hash_hmac('sha256', '', $waSecret);
+
+$whatsAppBadSig = runApiRouteE2E($helper, [
+    'route' => 'channels/whatsapp/webhook',
+    'method' => 'POST',
+    'env' => [
+        'WHATSAPP_APP_SECRET' => $waSecret,
+    ],
+    'payload' => $waPayload,
+]);
+$whatsAppBadSigJson = $whatsAppBadSig['json'];
+if (!is_array($whatsAppBadSigJson) || ($whatsAppBadSigJson['status'] ?? '') !== 'error' || !str_contains((string) ($whatsAppBadSigJson['message'] ?? ''), 'signature invalida')) {
+    $failures[] = 'channels/whatsapp/webhook debe validar firma HMAC cuando WHATSAPP_APP_SECRET esta activo.';
+}
+
+$whatsAppReplayA = runApiRouteE2E($helper, [
+    'route' => 'channels/whatsapp/webhook',
+    'method' => 'POST',
+    'env' => [
+        'WHATSAPP_APP_SECRET' => $waSecret,
+    ],
+    'headers' => [
+        'X-Hub-Signature-256' => $waSig,
+    ],
+    'payload' => $waPayload,
+]);
+$whatsAppReplayB = runApiRouteE2E($helper, [
+    'route' => 'channels/whatsapp/webhook',
+    'method' => 'POST',
+    'env' => [
+        'WHATSAPP_APP_SECRET' => $waSecret,
+    ],
+    'headers' => [
+        'X-Hub-Signature-256' => $waSig,
+    ],
+    'payload' => $waPayload,
+]);
+$whatsAppReplayJson = $whatsAppReplayB['json'];
+if (!is_array($whatsAppReplayJson) || ($whatsAppReplayJson['status'] ?? '') !== 'success' || !str_contains((string) ($whatsAppReplayJson['message'] ?? ''), 'duplicado')) {
+    $failures[] = 'channels/whatsapp/webhook debe ignorar replay por message.id.';
+}
+
 $ok = empty($failures);
 echo json_encode([
     'ok' => $ok,
     'failures' => $failures,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
 exit($ok ? 0 : 1);
-

@@ -424,3 +424,14 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - E2E operativos agregados:
   - `framework/tests/workflow_api_e2e_test.php` (auth guard + compile/validate/execute).
   - `framework/tests/security_channels_e2e_test.php` (OpenAPI auth, IDOR chat, Telegram secret, WhatsApp verify challenge).
+
+## Checkpoint (2026-02-24, security production hardening)
+- Se cierra brecha de seguridad operativa para salida a produccion:
+  - `ApiSecurityGuard` usa rate-limit central persistente via `SecurityStateRepository`.
+  - `API_SECURITY_STRICT=1` activa CSRF obligatorio en mutaciones sensibles.
+  - WhatsApp valida firma HMAC (`X-Hub-Signature-256`) cuando `WHATSAPP_APP_SECRET` esta activo.
+  - Telegram/WhatsApp aplican anti-replay por nonce con TTL para ignorar webhooks duplicados.
+- Pruebas nuevas/reforzadas:
+  - `framework/tests/security_state_repository_test.php`
+  - `framework/tests/api_security_guard_test.php` (strict CSRF + central rate-limit)
+  - `framework/tests/security_channels_e2e_test.php` (secret/firma/replay + CSRF strict en `integrations/import_openapi`).

@@ -30,6 +30,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('builder_guidance', fn() => $this->checkBuilderGuidance());
         $tests[] = $this->wrap('flow_control', fn() => $this->checkFlowControl());
         $tests[] = $this->wrap('domain_training_sync', fn() => $this->checkDomainTrainingSync());
+        $tests[] = $this->wrap('security_state_repository', fn() => $this->checkSecurityStateRepository());
         $tests[] = $this->wrap('openapi_importer', fn() => $this->checkOpenApiIntegrationImporter());
         $tests[] = $this->wrap('api_security_guard', fn() => $this->checkApiSecurityGuard());
         $tests[] = $this->wrap('workflow_api_e2e', fn() => $this->checkWorkflowApiE2E());
@@ -667,6 +668,11 @@ final class UnitTestRunner
         if (count($endpoints) !== 2) {
             throw new \RuntimeException('OpenApiIntegrationImporter debe extraer endpoints.');
         }
+    }
+
+    private function checkSecurityStateRepository(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/security_state_repository_test.php');
     }
 
     private function checkApiSecurityGuard(): void

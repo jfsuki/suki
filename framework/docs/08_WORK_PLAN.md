@@ -275,6 +275,22 @@
     - `framework/tests/workflow_api_e2e_test.php`
     - `framework/tests/security_channels_e2e_test.php`
 
+## Security hardening production (2026-02-24)
+- Rate-limit central persistente:
+  - nuevo `SecurityStateRepository` sobre SQLite (`project/storage/security/security_state.sqlite`).
+  - `ApiSecurityGuard` consume buckets centralizados en DB y mantiene fallback file-based solo si falla repositorio.
+- CSRF obligatorio en modo estricto:
+  - `API_SECURITY_STRICT=1` activa CSRF en mutaciones sensibles aunque `API_CSRF_ENFORCE` no este explicitado.
+  - `API_CSRF_ENFORCE=0` permite override controlado para compatibilidad temporal.
+- Firma de webhooks + anti-replay:
+  - WhatsApp POST valida `X-Hub-Signature-256` cuando existe `WHATSAPP_APP_SECRET`.
+  - Telegram/WhatsApp guardan nonce anti-replay con TTL para ignorar duplicados.
+  - nuevas variables opcionales: `TELEGRAM_REPLAY_TTL_SEC`, `WHATSAPP_REPLAY_TTL_SEC`.
+- QA dedicado:
+  - `framework/tests/security_state_repository_test.php`
+  - `framework/tests/api_security_guard_test.php` (strict CSRF + central rate-limit)
+  - `framework/tests/security_channels_e2e_test.php` (secret/firma/replay + CSRF strict en import OpenAPI)
+
 ## Siguiente bloque recomendado
 - WB-3 full visual graph: drag/drop real, conexiones con mouse y referencias tipadas `@` en inspector.
 - WB-4 advanced: diff visual entre revisiones y restauracion selectiva por nodo.

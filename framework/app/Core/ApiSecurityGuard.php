@@ -5,6 +5,13 @@ namespace App\Core;
 
 final class ApiSecurityGuard
 {
+    private ?SecurityStateRepository $securityRepo;
+
+    public function __construct(?SecurityStateRepository $securityRepo = null)
+    {
+        $this->securityRepo = $securityRepo;
+    }
+
     /**
      * @param array<string, mixed> $server
      * @param array<string, mixed> $session
@@ -59,6 +66,15 @@ final class ApiSecurityGuard
      */
     private function consumeRateLimit(string $key, int $limitPerMinute, string $storageDir): array
     {
+        $repo = $this->securityRepository($storageDir);
+        if ($repo !== null) {
+            try {
+                return $repo->consumeRateLimit($key, $limitPerMinute, 60);
+            } catch (\Throwable $e) {
+                // fallback below
+            }
+        }
+
         $file = rtrim($storageDir, '/\\') . '/api_rate_limit.json';
         $now = time();
         $window = 60;
@@ -139,8 +155,10 @@ final class ApiSecurityGuard
 
     private function requiresCsrf(string $route): bool
     {
-        $enforce = (string) (getenv('API_CSRF_ENFORCE') ?: '0');
-        if ($enforce !== '1') {
+        $enforce = trim((string) (getenv('API_CSRF_ENFORCE') ?: ''));
+        $strict = (string) (getenv('API_SECURITY_STRICT') ?: '0');
+        $mustEnforce = ($enforce === '1') || ($strict === '1' && $enforce !== '0');
+        if (!$mustEnforce) {
             return false;
         }
         if (str_starts_with($route, 'chat/')) {
@@ -183,5 +201,19 @@ final class ApiSecurityGuard
         }
         $ip = trim((string) ($server['REMOTE_ADDR'] ?? 'unknown'));
         return $tenant . '::' . $ip . '::' . $route;
+    }
+
+    private function securityRepository(string $storageDir): ?SecurityStateRepository
+    {
+        if ($this->securityRepo !== null) {
+            return $this->securityRepo;
+        }
+        try {
+            $dbPath = rtrim($storageDir, '/\\') . '/security_state.sqlite';
+            $this->securityRepo = new SecurityStateRepository($dbPath);
+            return $this->securityRepo;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 }

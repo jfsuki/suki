@@ -44,6 +44,7 @@ use App\Core\WorkflowExecutor;
 use App\Core\WorkflowCompiler;
 use App\Core\OpenApiIntegrationImporter;
 use App\Core\ApiSecurityGuard;
+use App\Core\SecurityStateRepository;
 use App\Core\Agents\ConversationQualityDashboard;
 
 $route = trim($_GET['route'] ?? '');
@@ -159,6 +160,19 @@ function requestData(): array
     return $cached;
 }
 
+function requestRawBody(): string
+{
+    static $loaded = false;
+    static $raw = '';
+    if ($loaded) {
+        return $raw;
+    }
+    $content = file_get_contents('php://input');
+    $raw = $content === false ? '' : (string) $content;
+    $loaded = true;
+    return $raw;
+}
+
 function respondJson(Response $response, string $status, string $message, array $data = [], int $code = 200): void
 {
     http_response_code($code);
@@ -199,6 +213,31 @@ function sanitizeKey(string $value): string
     $clean = preg_replace('/[^a-zA-Z0-9_-]/', '_', $value);
     $clean = $clean !== null ? $clean : $value;
     return $clean !== '' ? $clean : 'default';
+}
+
+function securityStateRepository(): SecurityStateRepository
+{
+    static $repo = null;
+    if ($repo instanceof SecurityStateRepository) {
+        return $repo;
+    }
+    $path = PROJECT_ROOT . '/storage/security/security_state.sqlite';
+    $repo = new SecurityStateRepository($path);
+    return $repo;
+}
+
+function verifyWhatsAppSignature(string $rawBody): bool
+{
+    $appSecret = trim((string) (getenv('WHATSAPP_APP_SECRET') ?: ''));
+    if ($appSecret === '') {
+        return true;
+    }
+    $header = trim((string) ($_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? ''));
+    if ($header === '' || !str_starts_with($header, 'sha256=')) {
+        return false;
+    }
+    $expected = 'sha256=' . hash_hmac('sha256', $rawBody, $appSecret);
+    return hash_equals($expected, $header);
 }
 
 function sendTelegramMessage(string $token, string $chatId, string $text): array
@@ -710,6 +749,7 @@ if ($route === 'chat/message') {
 
 if ($route === 'channels/telegram/webhook') {
     $payload = requestData();
+    $rawBody = requestRawBody();
     $expectedSecret = (string) (getenv('TELEGRAM_WEBHOOK_SECRET') ?: '');
     $receivedSecret = (string) ($_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '');
     if ($expectedSecret !== '' && !hash_equals($expectedSecret, $receivedSecret)) {
@@ -732,6 +772,26 @@ if ($route === 'channels/telegram/webhook') {
     if ($chatId === '') {
         respondJson($response, 'success', 'Telegram update ignorado', ['ignored' => true]);
         return;
+    }
+
+    $updateId = trim((string) ($update['update_id'] ?? ''));
+    $fallbackPayload = $rawBody !== '' ? $rawBody : ((string) (json_encode($update, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: ''));
+    $replayNonce = $updateId !== '' ? ('upd:' . $updateId) : ('hash:' . sha1($fallbackPayload));
+    $replayTtl = (int) (getenv('TELEGRAM_REPLAY_TTL_SEC') ?: 86400);
+    try {
+        $fresh = securityStateRepository()->rememberReplayNonce('telegram', $replayNonce, $replayTtl);
+        if (!$fresh) {
+            respondJson($response, 'success', 'Telegram update duplicado ignorado', [
+                'ignored' => true,
+                'reason' => 'replay_detected',
+            ]);
+            return;
+        }
+    } catch (\Throwable $e) {
+        if ((string) (getenv('API_SECURITY_STRICT') ?: '0') === '1') {
+            respondJson($response, 'error', 'No se pudo validar anti-replay de Telegram', [], 503);
+            return;
+        }
     }
 
     $mode = 'app';
@@ -817,6 +877,12 @@ if ($route === 'channels/whatsapp/webhook') {
         return;
     }
 
+    $rawBody = requestRawBody();
+    if (!verifyWhatsAppSignature($rawBody)) {
+        respondJson($response, 'error', 'WhatsApp signature invalida', [], 401);
+        return;
+    }
+
     $payload = requestData();
     $entry = is_array($payload['entry'] ?? null) ? (array) ($payload['entry'][0] ?? []) : [];
     $changes = is_array($entry['changes'] ?? null) ? (array) ($entry['changes'][0] ?? []) : [];
@@ -831,6 +897,29 @@ if ($route === 'channels/whatsapp/webhook') {
         respondJson($response, 'success', 'WhatsApp update ignorado', ['ignored' => true]);
         return;
     }
+
+    $statuses = is_array($value['statuses'] ?? null) ? (array) $value['statuses'] : [];
+    $statusNode = is_array($statuses[0] ?? null) ? (array) $statuses[0] : [];
+    $messageId = trim((string) ($message['id'] ?? $statusNode['id'] ?? ''));
+    $fallbackPayload = $rawBody !== '' ? $rawBody : ((string) (json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: ''));
+    $replayNonce = $messageId !== '' ? ('msg:' . $messageId) : ('hash:' . sha1($fallbackPayload));
+    $replayTtl = (int) (getenv('WHATSAPP_REPLAY_TTL_SEC') ?: 86400);
+    try {
+        $fresh = securityStateRepository()->rememberReplayNonce('whatsapp', $replayNonce, $replayTtl);
+        if (!$fresh) {
+            respondJson($response, 'success', 'WhatsApp update duplicado ignorado', [
+                'ignored' => true,
+                'reason' => 'replay_detected',
+            ]);
+            return;
+        }
+    } catch (\Throwable $e) {
+        if ((string) (getenv('API_SECURITY_STRICT') ?: '0') === '1') {
+            respondJson($response, 'error', 'No se pudo validar anti-replay de WhatsApp', [], 503);
+            return;
+        }
+    }
+
     if ($text === '') {
         $text = 'hola';
     }
