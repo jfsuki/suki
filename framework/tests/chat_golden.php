@@ -23,7 +23,7 @@ $steps = [
     [
         'mode' => 'builder',
         'message' => 'quiero crear una app para inventario',
-        'contains_any' => ['tipo de negocio', 'Paso 2', 'No tengo plantilla exacta', 'productos, servicios o ambos'],
+        'contains_any' => ['tipo de negocio', 'tipo de inventario', 'Paso 2', 'No tengo plantilla exacta', 'productos, servicios o ambos'],
     ],
     ['mode' => 'builder', 'message' => 'tengo una ferreteria y pierdo plata con los cables', 'contains' => 'plantilla experta para FERRETERIA'],
     ['mode' => 'builder', 'message' => 'si', 'contains' => 'Playbook FERRETERIA validado en simulacion'],
