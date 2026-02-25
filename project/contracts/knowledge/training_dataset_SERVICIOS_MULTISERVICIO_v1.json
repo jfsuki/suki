@@ -1,0 +1,1680 @@
+{
+    "batch_id": "SERVICIOS_MULTISERVICIO_v1",
+    "language": "es-CO",
+    "context_pack": {
+        "business_type": "servicios_pyme",
+        "country": "CO",
+        "currency": "COP",
+        "tax_regime": "rts_iva",
+        "payment_methods": [
+            "efectivo",
+            "transferencia",
+            "nequi",
+            "daviplata",
+            "tarjeta",
+            "credito"
+        ],
+        "document_flows": [
+            "cotizacion -> orden_servicio -> ejecucion -> factura -> recaudo",
+            "compra -> ingreso inventario -> cuenta por pagar -> pago proveedor"
+        ],
+        "channels": [
+            "whatsapp",
+            "telegram",
+            "web_chat"
+        ],
+        "volume_profile": "pyme_servicios_mixto",
+        "chart_of_accounts_min": [
+            {
+                "code": "110505",
+                "name": "Caja general"
+            },
+            {
+                "code": "111005",
+                "name": "Bancos"
+            },
+            {
+                "code": "130505",
+                "name": "Clientes nacionales"
+            },
+            {
+                "code": "240805",
+                "name": "IVA generado"
+            },
+            {
+                "code": "413595",
+                "name": "Ingresos por ventas"
+            }
+        ],
+        "posting_rules": [
+            {
+                "trigger": "factura_contado",
+                "debit_account": "110505",
+                "credit_account": "413595"
+            },
+            {
+                "trigger": "factura_credito",
+                "debit_account": "130505",
+                "credit_account": "413595"
+            },
+            {
+                "trigger": "recaudo_cliente",
+                "debit_account": "111005",
+                "credit_account": "130505"
+            }
+        ]
+    },
+    "intents_expansion": [
+        {
+            "intent": "APP_CREATE",
+            "action": "FRAMEWORK_APP_CREATE",
+            "utterances_explicit": [
+                "Crear app para empresa de servicios con órdenes de trabajo y técnicos",
+                "Crear app multiservicio (corte láser, imprenta, publicidad, mantenimientos)",
+                "Crear app con tabla Clientes, Sedes y Contactos",
+                "Crear app con tabla Activos del cliente (aires, vehículos, máquinas)",
+                "Crear app con tabla Solicitudes/Tickets (prioridad, SLA, estado)",
+                "Crear app con tabla Cotizaciones (ítems, mano de obra, repuestos, validez)",
+                "Crear app con tabla OrdenServicio/OT (programación, técnico, checklists)",
+                "Crear app con tabla Partes/Repuestos inventariables (SKU, costo, stock)",
+                "Crear app con tabla Servicios (tarifa_hora, tipo, IVA)",
+                "Crear app con tabla Técnicos y agenda (disponibilidad, zona)",
+                "Crear app con tabla Visitas (fecha, hora, ubicación, evidencia fotos)",
+                "Crear app con tabla Consumibles por OT (repuestos usados)",
+                "Crear app con fórmula costo_mo = horas * tarifa_hora",
+                "Crear app con fórmula costo_total = costo_mo + repuestos + externos",
+                "Crear app con fórmula precio_sugerido = costo_total * (1+margen_objetivo)",
+                "Crear app con fórmula margen = precio_venta - costo_total",
+                "Crear app con fórmula margen_pct = (margen/precio_venta)*100",
+                "Crear app con fórmula total_factura = subtotal + iva - descuento",
+                "Crear app con validación: OT no se cierra sin evidencia y firma",
+                "Crear app con campo estado_ot (abierta/asignada/en_proceso/finalizada/cobrada)",
+                "Crear app con campo tipo_servicio (mtto, instalación, reparación, producción)",
+                "Crear app con campo canal_origen (whatsapp/llamada/web)",
+                "Crear app con tabla Proveedores y Compras (repuestos, insumos)",
+                "Crear app con tabla IngresoInventario por compra y devolución a proveedor",
+                "Crear app con tabla Garantías (OT, fecha, vencimiento, condiciones)",
+                "Crear app con reporte: OTs por estado y por técnico",
+                "Crear app con reporte: tiempos de respuesta vs SLA",
+                "Crear app con reporte: rentabilidad por servicio y por cliente",
+                "Crear app con reporte: consumo de repuestos y rotación",
+                "Crear app con reporte: cartera (CxC) por cliente",
+                "Crear app con reporte: compras por proveedor y variación de costo",
+                "Crear app con tablero: ventas por mes, por línea (láser/imprenta/mtto)",
+                "Crear app con checklist por tipo de servicio (aire, vehículo, láser)",
+                "Crear app con campo observaciones y fallas reportadas por cliente",
+                "Crear app con fotos antes/después y firma digital",
+                "Crear app con flujo: ticket -> cotización -> OT -> factura -> recaudo",
+                "Crear app con prefijos por sede (OT-BAQ, COT-BAQ, FV-SER)",
+                "Crear app con roles admin, coordinador, técnico, compras, caja, contador",
+                "Crear app para contratos de mantenimiento (mensual) con visitas programadas",
+                "Crear app multiservicio #40 con OT y cotizaciones"
+            ],
+            "utterances_implicit": [
+                "Necesito un sistema pa manejar mantenimientos y órdenes de trabajo",
+                "Quiero llevar tickets de clientes y asignarlos a técnicos",
+                "Quiero cotizar y luego pasar eso a orden de servicio",
+                "Necesito agenda de técnicos por zonas y horarios",
+                "Quiero registrar repuestos usados en cada servicio",
+                "Quiero que el costo se calcule con horas + repuestos",
+                "Necesito fotos antes y después para soporte",
+                "Quiero controlar garantías de trabajos",
+                "Necesito compras y proveedores de repuestos",
+                "Quiero inventario de insumos (tintas, láminas, filtros, aceites)",
+                "Necesito reportes de OTs por estado y por técnico",
+                "Quiero medir tiempos de respuesta vs lo prometido (SLA)",
+                "Necesito saber qué servicios dejan más margen",
+                "Quiero cartera por cliente y pagos aplicados a facturas",
+                "Necesito tablero de ventas por línea (imprenta, láser, mtto)",
+                "Quiero contratos de mantenimiento mensual con visitas programadas",
+                "Quiero que al cerrar OT obligue evidencia y firma",
+                "Necesito controlar solicitudes por WhatsApp y pasarlas a OT",
+                "Quiero registrar fallas reportadas y diagnóstico",
+                "Necesito controlar activos del cliente (equipo, placa, serial)",
+                "Quiero reportes de consumo de repuestos y rotación",
+                "Necesito registrar devoluciones de repuestos a inventario",
+                "Quiero facturar servicios y repuestos en la misma factura",
+                "Quiero separar costos externos (terceros) por OT",
+                "Necesito reportes para el contador sin complicarme",
+                "Quiero que sugiera tablas, campos, fórmulas y reportes para mi negocio",
+                "Necesito cierre de caja y movimientos bancarios por pagos",
+                "Quiero registrar abonos parciales y saldos",
+                "Necesito prefijos por sede para OT y cotizaciones",
+                "Quiero control de clientes empresa con varias sedes",
+                "Necesito un flujo claro: cotización -> OT -> factura -> recaudo",
+                "Quiero una app tipo 'taller' pero para varios servicios",
+                "Quiero controlar impresiones por orden (metros, material, acabado)",
+                "Quiero controlar corte láser por orden (archivo, material, tiempo)",
+                "Necesito controlar mantenimiento de aires (BTU, gas, limpieza)",
+                "Necesito controlar mantenimiento de vehículos (km, aceite, repuestos)",
+                "Quiero reportes de técnicos (productividad y retrabajos)",
+                "Necesito registrar reclamos y garantías",
+                "Quiero todo organizado para crecer y no perder clientes",
+                "Necesito app de servicios #40 para OTs y facturación"
+            ],
+            "hard_negatives": [
+                "Consultar apps existentes",
+                "Listar apps creadas",
+                "Editar la app",
+                "Eliminar la app",
+                "Cambiar nombre de la app",
+                "Actualizar módulos de la app",
+                "Configurar tema/colores",
+                "Ver logs del runtime",
+                "Depurar error del framework",
+                "Optimizar performance del grid",
+                "Migrar datos desde otro sistema",
+                "Importar OTs desde Excel",
+                "Exportar base de datos",
+                "Conectar pasarela de pagos",
+                "Conectar WhatsApp API",
+                "Integración con ERP externo (consulta)",
+                "Crear dashboard BI externo",
+                "Configurar IVA global",
+                "Crear usuarios del sistema",
+                "Resetear contraseña",
+                "Asignar permisos",
+                "Soporte: no abre el módulo",
+                "Soporte: error 500",
+                "Manual del sistema",
+                "Tutorial de uso",
+                "Cotizar desarrollo a medida",
+                "Diseño de logo",
+                "Campañas de marketing",
+                "Registrar factura de venta (no crear app)",
+                "Registrar recaudo (no crear app)",
+                "Crear cliente (no crear app)",
+                "Crear ítem (no crear app)",
+                "Crear asiento (no crear app)",
+                "Consultar movimientos de caja",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Imprimir factura existente",
+                "Editar una factura existente",
+                "Anular OT existente (no crear app)",
+                "Configurar algo de la app #40 (no crear app)"
+            ],
+            "slots": [
+                {
+                    "name": "sector",
+                    "required": true
+                },
+                {
+                    "name": "procesos_criticos",
+                    "required": true
+                },
+                {
+                    "name": "documentos_criticos",
+                    "required": true
+                },
+                {
+                    "name": "roles",
+                    "required": true
+                },
+                {
+                    "name": "modulos_prioritarios",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "sector",
+                    "question": "¿Confirmas que la app es para empresa de Servicios Multiservicio (mtto, imprenta, láser, taller, etc.)?"
+                },
+                {
+                    "missing_slot": "procesos_criticos",
+                    "question": "¿Qué procesos son prioridad (tickets, cotizaciones, OT, agenda técnicos, compras/inventario, facturación, recaudo, garantías)?"
+                },
+                {
+                    "missing_slot": "documentos_criticos",
+                    "question": "¿Qué documentos críticos manejarás (cotizacion, orden_servicio, acta_entrega, factura, recibo_caja, orden_compra)?"
+                },
+                {
+                    "missing_slot": "roles",
+                    "question": "¿Qué roles usarán la app (admin, coordinador, técnico, compras, caja, contador)?"
+                },
+                {
+                    "missing_slot": "modulos_prioritarios",
+                    "question": "¿Qué módulos salen primero (tickets/OT, agenda técnicos, cotizaciones, inventario/repuestos, facturación, caja/bancos)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ App de Servicios Multiservicio creada con tickets, cotizaciones, OTs, agenda de técnicos, repuestos/inventario, facturación y caja.",
+            "error_reply_template": "No pude crear la app. Falta definir procesos, documentos y módulos prioritarios."
+        },
+        {
+            "intent": "ERP_FACTURA_VENTA",
+            "action": "ERP_INVOICE_SALES",
+            "utterances_explicit": [
+                "Registrar factura por mantenimiento de aire acondicionado",
+                "Registrar factura por reparación de aire acondicionado",
+                "Crear factura por instalación de aire",
+                "Registrar factura por mantenimiento de vehículo",
+                "Crear factura por reparación de frenos",
+                "Registrar factura por cambio de aceite + filtro",
+                "Crear factura por servicio de imprenta (volantes)",
+                "Registrar factura por impresión de banners",
+                "Crear factura por diseño + impresión",
+                "Registrar factura por corte láser de acrílico",
+                "Crear factura por corte láser en MDF",
+                "Registrar factura por rotulación/publicidad",
+                "Crear factura por servicio a domicilio (visita técnica)",
+                "Registrar factura por repuestos + mano de obra",
+                "Crear factura por contrato de mantenimiento mensual",
+                "Registrar factura por servicio urgente con recargo",
+                "Crear factura con descuento por cliente frecuente",
+                "Registrar factura con IVA 19% (según ítem)",
+                "Registrar factura de contado",
+                "Registrar factura pagada por Nequi",
+                "Registrar factura pagada por transferencia",
+                "Registrar factura pagada por tarjeta",
+                "Registrar factura a crédito con vencimiento",
+                "Registrar factura con prefijo FV-SER-000123",
+                "Crear factura por servicio por horas",
+                "Registrar factura por producción interna (orden)",
+                "Crear factura por instalación de vinilo",
+                "Registrar factura por recarga de gas del aire",
+                "Crear factura por mantenimiento preventivo",
+                "Registrar factura por mantenimiento correctivo",
+                "Crear factura por repuesto vendido (producto)",
+                "Registrar factura por servicio + material",
+                "Crear factura por visita + diagnóstico",
+                "Registrar factura por diseño de publicidad",
+                "Crear factura por mantenimiento de equipos (empresa)",
+                "Registrar factura por servicio a empresa con sedes",
+                "Crear factura por OT finalizada",
+                "Registrar factura por servicio de emergencia",
+                "Crear factura con ítems detallados",
+                "Registrar factura por plan de mantenimiento"
+            ],
+            "utterances_implicit": [
+                "Ya terminé la OT, falta facturarla",
+                "El cliente pidió la factura del mantenimiento",
+                "Falta facturar el corte láser de hoy",
+                "Necesito el documento fiscal para el cierre",
+                "La caja no cuadra porque falta una factura",
+                "Ya entregué el trabajo y no está facturado",
+                "Tengo la cotización aprobada, falta la factura",
+                "La empresa pide factura a crédito",
+                "Va a crédito, que quede cuenta por cobrar",
+                "Necesito el consecutivo FV-SER",
+                "Cobré pero no he facturado",
+                "Hay descuento, dejarlo en factura",
+                "Faltó facturar los repuestos",
+                "Necesito facturar la visita técnica",
+                "Para cierre de turno falta esa factura",
+                "Quiero soporte de esa venta/servicio",
+                "Falta emitir la factura del contrato mensual",
+                "Necesito el número de factura para el recibo",
+                "Quiero la factura con ítems detallados y OT",
+                "Me falta registrar IVA generado",
+                "La OT está lista, falta factura",
+                "El cliente ya pagó pero falta factura",
+                "Necesito factura por impresión de banners",
+                "El contador pidió esa factura registrada",
+                "No quedó facturado lo de hoy",
+                "Me piden la factura ya",
+                "Ayúdame a facturar ese servicio",
+                "Falta factura del taller",
+                "Necesito factura a nombre de empresa",
+                "Necesito facturar el recargo de urgencia",
+                "La venta quedó en borrador, toca emitirla",
+                "Necesito factura para reembolso",
+                "Falta factura por instalación",
+                "Necesito factura por rotulación",
+                "Falta factura por cambio de aceite",
+                "Necesito factura por diseño + impresión",
+                "Me falta facturar y ya",
+                "El cliente necesita factura electrónica (dejar datos)",
+                "Falta la factura del repuesto",
+                "Quiero facturar eso rápido"
+            ],
+            "hard_negatives": [
+                "Consultar factura por número",
+                "Buscar factura FV-SER-000123",
+                "Descargar PDF de una factura existente",
+                "Imprimir factura ya emitida",
+                "Reenviar factura existente",
+                "Editar una factura existente",
+                "Corregir ítems de factura existente",
+                "Anular factura existente",
+                "Eliminar factura",
+                "Listar facturas del mes",
+                "Ver estado de factura",
+                "Ver facturas por cliente",
+                "Ver cuentas por cobrar (consulta)",
+                "Registrar recaudo (solo pago)",
+                "Aplicar pago a factura existente",
+                "Consultar movimientos de caja",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Crear cliente",
+                "Editar cliente",
+                "Crear ítem",
+                "Editar ítem",
+                "Ajustar inventario",
+                "Registrar compra proveedor",
+                "Orden de compra",
+                "Nota crédito",
+                "Devolución/reembolso (sin factura nueva)",
+                "Crear asiento contable",
+                "Consultar asientos",
+                "Configurar impuestos",
+                "Ver OTs del día (consulta)",
+                "Ver cotizaciones (consulta)",
+                "Editar OT existente",
+                "Anular OT existente",
+                "Soporte: no imprime",
+                "Exportar facturas",
+                "Importar facturas",
+                "Consultar/editar factura existente #38",
+                "Consultar/editar factura existente #39",
+                "Consultar/editar factura existente #40"
+            ],
+            "slots": [
+                {
+                    "name": "cliente",
+                    "required": true
+                },
+                {
+                    "name": "items",
+                    "required": true
+                },
+                {
+                    "name": "impuestos",
+                    "required": true
+                },
+                {
+                    "name": "forma_pago",
+                    "required": true
+                },
+                {
+                    "name": "prefijo_numeracion",
+                    "required": true
+                },
+                {
+                    "name": "vencimiento",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "cliente",
+                    "question": "¿A nombre de quién emito la factura (cliente/empresa), con CC/NIT?"
+                },
+                {
+                    "missing_slot": "items",
+                    "question": "¿Qué ítems van (servicio, horas, repuestos), cantidad y valor?"
+                },
+                {
+                    "missing_slot": "impuestos",
+                    "question": "¿Qué IVA aplica (porcentaje)?"
+                },
+                {
+                    "missing_slot": "forma_pago",
+                    "question": "¿Cómo se paga (efectivo/transferencia/nequi/daviplata/tarjeta/crédito)?"
+                },
+                {
+                    "missing_slot": "prefijo_numeracion",
+                    "question": "¿Qué prefijo y consecutivo uso (ej. FV-SER-000123)?"
+                },
+                {
+                    "missing_slot": "vencimiento",
+                    "question": "Si es a crédito, ¿qué fecha de vencimiento lleva?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Factura de venta registrada para el servicio/OT.",
+            "error_reply_template": "No pude registrar la factura. Revisa cliente, ítems, IVA y numeración."
+        },
+        {
+            "intent": "ERP_CAJAYBANCOS",
+            "action": "ERP_CASH_BANK",
+            "utterances_explicit": [
+                "Registrar recaudo de factura de servicio",
+                "Registrar pago por Nequi de una factura",
+                "Registrar pago por Daviplata de una factura",
+                "Registrar pago por transferencia a bancos",
+                "Registrar pago por tarjeta (datáfono)",
+                "Registrar ingreso en efectivo",
+                "Registrar pago parcial (abono) de una factura",
+                "Registrar pago total de factura",
+                "Registrar egreso por compra de repuestos",
+                "Registrar egreso por compra de insumos (tintas, vinilo)",
+                "Registrar egreso por compra de gas refrigerante",
+                "Registrar egreso por pago a proveedor",
+                "Registrar egreso por arriendo",
+                "Registrar egreso por servicios públicos",
+                "Registrar egreso por nómina técnicos (si aplica)",
+                "Registrar egreso por comisión datáfono",
+                "Registrar egreso por gasolina/transporte",
+                "Registrar ingreso por contrato de mantenimiento",
+                "Registrar recibo de caja del pago",
+                "Aplicar pago a factura FV-SER",
+                "Registrar ingreso por adelanto/anticipo",
+                "Registrar salida por caja menor (compra urgente)",
+                "Registrar recaudo de cuenta por cobrar (empresa)",
+                "Registrar devolución (salida) por reembolso",
+                "Registrar consignación a bancos",
+                "Registrar transferencia caja->bancos",
+                "Registrar egreso por herramienta/consumible",
+                "Registrar ingreso por trabajo de imprenta",
+                "Registrar ingreso por corte láser",
+                "Registrar egreso por tercerizado (externo)",
+                "Registrar ingreso por visita técnica",
+                "Registrar egreso por parqueadero/peaje",
+                "Registrar ingreso por rotulación",
+                "Registrar egreso por compra de aceite",
+                "Registrar ingreso por mantenimiento aire",
+                "Registrar egreso por compra de filtros",
+                "Registrar ingreso por mantenimiento vehículo",
+                "Registrar egreso por compra de láminas/acrílico",
+                "Registrar ingreso por producción (orden)",
+                "Registrar egreso por pagos varios"
+            ],
+            "utterances_implicit": [
+                "Ya me pagaron ese servicio, falta registrarlo",
+                "Entró un Nequi y no quedó el movimiento",
+                "Cayó una transferencia de un cliente empresa",
+                "Pagaron con tarjeta y no quedó el pago",
+                "El cliente abonó, no pagó todo",
+                "Recibí efectivo y no hice el recibo",
+                "Falta aplicar el pago a la factura",
+                "Me llegó un pago pero no sé la factura",
+                "Pagué al proveedor, falta el egreso",
+                "Salió plata pa repuestos y no lo metí",
+                "Compré vinilo/tinta y falta registrarlo",
+                "Hay comisión del datáfono por registrar",
+                "No me cuadra la caja por un pago",
+                "Para cierre faltan movimientos",
+                "Entró Daviplata, falta meterlo",
+                "Me consignaron y no lo registré",
+                "Necesito que el pago baje la CxC",
+                "Es ingreso, pero va a bancos",
+                "Es salida, pago a proveedor",
+                "Tengo un reembolso, debo registrar salida",
+                "Me falta el recibo de caja del pago",
+                "El banco reflejó el ingreso hoy",
+                "Quiero registrar el pago ya",
+                "Sin ese movimiento no cuadra el cierre",
+                "Pagué gasolina del técnico, registra el egreso",
+                "Pagamos un tercero, falta el egreso",
+                "Entró anticipo de un trabajo, falta movimiento",
+                "Me pagaron el contrato mensual, regístralo",
+                "Me llegó pago sin referencia, ayúdame",
+                "Pagamos arriendo, registra el egreso",
+                "Entró plata por imprenta y falta movimiento",
+                "Entró plata por láser y falta movimiento",
+                "Necesito registrar salida de caja menor",
+                "Ayúdame a registrar ese recaudo",
+                "Necesito registrar egreso de insumos hoy",
+                "Me pagaron visita técnica y no lo metí",
+                "Entró un pago por mantenimiento de aire",
+                "Pagaron mantenimiento del carro y falta el ingreso",
+                "Necesito registrar todo para el contador",
+                "Toca registrar ese pago y listo"
+            ],
+            "hard_negatives": [
+                "Consultar movimientos de caja de hoy",
+                "Ver saldo de caja",
+                "Ver saldo de bancos",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Editar un movimiento existente",
+                "Anular un recaudo registrado",
+                "Eliminar un movimiento",
+                "Imprimir recibo existente",
+                "Descargar comprobante existente",
+                "Reenviar recibo existente",
+                "Abrir caja",
+                "Cerrar caja (solo consulta)",
+                "Arqueo de caja (consulta)",
+                "Registrar factura de venta",
+                "Consultar factura",
+                "Anular factura",
+                "Editar factura",
+                "Crear cliente",
+                "Editar cliente",
+                "Crear ítem",
+                "Editar ítem",
+                "Ajustar inventario",
+                "Registrar compra proveedor",
+                "Orden de compra",
+                "Crear asiento contable",
+                "Consultar asientos",
+                "Reporte de ingresos (consulta)",
+                "Reporte de gastos (consulta)",
+                "Ver CxC (consulta)",
+                "Ver CxP (consulta)",
+                "Configurar medios de pago",
+                "Configurar bancos",
+                "Configurar cajas",
+                "Soporte: no registra pago",
+                "Exportar movimientos",
+                "Importar movimientos",
+                "Ver OTs (consulta)",
+                "Ver cotizaciones (consulta)",
+                "Crear app"
+            ],
+            "slots": [
+                {
+                    "name": "tipo_movimiento",
+                    "required": true
+                },
+                {
+                    "name": "tercero",
+                    "required": true
+                },
+                {
+                    "name": "monto",
+                    "required": true
+                },
+                {
+                    "name": "medio",
+                    "required": true
+                },
+                {
+                    "name": "referencia_documento",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tipo_movimiento",
+                    "question": "¿Es un ingreso (recaudo) o una salida (pago/egreso)?"
+                },
+                {
+                    "missing_slot": "tercero",
+                    "question": "¿De quién es el movimiento (cliente/proveedor/tercero)?"
+                },
+                {
+                    "missing_slot": "monto",
+                    "question": "¿Cuál es el valor en COP?"
+                },
+                {
+                    "missing_slot": "medio",
+                    "question": "¿Qué medio usaste (efectivo/transferencia/nequi/daviplata/tarjeta/crédito)?"
+                },
+                {
+                    "missing_slot": "referencia_documento",
+                    "question": "¿A qué documento lo relaciono (factura FV-SER / soporte / OT)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Movimiento de caja/bancos registrado y asociado al documento.",
+            "error_reply_template": "No pude registrar el movimiento. Revisa tipo, tercero, monto, medio y referencia."
+        },
+        {
+            "intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "action": "APP_ENTITY_CREATE_CUSTOMER",
+            "utterances_explicit": [
+                "Crear cliente para servicio con cédula",
+                "Crear cliente con nombre y celular",
+                "Crear cliente empresa con NIT y razón social",
+                "Crear cliente con sedes (empresa)",
+                "Crear cliente con correo para enviar factura",
+                "Crear cliente con dirección para visita técnica",
+                "Crear cliente con condición contado",
+                "Crear cliente con condición crédito 30 días",
+                "Registrar tercero para facturar",
+                "Crear cliente frecuente",
+                "Crear cliente para contrato de mantenimiento",
+                "Crear cliente para imprenta/publicidad",
+                "Crear cliente para corte láser",
+                "Crear cliente para taller de vehículos",
+                "Crear cliente para mantenimiento de aires",
+                "Crear cliente con contacto alterno",
+                "Crear cliente para cuenta por cobrar",
+                "Crear cliente para anticipo",
+                "Crear cliente rápido para cobrar",
+                "Crear cliente con CC y apellido",
+                "Crear cliente con WhatsApp como contacto",
+                "Crear cliente con email y celular",
+                "Crear cliente con condición crédito 15 días",
+                "Crear cliente con condición crédito 45 días",
+                "Crear cliente con convenio empresarial",
+                "Crear cliente con RUT/NIT y correo",
+                "Crear cliente para facturar OT finalizada",
+                "Crear tercero para caja/bancos",
+                "Crear cliente con razón social",
+                "Crear cliente para servicio por contrato",
+                "Crear cliente para servicio urgente",
+                "Crear cliente con barrio/ciudad",
+                "Crear cliente para sede norte",
+                "Crear cliente para sede centro",
+                "Crear cliente para flota de vehículos",
+                "Crear cliente para mantenimiento preventivo",
+                "Crear cliente para rotulación de local",
+                "Crear cliente para producción de piezas",
+                "Crear cliente para visitas recurrentes",
+                "Crear cliente para póliza/garantía"
+            ],
+            "utterances_implicit": [
+                "No aparece el cliente, toca crearlo",
+                "Voy a facturar y el cliente no existe",
+                "No puedo cobrar sin tercero",
+                "Ese cliente es nuevo, agréguelo",
+                "Solo tengo el celular y nombre, créalo",
+                "Es empresa, toca crearla con NIT",
+                "Necesito guardar dirección para la visita",
+                "Necesito correo para enviar factura",
+                "Ese cliente va a crédito, pon condición",
+                "Es contado, déjalo contado",
+                "No lo encuentro por CC, créalo",
+                "Necesito tercero para registrar el recaudo",
+                "No me deja facturar sin cliente",
+                "Crea el cliente y seguimos con la OT",
+                "Necesito registrarlo rápido pa cobrar",
+                "Me falta el tercero para la factura",
+                "El cliente compra por convenio, regístralo",
+                "Necesito crear cliente empresa del contrato",
+                "Me falta el contacto del cliente",
+                "El cliente pide factura y falta email",
+                "Déjalo con crédito a 30 días",
+                "Solo tengo WhatsApp, pero créalo",
+                "No aparece en lista, créalo",
+                "Necesito cliente para CxC",
+                "No lo encuentra por nombre, créalo por CC",
+                "Necesito crear el cliente ya",
+                "Voy a registrar pago y falta tercero",
+                "Me pasaron el NIT y razón social, falta registrarlo",
+                "Necesito el tercero pa bancos",
+                "Me falta crear cliente para servicio urgente",
+                "Ayúdame a crear el cliente",
+                "No puedo enviar factura sin correo",
+                "No puedo agendar sin dirección",
+                "Falta el cliente para la OT",
+                "Necesito crear el cliente del taller",
+                "Necesito crear el cliente de imprenta",
+                "Necesito crear el cliente de láser",
+                "Ayúdame a crear el cliente ya",
+                "No aparece por cédula, créalo",
+                "No existe el cliente, crear #40"
+            ],
+            "hard_negatives": [
+                "Consultar cliente por cédula",
+                "Buscar cliente existente",
+                "Ver ficha del cliente",
+                "Editar teléfono del cliente",
+                "Actualizar correo del cliente",
+                "Cambiar condición comercial",
+                "Eliminar cliente",
+                "Inactivar cliente",
+                "Ver estado de cuenta del cliente",
+                "Ver facturas del cliente",
+                "Ver CxC del cliente",
+                "Registrar factura de venta",
+                "Consultar factura",
+                "Registrar recaudo",
+                "Consultar movimientos caja",
+                "Crear ítem",
+                "Editar ítem",
+                "Crear asiento contable",
+                "Consultar asientos",
+                "Crear OT (operación)",
+                "Editar OT",
+                "Anular OT",
+                "Ver OTs (consulta)",
+                "Ver cotizaciones (consulta)",
+                "Importar clientes Excel",
+                "Exportar clientes",
+                "Crear proveedor",
+                "Consultar proveedores",
+                "Soporte: cliente no carga",
+                "Resetear contraseña",
+                "Crear usuario",
+                "Asignar roles a usuario",
+                "Reporte de clientes (consulta)",
+                "Enviar mensajes masivos",
+                "Crear app",
+                "Editar app",
+                "Conciliar bancos",
+                "Cargar extracto",
+                "Agendar cita (no crear cliente)",
+                "Consultar/editar cliente (no crear) #40"
+            ],
+            "slots": [
+                {
+                    "name": "tipo",
+                    "required": true
+                },
+                {
+                    "name": "nit_cc",
+                    "required": true
+                },
+                {
+                    "name": "razon_social_nombre",
+                    "required": true
+                },
+                {
+                    "name": "contacto",
+                    "required": true
+                },
+                {
+                    "name": "condicion_comercial",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tipo",
+                    "question": "¿El cliente es persona natural o empresa?"
+                },
+                {
+                    "missing_slot": "nit_cc",
+                    "question": "¿Cuál es el NIT o la cédula?"
+                },
+                {
+                    "missing_slot": "razon_social_nombre",
+                    "question": "¿Cuál es el nombre completo o razón social?"
+                },
+                {
+                    "missing_slot": "contacto",
+                    "question": "¿Qué contacto registro (celular y/o email)?"
+                },
+                {
+                    "missing_slot": "condicion_comercial",
+                    "question": "¿Es contado o crédito (y a cuántos días)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Cliente creado y listo para cotizar/OT/facturar/recaudar.",
+            "error_reply_template": "No pude crear el cliente. Verifica tipo, documento y nombre."
+        },
+        {
+            "intent": "APP_RUNTIME_CREATE_ITEM",
+            "action": "APP_ENTITY_CREATE_ITEM",
+            "utterances_explicit": [
+                "Crear ítem servicio mantenimiento aire (servicio)",
+                "Crear ítem servicio reparación aire (servicio)",
+                "Crear ítem servicio instalación aire (servicio)",
+                "Crear ítem servicio visita técnica (servicio)",
+                "Crear ítem servicio corte láser (servicio)",
+                "Crear ítem servicio diseño publicitario (servicio)",
+                "Crear ítem servicio impresión volantes (servicio)",
+                "Crear ítem servicio impresión banner (servicio)",
+                "Crear ítem servicio rotulación (servicio)",
+                "Crear ítem servicio mantenimiento vehículo (servicio)",
+                "Crear ítem servicio cambio de aceite (servicio)",
+                "Crear ítem servicio alineación/balanceo (servicio)",
+                "Crear producto repuesto filtro aire (producto inventariable)",
+                "Crear producto aceite 20W50 (producto inventariable)",
+                "Crear producto gas refrigerante (producto inventariable)",
+                "Crear producto vinilo adhesivo (producto inventariable)",
+                "Crear producto tinta (producto inventariable)",
+                "Crear producto lámina acrílico (producto inventariable)",
+                "Crear producto tornillería (producto inventariable)",
+                "Crear ítem recargo urgencia (servicio)",
+                "Crear ítem mano de obra por hora (servicio)",
+                "Crear ítem transporte/desplazamiento (servicio)",
+                "Crear ítem externo tercerizado (servicio)",
+                "Crear ítem con IVA 19",
+                "Crear ítem exento (si aplica)",
+                "Crear ítem con SKU y precio",
+                "Crear ítem con costo y margen",
+                "Crear ítem con unidad (m, m2, und, hora)",
+                "Crear ítem inventariable sí (producto)",
+                "Crear ítem inventariable no (servicio)",
+                "Crear ítem por plan de mantenimiento (servicio)",
+                "Crear ítem repuesto correa (producto inventariable)",
+                "Crear ítem repuesto capacitor (producto inventariable)",
+                "Crear ítem repuesto rodamiento (producto inventariable)",
+                "Crear ítem impresión por metro (servicio)",
+                "Crear ítem corte por minuto (servicio)",
+                "Crear ítem alquiler herramienta (servicio)",
+                "Crear producto papel couche (producto inventariable)",
+                "Crear producto lija (producto inventariable)",
+                "Crear ítem limpieza de serpentín (servicio)"
+            ],
+            "utterances_implicit": [
+                "No me sale el servicio en el catálogo, toca crearlo",
+                "Voy a facturar y falta el ítem de visita técnica",
+                "Ese recargo de urgencia no está, agrégalo",
+                "Necesito el código del servicio",
+                "Ese repuesto va a inventario",
+                "Ese servicio no va a inventario",
+                "Falta crear mano de obra por hora",
+                "Quiero que calcule IVA desde el ítem",
+                "Necesito precio para poder cobrar",
+                "Falta el ítem de corte láser",
+                "Falta el ítem de impresión banner",
+                "No aparece el gas refrigerante, créalo",
+                "No aparece el aceite, créalo",
+                "Ese ítem va sin IVA (si aplica)",
+                "Necesito crear transporte/desplazamiento",
+                "No encuentro el vinilo, agrégalo",
+                "Necesito stock mínimo para repuestos",
+                "Ese producto debe ser inventariable sí",
+                "Ese servicio debe ser inventariable no",
+                "Me falta el ítem pa la factura",
+                "Crea el ítem y seguimos",
+                "Solo tengo nombre y precio, créalo",
+                "Ponle IVA 19 y listo",
+                "Necesito crear repuesto capacitor para inventario",
+                "Necesito crear filtro para inventario",
+                "Falta el ítem de mantenimiento vehículo",
+                "Falta el ítem de rotulación",
+                "Necesito crear tercerizado como ítem",
+                "Necesito crear impresión por metro",
+                "Falta el ítem de cambio de aceite",
+                "Necesito definir unidad (hora, metro, und)",
+                "Falta el SKU del producto",
+                "Necesito definir si es inventariable",
+                "Necesito costo para calcular margen",
+                "Ayúdame a crear ese ítem",
+                "Crear el item para facturar",
+                "No aparece papel couche, créalo",
+                "No aparece tinta, créala",
+                "No aparece lámina acrílico, créala",
+                "Necesito crear limpieza de serpentín"
+            ],
+            "hard_negatives": [
+                "Consultar ítem por SKU",
+                "Buscar producto existente",
+                "Ver kardex del producto",
+                "Ajustar inventario",
+                "Editar precio de ítem existente",
+                "Cambiar IVA de ítem existente",
+                "Eliminar ítem",
+                "Inactivar ítem",
+                "Importar catálogo Excel",
+                "Exportar catálogo",
+                "Crear cliente",
+                "Editar cliente",
+                "Registrar factura",
+                "Consultar factura",
+                "Anular factura",
+                "Registrar recaudo",
+                "Consultar movimientos caja",
+                "Crear asiento contable",
+                "Consultar asientos",
+                "Registrar compra proveedor",
+                "Ingreso a inventario",
+                "Traslado bodegas",
+                "Configurar bodegas",
+                "Configurar unidades",
+                "Configurar impuestos globales",
+                "Crear lista de precios",
+                "Aplicar descuento masivo",
+                "Reporte inventario (consulta)",
+                "Reporte ventas (consulta)",
+                "Crear OT (operación)",
+                "Ver OTs (consulta)",
+                "Actualizar cotización (no crear ítem)",
+                "Soporte: no carga catálogo",
+                "Crear app",
+                "Editar app",
+                "Listar apps",
+                "Conciliar bancos",
+                "Cargar extracto",
+                "Editar receta (no aplica)",
+                "Consultar/editar ítem existente #40"
+            ],
+            "slots": [
+                {
+                    "name": "tipo",
+                    "required": true
+                },
+                {
+                    "name": "precio",
+                    "required": true
+                },
+                {
+                    "name": "impuesto",
+                    "required": true
+                },
+                {
+                    "name": "sku_codigo",
+                    "required": true
+                },
+                {
+                    "name": "inventariable",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tipo",
+                    "question": "¿Es producto inventariable (repuesto/insumo) o servicio (mano de obra/visita/corte/impresión)?"
+                },
+                {
+                    "missing_slot": "precio",
+                    "question": "¿Cuál es el precio de venta en COP?"
+                },
+                {
+                    "missing_slot": "impuesto",
+                    "question": "¿Qué IVA aplica (porcentaje)?"
+                },
+                {
+                    "missing_slot": "sku_codigo",
+                    "question": "¿Cuál es el código/SKU del ítem?"
+                },
+                {
+                    "missing_slot": "inventariable",
+                    "question": "Si es producto, ¿es inventariable (sí/no)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Ítem creado (servicio/producto) con precio, IVA y código.",
+            "error_reply_template": "No pude crear el ítem. Verifica tipo, precio, IVA y código."
+        },
+        {
+            "intent": "ERP_ASIENTO_CONTABLE",
+            "action": "ERP_ACCOUNTING_JOURNAL",
+            "utterances_explicit": [
+                "Registrar asiento por descuadre de caja",
+                "Crear asiento por IVA generado del día",
+                "Registrar asiento por comisión datáfono",
+                "Crear asiento por arriendo del local",
+                "Registrar asiento por servicios públicos",
+                "Crear asiento por compra de repuestos (si se contabiliza manual)",
+                "Registrar asiento por ajuste de inventario",
+                "Crear asiento por traslado caja a bancos",
+                "Registrar asiento por reembolso a cliente",
+                "Crear asiento con centro de costo Taller",
+                "Crear asiento con centro de costo Aire Acondicionado",
+                "Crear asiento con centro de costo Imprenta/Publicidad",
+                "Registrar asiento con documento soporte (arqueo)",
+                "Crear comprobante contable diario",
+                "Registrar asiento por pago a proveedor",
+                "Crear asiento por caja menor",
+                "Registrar asiento por nómina (si aplica)",
+                "Crear asiento por depreciación de herramientas/equipos",
+                "Registrar asiento por gastos bancarios",
+                "Crear asiento por pagos a técnicos (si externos)",
+                "Registrar asiento por publicidad propia",
+                "Crear asiento por compras de insumos",
+                "Registrar asiento por provisión",
+                "Crear asiento por ajuste de cartera",
+                "Registrar asiento por castigo de cartera",
+                "Crear asiento por póliza/seguro",
+                "Registrar asiento por combustible/transporte",
+                "Crear asiento por mantenimiento de equipos internos",
+                "Registrar asiento por compra a crédito",
+                "Crear asiento por pago de factura proveedor",
+                "Registrar asiento con líneas débito/crédito",
+                "Crear asiento por cierre de turno",
+                "Registrar asiento por diferencia de bancos",
+                "Crear asiento por ingreso de contrato (si aplica)",
+                "Registrar asiento por costo de ventas (si aplica)",
+                "Crear asiento por materiales consumidos",
+                "Registrar asiento por tercerizados",
+                "Crear asiento por comisiones bancarias",
+                "Registrar asiento por ajuste contable",
+                "Crear asiento por compra de acrílico/insumos"
+            ],
+            "utterances_implicit": [
+                "El contador pidió un comprobante manual",
+                "Falta pasar esto a contabilidad",
+                "Necesito un comprobante con soporte",
+                "Hay descuadre y toca ajustar",
+                "Debo reconocer IVA en libros",
+                "La comisión del banco no está registrada",
+                "Falta el asiento del arriendo",
+                "Falta el asiento de servicios públicos",
+                "Necesito asociar documento soporte al asiento",
+                "Me falta centro de costo",
+                "Eso debe ir al diario hoy",
+                "Necesito líneas débito/crédito",
+                "Falta el comprobante del pago a proveedor",
+                "Quiero contabilizar traslado a bancos",
+                "Se ajustó inventario, falta asiento",
+                "Hubo reembolso, falta asiento",
+                "Necesito asiento por transporte",
+                "Necesito registrar gastos bancarios",
+                "No quedó registrado en libros",
+                "Debo imputar a taller o aires o imprenta",
+                "Me falta el concepto del asiento",
+                "Faltan las líneas del asiento",
+                "Necesito asiento por caja menor",
+                "Debo contabilizar devolución de dinero",
+                "Necesito asiento por ajuste de cartera",
+                "Necesito asiento por castigo de cartera",
+                "Falta el asiento del día",
+                "Hay diferencia entre factura y pago",
+                "Necesito registrar provisión",
+                "El soporte está, falta asiento",
+                "Toca meter comprobante contable",
+                "Necesito asiento por tercerizados",
+                "Falta asiento por compra de insumos",
+                "Necesito asiento por combustible",
+                "Falta contabilizar cierre de turno",
+                "Ayúdame con ese comprobante",
+                "Quiero registrar el asiento ya",
+                "Necesito asiento por compra de repuestos",
+                "Falta el asiento de depreciación",
+                "Necesito asiento por gastos bancarios"
+            ],
+            "hard_negatives": [
+                "Consultar asientos contables",
+                "Listar comprobantes del mes",
+                "Imprimir comprobante existente",
+                "Descargar comprobante existente",
+                "Editar un asiento registrado",
+                "Anular un asiento existente",
+                "Eliminar comprobante",
+                "Ver libro diario (consulta)",
+                "Ver balance general",
+                "Ver estado de resultados",
+                "Configurar plan de cuentas",
+                "Crear cuenta contable nueva",
+                "Cambiar códigos contables",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Registrar factura de venta",
+                "Consultar factura",
+                "Anular factura",
+                "Registrar recaudo",
+                "Consultar movimientos de caja",
+                "Crear cliente",
+                "Crear ítem",
+                "Ajustar inventario (operativo)",
+                "Cerrar caja",
+                "Abrir caja",
+                "Reporte de IVA (consulta)",
+                "Reporte de ventas (consulta)",
+                "Crear app",
+                "Editar app",
+                "Soporte: error contable",
+                "Exportar contabilidad",
+                "Importar asientos",
+                "Crear usuario",
+                "Resetear contraseña",
+                "Manual contable",
+                "Tutorial contable",
+                "Ver CxC (consulta)",
+                "Ver CxP (consulta)",
+                "Registrar compra",
+                "Orden de compra"
+            ],
+            "slots": [
+                {
+                    "name": "fecha",
+                    "required": true
+                },
+                {
+                    "name": "concepto",
+                    "required": true
+                },
+                {
+                    "name": "lineas_debito_credito",
+                    "required": true
+                },
+                {
+                    "name": "centro_costo",
+                    "required": true
+                },
+                {
+                    "name": "documento_soporte",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "fecha",
+                    "question": "¿Qué fecha debe llevar el asiento?"
+                },
+                {
+                    "missing_slot": "concepto",
+                    "question": "¿Cuál es el concepto/descripcion del asiento?"
+                },
+                {
+                    "missing_slot": "lineas_debito_credito",
+                    "question": "Dime las líneas (cuenta, débito/crédito y valor) para registrar el asiento."
+                },
+                {
+                    "missing_slot": "centro_costo",
+                    "question": "¿Qué centro de costo aplica (taller/aires/imprenta/láser/administración)?"
+                },
+                {
+                    "missing_slot": "documento_soporte",
+                    "question": "¿Cuál es el documento soporte (factura/recibo/soporte)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Asiento contable registrado con soporte y centro de costo.",
+            "error_reply_template": "No pude registrar el asiento. Revisa fecha, líneas y soporte."
+        }
+    ],
+    "multi_turn_dialogues": [
+        {
+            "id": "MSV-DLG-01",
+            "scenario": "OT finalizada -> factura",
+            "turns": [
+                {
+                    "user": "ya terminé la OT del aire, falta facturar"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                },
+                {
+                    "user": "a nombre de Laura Perez cc 1044556677"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                },
+                {
+                    "user": "mtto aire 1 a 180000 y gas 1 a 90000"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:impuestos"
+                },
+                {
+                    "user": "iva 19"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:forma_pago"
+                },
+                {
+                    "user": "transferencia"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:prefijo_numeracion"
+                },
+                {
+                    "user": "FV-SER-000201"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        },
+        {
+            "id": "MSV-DLG-02",
+            "scenario": "Recaudo implícito",
+            "turns": [
+                {
+                    "user": "ya me pagaron el mantenimiento y no lo he metido 😤"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo_movimiento"
+                },
+                {
+                    "user": "ingreso"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:referencia_documento"
+                }
+            ]
+        },
+        {
+            "id": "MSV-DLG-03",
+            "scenario": "Pago sin referencia",
+            "turns": [
+                {
+                    "user": "me entró un nequi y no sé de qué factura es"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:monto"
+                },
+                {
+                    "user": "65000"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tercero"
+                }
+            ]
+        },
+        {
+            "id": "MSV-DLG-04",
+            "scenario": "Crear cliente rápido",
+            "turns": [
+                {
+                    "user": "voy a facturar y no existe el cliente, créalo ya"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo"
+                },
+                {
+                    "user": "empresa"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:nit_cc"
+                }
+            ]
+        },
+        {
+            "id": "MSV-DLG-05",
+            "scenario": "Crear ítem repuesto inventariable",
+            "turns": [
+                {
+                    "user": "no me sale el ítem 'filtro aire', agrégalo"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo"
+                },
+                {
+                    "user": "producto"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:sku_codigo"
+                }
+            ]
+        },
+        {
+            "id": "MSV-DLG-06",
+            "scenario": "APP_CREATE con módulos",
+            "turns": [
+                {
+                    "user": "quiero una app para manejar OTs, técnicos y repuestos"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:procesos_criticos"
+                },
+                {
+                    "user": "tickets, cotizaciones, órdenes de trabajo, agenda técnicos, inventario repuestos, facturación y recaudo"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:modulos_prioritarios"
+                }
+            ]
+        },
+        {
+            "id": "MSV-DLG-07",
+            "scenario": "Desambiguación: factura vs recibo",
+            "turns": [
+                {
+                    "user": "necesito el recibo de ese servicio"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo_movimiento"
+                },
+                {
+                    "user": "no, era la factura, la del corte láser"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                }
+            ]
+        },
+        {
+            "id": "MSV-DLG-08",
+            "scenario": "Asiento por comisión datáfono",
+            "turns": [
+                {
+                    "user": "haz un asiento por comisión del datáfono"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:fecha"
+                },
+                {
+                    "user": "hoy"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:lineas_debito_credito"
+                }
+            ]
+        },
+        {
+            "id": "MSV-DLG-09",
+            "scenario": "Frustración: 1 pregunta mínima",
+            "turns": [
+                {
+                    "user": "no me mate a preguntas, solo registre el pago 😡"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:monto"
+                },
+                {
+                    "user": "120000"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:medio"
+                }
+            ]
+        },
+        {
+            "id": "MSV-DLG-10",
+            "scenario": "Desambiguación: crear vs anular factura",
+            "turns": [
+                {
+                    "user": "anula la factura FV-SER-000199"
+                },
+                {
+                    "assistant_expected_action": "NEEDS_DISAMBIGUATION"
+                },
+                {
+                    "user": "perdón, era crear la factura del taller de hoy"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                }
+            ]
+        }
+    ],
+    "emotion_cases": [
+        {
+            "emotion": "frustracion",
+            "user_samples": [
+                "parce estoy ocupado, haga eso rápido 😡",
+                "otra vez pidiendo lo mismo, de verdad?",
+                "me tiene mamado, solo registre el pago",
+                "se me va el cliente, apure"
+            ],
+            "assistant_style": "empático, breve, sin tecnicismos; valida y pide 1 dato crítico",
+            "expected_next_step": "aplicar one_question_policy del slot más crítico"
+        },
+        {
+            "emotion": "duda",
+            "user_samples": [
+                "eso es factura o recibo?",
+                "registro la venta o el pago?",
+                "eso va a caja o a contabilidad?"
+            ],
+            "assistant_style": "aclara en 1-2 líneas y hace una sola pregunta para definir intención",
+            "expected_next_step": "preguntar el dato que define el intent (factura vs recaudo vs asiento)"
+        },
+        {
+            "emotion": "urgencia",
+            "user_samples": [
+                "es para yaaa",
+                "me lo piden en 5 min",
+                "cierre de caja urgente"
+            ],
+            "assistant_style": "directo y resolutivo; 1 pregunta y ejecución inmediata",
+            "expected_next_step": "pedir slot faltante mínimo y ejecutar acción"
+        }
+    ],
+    "qa_cases": [
+        {
+            "text": "crear app para empresa de servicios con tickets, cotizaciones y órdenes de trabajo",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "necesito app de taller/aires/imprenta todo en uno con técnicos y agenda",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "quiero fórmulas de costo_total (horas+repuestos+externos) y margen por OT",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "app con reportes: OTs por estado, SLA, rentabilidad por cliente",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "crear app con inventario de repuestos e insumos y compras por proveedor",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "app con flujo ticket -> cotización -> OT -> factura -> recaudo",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "crear app con garantías y reclamos por OT",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "app con fotos antes/después y firma al cerrar OT",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "crear app con prefijos OT-BAQ, COT-BAQ y FV-SER",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "quiero roles admin/coordinador/técnico/compras/caja/contador",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "registrar factura por mantenimiento de aire con repuestos y mano de obra",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar corte láser en acrílico con IVA y prefijo FV-SER",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar impresión de banners y rotulación en la misma factura",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "la OT ya está finalizada, falta facturarla",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "necesito consecutivo FV-SER para facturar hoy",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar a crédito a una empresa con vencimiento",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar visita técnica + diagnóstico",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "el cliente me pidió la factura ya",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar recargo de urgencia",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar cambio de aceite y filtro",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "ya me pagaron por nequi, registra el recaudo y aplícalo a la factura",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar abono parcial y dejar saldo",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "pagué repuestos al proveedor, registra el egreso",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "pagaron con tarjeta y falta movimiento y comisión datáfono",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "me llegó un pago sin referencia, necesito registrarlo",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "hacer recibo de caja del pago",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar ingreso por transferencia a bancos de un cliente empresa",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar salida por compra de gas refrigerante",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar reembolso a un cliente (salida)",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "no me cuadra el cierre del turno, falta meter un pago",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "crear cliente empresa con NIT, razón social y correo",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "no existe el cliente, toca crearlo antes de facturar",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear cliente con dirección para visita técnica",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "solo tengo nombre y whatsapp, créalo",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear cliente con condición crédito 30 días",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear tercero para registrar recaudo",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear cliente para contrato de mantenimiento mensual",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear cliente para taller de vehículos",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear cliente para imprenta/publicidad",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear cliente para corte láser",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear ítem servicio mantenimiento aire con precio, IVA y código",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear producto gas refrigerante inventariable con SKU",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear ítem visita técnica como servicio",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "voy a facturar y falta el ítem de recargo urgencia",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "ese es servicio, no inventario",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "ese es repuesto inventariable sí",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear producto vinilo adhesivo inventariable",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear ítem mano de obra por hora con código",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear ítem corte por minuto (láser) con unidad",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear producto aceite inventariable con SKU",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "registrar asiento por descuadre de caja con soporte arqueo",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "crear asiento por comisión datáfono y gastos bancarios",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "asiento lines deb 110505 120000 / cred 413595 120000",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "el contador pidió comprobante con centro de costo Taller",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "necesito asociar documento soporte al asiento",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "crear asiento por compra de repuestos contabilizada manual",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "registrar asiento por combustible/transporte",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "crear asiento por depreciación de herramientas",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "registrar asiento por ajuste de inventario",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "registrar asiento por arriendo y servicios públicos",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        }
+    ]
+}
