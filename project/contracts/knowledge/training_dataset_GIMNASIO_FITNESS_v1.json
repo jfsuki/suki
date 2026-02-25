@@ -1,0 +1,1680 @@
+{
+    "batch_id": "GIMNASIO_FITNESS_v1",
+    "language": "es-CO",
+    "context_pack": {
+        "business_type": "comercio_pyme",
+        "country": "CO",
+        "currency": "COP",
+        "tax_regime": "rts_iva",
+        "payment_methods": [
+            "efectivo",
+            "transferencia",
+            "nequi",
+            "daviplata",
+            "tarjeta",
+            "credito"
+        ],
+        "document_flows": [
+            "cotizacion -> pedido -> factura -> recaudo",
+            "compra -> ingreso inventario -> cuenta por pagar -> pago proveedor"
+        ],
+        "channels": [
+            "whatsapp",
+            "telegram",
+            "web_chat"
+        ],
+        "volume_profile": "pyme_media",
+        "chart_of_accounts_min": [
+            {
+                "code": "110505",
+                "name": "Caja general"
+            },
+            {
+                "code": "111005",
+                "name": "Bancos"
+            },
+            {
+                "code": "130505",
+                "name": "Clientes nacionales"
+            },
+            {
+                "code": "240805",
+                "name": "IVA generado"
+            },
+            {
+                "code": "413595",
+                "name": "Ingresos por ventas"
+            }
+        ],
+        "posting_rules": [
+            {
+                "trigger": "factura_contado",
+                "debit_account": "110505",
+                "credit_account": "413595"
+            },
+            {
+                "trigger": "factura_credito",
+                "debit_account": "130505",
+                "credit_account": "413595"
+            },
+            {
+                "trigger": "recaudo_cliente",
+                "debit_account": "111005",
+                "credit_account": "130505"
+            }
+        ]
+    },
+    "intents_expansion": [
+        {
+            "intent": "APP_CREATE",
+            "action": "FRAMEWORK_APP_CREATE",
+            "utterances_explicit": [
+                "Crear app para gimnasio con socios, membresías, clases y pagos",
+                "Crear app fitness con tablas Socios, Planes, Pagos, Facturas y Recaudos",
+                "Crear app para control de asistencia con QR y registro por sede",
+                "Crear app con tabla Clases (spinning, yoga, cross) y cupos por horario",
+                "Crear app con tabla Entrenadores y comisiones por venta de planes",
+                "Crear app con tabla Evaluaciones físicas (peso, IMC, %grasa) y seguimiento",
+                "Crear app con entidad Membresía y fórmula dias_restantes = fin - hoy",
+                "Crear app con fórmula estado_membresia = (dias_restantes>0) ? 'activa' : 'vencida'",
+                "Crear app con secuencia: inscripción -> plan -> factura -> recaudo -> acceso",
+                "Crear app con secuencia: venta producto -> factura -> recaudo -> salida inventario",
+                "Crear app con tabla Inventario (suplementos, bebidas) y stock_min",
+                "Crear app con fórmula total_factura = subtotal + iva - descuento",
+                "Crear app con fórmula saldo = total_factura - pagado",
+                "Crear app con tabla Sedes y prefijos de factura por sede (FV-GYM-A, FV-GYM-B)",
+                "Crear app con roles admin, recepción, coach, caja y contador",
+                "Crear app con reporte: asistencias por día/semana/mes",
+                "Crear app con reporte: ingresos por plan (mensual, trimestral, anual)",
+                "Crear app con reporte: recaudos por medio (nequi, tarjeta, transferencia)",
+                "Crear app con reporte: morosos (membresías vencidas con saldo)",
+                "Crear app con reporte: productos top vendidos y rotación",
+                "Crear app con tabla Reservas de clase y lista de espera",
+                "Crear app con validación: no permitir sobrecupo en clase",
+                "Crear app con validación: no permitir acceso si membresía vencida",
+                "Crear app con campos: objetivo (bajar peso, fuerza), nivel, lesiones",
+                "Crear app con tabla Rutinas y ejercicios por socio",
+                "Crear app con tabla Paquetes PT (entrenamiento personal) y sesiones consumidas",
+                "Crear app con fórmula sesiones_restantes = sesiones_total - sesiones_usadas",
+                "Crear app con dashboard de ventas diarias y cierre de caja",
+                "Crear app con módulo de cuentas por cobrar para planes a crédito",
+                "Crear app con integración lógica: recaudo disminuye CxC del socio",
+                "Crear app con historial de pagos del socio y comprobantes",
+                "Crear app con tabla Contratos/Consentimientos y firmas",
+                "Crear app con campos calculados: imc = peso/(altura^2)",
+                "Crear app con informe: renovaciones próximas (7 días)",
+                "Crear app con informe: asistencia baja (menos de 4/mes)",
+                "Crear app con tabla Promos/cupones y reglas de descuento",
+                "Crear app con lógica: descuento aplica solo a planes seleccionados",
+                "Crear app para gimnasio boutique con clases por reserva y prepago",
+                "Crear app para box de crossfit con WOD, PR y tracking",
+                "Crear app fitness #40 con módulos de socios y pagos"
+            ],
+            "utterances_implicit": [
+                "Necesito un sistema para controlar socios, planes y pagos del gym",
+                "Quiero dejar de manejar asistencias en cuaderno y Excel",
+                "Necesito agenda de clases con cupos y reservas",
+                "Quiero que el sistema me avise quién se vence esta semana",
+                "Necesito ver morosos y saldos pendientes por socio",
+                "Quiero que calcule totales e IVA sin estar sumando",
+                "Necesito que el acceso dependa de membresía activa",
+                "Quiero registrar evaluación física y ver progreso",
+                "Necesito inventario de suplementos y que descuente al vender",
+                "Quiero reportes de ingresos por plan y por sede",
+                "Necesito cierre de caja con recaudos por medio de pago",
+                "Quiero control de sesiones de personal training",
+                "Necesito una app con roles (coach no ve contabilidad)",
+                "Quiero reservar clases desde el chat y ver cupos",
+                "Necesito que no deje sobrecupo en spinning",
+                "Quiero un catálogo de planes (mensual/trimestral/anual)",
+                "Necesito facturar la membresía y luego cobrarla",
+                "Si pagan a crédito, que quede cuenta por cobrar",
+                "Quiero que el pago baje la deuda del socio",
+                "Necesito prefijos por sede para facturas y recibos",
+                "Quiero un tablero con ventas del día",
+                "Necesito informe de asistencia por socio",
+                "Quiero saber qué productos se venden más",
+                "Necesito alertas de stock mínimo",
+                "Quiero rutinas por socio y seguimiento de cumplimiento",
+                "Necesito contratos/consentimientos firmados",
+                "Quiero descuentos por promo y cupones",
+                "Necesito lista de espera en clases llenas",
+                "Quiero reportes para el contador sin enredos",
+                "Necesito registrar comisiones del datáfono",
+                "Quiero controlar devoluciones/reembolsos",
+                "Necesito estados de factura (emitida/pagada/anulada)",
+                "Quiero estados de membresía (activa/vencida/suspendida)",
+                "Necesito registrar visitas de cortesía",
+                "Quiero control por sede y por entrenador",
+                "Necesito exportar reportes (pero primero operar)",
+                "Quiero que sugiera tablas y campos para el gym",
+                "Necesito secuencia completa: inscripción -> factura -> pago",
+                "Quiero que el sistema genere recibo de caja del pago",
+                "Quiero algo tipo ERP pero para gimnasio"
+            ],
+            "hard_negatives": [
+                "Consultar apps existentes del gimnasio",
+                "Listar apps creadas",
+                "Editar la app del gimnasio",
+                "Renombrar la app",
+                "Eliminar la app",
+                "Actualizar módulos de la app",
+                "Cambiar tema/colores",
+                "Ver logs del runtime",
+                "Depurar error del framework",
+                "Optimizar performance de grids",
+                "Migrar datos desde otro sistema",
+                "Importar socios desde Excel",
+                "Exportar base de datos",
+                "Conectar pasarela de pagos",
+                "Conectar WhatsApp API",
+                "Integración con torniquete/biométrico (consulta)",
+                "Crear dashboard BI externo",
+                "Configurar DIAN y facturación electrónica",
+                "Configurar IVA global",
+                "Crear usuarios del sistema",
+                "Restablecer contraseña",
+                "Asignar permisos a usuarios",
+                "Soporte: no abre el módulo",
+                "Soporte: error 500",
+                "Manual del sistema",
+                "Tutorial de uso",
+                "Cotizar desarrollo a medida",
+                "Diseño de logo del gimnasio",
+                "Campañas de marketing",
+                "Registrar factura de venta (no crear app)",
+                "Registrar recaudo/pago (no crear app)",
+                "Crear cliente/socio (no crear app)",
+                "Crear ítem/plan/producto (no crear app)",
+                "Crear asiento contable (no crear app)",
+                "Consultar movimientos de caja",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Imprimir factura existente",
+                "Descargar PDF existente",
+                "Editar una factura existente"
+            ],
+            "slots": [
+                {
+                    "name": "sector",
+                    "required": true
+                },
+                {
+                    "name": "procesos_criticos",
+                    "required": true
+                },
+                {
+                    "name": "documentos_criticos",
+                    "required": true
+                },
+                {
+                    "name": "roles",
+                    "required": true
+                },
+                {
+                    "name": "modulos_prioritarios",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "sector",
+                    "question": "¿Confirmas que la app es para Gimnasios/Fitness?"
+                },
+                {
+                    "missing_slot": "procesos_criticos",
+                    "question": "¿Qué procesos son prioridad (membresías, clases, asistencia, ventas, facturación, recaudo, inventario)?"
+                },
+                {
+                    "missing_slot": "documentos_criticos",
+                    "question": "¿Qué documentos críticos manejarás (factura, recibo_caja, contrato, orden_servicio)?"
+                },
+                {
+                    "missing_slot": "roles",
+                    "question": "¿Qué roles usarán la app (admin, recepción, coach, caja, contador)?"
+                },
+                {
+                    "missing_slot": "modulos_prioritarios",
+                    "question": "¿Qué módulos salen primero (socios, membresías, clases, facturación, caja/bancos, inventario)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ App Gimnasio/Fitness creada con tablas (socios, membresías, clases, pagos) y fórmulas (IVA, total, saldo, días restantes).",
+            "error_reply_template": "No pude crear la app. Falta definir procesos, documentos y módulos prioritarios."
+        },
+        {
+            "intent": "ERP_FACTURA_VENTA",
+            "action": "ERP_INVOICE_SALES",
+            "utterances_explicit": [
+                "Registrar factura por membresía mensual",
+                "Crear factura por membresía trimestral",
+                "Emitir factura por membresía anual",
+                "Registrar factura por inscripción",
+                "Crear factura por paquete de clases (10 clases)",
+                "Crear factura por personal training (PT) 8 sesiones",
+                "Registrar factura por clase suelta (drop-in)",
+                "Registrar factura por suplemento (proteína)",
+                "Crear factura por bebida isotónica",
+                "Crear factura por camiseta del gym",
+                "Registrar factura por evaluación física",
+                "Crear factura por plan nutricional",
+                "Registrar factura por reactivación de membresía",
+                "Crear factura con IVA 19% por producto",
+                "Crear factura con ítems (plan + inscripción)",
+                "Registrar factura con descuento por promo",
+                "Registrar factura de contado",
+                "Registrar factura con pago por Nequi",
+                "Registrar factura con pago por transferencia",
+                "Registrar factura con pago por tarjeta",
+                "Registrar factura a crédito (con vencimiento)",
+                "Registrar factura por venta de combo (plan+suplemento)",
+                "Crear factura por locker/alquiler casillero",
+                "Registrar factura por parqueadero mensual",
+                "Crear factura por clase de yoga mensual",
+                "Registrar factura por spinning mensual",
+                "Crear factura por cross training mensual",
+                "Registrar factura por plan estudiante",
+                "Crear factura por plan corporativo",
+                "Registrar factura por congelar plan (servicio)",
+                "Crear factura por cambio de plan",
+                "Registrar factura por reposición carnet",
+                "Crear factura por toalla/servicio adicional",
+                "Registrar factura con prefijo FV-GYM-A",
+                "Registrar factura con prefijo FV-GYM-B",
+                "Crear factura por venta de guantes",
+                "Registrar factura por cuerda/implemento",
+                "Crear factura por evento/competencia",
+                "Registrar factura por bootcamp fin de semana",
+                "Crear factura por asesoría de rutina"
+            ],
+            "utterances_implicit": [
+                "El socio me pidió la factura del plan",
+                "Falta dejar facturada la membresía de hoy",
+                "Necesito el documento fiscal del cobro",
+                "La caja no cuadra porque falta una factura",
+                "Ya se vendió el plan y no está la factura",
+                "Hay una venta de proteína sin facturar",
+                "Necesito emitir la factura para enviar al correo",
+                "La empresa pide factura del plan corporativo",
+                "Va a crédito, que quede cuenta por cobrar",
+                "Necesito consecutivo de factura del gym",
+                "La inscripción quedó pendiente de facturar",
+                "Toca legalizar esa venta del drop-in",
+                "Me hace falta la factura del PT",
+                "Necesito facturar el paquete de clases",
+                "El contador pide que quede registrada esa venta",
+                "Para cierre de caja falta factura",
+                "Quiero el soporte de la venta del suplemento",
+                "Falta facturar el locker",
+                "El socio pagó pero primero necesito la factura",
+                "Hay un descuento de promo, dejarlo en factura",
+                "La factura debe llevar IVA en el producto",
+                "Necesito facturar plan y matrícula en una sola",
+                "Me piden la factura a nombre de empresa",
+                "Falta emitir la factura de la evaluación física",
+                "Necesito el número de factura para el recibo",
+                "Quiero que la factura quede con ítems detallados",
+                "Me falta registrar IVA generado en ventas",
+                "Necesito factura por parqueadero",
+                "Faltó facturar reposición de carnet",
+                "Necesito factura por evento del gym",
+                "La venta quedó en borrador, toca emitirla",
+                "Necesito facturar el cambio de plan",
+                "Me piden factura del plan estudiante",
+                "Necesito factura del bootcamp",
+                "No quedó facturado lo de hoy",
+                "El socio quiere factura para reembolso",
+                "Tengo la orden/venta, falta factura",
+                "Necesito facturar la asesoría",
+                "El socio pide factura ya",
+                "Falta emitir factura gym #40"
+            ],
+            "hard_negatives": [
+                "Consultar factura por número",
+                "Buscar factura FV-GYM-A-000123",
+                "Descargar PDF de una factura existente",
+                "Imprimir factura ya emitida",
+                "Reenviar factura existente",
+                "Editar una factura existente",
+                "Corregir ítems de factura existente",
+                "Anular factura existente",
+                "Eliminar factura",
+                "Listar facturas del mes",
+                "Ver estado de factura",
+                "Ver facturas por socio",
+                "Ver cuentas por cobrar (consulta)",
+                "Registrar recaudo/pago (solo pago)",
+                "Aplicar pago a factura existente",
+                "Consultar movimientos de caja",
+                "Abrir caja",
+                "Cerrar caja",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Crear socio/cliente",
+                "Editar socio/cliente",
+                "Crear ítem/plan/producto",
+                "Editar ítem/plan/producto",
+                "Ajustar inventario",
+                "Registrar compra proveedor",
+                "Nota crédito",
+                "Devolución/reembolso (sin factura nueva)",
+                "Crear asiento contable",
+                "Consultar asientos contables",
+                "Configurar IVA",
+                "Configurar numeración DIAN",
+                "Ver agenda de clases (consulta)",
+                "Reservar clase (operación)",
+                "Cancelar reserva",
+                "Soporte: no imprime",
+                "Exportar facturas a Excel",
+                "Importar facturas desde Excel",
+                "Consultar/editar factura (no crear) #39",
+                "Consultar/editar factura (no crear) #40"
+            ],
+            "slots": [
+                {
+                    "name": "cliente",
+                    "required": true
+                },
+                {
+                    "name": "items",
+                    "required": true
+                },
+                {
+                    "name": "impuestos",
+                    "required": true
+                },
+                {
+                    "name": "forma_pago",
+                    "required": true
+                },
+                {
+                    "name": "prefijo_numeracion",
+                    "required": true
+                },
+                {
+                    "name": "vencimiento",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "cliente",
+                    "question": "¿A nombre de qué socio/cliente debo emitir la factura (nombre y CC/NIT)?"
+                },
+                {
+                    "missing_slot": "items",
+                    "question": "¿Qué ítems incluyo (plan/producto/servicio), cantidad y valor?"
+                },
+                {
+                    "missing_slot": "impuestos",
+                    "question": "¿Qué IVA aplica (porcentaje)?"
+                },
+                {
+                    "missing_slot": "forma_pago",
+                    "question": "¿Cómo se paga (efectivo/transferencia/nequi/daviplata/tarjeta/crédito)?"
+                },
+                {
+                    "missing_slot": "prefijo_numeracion",
+                    "question": "¿Qué prefijo y consecutivo uso (ej. FV-GYM-A-000123)?"
+                },
+                {
+                    "missing_slot": "vencimiento",
+                    "question": "Si es a crédito, ¿qué fecha de vencimiento lleva?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Factura de venta del gimnasio registrada con IVA y numeración.",
+            "error_reply_template": "No pude registrar la factura. Revisa cliente, ítems, IVA y numeración."
+        },
+        {
+            "intent": "ERP_CAJAYBANCOS",
+            "action": "ERP_CASH_BANK",
+            "utterances_explicit": [
+                "Registrar recaudo de la factura del plan mensual",
+                "Registrar pago del socio por Nequi",
+                "Registrar pago del socio por Daviplata",
+                "Registrar pago por transferencia a bancos",
+                "Registrar pago por tarjeta (datáfono)",
+                "Registrar ingreso en efectivo de inscripción",
+                "Registrar abono de plan a crédito",
+                "Registrar pago total de factura de membresía",
+                "Registrar pago parcial de factura",
+                "Registrar egreso por compra de suplementos",
+                "Registrar egreso por compra de implementos",
+                "Registrar egreso por pago de arriendo",
+                "Registrar egreso por pago de servicios públicos",
+                "Registrar egreso por pago a entrenador (honorarios)",
+                "Registrar egreso por comisión de datáfono",
+                "Registrar egreso por mantenimiento de equipos",
+                "Registrar ingreso por venta de proteína",
+                "Registrar ingreso por venta de bebida",
+                "Registrar ingreso por evento/competencia",
+                "Registrar recibo de caja del pago del socio",
+                "Aplicar pago a factura FV-GYM",
+                "Registrar ingreso por paquete de clases",
+                "Registrar egreso por compra de agua",
+                "Registrar salida por caja menor",
+                "Registrar ingreso por plan corporativo",
+                "Registrar recaudo de cuenta por cobrar",
+                "Registrar devolución (salida) por reembolso",
+                "Registrar consignación a bancos",
+                "Registrar transferencia caja->bancos",
+                "Registrar ingreso por parqueadero",
+                "Registrar egreso por publicidad del gym",
+                "Registrar ingreso por PT 8 sesiones",
+                "Registrar egreso por compra de bandas elásticas",
+                "Registrar ingreso por drop-in",
+                "Registrar egreso por limpieza",
+                "Registrar ingreso por reposición carnet",
+                "Registrar egreso por compra de toallas",
+                "Registrar ingreso por locker",
+                "Registrar egreso por compra de colchonetas",
+                "Registrar ingreso por asesoría nutricional"
+            ],
+            "utterances_implicit": [
+                "Ya me pagaron el plan, falta registrarlo",
+                "Entró un Nequi del socio, súbelo al sistema",
+                "Cayó una transferencia del plan corporativo",
+                "Pagaron con tarjeta y no quedó el movimiento",
+                "El socio abonó, no pagó todo",
+                "Recibí efectivo y no hice el recibo",
+                "Falta aplicar el pago a la factura",
+                "Me llegó un pago pero no sé la factura",
+                "Pagué el arriendo, falta el egreso",
+                "Salió plata para mantenimiento de caminadoras",
+                "Compramos suplementos y falta registrarlo",
+                "Se pagó a un entrenador, falta el movimiento",
+                "Hay comisión del datáfono por registrar",
+                "No me cuadra la caja por un pago",
+                "Para cierre de caja faltan movimientos",
+                "Entró Daviplata, falta meterlo",
+                "Me consignaron y no lo registré",
+                "Falta el movimiento del evento del sábado",
+                "Necesito que el pago baje la CxC del socio",
+                "Es ingreso, pero va a bancos por transferencia",
+                "Es ingreso, pero fue en efectivo",
+                "Es salida, pago a proveedor",
+                "Tengo un reembolso, debo registrar salida",
+                "Me falta el recibo de caja del pago",
+                "El banco reflejó el ingreso hoy",
+                "Quiero registrar el pago ya",
+                "Toca dejar trazabilidad con referencia de factura",
+                "Sin ese movimiento no cuadra el cierre",
+                "El socio pagó el locker, falta registrarlo",
+                "Salió plata de caja menor",
+                "Entró plata por proteína, falta el movimiento",
+                "Me pagaron el PT, falta registrarlo",
+                "El socio hizo abono por transferencia",
+                "Hay un pago en tarjeta pendiente",
+                "Me llegó pago sin referencia, ayúdame",
+                "Pagamos servicios públicos, registra el egreso",
+                "Entró un pago por parqueadero",
+                "Se devolvió plata a un socio (reembolso)",
+                "Necesito registrar ingreso por drop-in",
+                "Necesito registrar egreso por limpieza"
+            ],
+            "hard_negatives": [
+                "Consultar movimientos de caja de hoy",
+                "Ver saldo de caja",
+                "Ver saldo de bancos",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Editar un movimiento existente",
+                "Anular un recaudo registrado",
+                "Eliminar un movimiento",
+                "Imprimir recibo existente",
+                "Descargar comprobante existente",
+                "Reenviar recibo existente",
+                "Abrir caja",
+                "Cerrar caja (solo consulta)",
+                "Arqueo de caja (consulta)",
+                "Registrar factura de venta",
+                "Consultar factura",
+                "Anular factura",
+                "Editar factura",
+                "Crear socio/cliente",
+                "Editar socio/cliente",
+                "Crear ítem/plan/producto",
+                "Editar ítem/plan/producto",
+                "Ajustar inventario",
+                "Registrar compra proveedor",
+                "Orden de compra",
+                "Crear asiento contable",
+                "Consultar asientos",
+                "Reporte de ingresos (consulta)",
+                "Reporte de gastos (consulta)",
+                "Ver CxC (consulta)",
+                "Ver CxP (consulta)",
+                "Configurar medios de pago",
+                "Configurar bancos",
+                "Configurar cajas",
+                "Soporte: no registra pago",
+                "Exportar movimientos",
+                "Importar movimientos",
+                "Ver agenda de clases (consulta)",
+                "Reservar clase",
+                "Cancelar reserva"
+            ],
+            "slots": [
+                {
+                    "name": "tipo_movimiento",
+                    "required": true
+                },
+                {
+                    "name": "tercero",
+                    "required": true
+                },
+                {
+                    "name": "monto",
+                    "required": true
+                },
+                {
+                    "name": "medio",
+                    "required": true
+                },
+                {
+                    "name": "referencia_documento",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tipo_movimiento",
+                    "question": "¿Es un ingreso (recaudo) o una salida (pago/egreso)?"
+                },
+                {
+                    "missing_slot": "tercero",
+                    "question": "¿De quién es el movimiento (socio/cliente, proveedor o tercero)?"
+                },
+                {
+                    "missing_slot": "monto",
+                    "question": "¿Cuál es el valor en COP?"
+                },
+                {
+                    "missing_slot": "medio",
+                    "question": "¿Qué medio usaste (efectivo/transferencia/nequi/daviplata/tarjeta/crédito)?"
+                },
+                {
+                    "missing_slot": "referencia_documento",
+                    "question": "¿A qué documento lo relaciono (factura FV-GYM / recibo / soporte)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Movimiento de caja/bancos registrado y asociado a su documento.",
+            "error_reply_template": "No pude registrar el movimiento. Revisa tipo, tercero, monto, medio y referencia."
+        },
+        {
+            "intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "action": "APP_ENTITY_CREATE_CUSTOMER",
+            "utterances_explicit": [
+                "Crear socio nuevo (persona) con cédula",
+                "Crear socio nuevo con nombre y celular",
+                "Crear socio con correo para enviar factura",
+                "Crear cliente empresa para plan corporativo (NIT)",
+                "Crear socio con condición contado",
+                "Crear socio con condición crédito 30 días",
+                "Registrar tercero para facturar membresía",
+                "Crear socio para paquete de clases",
+                "Crear socio para personal training",
+                "Crear socio para venta de productos",
+                "Crear socio con contacto de emergencia",
+                "Crear socio con dirección",
+                "Crear socio con observación (lesión)",
+                "Crear cliente para recaudos (tercero)",
+                "Crear cliente para cuenta por cobrar",
+                "Crear socio para inscripción hoy",
+                "Crear socio para reactivación",
+                "Crear cliente empresa con razón social y correo",
+                "Crear socio rápido para cobrar",
+                "Crear socio con CC y apellido",
+                "Crear socio con WhatsApp como contacto",
+                "Crear socio con email y celular",
+                "Crear socio con condición crédito 15 días",
+                "Crear socio con condición crédito 45 días",
+                "Crear socio con convenio empresarial",
+                "Crear socio para plan estudiante",
+                "Crear socio para plan familiar",
+                "Crear socio para sede A",
+                "Crear socio para sede B",
+                "Crear socio y asignar plan después",
+                "Registrar dueño de factura (tercero)",
+                "Crear tercero para caja/bancos",
+                "Crear cliente con dos contactos",
+                "Crear socio con fecha de nacimiento",
+                "Crear socio con género y objetivo",
+                "Crear socio para clase boutique",
+                "Crear socio para evento/competencia",
+                "Crear socio para drop-in",
+                "Crear socio para locker",
+                "Crear socio para parqueadero"
+            ],
+            "utterances_implicit": [
+                "No aparece el socio, toca crearlo",
+                "Voy a facturar y el socio no existe",
+                "No puedo cobrar sin tercero",
+                "Ese cliente es nuevo, agréguelo",
+                "Solo tengo la cédula, créalo",
+                "Es empresa, toca crearla con NIT",
+                "Solo tengo nombre y celu, créalo",
+                "Necesito guardar correo para enviar factura",
+                "Ese cliente va a crédito, pon condición",
+                "Es contado, déjalo contado",
+                "No lo encuentro por CC, créalo",
+                "Falta crear responsable de pago",
+                "Necesito tercero para registrar el recaudo",
+                "No me deja facturar sin cliente",
+                "Crea el socio y seguimos con la inscripción",
+                "Necesito registrarlo rápido pa cobrar",
+                "Me falta el tercero para la factura",
+                "El cliente compra por convenio, regístralo",
+                "Necesito crear cliente empresa del plan corporativo",
+                "Me falta el contacto del socio",
+                "El socio pide factura electrónica y falta email",
+                "Déjalo con crédito a 30 días",
+                "Solo tengo WhatsApp, pero créalo",
+                "No aparece en lista, créalo",
+                "Falta crear socio para PT",
+                "Falta crear socio para paquete clases",
+                "Necesito cliente para CxC",
+                "No lo encuentra por nombre, créalo por CC",
+                "Necesito crear el socio ya",
+                "Voy a vender producto y falta cliente",
+                "No puedo registrar pago sin tercero",
+                "Es un plan familiar, falta crear el titular",
+                "Necesito crear el socio para sede A",
+                "Necesito registrar datos mínimos",
+                "Me pasaron el NIT y razón social, falta registrarlo",
+                "Necesito el tercero pa bancos",
+                "Ese socio es nuevo, agréguelo",
+                "Me falta crear cliente para locker",
+                "Me falta crear cliente para parqueadero",
+                "Ayúdame a crear el socio"
+            ],
+            "hard_negatives": [
+                "Consultar socio por cédula",
+                "Buscar socio existente",
+                "Ver ficha del socio",
+                "Editar teléfono del socio",
+                "Actualizar correo del socio",
+                "Cambiar condición comercial",
+                "Eliminar socio",
+                "Inactivar socio",
+                "Ver estado de cuenta del socio",
+                "Ver facturas del socio",
+                "Ver CxC del socio",
+                "Registrar factura de venta",
+                "Consultar factura",
+                "Registrar recaudo",
+                "Consultar movimientos caja",
+                "Crear ítem/plan/producto",
+                "Editar ítem/plan/producto",
+                "Crear asiento contable",
+                "Consultar asientos",
+                "Reservar clase",
+                "Cancelar reserva",
+                "Reprogramar clase",
+                "Ver agenda (consulta)",
+                "Ver asistencia del socio (consulta)",
+                "Editar evaluación física",
+                "Importar socios Excel",
+                "Exportar socios",
+                "Crear proveedor",
+                "Consultar proveedores",
+                "Soporte: socio no carga",
+                "Resetear contraseña",
+                "Crear usuario",
+                "Asignar roles a usuario",
+                "Reporte de socios (consulta)",
+                "Enviar mensajes masivos",
+                "Crear app",
+                "Editar app",
+                "Listar apps",
+                "Conciliar bancos",
+                "Cargar extracto"
+            ],
+            "slots": [
+                {
+                    "name": "tipo",
+                    "required": true
+                },
+                {
+                    "name": "nit_cc",
+                    "required": true
+                },
+                {
+                    "name": "razon_social_nombre",
+                    "required": true
+                },
+                {
+                    "name": "contacto",
+                    "required": true
+                },
+                {
+                    "name": "condicion_comercial",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tipo",
+                    "question": "¿El socio/cliente es persona natural o empresa?"
+                },
+                {
+                    "missing_slot": "nit_cc",
+                    "question": "¿Cuál es el NIT o la cédula?"
+                },
+                {
+                    "missing_slot": "razon_social_nombre",
+                    "question": "¿Cuál es el nombre completo o razón social?"
+                },
+                {
+                    "missing_slot": "contacto",
+                    "question": "¿Qué contacto registro (celular y/o email)?"
+                },
+                {
+                    "missing_slot": "condicion_comercial",
+                    "question": "¿Es contado o crédito (y a cuántos días)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Socio/cliente creado y listo para facturar/recaudar.",
+            "error_reply_template": "No pude crear el socio/cliente. Verifica tipo, documento y nombre."
+        },
+        {
+            "intent": "APP_RUNTIME_CREATE_ITEM",
+            "action": "APP_ENTITY_CREATE_ITEM",
+            "utterances_explicit": [
+                "Crear plan mensual (servicio) con precio e IVA",
+                "Crear plan trimestral (servicio) con código",
+                "Crear plan anual (servicio) con descuento",
+                "Crear servicio inscripción (matrícula)",
+                "Crear servicio PT 8 sesiones",
+                "Crear servicio PT 12 sesiones",
+                "Crear servicio evaluación física",
+                "Crear servicio asesoría nutricional",
+                "Crear servicio clase suelta (drop-in)",
+                "Crear servicio paquete 10 clases",
+                "Crear servicio parqueadero mensual",
+                "Crear servicio locker mensual",
+                "Crear producto proteína 2lb (inventariable)",
+                "Crear producto creatina (inventariable)",
+                "Crear producto bebida isotónica (inventariable)",
+                "Crear producto agua (inventariable)",
+                "Crear producto camiseta gym (inventariable)",
+                "Crear producto guantes (inventariable)",
+                "Crear producto cuerda (inventariable)",
+                "Crear producto toalla (inventariable)",
+                "Crear ítem con SKU y precio",
+                "Crear ítem con IVA 19",
+                "Crear ítem exento (si aplica)",
+                "Crear ítem con costo y margen",
+                "Crear plan corporativo (servicio)",
+                "Crear plan estudiante (servicio)",
+                "Crear plan familiar (servicio)",
+                "Crear servicio congelar plan",
+                "Crear servicio reposición carnet",
+                "Crear paquete plan+matrícula",
+                "Crear paquete plan+proteína",
+                "Crear servicio clase yoga mensual",
+                "Crear servicio spinning mensual",
+                "Crear servicio cross training mensual",
+                "Crear producto banda elástica (inventariable)",
+                "Crear producto colchoneta (inventariable)",
+                "Crear producto shaker (inventariable)",
+                "Crear servicio bootcamp fin de semana",
+                "Crear servicio evento/competencia",
+                "Crear servicio mantenimiento (cargo)"
+            ],
+            "utterances_implicit": [
+                "No me sale el plan mensual, toca crearlo",
+                "Voy a facturar y falta el ítem de matrícula",
+                "Ese suplemento no está en catálogo",
+                "Necesito el SKU del producto",
+                "Ese producto va a inventario",
+                "Ese plan es servicio, no inventario",
+                "Falta crear paquete de clases para cobrar fácil",
+                "Quiero que calcule IVA desde el ítem",
+                "Necesito precio para poder cobrar",
+                "Falta el ítem de PT",
+                "Falta el ítem de evaluación física",
+                "Falta el ítem de asesoría nutricional",
+                "No aparece bebida isotónica, créala",
+                "No aparece proteína, agrégala",
+                "Ese ítem va sin IVA (si aplica)",
+                "Necesito crear el locker como servicio",
+                "Necesito crear el parqueadero como servicio",
+                "No encuentro guantes, agrégalo",
+                "No encuentro cuerda, agrégalo",
+                "Necesito stock mínimo para suplementos",
+                "Ese producto debe ser inventariable sí",
+                "Ese servicio debe ser inventariable no",
+                "Me falta el ítem pa la factura",
+                "Crea el ítem y seguimos",
+                "Solo tengo nombre y precio, créalo",
+                "Ponle IVA 19 y listo",
+                "Necesito código para el plan",
+                "Quiero crear plan corporativo",
+                "Quiero crear plan estudiante",
+                "Necesito crear paquete plan+proteína",
+                "Necesito crear reposición de carnet",
+                "Falta el ítem de bootcamp",
+                "Falta el ítem del evento",
+                "Necesito crear snack proteico",
+                "Necesito crear shaker",
+                "No aparece agua, agrégala",
+                "Necesito crear banda elástica",
+                "Necesito crear colchoneta",
+                "Ese plan lleva descuento, déjalo como ítem",
+                "Ayúdame a crear ese ítem"
+            ],
+            "hard_negatives": [
+                "Consultar ítem por SKU",
+                "Buscar producto existente",
+                "Ver kardex del producto",
+                "Ajustar inventario",
+                "Editar precio de ítem existente",
+                "Cambiar IVA de ítem existente",
+                "Eliminar ítem",
+                "Inactivar ítem",
+                "Importar catálogo Excel",
+                "Exportar catálogo",
+                "Crear socio/cliente",
+                "Editar socio/cliente",
+                "Registrar factura",
+                "Consultar factura",
+                "Anular factura",
+                "Registrar recaudo",
+                "Consultar movimientos caja",
+                "Crear asiento contable",
+                "Consultar asientos",
+                "Registrar compra proveedor",
+                "Ingreso a inventario",
+                "Traslado bodegas",
+                "Configurar bodegas",
+                "Configurar unidades",
+                "Configurar impuestos globales",
+                "Crear lista de precios",
+                "Aplicar descuento masivo",
+                "Reporte inventario (consulta)",
+                "Reporte ventas (consulta)",
+                "Reservar clase",
+                "Ver agenda",
+                "Actualizar evaluación física (no crear ítem)",
+                "Soporte: no carga catálogo",
+                "Crear app",
+                "Editar app",
+                "Listar apps",
+                "Conciliar bancos",
+                "Cargar extracto",
+                "Consultar/editar ítem (no crear) #39",
+                "Consultar/editar ítem (no crear) #40"
+            ],
+            "slots": [
+                {
+                    "name": "tipo",
+                    "required": true
+                },
+                {
+                    "name": "precio",
+                    "required": true
+                },
+                {
+                    "name": "impuesto",
+                    "required": true
+                },
+                {
+                    "name": "sku_codigo",
+                    "required": true
+                },
+                {
+                    "name": "inventariable",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tipo",
+                    "question": "¿Es producto (inventario) o servicio (plan/clase)?"
+                },
+                {
+                    "missing_slot": "precio",
+                    "question": "¿Cuál es el precio de venta en COP?"
+                },
+                {
+                    "missing_slot": "impuesto",
+                    "question": "¿Qué IVA aplica (porcentaje)?"
+                },
+                {
+                    "missing_slot": "sku_codigo",
+                    "question": "¿Cuál es el código/SKU del ítem?"
+                },
+                {
+                    "missing_slot": "inventariable",
+                    "question": "Si es producto, ¿es inventariable (sí/no)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Ítem creado (producto/servicio) con precio, IVA y código.",
+            "error_reply_template": "No pude crear el ítem. Verifica tipo, precio, IVA y código."
+        },
+        {
+            "intent": "ERP_ASIENTO_CONTABLE",
+            "action": "ERP_ACCOUNTING_JOURNAL",
+            "utterances_explicit": [
+                "Registrar asiento por descuadre de caja del gym",
+                "Crear asiento manual por gasto de mantenimiento equipos",
+                "Registrar asiento por IVA generado del día",
+                "Crear asiento por comisión datáfono",
+                "Registrar asiento por arriendo del local",
+                "Registrar asiento por servicios públicos",
+                "Crear asiento por compra de suplementos (gasto/stock)",
+                "Registrar asiento por ajuste de inventario",
+                "Crear asiento por traslado caja a bancos",
+                "Registrar asiento por reembolso a socio",
+                "Crear asiento con centro de costo Sede A",
+                "Crear asiento con centro de costo Sede B",
+                "Registrar asiento con documento soporte (arqueo)",
+                "Crear comprobante contable diario",
+                "Registrar asiento por ingreso no facturado (ajuste)",
+                "Crear asiento por anticipo recibido",
+                "Registrar asiento por nómina (si aplica)",
+                "Registrar asiento por depreciación de máquinas",
+                "Crear asiento por provisión",
+                "Registrar asiento por gastos bancarios",
+                "Crear asiento por pago a entrenador (honorarios)",
+                "Registrar asiento por publicidad/marketing",
+                "Crear asiento por limpieza y aseo",
+                "Registrar asiento por compra de implementos",
+                "Crear asiento por devolución de dinero",
+                "Registrar asiento por retención (si aplica)",
+                "Crear asiento por caja menor",
+                "Registrar asiento por ajuste de cartera",
+                "Crear asiento por castigo de cartera",
+                "Registrar asiento por diferencia de bancos",
+                "Crear asiento por póliza/seguro",
+                "Registrar asiento por mantenimiento datáfono",
+                "Crear asiento por gasto de internet",
+                "Registrar asiento por alquiler de lockers (ingreso diferido)",
+                "Crear asiento por ingreso de evento",
+                "Registrar asiento por costo de ventas de productos",
+                "Crear asiento por compras a crédito",
+                "Registrar asiento por pago de proveedor",
+                "Crear asiento con líneas débito/crédito",
+                "Registrar asiento con soporte y concepto"
+            ],
+            "utterances_implicit": [
+                "El contador pidió un comprobante manual",
+                "Falta pasar esto a contabilidad",
+                "Necesito un comprobante con soporte",
+                "Hay descuadre y toca ajustar",
+                "Debo reconocer IVA en libros",
+                "La comisión del banco no está registrada",
+                "Ese gasto debe quedar en el diario",
+                "Falta el asiento del arriendo",
+                "Falta el asiento de servicios públicos",
+                "Necesito asociar documento soporte al asiento",
+                "Me falta centro de costo",
+                "Eso debe ir al diario hoy",
+                "Necesito líneas débito/crédito",
+                "Falta el comprobante del gasto de mantenimiento",
+                "Quiero contabilizar traslado a bancos",
+                "Falta contabilizar compra de suplementos",
+                "Hubo reembolso a un socio, falta asiento",
+                "Necesito asiento por publicidad",
+                "Necesito registrar gastos bancarios",
+                "No quedó registrado en libros",
+                "Debo imputar a sede A o sede B",
+                "Me falta el concepto del asiento",
+                "Faltan las líneas del asiento",
+                "Necesito asiento por ajuste inventario",
+                "Debo contabilizar devolución de dinero",
+                "Necesito asiento por ajuste de cartera",
+                "Necesito asiento por castigo de cartera",
+                "Falta el asiento del día",
+                "Hay diferencia entre factura y pago",
+                "Necesito registrar provisión",
+                "El soporte está, falta asiento",
+                "Toca meter comprobante contable",
+                "Necesito asiento por pago a entrenador",
+                "Falta asiento por compra de implementos",
+                "Necesito asiento por costo de ventas (productos)",
+                "Necesito asiento por compras a crédito",
+                "Necesito asiento por pago de proveedor",
+                "Necesito asiento por depreciación equipos",
+                "Ayúdame con ese comprobante",
+                "Quiero registrar el asiento ya"
+            ],
+            "hard_negatives": [
+                "Consultar asientos contables",
+                "Listar comprobantes del mes",
+                "Imprimir comprobante existente",
+                "Descargar comprobante existente",
+                "Editar un asiento registrado",
+                "Anular un asiento existente",
+                "Eliminar comprobante",
+                "Ver libro diario (consulta)",
+                "Ver balance general",
+                "Ver estado de resultados",
+                "Configurar plan de cuentas",
+                "Crear cuenta contable nueva",
+                "Cambiar códigos contables",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Registrar factura de venta",
+                "Consultar factura",
+                "Anular factura",
+                "Registrar recaudo",
+                "Consultar movimientos de caja",
+                "Crear socio/cliente",
+                "Crear ítem/plan/producto",
+                "Ajustar inventario (operativo)",
+                "Cerrar caja",
+                "Abrir caja",
+                "Reporte de ventas (consulta)",
+                "Reporte de IVA (consulta)",
+                "Crear app",
+                "Editar app",
+                "Soporte: error contable",
+                "Exportar contabilidad",
+                "Importar asientos",
+                "Crear usuario",
+                "Resetear contraseña",
+                "Manual contable",
+                "Tutorial contable",
+                "Ver CxC (consulta)",
+                "Ver CxP (consulta)",
+                "Registrar compra",
+                "Orden de compra"
+            ],
+            "slots": [
+                {
+                    "name": "fecha",
+                    "required": true
+                },
+                {
+                    "name": "concepto",
+                    "required": true
+                },
+                {
+                    "name": "lineas_debito_credito",
+                    "required": true
+                },
+                {
+                    "name": "centro_costo",
+                    "required": true
+                },
+                {
+                    "name": "documento_soporte",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "fecha",
+                    "question": "¿Qué fecha debe llevar el asiento?"
+                },
+                {
+                    "missing_slot": "concepto",
+                    "question": "¿Cuál es el concepto/descripcion del asiento?"
+                },
+                {
+                    "missing_slot": "lineas_debito_credito",
+                    "question": "Dime las líneas (cuenta, débito/crédito y valor) para registrar el asiento."
+                },
+                {
+                    "missing_slot": "centro_costo",
+                    "question": "¿Qué centro de costo aplica (ej. Sede A/Sede B)?"
+                },
+                {
+                    "missing_slot": "documento_soporte",
+                    "question": "¿Cuál es el documento soporte (número/archivo/referencia)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Asiento contable registrado con soporte y centro de costo.",
+            "error_reply_template": "No pude registrar el asiento. Revisa fecha, líneas y soporte."
+        }
+    ],
+    "multi_turn_dialogues": [
+        {
+            "id": "GYM-DLG-01",
+            "scenario": "Corrección: factura de membresía con numeración",
+            "turns": [
+                {
+                    "user": "necesito facturar el plan mensual"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                },
+                {
+                    "user": "para Andrés Pérez cc 1022334455"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                },
+                {
+                    "user": "plan mensual 1 por 120000"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:impuestos"
+                },
+                {
+                    "user": "iva 19"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:forma_pago"
+                },
+                {
+                    "user": "nequi"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:prefijo_numeracion"
+                },
+                {
+                    "user": "FV-GYM-A-000123"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        },
+        {
+            "id": "GYM-DLG-02",
+            "scenario": "Frustración: recaudo implícito",
+            "turns": [
+                {
+                    "user": "ya me pagaron y no me cuadra la caja 😡"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo_movimiento"
+                },
+                {
+                    "user": "ingreso, del socio"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:referencia_documento"
+                }
+            ]
+        },
+        {
+            "id": "GYM-DLG-03",
+            "scenario": "Desambiguación: factura vs recibo",
+            "turns": [
+                {
+                    "user": "necesito el recibo del pago del plan"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo_movimiento"
+                },
+                {
+                    "user": "no, era la factura a nombre de la empresa"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                }
+            ]
+        },
+        {
+            "id": "GYM-DLG-04",
+            "scenario": "Crear socio antes de cobrar",
+            "turns": [
+                {
+                    "user": "ese socio no aparece, créalo rápido"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo"
+                },
+                {
+                    "user": "persona"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:nit_cc"
+                }
+            ]
+        },
+        {
+            "id": "GYM-DLG-05",
+            "scenario": "Crear ítem producto vs servicio",
+            "turns": [
+                {
+                    "user": "no me sale la proteína 2lb, agrégala"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo"
+                },
+                {
+                    "user": "producto"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:sku_codigo"
+                }
+            ]
+        },
+        {
+            "id": "GYM-DLG-06",
+            "scenario": "APP_CREATE: definición de módulos prioritarios",
+            "turns": [
+                {
+                    "user": "quiero app para gimnasio con clases, membresías y pagos"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:procesos_criticos"
+                },
+                {
+                    "user": "membresías, clases, asistencia, facturación y recaudo"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:modulos_prioritarios"
+                }
+            ]
+        },
+        {
+            "id": "GYM-DLG-07",
+            "scenario": "Frustración: app sin tanta pregunta",
+            "turns": [
+                {
+                    "user": "hágale y cree la app ya sin tanta vuelta 😤"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:roles"
+                },
+                {
+                    "user": "admin, recepción, coach y caja"
+                },
+                {
+                    "assistant_expected_action": "FRAMEWORK_APP_CREATE"
+                }
+            ]
+        },
+        {
+            "id": "GYM-DLG-08",
+            "scenario": "Asiento por comisión datáfono",
+            "turns": [
+                {
+                    "user": "necesito un asiento por comisión del datáfono"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:fecha"
+                },
+                {
+                    "user": "hoy"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:lineas_debito_credito"
+                }
+            ]
+        },
+        {
+            "id": "GYM-DLG-09",
+            "scenario": "Pago sin referencia clara",
+            "turns": [
+                {
+                    "user": "me entró un nequi pero no sé qué factura era"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tercero"
+                },
+                {
+                    "user": "de Laura Díaz cc 100200300"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:monto"
+                }
+            ]
+        },
+        {
+            "id": "GYM-DLG-10",
+            "scenario": "Desambiguación: crear vs anular",
+            "turns": [
+                {
+                    "user": "anula la factura FV-GYM-A-000120"
+                },
+                {
+                    "assistant_expected_action": "NEEDS_DISAMBIGUATION"
+                },
+                {
+                    "user": "perdón, era crear la factura del plan de hoy"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                }
+            ]
+        }
+    ],
+    "emotion_cases": [
+        {
+            "emotion": "frustracion",
+            "user_samples": [
+                "no joda, necesito cobrar ya",
+                "otra vez pidiendo lo mismo 😡",
+                "eso no sirve, me atrasa el cierre",
+                "me tiene mamado, solo registre el pago"
+            ],
+            "assistant_style": "empático, breve, sin discutir; valida emoción y pide 1 dato crítico",
+            "expected_next_step": "aplicar one_question_policy del slot más crítico para avanzar"
+        },
+        {
+            "emotion": "duda",
+            "user_samples": [
+                "no sé si es factura o solo recibo",
+                "eso va a caja o a contabilidad?",
+                "registro pago o registro venta?"
+            ],
+            "assistant_style": "explica en 1-2 líneas y hace una sola pregunta para definir intención",
+            "expected_next_step": "preguntar el dato que define el intent (factura vs recaudo vs asiento)"
+        },
+        {
+            "emotion": "urgencia",
+            "user_samples": [
+                "es para yaaa",
+                "me lo piden en 5 min",
+                "cierre de caja urgente"
+            ],
+            "assistant_style": "directo y resolutivo; 1 pregunta y ejecución inmediata al completar",
+            "expected_next_step": "pedir el slot faltante mínimo y ejecutar acción"
+        }
+    ],
+    "qa_cases": [
+        {
+            "text": "crear app gimnasio con tablas socios, membresías, clases y pagos; total=subtotal+iva",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "necesito app que calcule dias_restantes de la membresía y estado activa/vencida",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "quiero app con reservas y cupos por clase y lista de espera",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "app gym con inventario de suplementos y stock_min con alertas",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "armar app con reportes: ingresos por plan, recaudos por medio, morosos",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "crear app con fórmula saldo=total-pagado y renovación próxima (7 días)",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "quiero app con roles admin/recepción/coach/caja y permisos",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "app con flujo inscripción->factura->recaudo->acceso",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "crear app para box crossfit con WOD y tracking (PR) + facturación",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "quiero app con cierre de caja diario y reporte de ventas del día",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "registrar factura por membresía mensual con IVA y prefijo FV-GYM",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar plan corporativo a crédito con vencimiento",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar proteína 2lb y bebida isotónica en la misma factura",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "me falta el documento fiscal del PT 8 sesiones",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "necesito consecutivo FV-GYM-A para facturar hoy",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar paquete 10 clases con descuento promo",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "emitir factura por inscripción y plan mensual",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "el socio me pidió la factura ya",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar reposición de carnet",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar evento/competencia del gym",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "ya me pagaron por nequi, registra el recaudo y aplícalo a la factura",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar abono del plan a crédito y dejar saldo",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "pagué arriendo del gym, registra el egreso",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "entró pago por tarjeta, falta movimiento y comisión datáfono",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "me llegó un pago sin referencia, necesito registrarlo",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "hacer recibo de caja del pago del socio",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar ingreso por transferencia a bancos",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar salida por compra de suplementos",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar reembolso a un socio (salida)",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "no me cuadra el cierre, falta meter un pago",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "crear socio persona con cédula, nombre y celular para facturar",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "no existe el socio, toca crearlo antes de cobrar",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear cliente empresa con NIT para plan corporativo y crédito 30 días",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "me falta el correo del socio para enviar factura electrónica",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "solo tengo nombre y whatsapp, créalo",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear tercero para registrar recaudo en caja/bancos",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear socio para plan familiar (titular)",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear socio para clase boutique por reserva",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear socio para locker mensual",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear socio para parqueadero mensual",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear ítem plan mensual (servicio) con precio, IVA y código",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear producto proteína 2lb inventariable con SKU",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "no me sale matrícula/inscripción, créala como servicio",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "voy a facturar y falta el ítem de PT 8 sesiones",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "ese es servicio, no inventario",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "ese es producto y debe ser inventariable sí",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear paquete plan+proteína como ítem",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear ítem locker mensual como servicio",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear producto bebida isotónica inventariable",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear ítem evaluación física con precio e IVA",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "registrar asiento por descuadre de caja con soporte arqueo",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "registrar asiento por IVA generado del día (240805)",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "crear asiento por comisión datáfono y gasto bancario",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "asiento lines deb 110505 20000 / cred 413595 20000",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "el contador pidió un comprobante manual con centro de costo Sede A",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "necesito asociar documento soporte al asiento",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "crear asiento por mantenimiento de equipos",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "registrar asiento por publicidad del gym",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "crear asiento por reembolso a socio",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "registrar asiento por ajuste de inventario",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        }
+    ]
+}
