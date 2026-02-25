@@ -43,15 +43,58 @@ if (count($questions) < 4) {
     $failures[] = 'Expected 4+ discovery questions.';
 }
 
-$result = $start;
-for ($i = 0; $i < count($questions); $i++) {
+$result = $gateway->handle(
+    $tenantId,
+    $userId,
+    'ventas, inventario y facturacion',
+    'builder',
+    $projectId
+);
+$stepOneState = is_array($result['state'] ?? null) ? (array) $result['state'] : [];
+$stepOneFlow = is_array($stepOneState['unknown_business_discovery'] ?? null)
+    ? (array) $stepOneState['unknown_business_discovery']
+    : [];
+if ((int) ($stepOneFlow['current_index'] ?? -1) !== 1) {
+    $failures[] = 'Expected discovery index = 1 after first valid answer.';
+}
+
+$frustration = $gateway->handle(
+    $tenantId,
+    $userId,
+    'no estas entendiendo',
+    'builder',
+    $projectId
+);
+$frustrationReply = mb_strtolower((string) ($frustration['reply'] ?? ''), 'UTF-8');
+if (!str_contains($frustrationReply, 'pregunta 2/')) {
+    $failures[] = 'Discovery should keep same question for non-answer frustration input.';
+}
+$frustrationState = is_array($frustration['state'] ?? null) ? (array) $frustration['state'] : [];
+$frustrationFlow = is_array($frustrationState['unknown_business_discovery'] ?? null)
+    ? (array) $frustrationState['unknown_business_discovery']
+    : [];
+if ((int) ($frustrationFlow['current_index'] ?? -1) !== 1) {
+    $failures[] = 'Discovery index should not advance on frustration non-answer.';
+}
+
+$result = $frustration;
+for ($i = 1; $i < count($questions); $i++) {
+    $answer = 'respuesta ' . ($i + 1) . ' control de produccion, inventario, factura, pagos y reportes';
+    if ($i === 2) {
+        $answer = 'ventas, contabilidad, pagos y lo que me pide la dian';
+    }
     $result = $gateway->handle(
         $tenantId,
         $userId,
-        'respuesta ' . ($i + 1) . ' control de produccion, inventario, factura, pagos y reportes',
+        $answer,
         'builder',
         $projectId
     );
+    $loopReply = mb_strtolower((string) ($result['reply'] ?? ''), 'UTF-8');
+    if (str_contains($loopReply, 'flujo sugerido:') || str_contains($loopReply, 'facturacion electronica en colombia')) {
+        $failures[] = 'Builder guidance should not interrupt unknown discovery flow.';
+        break;
+    }
 }
 
 $finalReply = mb_strtolower((string) ($result['reply'] ?? ''), 'UTF-8');

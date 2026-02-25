@@ -2534,12 +2534,27 @@ final class ConversationGateway
         $explicitBusinessRejection = $this->isBusinessTypeRejectedByUser($text, $existingBusinessType);
         $businessResolvedNote = '';
         if ($explicitBusinessRejection) {
-            $business = '';
-            unset($localProfile['business_type']);
-            $localState['proposed_profile'] = null;
-            $localState['analysis_approved'] = null;
-            $localState['dynamic_playbook_proposal'] = null;
-            $localState['resolution_attempts'] = (int) ($localState['resolution_attempts'] ?? 0) + 1;
+            $existingNormalized = $this->normalizeBusinessType($existingBusinessType);
+            $detectedNormalized = $this->normalizeBusinessType($business);
+            $hasReplacementBusiness = $detectedNormalized !== '' && $detectedNormalized !== $existingNormalized;
+            if (!$hasReplacementBusiness) {
+                $replacementCandidate = $this->detectUnknownBusinessCandidate($text, $business);
+                $candidateNormalized = $this->normalizeBusinessType($replacementCandidate);
+                $candidateProfile = $candidateNormalized !== '' ? $this->findDomainProfile($candidateNormalized) : [];
+                if ($candidateNormalized !== '' && !empty($candidateProfile) && $candidateNormalized !== $existingNormalized) {
+                    $business = $candidateNormalized;
+                    $localProfile['business_type'] = $candidateNormalized;
+                    $hasReplacementBusiness = true;
+                }
+            }
+            if (!$hasReplacementBusiness) {
+                $business = '';
+                unset($localProfile['business_type']);
+                $localState['proposed_profile'] = null;
+                $localState['analysis_approved'] = null;
+                $localState['dynamic_playbook_proposal'] = null;
+                $localState['resolution_attempts'] = (int) ($localState['resolution_attempts'] ?? 0) + 1;
+            }
         }
         if (
             $business === ''
@@ -2576,11 +2591,25 @@ final class ConversationGateway
                 $localState['confirm_scope_repeats'] = 0;
                 unset($localProfile['needs_scope'], $localProfile['needs_scope_items'], $localProfile['documents_scope'], $localProfile['documents_scope_items']);
                 $localState['onboarding_step'] = !empty($localProfile['operation_model']) ? 'needs_scope' : 'operation_model';
+                if ($businessResolvedNote === '' && $existingBusinessType !== '') {
+                    $label = $this->domainLabelByBusinessType($business);
+                    $businessResolvedNote = 'Entendido. Ajuste el negocio a "' . $label . '".';
+                }
             }
         }
         $unknownBusinessCandidate = (bool) ($localState['unknown_business_force_research'] ?? false)
             ? trim((string) ($localProfile['business_candidate'] ?? ''))
             : $this->detectUnknownBusinessCandidate($text, $business);
+        if ($unknownBusinessCandidate !== '') {
+            $candidateAsKnownType = $this->normalizeBusinessType($unknownBusinessCandidate);
+            $candidateKnownProfile = $candidateAsKnownType !== '' ? $this->findDomainProfile($candidateAsKnownType) : [];
+            if ($candidateAsKnownType !== '' && !empty($candidateKnownProfile)) {
+                $business = $candidateAsKnownType;
+                $localProfile['business_type'] = $candidateAsKnownType;
+                unset($localProfile['business_candidate']);
+                $unknownBusinessCandidate = '';
+            }
+        }
         if ($unknownBusinessCandidate !== '') {
             $localProfile['business_candidate'] = $unknownBusinessCandidate;
             $this->registerUnknownBusinessCase($tenantId, $userId, $unknownBusinessCandidate, $text);
@@ -2591,7 +2620,10 @@ final class ConversationGateway
                 $localState['analysis_approved'] = null;
             }
         }
-        $operationModel = $this->detectOperationModel($text);
+        $shouldCaptureOperationModel = $currentStep === 'operation_model'
+            || empty((string) ($localProfile['operation_model'] ?? ''))
+            || $this->isOperationModelOverrideHint($text);
+        $operationModel = $shouldCaptureOperationModel ? $this->detectOperationModel($text) : '';
         if ($operationModel !== '') {
             $localProfile['operation_model'] = $operationModel;
         }
@@ -2800,6 +2832,15 @@ final class ConversationGateway
             return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
         }
         if (empty($localProfile['operation_model'])) {
+            if ($currentStep === 'operation_model' && $operationModel === '') {
+                $localState['active_task'] = 'builder_onboarding';
+                $localState['onboarding_step'] = 'operation_model';
+                $reply = 'En este paso responde solo como cobras: contado, credito o mixto.';
+                if ($businessResolvedNote !== '') {
+                    $reply = $businessResolvedNote . "\n" . $reply;
+                }
+                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+            }
             $captured = [];
             $needsDraft = $this->extractNeedItems($text, $businessType);
             if (!empty($needsDraft)) {
@@ -3372,6 +3413,8 @@ final class ConversationGateway
             'laser' => 'corte_laser',
             'restaurante' => 'restaurante_cafeteria',
             'cafeteria' => 'restaurante_cafeteria',
+            'panaderia' => 'restaurante_cafeteria',
+            'pasteleria' => 'restaurante_cafeteria',
             'ropa' => 'retail_tienda',
             'calzado' => 'retail_tienda',
             'consultoria' => 'consultoria_profesional',
@@ -3426,6 +3469,22 @@ final class ConversationGateway
         $normalizedDetected = $this->normalizeBusinessType($detectedBusinessType);
         if ($normalizedDetected !== '' && !in_array($normalizedDetected, ['retail_tienda', 'servicios_mantenimiento'], true)) {
             return '';
+        }
+
+        $normalizedText = $this->normalize($text);
+        if (
+            preg_match(
+                '/\b(?:no\s+soy|no\s+es)\s+(?:una|un)?\s*[a-z0-9_\-\s]{2,60}(?:,|\\.|;)?\s*(?:es|soy)\s+(?:una|un)?\s*([a-z0-9_\-\s]{2,60})/u',
+                $normalizedText,
+                $m
+            ) === 1
+        ) {
+            $candidate = trim((string) ($m[1] ?? ''));
+            $candidate = preg_split('/(?:,|\\.|;|\\bpero\\b|\\by\\b)/u', $candidate)[0] ?? $candidate;
+            $candidate = trim((string) $candidate);
+            if ($candidate !== '' && !$this->isGenericBusinessCandidate($candidate)) {
+                return $candidate;
+            }
         }
 
         $patterns = [
@@ -3537,16 +3596,38 @@ final class ConversationGateway
 
     private function detectOperationModel(string $text): string
     {
-        if (str_contains($text, 'mixto') || str_contains($text, 'misto') || str_contains($text, 'contado y credito') || str_contains($text, 'credito y contado')) {
+        $normalized = $this->normalize($text);
+        if ($normalized === '') {
+            return '';
+        }
+        if (
+            str_contains($normalized, 'mixto')
+            || str_contains($normalized, 'misto')
+            || str_contains($normalized, 'contado y credito')
+            || str_contains($normalized, 'credito y contado')
+            || str_contains($normalized, 'contado y a credito')
+        ) {
             return 'mixto';
         }
-        if (str_contains($text, 'credito') || str_contains($text, 'a credito') || str_contains($text, 'cartera')) {
+        if (str_contains($normalized, 'credito') || str_contains($normalized, 'a credito') || str_contains($normalized, 'fiado')) {
             return 'credito';
         }
-        if (str_contains($text, 'contado') || str_contains($text, 'efectivo') || str_contains($text, 'inmediato')) {
+        if (str_contains($normalized, 'contado') || str_contains($normalized, 'efectivo') || str_contains($normalized, 'inmediato')) {
             return 'contado';
         }
         return '';
+    }
+
+    private function isOperationModelOverrideHint(string $text): bool
+    {
+        $normalized = $this->normalize($text);
+        if ($normalized === '') {
+            return false;
+        }
+        if (preg_match('/\b(forma de pago|formas de pago|como cobro|como cobras|cobro|cobras|manejo pagos|medio de pago)\b/u', $normalized) !== 1) {
+            return false;
+        }
+        return preg_match('/\b(contado|credito|mixto|efectivo|a credito|fiado)\b/u', $normalized) === 1;
     }
 
     private function normalizeOperationModel(string $value): string
@@ -3650,6 +3731,7 @@ final class ConversationGateway
             : [];
         $technicalPrompt = trim((string) ($discoveryState['technical_prompt'] ?? ''));
         $technicalBrief = trim((string) ($discoveryState['technical_brief'] ?? ''));
+        $scopeFallback = $this->inferUnknownBusinessScopeFallback($text, $candidate, $profile, $state);
 
         $dedupeTtlSeconds = (int) ($unknownProtocol['llm_dedupe_ttl_seconds'] ?? 900);
         if ($dedupeTtlSeconds < 60 || $dedupeTtlSeconds > 86400) {
@@ -3694,6 +3776,29 @@ final class ConversationGateway
         }
         $knownProfiles = array_values(array_unique($knownProfiles));
 
+        $requiredOutputKeys = [
+            'status',
+            'confidence',
+            'canonical_business_type',
+            'business_candidate',
+            'business_objective',
+            'expected_result',
+            'reason_short',
+            'needs_normalized',
+            'documents_normalized',
+            'key_entities',
+            'first_module',
+            'operator_assistance_flow',
+            'similar_user_signals',
+            'training_dialog_flow',
+            'training_gaps',
+            'next_data_questions',
+            'clarifying_question',
+        ];
+        $allowedNeedsVocabulary = $this->unknownBusinessAllowedNeedsVocabulary();
+        $allowedDocumentsVocabulary = $this->unknownBusinessAllowedDocumentsVocabulary();
+        $requiredBusinessInfo = $this->unknownBusinessRequiredInfoChecklist();
+
         $promptContract = [
             'ROLE' => 'Domain Classification Assistant',
             'CONTEXT' => [
@@ -3701,6 +3806,11 @@ final class ConversationGateway
                 'language' => 'es-CO',
                 'goal' => 'clasificar tipo de negocio y necesidades iniciales sin inventar',
                 'has_discovery_answers' => !empty($discoveryAnswers),
+                'required_business_information' => $requiredBusinessInfo,
+                'fallback_needs' => $scopeFallback['needs'] ?? [],
+                'fallback_documents' => $scopeFallback['documents'] ?? [],
+                'allowed_needs_vocabulary' => $allowedNeedsVocabulary,
+                'allowed_documents_vocabulary' => $allowedDocumentsVocabulary,
             ],
             'INPUT' => [
                 'user_text' => $text,
@@ -3710,6 +3820,7 @@ final class ConversationGateway
                 'known_needs' => is_array($profile['needs_scope_items'] ?? null) ? array_values((array) $profile['needs_scope_items']) : [],
                 'known_documents' => is_array($profile['documents_scope_items'] ?? null) ? array_values((array) $profile['documents_scope_items']) : [],
                 'discovery_answers' => $discoveryAnswers,
+                'answered_business_information' => $this->buildUnknownBusinessAnsweredInfo($discoveryAnswers),
                 'technical_brief' => $technicalBrief,
                 'compiled_research_prompt' => $technicalPrompt,
             ],
@@ -3719,20 +3830,54 @@ final class ConversationGateway
                 'one_question_max_if_missing' => true,
                 'prefer_known_profiles' => true,
                 'use_discovery_answers_if_present' => true,
+                'if_status_matched_require_scope_lists' => true,
+                'if_status_matched_require_business_context' => true,
+                'if_status_matched_require_richness_minimums' => [
+                    'needs_min' => 5,
+                    'documents_min' => 4,
+                    'key_entities_min' => 6,
+                ],
+                'if_status_matched_require_assistance_pack' => true,
+                'if_status_matched_require_operator_flow_min' => 5,
+                'if_status_matched_require_similarity_signals_min' => 4,
+                'if_status_matched_require_training_dialog_min' => 6,
+                'if_status_needs_clarification_require_training_gaps' => true,
+                'if_status_needs_clarification_require_next_data_questions_min' => 3,
+                'if_missing_required_business_information_return_needs_clarification' => true,
+                'if_status_needs_clarification_require_question' => true,
+                'training_dialog_flow_item_format' => 'escenario | mensaje_usuario | respuesta_asistente | dato_critico',
+                'next_data_questions_must_be_closed_options' => true,
+                'prioritize_low_tech_user_language' => true,
+                'forbid_unknown_scope_labels' => true,
+                'forbid_legal_or_tax_advice_outside_input' => true,
+                'avoid_confidence_1_0_without_hard_evidence' => true,
+                'avoid_generic_entities_only' => true,
             ],
             'OUTPUT_FORMAT' => [
-                'status' => 'MATCHED|NEW_BUSINESS|NEEDS_CLARIFICATION|INVALID_REQUEST',
-                'confidence' => '0.0-1.0',
-                'canonical_business_type' => '<known_profile_or_empty>',
-                'business_candidate' => '<texto_normalizado>',
-                'reason_short' => '<breve>',
-                'needs_normalized' => ['<item>'],
-                'documents_normalized' => ['<item>'],
-                'clarifying_question' => '<si aplica>',
+                'status' => ['type' => 'string', 'enum' => ['MATCHED', 'NEW_BUSINESS', 'NEEDS_CLARIFICATION', 'INVALID_REQUEST']],
+                'confidence' => ['type' => 'number', 'minimum' => 0.0, 'maximum' => 1.0],
+                'canonical_business_type' => ['type' => 'string'],
+                'business_candidate' => ['type' => 'string'],
+                'business_objective' => ['type' => 'string'],
+                'expected_result' => ['type' => 'string'],
+                'reason_short' => ['type' => 'string'],
+                'needs_normalized' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'documents_normalized' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'key_entities' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'first_module' => ['type' => 'string'],
+                'operator_assistance_flow' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'similar_user_signals' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'training_dialog_flow' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'training_gaps' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'next_data_questions' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'clarifying_question' => ['type' => 'string'],
             ],
             'FAIL_RULES' => [
                 'if_confidence_below' => $confidenceThreshold,
                 'return_on_low_confidence' => 'NEEDS_CLARIFICATION',
+                'if_required_key_missing' => 'INVALID_REQUEST',
+                'if_required_business_info_missing' => 'NEEDS_CLARIFICATION',
+                'required_output_keys' => $requiredOutputKeys,
             ],
         ];
 
@@ -3755,39 +3900,1122 @@ final class ConversationGateway
             $llm = $router->chat($capsule, ['mode' => 'gemini', 'temperature' => 0.1]);
             $json = is_array($llm['json'] ?? null) ? (array) $llm['json'] : [];
             if (empty($json)) {
-                return ['status' => 'INVALID_RESPONSE'];
-            }
-            $status = strtoupper(trim((string) ($json['status'] ?? '')));
-            $allowed = ['MATCHED', 'NEW_BUSINESS', 'NEEDS_CLARIFICATION', 'INVALID_REQUEST'];
-            if (!in_array($status, $allowed, true)) {
-                $status = 'INVALID_RESPONSE';
+                $emptyResult = [
+                    'status' => 'INVALID_RESPONSE',
+                    'confidence' => 0.0,
+                    'canonical_business_type' => '',
+                    'business_candidate' => $candidate,
+                    'business_objective' => '',
+                    'expected_result' => '',
+                    'reason_short' => 'Respuesta vacia o no parseable del proveedor LLM.',
+                    'needs_normalized' => $scopeFallback['needs'] ?? [],
+                    'documents_normalized' => $scopeFallback['documents'] ?? [],
+                    'key_entities' => [],
+                    'first_module' => '',
+                    'operator_assistance_flow' => [],
+                    'similar_user_signals' => [],
+                    'training_dialog_flow' => [],
+                    'training_gaps' => [],
+                    'next_data_questions' => [],
+                    'clarifying_question' => 'Para ubicar bien tu negocio, dime en una frase que vendes o fabricas.',
+                    'provider_used' => (string) ($llm['provider'] ?? 'gemini'),
+                    'used_compiled_prompt' => $technicalPrompt !== '',
+                ];
+                $quality = $this->evaluateUnknownBusinessLlmQuality($emptyResult, $confidenceThreshold);
+                $emptyResult['quality_score'] = $quality['score'];
+                $emptyResult['quality_ok'] = $quality['ok'];
+                $emptyResult['quality_issues'] = $quality['issues'];
+                $this->persistUnknownBusinessLlmSample(
+                    $this->contextTenantId,
+                    $this->contextUserId,
+                    $candidate,
+                    $text,
+                    $emptyResult,
+                    $quality
+                );
+                return $emptyResult;
             }
 
-            $resolved = [
-                'status' => $status,
-                'confidence' => (float) ($json['confidence'] ?? 0.0),
-                'canonical_business_type' => (string) ($json['canonical_business_type'] ?? ''),
-                'business_candidate' => (string) ($json['business_candidate'] ?? ''),
-                'reason_short' => (string) ($json['reason_short'] ?? ''),
-                'needs_normalized' => is_array($json['needs_normalized'] ?? null) ? array_values((array) $json['needs_normalized']) : [],
-                'documents_normalized' => is_array($json['documents_normalized'] ?? null) ? array_values((array) $json['documents_normalized']) : [],
-                'clarifying_question' => (string) ($json['clarifying_question'] ?? ''),
-                'provider_used' => (string) ($llm['provider'] ?? 'gemini'),
-                'used_compiled_prompt' => $technicalPrompt !== '',
-            ];
+            $resolved = $this->normalizeUnknownBusinessLlmResolution(
+                $json,
+                $candidate,
+                $text,
+                $profile,
+                $state,
+                $confidenceThreshold,
+                $scopeFallback
+            );
+            $resolved['provider_used'] = (string) ($llm['provider'] ?? 'gemini');
+            $resolved['used_compiled_prompt'] = $technicalPrompt !== '';
 
-            if ($resolved['status'] === 'MATCHED' && $resolved['confidence'] < $confidenceThreshold) {
-                $resolved['status'] = 'NEEDS_CLARIFICATION';
-            }
-            if ($resolved['status'] === 'NEW_BUSINESS' && $resolved['confidence'] < 0.65) {
-                $resolved['status'] = 'NEEDS_CLARIFICATION';
-            }
+            $quality = $this->evaluateUnknownBusinessLlmQuality($resolved, $confidenceThreshold);
+            $resolved['quality_score'] = $quality['score'];
+            $resolved['quality_ok'] = $quality['ok'];
+            $resolved['quality_issues'] = $quality['issues'];
+            $this->persistUnknownBusinessLlmSample(
+                $this->contextTenantId,
+                $this->contextUserId,
+                $candidate,
+                $text,
+                $resolved,
+                $quality
+            );
 
             return $resolved;
         } catch (\Throwable $e) {
-            return ['status' => 'ERROR', 'error' => $e->getMessage()];
+            $errorResult = [
+                'status' => 'ERROR',
+                'error' => $e->getMessage(),
+                'confidence' => 0.0,
+                'canonical_business_type' => '',
+                'business_candidate' => $candidate,
+                'business_objective' => '',
+                'expected_result' => '',
+                'reason_short' => 'Fallo de llamada LLM.',
+                'needs_normalized' => $scopeFallback['needs'] ?? [],
+                'documents_normalized' => $scopeFallback['documents'] ?? [],
+                'key_entities' => [],
+                'first_module' => '',
+                'operator_assistance_flow' => [],
+                'similar_user_signals' => [],
+                'training_dialog_flow' => [],
+                'training_gaps' => [],
+                'next_data_questions' => [],
+                'clarifying_question' => 'Para ubicar bien tu negocio, dime en una frase que vendes o fabricas.',
+            ];
+            $quality = $this->evaluateUnknownBusinessLlmQuality($errorResult, $confidenceThreshold);
+            $errorResult['quality_score'] = $quality['score'];
+            $errorResult['quality_ok'] = $quality['ok'];
+            $errorResult['quality_issues'] = $quality['issues'];
+            $this->persistUnknownBusinessLlmSample(
+                $this->contextTenantId,
+                $this->contextUserId,
+                $candidate,
+                $text,
+                $errorResult,
+                $quality
+            );
+            return $errorResult;
         }
     }
+
+    private function normalizeUnknownBusinessLlmResolution(
+        array $json,
+        string $candidate,
+        string $text,
+        array $profile,
+        array $state,
+        float $confidenceThreshold,
+        array $scopeFallback = []
+    ): array {
+        $status = $this->normalizeUnknownBusinessStatus((string) ($json['status'] ?? ''));
+        $confidence = $this->clampConfidence($json['confidence'] ?? 0.0);
+        $canonicalBusinessType = $this->normalizeBusinessType((string) ($json['canonical_business_type'] ?? ''));
+        $businessCandidate = $this->sanitizeRequirementText((string) ($json['business_candidate'] ?? ''));
+        if ($businessCandidate === '') {
+            $businessCandidate = $this->sanitizeRequirementText($candidate);
+        }
+        if ($businessCandidate === '') {
+            $businessCandidate = $candidate;
+        }
+
+        $needs = $this->canonicalizeUnknownBusinessNeeds(
+            $this->normalizeUnknownBusinessList($json['needs_normalized'] ?? [])
+        );
+        $documents = $this->canonicalizeUnknownBusinessDocuments(
+            $this->normalizeUnknownBusinessList($json['documents_normalized'] ?? [])
+        );
+        $businessObjective = $this->sanitizeRequirementText((string) ($json['business_objective'] ?? ''));
+        $expectedResult = $this->sanitizeRequirementText((string) ($json['expected_result'] ?? ''));
+        $keyEntities = $this->normalizeUnknownBusinessEntityList($json['key_entities'] ?? []);
+        $firstModule = $this->sanitizeRequirementText((string) ($json['first_module'] ?? ''));
+        $operatorAssistanceFlow = $this->normalizeUnknownBusinessList($json['operator_assistance_flow'] ?? []);
+        $similarUserSignals = $this->normalizeUnknownBusinessList($json['similar_user_signals'] ?? []);
+        $trainingDialogFlow = $this->normalizeUnknownBusinessList($json['training_dialog_flow'] ?? []);
+        $trainingGaps = $this->normalizeUnknownBusinessList($json['training_gaps'] ?? []);
+        $nextDataQuestions = $this->normalizeUnknownBusinessList($json['next_data_questions'] ?? []);
+        $fallbackNeeds = is_array($scopeFallback['needs'] ?? null)
+            ? array_values(array_filter(array_map('strval', (array) $scopeFallback['needs'])))
+            : [];
+        $fallbackDocuments = is_array($scopeFallback['documents'] ?? null)
+            ? array_values(array_filter(array_map('strval', (array) $scopeFallback['documents'])))
+            : [];
+        if ($needs === [] && $fallbackNeeds !== []) {
+            $needs = $this->canonicalizeUnknownBusinessNeeds($this->mergeScopeLabels([], $fallbackNeeds));
+        }
+        if ($documents === [] && $fallbackDocuments !== []) {
+            $documents = $this->canonicalizeUnknownBusinessDocuments($this->mergeScopeLabels([], $fallbackDocuments));
+        }
+        $operatorAssistanceFlow = $this->mergeScopeLabels(
+            $operatorAssistanceFlow,
+            $this->buildUnknownBusinessOperatorAssistanceFallback($businessCandidate, $canonicalBusinessType)
+        );
+        $similarUserSignals = $this->mergeScopeLabels(
+            $similarUserSignals,
+            $this->buildUnknownBusinessSimilaritySignalsFallback($businessCandidate, $canonicalBusinessType)
+        );
+        $trainingDialogFlow = $this->mergeScopeLabels(
+            $trainingDialogFlow,
+            $this->buildUnknownBusinessTrainingDialogFallback($businessCandidate, $canonicalBusinessType)
+        );
+        $trainingGaps = $this->mergeScopeLabels(
+            $trainingGaps,
+            $this->buildUnknownBusinessTrainingGapsFallback($businessCandidate, $canonicalBusinessType)
+        );
+        $nextDataQuestions = $this->mergeScopeLabels(
+            $nextDataQuestions,
+            $this->buildUnknownBusinessNextDataQuestionsFallback($businessCandidate, $canonicalBusinessType)
+        );
+
+        $reason = trim((string) ($json['reason_short'] ?? ''));
+        $clarifyingQuestion = trim((string) ($json['clarifying_question'] ?? ''));
+
+        $knownProfile = $canonicalBusinessType !== '' ? $this->findDomainProfile($canonicalBusinessType) : [];
+        if ($status === 'MATCHED' && $canonicalBusinessType === '') {
+            $status = 'NEEDS_CLARIFICATION';
+            if ($reason === '') {
+                $reason = 'No se pudo confirmar un perfil canonico de negocio.';
+            }
+        }
+        if ($status === 'MATCHED' && $canonicalBusinessType !== '' && empty($knownProfile)) {
+            $status = 'NEEDS_CLARIFICATION';
+            if ($reason === '') {
+                $reason = 'El perfil canonico sugerido no existe en la base actual.';
+            }
+        }
+        if ($status === 'MATCHED' && $confidence < $confidenceThreshold) {
+            $status = 'NEEDS_CLARIFICATION';
+            if ($reason === '') {
+                $reason = 'Confianza insuficiente para confirmar el tipo de negocio.';
+            }
+        }
+        if ($status === 'MATCHED' && ($needs === [] || $documents === [])) {
+            $fallback = $this->inferUnknownBusinessScopeFallback($text, $candidate, $profile, $state);
+            if ($needs === []) {
+                $needs = is_array($fallback['needs'] ?? null) ? (array) $fallback['needs'] : [];
+            }
+            if ($documents === []) {
+                $documents = is_array($fallback['documents'] ?? null) ? (array) $fallback['documents'] : [];
+            }
+            if ($needs === [] || $documents === []) {
+                $status = 'NEEDS_CLARIFICATION';
+                if ($reason === '') {
+                    $reason = 'La respuesta no trajo alcance minimo para entrenar y confirmar.';
+                }
+            }
+        }
+        if (
+            $status === 'MATCHED'
+            && ($businessObjective === '' || $expectedResult === '' || $firstModule === '' || count($keyEntities) < 2)
+        ) {
+            $status = 'NEEDS_CLARIFICATION';
+            if ($reason === '') {
+                $reason = 'La respuesta no trajo contexto tecnico minimo para entrenar en produccion.';
+            }
+        }
+        if (
+            $status === 'MATCHED'
+            && (count($operatorAssistanceFlow) < 5 || count($trainingDialogFlow) < 6 || count($similarUserSignals) < 4)
+        ) {
+            $status = 'NEEDS_CLARIFICATION';
+            if ($reason === '') {
+                $reason = 'Falta flujo conversacional de uso para entrenar asistencia en app creada.';
+            }
+        }
+
+        if ($status === 'NEW_BUSINESS') {
+            if ($confidence < 0.65) {
+                $status = 'NEEDS_CLARIFICATION';
+                if ($reason === '') {
+                    $reason = 'Confianza baja para crear playbook nuevo.';
+                }
+            }
+            if ($needs === []) {
+                $needs = $fallbackNeeds !== [] ? $fallbackNeeds : ['inventario', 'ventas', 'pagos'];
+            }
+            if ($documents === []) {
+                $documents = $fallbackDocuments !== [] ? $fallbackDocuments : ['factura', 'orden de trabajo', 'cotizacion'];
+            }
+            if ($businessObjective === '' || $expectedResult === '' || $firstModule === '' || count($keyEntities) < 2) {
+                $status = 'NEEDS_CLARIFICATION';
+                if ($reason === '') {
+                    $reason = 'Falta contexto tecnico para construir playbook temporal confiable.';
+                }
+            }
+        }
+
+        if ($status === 'NEEDS_CLARIFICATION') {
+            if (count($trainingGaps) < 4) {
+                $trainingGaps = $this->mergeScopeLabels(
+                    $trainingGaps,
+                    [
+                        'definir_catalogo_servicios_con_precios',
+                        'definir_regla_de_comisiones_por_personal',
+                        'definir_pasos_operativos_del_dia_para_usuario_no_tecnico',
+                        'definir_flujo_de_cierre_de_caja',
+                    ]
+                );
+            }
+            if (count($nextDataQuestions) < 3) {
+                $nextDataQuestions = $this->mergeScopeLabels(
+                    $nextDataQuestions,
+                    [
+                        'Como pagas al personal? A) Porcentaje por servicio B) Sueldo fijo C) Alquiler de puesto.',
+                        'Que quieres resolver primero? A) Agenda de citas B) Cobro y caja C) Inventario de insumos.',
+                        'Como cobras normalmente? A) Efectivo B) Transferencia/Nequi C) Mixto.',
+                    ]
+                );
+            }
+        }
+
+        if ($status === 'NEEDS_CLARIFICATION' && $clarifyingQuestion === '') {
+            if ($businessObjective === '') {
+                $clarifyingQuestion = 'En una frase, cual es el objetivo principal de tu app para este negocio?';
+            } elseif ($firstModule === '') {
+                $clarifyingQuestion = 'Cual es el primer modulo que quieres tener listo para operar hoy?';
+            } else {
+                $clarifyingQuestion = 'Para ubicar bien tu negocio, dime en una frase que vendes o fabricas.';
+            }
+        }
+
+        $needs = array_values(array_slice($this->canonicalizeUnknownBusinessNeeds($this->mergeScopeLabels([], $needs)), 0, 8));
+        $documents = array_values(array_slice($this->canonicalizeUnknownBusinessDocuments($this->mergeScopeLabels([], $documents)), 0, 8));
+        $keyEntities = array_values(array_slice($this->normalizeUnknownBusinessEntityList($keyEntities), 0, 8));
+        $operatorAssistanceFlow = array_values(array_slice($this->mergeScopeLabels([], $operatorAssistanceFlow), 0, 8));
+        $similarUserSignals = array_values(array_slice($this->mergeScopeLabels([], $similarUserSignals), 0, 8));
+        $trainingDialogFlow = array_values(array_slice($this->mergeScopeLabels([], $trainingDialogFlow), 0, 10));
+        $trainingGaps = array_values(array_slice($this->mergeScopeLabels([], $trainingGaps), 0, 10));
+        $nextDataQuestions = array_values(array_slice($this->mergeScopeLabels([], $nextDataQuestions), 0, 4));
+
+        return [
+            'status' => $status,
+            'confidence' => $confidence,
+            'canonical_business_type' => $canonicalBusinessType,
+            'business_candidate' => $businessCandidate,
+            'business_objective' => $businessObjective,
+            'expected_result' => $expectedResult,
+            'reason_short' => $reason,
+            'needs_normalized' => $needs,
+            'documents_normalized' => $documents,
+            'key_entities' => $keyEntities,
+            'first_module' => $firstModule,
+            'operator_assistance_flow' => $operatorAssistanceFlow,
+            'similar_user_signals' => $similarUserSignals,
+            'training_dialog_flow' => $trainingDialogFlow,
+            'training_gaps' => $trainingGaps,
+            'next_data_questions' => $nextDataQuestions,
+            'clarifying_question' => $clarifyingQuestion,
+        ];
+    }
+
+    private function normalizeUnknownBusinessStatus(string $status): string
+    {
+        $status = strtoupper(trim($status));
+        $map = [
+            'SUCCESS' => 'MATCHED',
+            'OK' => 'MATCHED',
+            'RESOLVED' => 'MATCHED',
+            'MATCH' => 'MATCHED',
+            'NEW' => 'NEW_BUSINESS',
+            'UNKNOWN' => 'NEEDS_CLARIFICATION',
+            'CLARIFY' => 'NEEDS_CLARIFICATION',
+        ];
+        if (isset($map[$status])) {
+            $status = $map[$status];
+        }
+        $allowed = ['MATCHED', 'NEW_BUSINESS', 'NEEDS_CLARIFICATION', 'INVALID_REQUEST'];
+        if (!in_array($status, $allowed, true)) {
+            return 'INVALID_RESPONSE';
+        }
+        return $status;
+    }
+
+    private function clampConfidence($value): float
+    {
+        $confidence = is_numeric($value) ? (float) $value : 0.0;
+        if ($confidence > 1.0 && $confidence <= 100.0) {
+            $confidence = $confidence / 100.0;
+        }
+        if ($confidence < 0.0) {
+            return 0.0;
+        }
+        if ($confidence > 1.0) {
+            return 1.0;
+        }
+        return $confidence;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function normalizeUnknownBusinessList($value): array
+    {
+        if (is_object($value)) {
+            $value = (array) $value;
+        }
+        $items = [];
+        if (is_array($value)) {
+            foreach ($value as $entry) {
+                $items = array_merge($items, $this->normalizeUnknownBusinessList($entry));
+            }
+        } elseif (is_string($value)) {
+            $raw = trim($value);
+            if ($raw !== '') {
+                if ((str_starts_with($raw, '[') || str_starts_with($raw, '{'))) {
+                    $decoded = json_decode($raw, true);
+                    if (is_array($decoded)) {
+                        return $this->normalizeUnknownBusinessList($decoded);
+                    }
+                }
+                $parts = preg_split('/[,;\n\|]+/u', $raw) ?: [];
+                foreach ($parts as $part) {
+                    $clean = trim((string) $part);
+                    if ($clean === '') {
+                        continue;
+                    }
+                    $clean = preg_replace('/^[\-\*\•\d\.\)\(]+\s*/u', '', $clean) ?? $clean;
+                    $clean = $this->normalize($clean);
+                    $clean = trim($clean, " \t\n\r\0\x0B.,;:!?");
+                    if ($clean === '' || preg_match('/^<.*>$/', $clean) === 1) {
+                        continue;
+                    }
+                    $items[] = $clean;
+                }
+            }
+        }
+
+        $unique = [];
+        foreach ($items as $item) {
+            $key = $this->normalize($item);
+            if ($key === '') {
+                continue;
+            }
+            $unique[$key] = $item;
+        }
+        return array_values(array_slice($unique, 0, 8));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function unknownBusinessAllowedNeedsVocabulary(): array
+    {
+        return [
+            'ventas',
+            'facturacion',
+            'inventario',
+            'pagos',
+            'productos',
+            'servicios/tratamientos',
+            'citas',
+            'historia clinica',
+            'pacientes',
+            'medicamentos',
+            'muestras/examenes',
+            'ordenes de trabajo',
+            'gastos/costos',
+            'cartera',
+            'compras',
+            'produccion',
+            'contabilidad',
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function unknownBusinessAllowedDocumentsVocabulary(): array
+    {
+        return [
+            'factura',
+            'ticket',
+            'recibo de pago',
+            'recibo de caja',
+            'comprobante de egreso',
+            'orden de trabajo',
+            'cotizacion',
+            'orden de compra',
+            'historia clinica',
+            'receta',
+            'remision',
+            'inventario',
+            'comprobante contable',
+            'nota credito',
+            'nota debito',
+        ];
+    }
+
+    /**
+     * @param array<int, string> $items
+     * @return array<int, string>
+     */
+    private function canonicalizeUnknownBusinessNeeds(array $items): array
+    {
+        $allowed = $this->unknownBusinessAllowedNeedsVocabulary();
+        $aliasMap = [
+            'inventario' => ['inventario', 'stock', 'existencia', 'control inventario', 'control inventarios'],
+            'ventas' => ['venta', 'ventas', 'ventas pos', 'punto de venta', 'pos'],
+            'facturacion' => ['facturacion', 'factura', 'factura electronica', 'facturacion electronica', 'fiscal'],
+            'pagos' => ['pago', 'pagos', 'recaudo', 'cobro', 'abono'],
+            'productos' => ['producto', 'productos', 'catalogo', 'sku', 'item', 'items', 'insumo', 'insumos'],
+            'servicios/tratamientos' => ['servicio', 'servicios', 'tratamiento', 'tratamientos', 'procedimiento', 'procedimientos'],
+            'citas' => ['cita', 'citas', 'agenda', 'agendar', 'reserva', 'reservas'],
+            'historia clinica' => ['historia clinica', 'historia medica', 'expediente', 'evolucion clinica'],
+            'pacientes' => ['paciente', 'pacientes', 'cliente', 'clientes', 'mascota', 'mascotas'],
+            'medicamentos' => ['medicamento', 'medicamentos', 'farmacia'],
+            'muestras/examenes' => ['laboratorio', 'examen', 'examenes', 'muestra', 'muestras', 'analitica'],
+            'ordenes de trabajo' => ['orden de trabajo', 'ordenes de trabajo', 'ot', 'mantenimiento'],
+            'gastos/costos' => ['gasto', 'gastos', 'costo', 'costos', 'egreso', 'egresos'],
+            'cartera' => ['cartera', 'cuentas por cobrar', 'cx c', 'cxc'],
+            'compras' => ['compra', 'compras', 'proveedor', 'proveedores'],
+            'produccion' => ['produccion', 'fabricacion', 'manufactura'],
+            'contabilidad' => ['contabilidad', 'asiento', 'asientos', 'contable'],
+        ];
+
+        $resolved = [];
+        foreach ($items as $item) {
+            $token = $this->normalize((string) $item);
+            $token = str_replace(['_', '-', '/'], ' ', $token);
+            $token = preg_replace('/\s+/', ' ', trim($token)) ?? trim($token);
+            if ($token === '') {
+                continue;
+            }
+
+            $canonical = $this->matchUnknownBusinessCanonicalToken($token, $aliasMap);
+            if ($canonical === '') {
+                $derived = $this->extractNeedItems($token, '');
+                foreach ($derived as $label) {
+                    $label = trim((string) $label);
+                    if ($label === '' || !in_array($label, $allowed, true)) {
+                        continue;
+                    }
+                    $resolved[$this->normalize($label)] = $label;
+                }
+            } elseif (in_array($canonical, $allowed, true)) {
+                $resolved[$this->normalize($canonical)] = $canonical;
+            }
+
+            if ($canonical === '' && in_array($token, $allowed, true)) {
+                $resolved[$this->normalize($token)] = $token;
+            }
+        }
+
+        return array_values(array_slice($resolved, 0, 8));
+    }
+
+    /**
+     * @param array<int, string> $items
+     * @return array<int, string>
+     */
+    private function canonicalizeUnknownBusinessDocuments(array $items): array
+    {
+        $allowed = $this->unknownBusinessAllowedDocumentsVocabulary();
+        $aliasMap = [
+            'factura' => ['factura', 'facturacion', 'factura electronica', 'factura fiscal'],
+            'ticket' => ['ticket', 'pos', 'tirilla'],
+            'recibo de pago' => ['recibo de pago', 'comprobante de pago', 'soporte de pago', 'pago'],
+            'recibo de caja' => ['recibo de caja', 'recibo caja', 'rc'],
+            'comprobante de egreso' => ['comprobante de egreso', 'egreso', 'salida de caja'],
+            'orden de trabajo' => ['orden de trabajo', 'ot', 'orden servicio', 'orden de servicio'],
+            'cotizacion' => ['cotizacion', 'presupuesto', 'proforma', 'propuesta'],
+            'orden de compra' => ['orden de compra', 'oc'],
+            'historia clinica' => ['historia clinica', 'historia medica', 'expediente'],
+            'receta' => ['receta', 'formula medica'],
+            'remision' => ['remision', 'entrega'],
+            'inventario' => ['inventario', 'kardex'],
+            'comprobante contable' => ['comprobante contable', 'asiento', 'comprobante diario', 'contable'],
+            'nota credito' => ['nota credito', 'nota de credito'],
+            'nota debito' => ['nota debito', 'nota de debito'],
+        ];
+
+        $resolved = [];
+        foreach ($items as $item) {
+            $token = $this->normalize((string) $item);
+            $token = str_replace(['_', '-', '/'], ' ', $token);
+            $token = preg_replace('/\s+/', ' ', trim($token)) ?? trim($token);
+            if ($token === '') {
+                continue;
+            }
+
+            $canonical = $this->matchUnknownBusinessCanonicalToken($token, $aliasMap);
+            if ($canonical === '') {
+                $derived = $this->extractDocumentItems($token);
+                foreach ($derived as $label) {
+                    $label = trim((string) $label);
+                    if ($label === '' || !in_array($label, $allowed, true)) {
+                        continue;
+                    }
+                    $resolved[$this->normalize($label)] = $label;
+                }
+            } elseif (in_array($canonical, $allowed, true)) {
+                $resolved[$this->normalize($canonical)] = $canonical;
+            }
+
+            if ($canonical === '' && in_array($token, $allowed, true)) {
+                $resolved[$this->normalize($token)] = $token;
+            }
+        }
+
+        return array_values(array_slice($resolved, 0, 8));
+    }
+
+    /**
+     * @param array<string, array<int, string>> $aliasMap
+     */
+    private function matchUnknownBusinessCanonicalToken(string $token, array $aliasMap): string
+    {
+        foreach ($aliasMap as $canonical => $aliases) {
+            $canonicalKey = $this->normalize((string) $canonical);
+            if ($canonicalKey !== '' && ($token === $canonicalKey || str_contains($token, $canonicalKey))) {
+                return (string) $canonical;
+            }
+            foreach ($aliases as $alias) {
+                $aliasKey = $this->normalize((string) $alias);
+                if ($aliasKey === '') {
+                    continue;
+                }
+                if ($token === $aliasKey || str_contains($token, $aliasKey)) {
+                    return (string) $canonical;
+                }
+            }
+        }
+        return '';
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function normalizeUnknownBusinessEntityList($value): array
+    {
+        $items = $this->normalizeUnknownBusinessList($value);
+        $aliasMap = [
+            'cliente' => ['cliente', 'clientes', 'paciente', 'pacientes', 'dueno', 'duenos', 'propietario'],
+            'producto' => ['producto', 'productos', 'item', 'items'],
+            'insumo' => ['insumo', 'insumos', 'materia prima', 'materias primas'],
+            'servicio' => ['servicio', 'servicios', 'tratamiento', 'tratamientos', 'procedimiento'],
+            'factura' => ['factura', 'facturas'],
+            'pago' => ['pago', 'pagos', 'recaudo', 'cobro', 'abono'],
+            'transaccion_venta' => ['venta', 'ventas', 'transaccion venta', 'ticket'],
+            'cita' => ['cita', 'citas', 'reserva', 'reservas'],
+            'inventario' => ['inventario', 'stock', 'kardex'],
+            'orden' => ['orden', 'ordenes', 'orden trabajo', 'orden servicio'],
+            'comprobante' => ['comprobante', 'recibo', 'soporte'],
+            'cierre_caja' => ['cierre de caja', 'arqueo', 'cuadre de caja', 'caja diaria'],
+            'cuenta_por_cobrar' => ['cartera', 'cuenta por cobrar', 'cuentas por cobrar', 'cxc'],
+        ];
+
+        $resolved = [];
+        foreach ($items as $item) {
+            $token = $this->normalize((string) $item);
+            $token = str_replace(['-', '/'], ' ', $token);
+            $token = preg_replace('/\s+/', ' ', trim($token)) ?? trim($token);
+            if ($token === '') {
+                continue;
+            }
+            $canonical = $this->matchUnknownBusinessCanonicalToken($token, $aliasMap);
+            if ($canonical !== '') {
+                $resolved[$canonical] = $canonical;
+                continue;
+            }
+
+            $token = str_replace(' ', '_', $token);
+            $token = preg_replace('/[^a-z0-9_]/', '', $token) ?? '';
+            $token = trim($token, '_');
+            if ($token === '' || strlen($token) < 3) {
+                continue;
+            }
+            $resolved[$token] = $token;
+        }
+
+        return array_values(array_slice($resolved, 0, 8));
+    }
+
+    /**
+     * @param array<int, string> $items
+     * @param array<int, string> $allowed
+     * @return array<int, string>
+     */
+    private function unknownBusinessScopeOutsideVocabulary(array $items, array $allowed): array
+    {
+        $allowedIndex = [];
+        foreach ($allowed as $item) {
+            $key = $this->normalize((string) $item);
+            if ($key !== '') {
+                $allowedIndex[$key] = true;
+            }
+        }
+
+        $outside = [];
+        foreach ($items as $item) {
+            $key = $this->normalize((string) $item);
+            if ($key === '' || isset($allowedIndex[$key])) {
+                continue;
+            }
+            $outside[$key] = $key;
+        }
+        return array_values($outside);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function unknownBusinessGenericEntityVocabulary(): array
+    {
+        return [
+            'cliente',
+            'producto',
+            'servicio',
+            'venta',
+            'transaccion_venta',
+            'pago',
+            'caja',
+            'cierre_caja',
+            'factura',
+            'inventario',
+            'orden',
+            'comprobante',
+        ];
+    }
+
+    private function unknownBusinessSpecificEntityCount(array $entities): int
+    {
+        $generic = [];
+        foreach ($this->unknownBusinessGenericEntityVocabulary() as $token) {
+            $key = $this->normalize((string) $token);
+            if ($key !== '') {
+                $generic[$key] = true;
+            }
+        }
+
+        $count = 0;
+        foreach ($entities as $entity) {
+            $key = $this->normalize((string) $entity);
+            if ($key === '' || isset($generic[$key])) {
+                continue;
+            }
+            $count++;
+        }
+        return $count;
+    }
+
+    private function looksWeakUnknownBusinessText(string $text): bool
+    {
+        $value = trim($text);
+        if ($value === '') {
+            return true;
+        }
+        if (mb_strlen($value, 'UTF-8') < 28) {
+            return true;
+        }
+        $normalized = $this->normalize($value);
+        $weakPhrases = [
+            'perfil completamente definido',
+            'coincide por catalogo',
+            'coincide por perfil',
+            'requerimientos estandar',
+            'sin novedad',
+            'todo correcto',
+        ];
+        foreach ($weakPhrases as $phrase) {
+            if (str_contains($normalized, $phrase)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function inferUnknownBusinessScopeFallback(string $text, string $candidate, array $profile, array $state): array
+    {
+        $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
+        $needs = [];
+        $documents = [];
+
+        $profileNeeds = is_array($profile['needs_scope_items'] ?? null)
+            ? array_values((array) $profile['needs_scope_items'])
+            : array_values(array_filter(array_map('trim', explode(',', (string) ($profile['needs_scope'] ?? '')))));
+        $profileDocuments = is_array($profile['documents_scope_items'] ?? null)
+            ? array_values((array) $profile['documents_scope_items'])
+            : array_values(array_filter(array_map('trim', explode(',', (string) ($profile['documents_scope'] ?? '')))));
+        if ($profileNeeds !== []) {
+            $needs = $this->mergeScopeLabels($needs, array_map('strval', $profileNeeds));
+        }
+        if ($profileDocuments !== []) {
+            $documents = $this->mergeScopeLabels($documents, array_map('strval', $profileDocuments));
+        }
+
+        $sources = [];
+        $normalizedText = $this->normalize($text);
+        if ($normalizedText !== '') {
+            $sources[] = $normalizedText;
+        }
+        $normalizedCandidate = $this->normalize($candidate);
+        if ($normalizedCandidate !== '') {
+            $sources[] = $normalizedCandidate;
+        }
+        $flow = is_array($state['unknown_business_discovery'] ?? null)
+            ? (array) $state['unknown_business_discovery']
+            : [];
+        $answers = is_array($flow['answers'] ?? null) ? (array) $flow['answers'] : [];
+        foreach ($answers as $pair) {
+            if (!is_array($pair)) {
+                continue;
+            }
+            $answer = $this->normalize((string) ($pair['answer'] ?? ''));
+            if ($answer !== '') {
+                $sources[] = $answer;
+            }
+        }
+
+        foreach ($sources as $source) {
+            $needs = $this->mergeScopeLabels($needs, $this->extractNeedItems($source, $businessType));
+            $documents = $this->mergeScopeLabels($documents, $this->extractDocumentItems($source));
+        }
+
+        $draft = $this->buildUnknownBusinessLocalDraft($state, $candidate);
+        $draftNeeds = is_array($draft['needs'] ?? null) ? array_values((array) $draft['needs']) : [];
+        $draftDocuments = is_array($draft['documents'] ?? null) ? array_values((array) $draft['documents']) : [];
+        if ($draftNeeds !== []) {
+            $needs = $this->mergeScopeLabels($needs, array_map('strval', $draftNeeds));
+        }
+        if ($draftDocuments !== []) {
+            $documents = $this->mergeScopeLabels($documents, array_map('strval', $draftDocuments));
+        }
+
+        return [
+            'needs' => array_values(array_slice($needs, 0, 6)),
+            'documents' => array_values(array_slice($documents, 0, 6)),
+        ];
+    }
+
+    private function evaluateUnknownBusinessLlmQuality(array $resolved, float $confidenceThreshold): array
+    {
+        $status = strtoupper(trim((string) ($resolved['status'] ?? '')));
+        $confidence = $this->clampConfidence($resolved['confidence'] ?? 0.0);
+        $needs = is_array($resolved['needs_normalized'] ?? null) ? array_values((array) $resolved['needs_normalized']) : [];
+        $documents = is_array($resolved['documents_normalized'] ?? null) ? array_values((array) $resolved['documents_normalized']) : [];
+        $businessObjective = trim((string) ($resolved['business_objective'] ?? ''));
+        $expectedResult = trim((string) ($resolved['expected_result'] ?? ''));
+        $keyEntities = is_array($resolved['key_entities'] ?? null) ? array_values((array) $resolved['key_entities']) : [];
+        $specificEntityCount = $this->unknownBusinessSpecificEntityCount($keyEntities);
+        $firstModule = trim((string) ($resolved['first_module'] ?? ''));
+        $operatorAssistanceFlow = is_array($resolved['operator_assistance_flow'] ?? null)
+            ? array_values((array) $resolved['operator_assistance_flow'])
+            : [];
+        $similarUserSignals = is_array($resolved['similar_user_signals'] ?? null)
+            ? array_values((array) $resolved['similar_user_signals'])
+            : [];
+        $trainingDialogFlow = is_array($resolved['training_dialog_flow'] ?? null)
+            ? array_values((array) $resolved['training_dialog_flow'])
+            : [];
+        $trainingGaps = is_array($resolved['training_gaps'] ?? null)
+            ? array_values((array) $resolved['training_gaps'])
+            : [];
+        $nextDataQuestions = is_array($resolved['next_data_questions'] ?? null)
+            ? array_values((array) $resolved['next_data_questions'])
+            : [];
+        $canonical = $this->normalizeBusinessType((string) ($resolved['canonical_business_type'] ?? ''));
+        $question = trim((string) ($resolved['clarifying_question'] ?? ''));
+        $reason = trim((string) ($resolved['reason_short'] ?? ''));
+        $needsOutsideVocabulary = $this->unknownBusinessScopeOutsideVocabulary(
+            $needs,
+            $this->unknownBusinessAllowedNeedsVocabulary()
+        );
+        $documentsOutsideVocabulary = $this->unknownBusinessScopeOutsideVocabulary(
+            $documents,
+            $this->unknownBusinessAllowedDocumentsVocabulary()
+        );
+
+        $score = 1.0;
+        $issues = [];
+        $allowed = ['MATCHED', 'NEW_BUSINESS', 'NEEDS_CLARIFICATION', 'INVALID_REQUEST'];
+        if (!in_array($status, $allowed, true)) {
+            $score -= 0.45;
+            $issues[] = 'status_invalido';
+        }
+
+        if ($status === 'MATCHED') {
+            if ($canonical === '') {
+                $score -= 0.3;
+                $issues[] = 'matched_sin_canonical';
+            }
+            if ($confidence < $confidenceThreshold) {
+                $score -= 0.25;
+                $issues[] = 'matched_confianza_baja';
+            }
+            if ($needs === []) {
+                $score -= 0.15;
+                $issues[] = 'matched_sin_needs';
+            }
+            if ($documents === []) {
+                $score -= 0.15;
+                $issues[] = 'matched_sin_documents';
+            }
+            if ($businessObjective === '') {
+                $score -= 0.12;
+                $issues[] = 'matched_sin_business_objective';
+            }
+            if ($expectedResult === '') {
+                $score -= 0.12;
+                $issues[] = 'matched_sin_expected_result';
+            }
+            if (count($keyEntities) < 2) {
+                $score -= 0.1;
+                $issues[] = 'matched_sin_key_entities';
+            }
+            if ($firstModule === '') {
+                $score -= 0.08;
+                $issues[] = 'matched_sin_first_module';
+            }
+            if (count($needs) < 5) {
+                $score -= 0.12;
+                $issues[] = 'matched_needs_pobres';
+            }
+            if (count($documents) < 4) {
+                $score -= 0.1;
+                $issues[] = 'matched_documents_pobres';
+            }
+            if (count($keyEntities) < 6) {
+                $score -= 0.14;
+                $issues[] = 'matched_key_entities_pobres';
+            }
+            if ($specificEntityCount < 2) {
+                $score -= 0.12;
+                $issues[] = 'matched_key_entities_genericas';
+            }
+            if ($this->looksWeakUnknownBusinessText($businessObjective)) {
+                $score -= 0.08;
+                $issues[] = 'matched_objetivo_debil';
+            }
+            if ($this->looksWeakUnknownBusinessText($expectedResult)) {
+                $score -= 0.08;
+                $issues[] = 'matched_resultado_debil';
+            }
+            if ($this->looksWeakUnknownBusinessText($reason)) {
+                $score -= 0.06;
+                $issues[] = 'matched_razon_debil';
+            }
+            if ($confidence >= 0.985) {
+                $score -= 0.05;
+                $issues[] = 'matched_confianza_excesiva';
+            }
+            if (count($operatorAssistanceFlow) < 5) {
+                $score -= 0.1;
+                $issues[] = 'matched_sin_operator_flow';
+            }
+            if (count($similarUserSignals) < 4) {
+                $score -= 0.08;
+                $issues[] = 'matched_sin_similarity_signals';
+            }
+            if (count($trainingDialogFlow) < 6) {
+                $score -= 0.12;
+                $issues[] = 'matched_sin_training_dialog_flow';
+            }
+        }
+
+        if ($status === 'NEW_BUSINESS') {
+            if ($confidence < 0.65) {
+                $score -= 0.2;
+                $issues[] = 'new_business_confianza_baja';
+            }
+            if ($needs === []) {
+                $score -= 0.12;
+                $issues[] = 'new_business_sin_needs';
+            }
+            if ($documents === []) {
+                $score -= 0.12;
+                $issues[] = 'new_business_sin_documents';
+            }
+            if ($businessObjective === '') {
+                $score -= 0.1;
+                $issues[] = 'new_business_sin_business_objective';
+            }
+            if ($expectedResult === '') {
+                $score -= 0.1;
+                $issues[] = 'new_business_sin_expected_result';
+            }
+            if (count($keyEntities) < 2) {
+                $score -= 0.08;
+                $issues[] = 'new_business_sin_key_entities';
+            }
+            if ($firstModule === '') {
+                $score -= 0.08;
+                $issues[] = 'new_business_sin_first_module';
+            }
+            if (count($needs) < 5) {
+                $score -= 0.1;
+                $issues[] = 'new_business_needs_pobres';
+            }
+            if (count($documents) < 4) {
+                $score -= 0.08;
+                $issues[] = 'new_business_documents_pobres';
+            }
+            if (count($keyEntities) < 6) {
+                $score -= 0.1;
+                $issues[] = 'new_business_key_entities_pobres';
+            }
+            if ($specificEntityCount < 2) {
+                $score -= 0.08;
+                $issues[] = 'new_business_key_entities_genericas';
+            }
+            if ($this->looksWeakUnknownBusinessText($businessObjective)) {
+                $score -= 0.06;
+                $issues[] = 'new_business_objetivo_debil';
+            }
+            if ($this->looksWeakUnknownBusinessText($expectedResult)) {
+                $score -= 0.06;
+                $issues[] = 'new_business_resultado_debil';
+            }
+            if (count($operatorAssistanceFlow) < 4) {
+                $score -= 0.08;
+                $issues[] = 'new_business_sin_operator_flow';
+            }
+            if (count($trainingDialogFlow) < 5) {
+                $score -= 0.08;
+                $issues[] = 'new_business_sin_training_dialog_flow';
+            }
+        }
+
+        if ($status === 'NEEDS_CLARIFICATION' && $question === '') {
+            $score -= 0.2;
+            $issues[] = 'clarificacion_sin_pregunta';
+        }
+        if ($status === 'NEEDS_CLARIFICATION') {
+            if ($businessObjective === '' && $expectedResult === '' && $firstModule === '' && count($keyEntities) === 0) {
+                $score -= 0.12;
+                $issues[] = 'clarificacion_sin_contexto';
+            }
+            if ($confidence >= $confidenceThreshold && $canonical !== '') {
+                if ($businessObjective === '' || $expectedResult === '' || $firstModule === '' || count($keyEntities) < 2) {
+                    $score -= 0.15;
+                    $issues[] = 'clarificacion_por_respuesta_incompleta';
+                }
+            }
+            if (count($trainingGaps) < 3) {
+                $score -= 0.08;
+                $issues[] = 'clarificacion_sin_training_gaps';
+            }
+            if (count($nextDataQuestions) < 3) {
+                $score -= 0.06;
+                $issues[] = 'clarificacion_sin_next_data_questions';
+            }
+            if (count($trainingDialogFlow) < 4) {
+                $score -= 0.08;
+                $issues[] = 'clarificacion_sin_dialog_flow';
+            }
+        }
+
+        if ($status === 'INVALID_REQUEST' && $reason === '') {
+            $score -= 0.1;
+            $issues[] = 'invalid_request_sin_razon';
+        }
+        if ($needsOutsideVocabulary !== []) {
+            $score -= min(0.2, 0.04 * count($needsOutsideVocabulary));
+            $issues[] = 'needs_fuera_vocabulario';
+        }
+        if ($documentsOutsideVocabulary !== []) {
+            $score -= min(0.2, 0.05 * count($documentsOutsideVocabulary));
+            $issues[] = 'documents_fuera_vocabulario';
+        }
+
+        $score = max(0.0, min(1.0, $score));
+        return [
+            'ok' => $score >= 0.85,
+            'score' => round($score, 4),
+            'issues' => array_values(array_unique($issues)),
+        ];
+    }
+
+    private function persistUnknownBusinessLlmSample(
+        string $tenantId,
+        string $userId,
+        string $candidate,
+        string $text,
+        array $resolved,
+        array $quality
+    ): void {
+        $tenantId = trim($tenantId) !== '' ? trim($tenantId) : 'default';
+        $userId = trim($userId) !== '' ? trim($userId) : 'anon';
+        $candidate = trim($candidate);
+        if ($candidate === '') {
+            $candidate = trim((string) ($resolved['business_candidate'] ?? ''));
+        }
+        if ($candidate === '') {
+            $candidate = 'negocio_desconocido';
+        }
+
+        try {
+            $bucket = $this->memory->getTenantMemory($tenantId, 'unknown_business_llm_samples', ['items' => []]);
+            if (!is_array($bucket)) {
+                $bucket = ['items' => []];
+            }
+            $items = is_array($bucket['items'] ?? null) ? array_values((array) $bucket['items']) : [];
+            array_unshift($items, [
+                'at' => date('c'),
+                'tenant_id' => $tenantId,
+                'user_id' => $userId,
+                'candidate' => $candidate,
+                'user_text' => mb_substr(trim($text), 0, 260),
+                'status' => (string) ($resolved['status'] ?? ''),
+                'confidence' => (float) ($resolved['confidence'] ?? 0.0),
+                'canonical_business_type' => (string) ($resolved['canonical_business_type'] ?? ''),
+                'business_objective' => (string) ($resolved['business_objective'] ?? ''),
+                'expected_result' => (string) ($resolved['expected_result'] ?? ''),
+                'needs_normalized' => is_array($resolved['needs_normalized'] ?? null)
+                    ? array_values((array) $resolved['needs_normalized'])
+                    : [],
+                'documents_normalized' => is_array($resolved['documents_normalized'] ?? null)
+                    ? array_values((array) $resolved['documents_normalized'])
+                    : [],
+                'key_entities' => is_array($resolved['key_entities'] ?? null)
+                    ? array_values((array) $resolved['key_entities'])
+                    : [],
+                'first_module' => (string) ($resolved['first_module'] ?? ''),
+                'operator_assistance_flow' => is_array($resolved['operator_assistance_flow'] ?? null)
+                    ? array_values((array) $resolved['operator_assistance_flow'])
+                    : [],
+                'similar_user_signals' => is_array($resolved['similar_user_signals'] ?? null)
+                    ? array_values((array) $resolved['similar_user_signals'])
+                    : [],
+                'training_dialog_flow' => is_array($resolved['training_dialog_flow'] ?? null)
+                    ? array_values((array) $resolved['training_dialog_flow'])
+                    : [],
+                'training_gaps' => is_array($resolved['training_gaps'] ?? null)
+                    ? array_values((array) $resolved['training_gaps'])
+                    : [],
+                'next_data_questions' => is_array($resolved['next_data_questions'] ?? null)
+                    ? array_values((array) $resolved['next_data_questions'])
+                    : [],
+                'provider_used' => (string) ($resolved['provider_used'] ?? ''),
+                'quality_score' => (float) ($quality['score'] ?? 0.0),
+                'quality_ok' => (bool) ($quality['ok'] ?? false),
+                'quality_issues' => is_array($quality['issues'] ?? null) ? array_values((array) $quality['issues']) : [],
+            ]);
+            if (count($items) > 200) {
+                $items = array_slice($items, 0, 200);
+            }
+            $bucket['items'] = $items;
+            $bucket['updated_at'] = date('c');
+            $this->memory->saveTenantMemory($tenantId, 'unknown_business_llm_samples', $bucket);
+
+            if (!(bool) ($quality['ok'] ?? false)) {
+                $scoreText = number_format((float) ($quality['score'] ?? 0.0), 2, '.', '');
+                $issueText = is_array($quality['issues'] ?? null)
+                    ? implode(', ', array_slice((array) $quality['issues'], 0, 3))
+                    : 'sin_detalle';
+                $sample = '[llm_quality=' . $scoreText . '] status=' . (string) ($resolved['status'] ?? '')
+                    . ' issues=' . $issueText;
+                $this->appendResearchTopic(
+                    $tenantId,
+                    $candidate . ':llm_quality',
+                    $userId,
+                    mb_substr($sample, 0, 220)
+                );
+            }
+        } catch (\Throwable $e) {
+            // nunca bloquear flujo de chat por persistencia de telemetria.
+        }
+    }
+
     private function findDomainProfile(string $businessType, array $playbook = []): array
     {
         if ($businessType === '') {
@@ -5888,6 +7116,10 @@ private function parseEntityFromCrudText(string $text): string
         if (!empty($state['builder_pending_command']) && is_array($state['builder_pending_command'])) {
             return [];
         }
+        $activeTask = (string) ($state['active_task'] ?? '');
+        if (in_array($activeTask, ['builder_onboarding', 'unknown_business_discovery', 'business_research_confirmation'], true)) {
+            return [];
+        }
 
         $guides = $this->loadBuilderGuidance($training);
         if (empty($guides)) {
@@ -6187,7 +7419,9 @@ private function parseEntityFromCrudText(string $text): string
         }
 
         $reply = str_replace('{business}', $candidate, $template) . "\n"
-            . 'Para disenar bien la solucion, te hare unas preguntas cortas antes de crear.' . "\n"
+            . 'Para disenar bien la solucion, necesito datos minimos del negocio antes de construir.' . "\n"
+            . 'Te pedire 1 dato critico por turno y luego te mostrare: "Esto entendi".' . "\n"
+            . $this->buildUnknownBusinessInformationNeedsText() . "\n"
             . 'Pregunta 1/' . count($questions) . ': ' . $firstQuestion;
 
         return [
@@ -6245,14 +7479,31 @@ private function parseEntityFromCrudText(string $text): string
 
         if ($index < count($questions)) {
             $answer = $this->sanitizeRequirementText($text);
-            if ($answer === '') {
+            if ($answer === '' || $this->isUnknownDiscoveryNonAnswer($answer)) {
+                $question = trim((string) ($questions[$index] ?? ''));
+                if ($question === '') {
+                    $question = 'Describe el proceso principal que quieres controlar.';
+                }
+                $prefix = $this->isFrustrationSignal($answer)
+                    ? 'Entiendo la molestia. Para avanzar necesito este dato:'
+                    : 'Necesito una respuesta corta para continuar.';
+                return [
+                    'action' => 'ask_user',
+                    'reply' => $prefix . "\n"
+                        . $this->buildUnknownBusinessUnderstandingSummary($candidate, $answers, $questions) . "\n"
+                        . 'Pregunta ' . ($index + 1) . '/' . count($questions) . ': ' . $question,
+                    'state' => $state,
+                ];
+            }
+            if ($this->isUnknownDiscoveryRepeatedAnswer($answer, $answers)) {
                 $question = trim((string) ($questions[$index] ?? ''));
                 if ($question === '') {
                     $question = 'Describe el proceso principal que quieres controlar.';
                 }
                 return [
                     'action' => 'ask_user',
-                    'reply' => 'Necesito una respuesta corta para continuar.' . "\n"
+                    'reply' => 'Ese dato ya lo tengo. Solo necesito el que sigue.' . "\n"
+                        . $this->buildUnknownBusinessUnderstandingSummary($candidate, $answers, $questions) . "\n"
                         . 'Pregunta ' . ($index + 1) . '/' . count($questions) . ': ' . $question,
                     'state' => $state,
                 ];
@@ -6279,7 +7530,7 @@ private function parseEntityFromCrudText(string $text): string
             }
             return [
                 'action' => 'ask_user',
-                'reply' => 'Perfecto.' . "\n"
+                'reply' => $this->buildUnknownBusinessUnderstandingSummary($candidate, $answers, $questions) . "\n"
                     . 'Pregunta ' . ($index + 1) . '/' . count($questions) . ': ' . $question,
                 'state' => $state,
             ];
@@ -6303,19 +7554,322 @@ private function parseEntityFromCrudText(string $text): string
         $this->saveProfile($tenantId, $this->profileUserKey($userId), $profile);
 
         $text = $this->buildUnknownBusinessDiscoveryContextText($candidate, $answers);
-        $completionNote = 'Documento tecnico inicial listo para investigacion.' . "\n" . $brief;
+        $completionNote = $this->buildUnknownBusinessUnderstandingSummary($candidate, $answers, $questions)
+            . "\n" . 'Documento tecnico inicial listo para investigacion.'
+            . "\n" . $brief;
         return null;
+    }
+
+    private function isUnknownDiscoveryNonAnswer(string $answer): bool
+    {
+        $normalized = $this->normalize($answer);
+        if ($normalized === '') {
+            return true;
+        }
+        if ($this->isAffirmativeReply($normalized) || $this->isNegativeReply($normalized)) {
+            return true;
+        }
+
+        $phrases = [
+            'ya te respondi',
+            'ya te dije',
+            'ya lo respondi',
+            'no entiendes',
+            'no estas entendiendo',
+            'no estas',
+            'no me entiendes',
+            'no sirves',
+            'que mas necesitas saber',
+            'que mas',
+            'que necesitas',
+            'otra vez lo mismo',
+            'no funciona',
+        ];
+        foreach ($phrases as $phrase) {
+            if (str_contains($normalized, $phrase)) {
+                return true;
+            }
+        }
+        if (preg_match('/\bno\s+est[ao]s?\s+en?tend\w*/u', $normalized) === 1) {
+            return true;
+        }
+        if (preg_match('/\bno\s+me\s+en?tend\w*/u', $normalized) === 1) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function isUnknownDiscoveryRepeatedAnswer(string $answer, array $answers): bool
+    {
+        $target = $this->normalize($answer);
+        if ($target === '') {
+            return false;
+        }
+        foreach ($answers as $pair) {
+            if (!is_array($pair)) {
+                continue;
+            }
+            $saved = $this->normalize((string) ($pair['answer'] ?? ''));
+            if ($saved !== '' && $saved === $target) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function isFrustrationSignal(string $text): bool
+    {
+        $text = $this->normalize($text);
+        if ($text === '') {
+            return false;
+        }
+        $markers = [
+            'no entiendes',
+            'no estas entendiendo',
+            'no estas',
+            'no me entiendes',
+            'no sirves',
+            'otra vez',
+            'me frustra',
+            'me molesta',
+            'estoy cansado',
+            'estoy cansada',
+            'que estres',
+            'que frustrante',
+            'nada que',
+        ];
+        foreach ($markers as $marker) {
+            if (str_contains($text, $marker)) {
+                return true;
+            }
+        }
+        if (preg_match('/\bno\s+est[ao]s?\s+en?tend\w*/u', $text) === 1) {
+            return true;
+        }
+        if (preg_match('/\bno\s+me\s+en?tend\w*/u', $text) === 1) {
+            return true;
+        }
+        return false;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function unknownBusinessRequiredInfoChecklist(): array
+    {
+        return [
+            'Oferta principal (que vendes o prestas).',
+            'Cliente objetivo y canal de venta (mostrador, domicilio, web, etc).',
+            'Forma de cobro y medios de pago.',
+            'Regla de pago al personal (comision, sueldo, alquiler de puesto).',
+            'Proceso operativo principal de inicio a fin.',
+            'Flujo diario para usuaria no tecnica (inicio de jornada -> atencion -> cobro -> cierre).',
+            'Datos minimos por registro (productos, cantidades, precio, usuario, sede, etc).',
+            'Documentos obligatorios que debes emitir.',
+            'Reportes o indicadores diarios/semanales.',
+            'Reglas criticas que no se pueden romper.',
+            'Roles que operan la app (admin, caja, vendedor, contador, etc).',
+            'Preguntas y errores frecuentes del usuario final durante uso de la app.',
+            'Frases reales del usuario (con typos) que debemos entender en soporte.',
+            'Modulo prioritario para salir en version 1.',
+        ];
+    }
+
+    private function buildUnknownBusinessInformationNeedsText(): string
+    {
+        $items = $this->unknownBusinessRequiredInfoChecklist();
+        if ($items === []) {
+            return '';
+        }
+        $parts = [];
+        foreach ($items as $index => $item) {
+            $parts[] = ($index + 1) . ') ' . trim((string) $item);
+        }
+        return 'Informacion que necesito para construir y asistirte bien: ' . implode(' | ', $parts);
+    }
+
+    private function buildUnknownBusinessUnderstandingSummary(string $candidate, array $answers, array $questions): string
+    {
+        $lines = [];
+        $labelCandidate = trim($candidate) !== '' ? trim($candidate) : 'negocio en estudio';
+        $lines[] = 'Esto entendi de "' . $labelCandidate . '" hasta ahora:';
+
+        $maxItems = 5;
+        $used = 0;
+        foreach ($answers as $pair) {
+            if (!is_array($pair)) {
+                continue;
+            }
+            $question = trim((string) ($pair['question'] ?? ''));
+            $answer = trim((string) ($pair['answer'] ?? ''));
+            if ($answer === '') {
+                continue;
+            }
+            if ($question === '') {
+                $question = 'Dato';
+            }
+            $question = rtrim($question, " \t\n\r\0\x0B?.!");
+            $lines[] = '- ' . $question . ': ' . $answer . '.';
+            $used++;
+            if ($used >= $maxItems) {
+                break;
+            }
+        }
+
+        if ($used === 0) {
+            $lines[] = '- Aun no tengo datos suficientes confirmados.';
+        }
+
+        $pending = max(0, count($questions) - count($answers));
+        $lines[] = 'Datos pendientes por confirmar: ' . $pending . '.';
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function buildUnknownBusinessOperatorAssistanceFallback(string $candidate, string $canonicalBusinessType): array
+    {
+        $label = trim($candidate) !== '' ? trim($candidate) : 'tu negocio';
+        if ($canonicalBusinessType !== '') {
+            $domainLabel = $this->domainLabelByBusinessType($canonicalBusinessType);
+            if ($domainLabel !== '') {
+                $label = $domainLabel;
+            }
+        }
+        return [
+            '1) Resumen inicial: confirmar que entendimos "' . $label . '" y objetivo principal de la app.',
+            '2) Operacion diaria guiada: abrir agenda o ventas, registrar servicio/producto, cobrar y guardar soporte.',
+            '3) Control del personal: calcular pago o comision por tarea realizada y validar reglas de negocio.',
+            '4) Cierre diario: validar caja vs transferencias, gastos y pendientes por cobrar.',
+            '5) Soporte rapido: ante duda o error, explicar en lenguaje simple y pedir solo 1 dato critico.',
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function buildUnknownBusinessSimilaritySignalsFallback(string $candidate, string $canonicalBusinessType): array
+    {
+        $label = trim($candidate) !== '' ? trim($candidate) : 'negocio';
+        if ($canonicalBusinessType !== '') {
+            $domainLabel = $this->domainLabelByBusinessType($canonicalBusinessType);
+            if ($domainLabel !== '') {
+                $label = $domainLabel;
+            }
+        }
+        return [
+            'usuario_no_tecnico_' . $this->normalize($label) . ': "no se de sistemas, solo quiero que funcione"',
+            'usuario_con_frustracion: "no entiendo esto, ayudame paso a paso"',
+            'usuario_con_urgencia: "es para ya, necesito cobrar ahora"',
+            'usuario_con_pocos_datos: "no se, tu dime que necesitas"',
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function buildUnknownBusinessTrainingDialogFallback(string $candidate, string $canonicalBusinessType): array
+    {
+        $label = trim($candidate) !== '' ? trim($candidate) : 'negocio';
+        if ($canonicalBusinessType !== '') {
+            $domainLabel = $this->domainLabelByBusinessType($canonicalBusinessType);
+            if ($domainLabel !== '') {
+                $label = $domainLabel;
+            }
+        }
+        return [
+            'deteccion_negocio | usuario: "tengo un ' . $label . '" | asistente: "Entendi tu negocio. Te guio con 1 dato por turno." | dato_critico: tipo_de_operacion',
+            'resumen_entendimiento | usuario: "si, pero no se de administracion" | asistente: "Esto entendi: agenda, cobro y cierre diario. Confirmas?" | dato_critico: confirmacion_resumen',
+            'captura_catalogo | usuario: "vendo varias cosas" | asistente: "Dime 3 servicios o productos con precio." | dato_critico: catalogo_base',
+            'captura_regla_personal | usuario: "les pago como siempre" | asistente: "Es porcentaje, sueldo fijo o alquiler de puesto?" | dato_critico: regla_pago_personal',
+            'captura_cobro | usuario: "cobro por nequi y efectivo" | asistente: "Perfecto, dejo medios de pago y cierre por canal." | dato_critico: medios_pago',
+            'uso_operativo_app | usuario: "como lo uso en el dia?" | asistente: "Abres jornada, registras atencion, cobras, luego cierras caja." | dato_critico: flujo_diario',
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function buildUnknownBusinessTrainingGapsFallback(string $candidate, string $canonicalBusinessType): array
+    {
+        $label = trim($candidate) !== '' ? trim($candidate) : 'negocio';
+        if ($canonicalBusinessType !== '') {
+            $domainLabel = $this->domainLabelByBusinessType($canonicalBusinessType);
+            if ($domainLabel !== '') {
+                $label = $domainLabel;
+            }
+        }
+        return [
+            'definir_catalogo_base_para_' . $this->normalize($label),
+            'definir_flujo_diario_para_usuario_no_tecnico',
+            'definir_regla_de_pago_al_personal',
+            'definir_documentos_y_soportes_obligatorios',
+            'definir_proceso_de_cierre_y_alertas_de_error',
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function buildUnknownBusinessNextDataQuestionsFallback(string $candidate, string $canonicalBusinessType): array
+    {
+        $label = trim($candidate) !== '' ? trim($candidate) : 'tu negocio';
+        if ($canonicalBusinessType !== '') {
+            $domainLabel = $this->domainLabelByBusinessType($canonicalBusinessType);
+            if ($domainLabel !== '') {
+                $label = $domainLabel;
+            }
+        }
+        return [
+            'Para "' . $label . '", que quieres ordenar primero? A) Agenda/atencion B) Cobro/caja C) Inventario.',
+            'Como pagas al personal? A) Porcentaje por servicio B) Sueldo fijo C) Alquiler de puesto.',
+            'Como cobras a tus clientes? A) Efectivo B) Transferencia/Nequi C) Mixto.',
+            'Que te duele mas hoy? A) Cruce de citas B) No saber utilidad C) No cuadrar caja.',
+        ];
+    }
+
+    /**
+     * @return array<int, array<string, string>>
+     */
+    private function buildUnknownBusinessAnsweredInfo(array $answers): array
+    {
+        $rows = [];
+        foreach ($answers as $pair) {
+            if (!is_array($pair)) {
+                continue;
+            }
+            $question = trim((string) ($pair['question'] ?? ''));
+            $answer = trim((string) ($pair['answer'] ?? ''));
+            if ($question === '' || $answer === '') {
+                continue;
+            }
+            $rows[] = [
+                'question' => $question,
+                'answer' => $answer,
+            ];
+            if (count($rows) >= 12) {
+                break;
+            }
+        }
+        return $rows;
     }
 
     private function buildUnknownBusinessTechnicalBrief(string $candidate, array $answers): string
     {
         $labels = [
-            'Objetivo',
-            'Proceso inicial',
+            'Alcance inicial',
+            'Modelo de cobro',
+            'Reporte prioritario',
+            'Objetivo principal',
+            'Proceso operativo',
             'Datos minimos',
-            'Documentos',
+            'Documentos obligatorios',
             'Indicador principal',
             'Regla critica',
+            'Roles operativos',
+            'Modulo prioritario',
         ];
 
         $lines = [];
@@ -6352,11 +7906,46 @@ private function parseEntityFromCrudText(string $text): string
                 'confidence',
                 'canonical_business_type',
                 'business_candidate',
+                'business_objective',
+                'expected_result',
                 'reason_short',
                 'needs_normalized',
                 'documents_normalized',
+                'key_entities',
+                'first_module',
+                'operator_assistance_flow',
+                'similar_user_signals',
+                'training_dialog_flow',
+                'training_gaps',
+                'next_data_questions',
                 'clarifying_question',
             ];
+        $requiredKeys = array_values(array_unique(array_merge(
+            [
+                'status',
+                'confidence',
+                'canonical_business_type',
+                'business_candidate',
+                'business_objective',
+                'expected_result',
+                'reason_short',
+                'needs_normalized',
+                'documents_normalized',
+                'key_entities',
+                'first_module',
+                'operator_assistance_flow',
+                'similar_user_signals',
+                'training_dialog_flow',
+                'training_gaps',
+                'next_data_questions',
+                'clarifying_question',
+            ],
+            $requiredKeys
+        )));
+        $allowedNeedsVocabulary = $this->unknownBusinessAllowedNeedsVocabulary();
+        $allowedDocumentsVocabulary = $this->unknownBusinessAllowedDocumentsVocabulary();
+        $requiredBusinessInfo = $this->unknownBusinessRequiredInfoChecklist();
+        $answeredBusinessInfo = $this->buildUnknownBusinessAnsweredInfo($answers);
 
         $promptContract = [
             'ROLE' => 'Senior Business Systems Analyst',
@@ -6365,24 +7954,66 @@ private function parseEntityFromCrudText(string $text): string
                 'language' => 'es-CO',
                 'profile_hint' => (string) ($profile['business_type'] ?? ''),
                 'onboarding_step' => (string) ($state['onboarding_step'] ?? ''),
+                'strict_quality_target' => '10/10',
+                'required_business_information' => $requiredBusinessInfo,
             ],
             'INPUT' => [
                 'business_candidate' => $candidate,
                 'requirements_answers' => $answers,
+                'answered_business_information' => $answeredBusinessInfo,
             ],
             'CONSTRAINTS' => [
                 'no_invent_data' => true,
                 'one_question_max_if_missing' => true,
                 'output_json_only' => true,
                 'backward_compatible' => true,
+                'if_status_matched_require_business_context' => true,
+                'if_status_matched_require_richness_minimums' => [
+                    'needs_min' => 5,
+                    'documents_min' => 4,
+                    'key_entities_min' => 6,
+                ],
+                'if_status_matched_require_assistance_pack' => true,
+                'if_status_matched_require_operator_flow_min' => 5,
+                'if_status_matched_require_similarity_signals_min' => 4,
+                'if_status_matched_require_training_dialog_min' => 6,
+                'if_status_needs_clarification_require_training_gaps' => true,
+                'if_status_needs_clarification_require_next_data_questions_min' => 3,
+                'if_missing_required_business_information_return_needs_clarification' => true,
+                'training_dialog_flow_item_format' => 'escenario | mensaje_usuario | respuesta_asistente | dato_critico',
+                'next_data_questions_must_be_closed_options' => true,
+                'prioritize_low_tech_user_language' => true,
+                'forbid_unknown_scope_labels' => true,
+                'avoid_confidence_1_0_without_hard_evidence' => true,
+                'avoid_generic_entities_only' => true,
+                'allowed_needs_vocabulary' => $allowedNeedsVocabulary,
+                'allowed_documents_vocabulary' => $allowedDocumentsVocabulary,
             ],
             'OUTPUT_FORMAT' => [
-                'required_keys' => $requiredKeys,
+                'status' => ['type' => 'string', 'enum' => ['MATCHED', 'NEW_BUSINESS', 'NEEDS_CLARIFICATION', 'INVALID_REQUEST']],
+                'confidence' => ['type' => 'number', 'minimum' => 0.0, 'maximum' => 1.0],
+                'canonical_business_type' => ['type' => 'string'],
+                'business_candidate' => ['type' => 'string'],
+                'business_objective' => ['type' => 'string'],
+                'expected_result' => ['type' => 'string'],
+                'reason_short' => ['type' => 'string'],
+                'needs_normalized' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'documents_normalized' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'key_entities' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'first_module' => ['type' => 'string'],
+                'operator_assistance_flow' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'similar_user_signals' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'training_dialog_flow' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'training_gaps' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'next_data_questions' => ['type' => 'array', 'items' => ['type' => 'string']],
+                'clarifying_question' => ['type' => 'string'],
             ],
             'FAIL_RULES' => [
                 'if_confidence_below' => 0.7,
                 'return_on_low_confidence' => 'NEEDS_CLARIFICATION',
                 'if_contract_conflict' => 'INVALID_REQUEST',
+                'if_required_business_info_missing' => 'NEEDS_CLARIFICATION',
+                'required_output_keys' => $requiredKeys,
             ],
         ];
 
@@ -6448,7 +8079,7 @@ private function parseEntityFromCrudText(string $text): string
 
     private function stripNegatedBusinessMentions(string $text): string
     {
-        $clean = preg_replace('/\\bno\\s+soy\\s+(?:un|una)?\\s*[a-z0-9_\\-\\s]{2,40}(?:,|\\.|;|\\by\\b|\\bpero\\b)?/iu', ' ', $text);
+        $clean = preg_replace('/\\bno\\s+soy\\s+(?:una|un)?\\s*[a-z0-9_\\-\\s]{2,40}(?:,|\\.|;|\\by\\b|\\bpero\\b)?/iu', ' ', $text);
         if (!is_string($clean)) {
             return $text;
         }
@@ -6461,7 +8092,14 @@ private function parseEntityFromCrudText(string $text): string
         if ($existingBusinessType === '') {
             return false;
         }
-        if (preg_match('/\\bno\\s+soy\\b/u', $text) !== 1 && preg_match('/\\bno\\s+es\\b/u', $text) !== 1) {
+        $normalizedText = $this->normalize($text);
+        if (!preg_match('/\b(?:no\s+soy|no\s+es)\s+(?:una|un)?\s*([a-z0-9_\-\s]{2,60})/u', $normalizedText, $match)) {
+            return false;
+        }
+        $negatedChunk = trim((string) ($match[1] ?? ''));
+        $negatedChunk = preg_split('/(?:,|\\.|;|\\bpero\\b|\\by\\b)/u', $negatedChunk)[0] ?? $negatedChunk;
+        $negatedChunk = trim((string) $negatedChunk);
+        if ($negatedChunk === '') {
             return false;
         }
 
@@ -6479,10 +8117,12 @@ private function parseEntityFromCrudText(string $text): string
             }
         }
 
-        $normalizedText = $this->normalize($text);
         foreach ($needles as $needle) {
             $normalizedNeedle = $this->normalize((string) $needle);
-            if ($normalizedNeedle !== '' && str_contains($normalizedText, $normalizedNeedle)) {
+            if ($normalizedNeedle === '') {
+                continue;
+            }
+            if (str_contains($negatedChunk, $normalizedNeedle) || str_contains($normalizedNeedle, $negatedChunk)) {
                 return true;
             }
         }
@@ -6499,7 +8139,7 @@ private function parseEntityFromCrudText(string $text): string
         }
 
         if (!empty($needleTokens)) {
-            $textTokens = preg_split('/[^a-z0-9]+/u', $normalizedText) ?: [];
+            $textTokens = preg_split('/[^a-z0-9]+/u', $negatedChunk) ?: [];
             foreach ($textTokens as $token) {
                 $token = trim((string) $token);
                 if (strlen($token) < 5) {
@@ -6511,12 +8151,6 @@ private function parseEntityFromCrudText(string $text): string
                     }
                 }
             }
-        }
-
-        // If the user explicitly says "no soy/no es <algo>", treat it as business rejection
-        // even when the provided label has typos or does not match aliases exactly.
-        if (preg_match('/\b(?:no\s+soy|no\s+es)\s+[a-z0-9_\-\s]{3,40}\b/u', $normalizedText) === 1) {
-            return true;
         }
 
         return false;
@@ -6800,11 +8434,25 @@ private function parseEntityFromCrudText(string $text): string
 
         if ($intent === 'restart') {
             if ($mode === 'builder') {
+                $this->resetBuilderOnboardingProfile($profile, $tenantId, $userId);
                 $this->clearBuilderPendingCommand($state);
                 $state['builder_calc_prompt'] = null;
                 $state['builder_formula_notes'] = [];
                 $state['builder_plan'] = null;
                 $state['analysis_approved'] = null;
+                $state['proposed_profile'] = null;
+                $state['dynamic_playbook'] = null;
+                $state['dynamic_playbook_proposal'] = null;
+                $state['unknown_business_discovery'] = null;
+                $state['unknown_business_force_research'] = false;
+                $state['unknown_business_notice_sent'] = false;
+                $state['business_resolution_last_candidate'] = null;
+                $state['business_resolution_last_status'] = null;
+                $state['business_resolution_last_result'] = null;
+                $state['business_resolution_last_at'] = null;
+                $state['confirm_scope_last_hash'] = null;
+                $state['confirm_scope_repeats'] = 0;
+                $state['resolution_attempts'] = 0;
                 $state['active_task'] = 'builder_onboarding';
                 $state['onboarding_step'] = 'business_type';
                 $state['entity'] = null;
@@ -6934,6 +8582,25 @@ private function parseEntityFromCrudText(string $text): string
         }
 
         return [];
+    }
+
+    private function resetBuilderOnboardingProfile(array $profile, string $tenantId, string $userId): void
+    {
+        $reset = $profile;
+        foreach ([
+            'business_type',
+            'business_label',
+            'business_scope',
+            'business_candidate',
+            'operation_model',
+            'needs_scope',
+            'needs_scope_items',
+            'documents_scope',
+            'documents_scope_items',
+        ] as $key) {
+            unset($reset[$key]);
+        }
+        $this->saveProfile($tenantId, $this->profileUserKey($userId), $reset);
     }
 
     private function detectFlowControlIntent(string $text): string
@@ -7309,10 +8976,8 @@ private function parseEntityFromCrudText(string $text): string
         $playbook = $this->loadDomainPlaybook();
         $sector = $this->findSectorPlaybook($sectorKey, $playbook);
         if (empty($sector)) {
-            $this->appendResearchTopic($tenantId, $sectorKey . ':playbook_missing', [
-                'requested_action' => $action,
-                'source' => 'playbook_router',
-            ]);
+            $sample = 'requested_action=' . $action . '; source=playbook_router';
+            $this->appendResearchTopic($tenantId, $sectorKey . ':playbook_missing', $userId, mb_substr($sample, 0, 220));
             return [];
         }
 

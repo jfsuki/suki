@@ -18,12 +18,15 @@ namespace App\Tests\LLM\Providers {
 
     final class SuccessProvider
     {
+        public static array $lastParams = [];
+
         public function __construct(array $config = [])
         {
         }
 
         public function sendChat(array $messages, array $params = []): array
         {
+            self::$lastParams = $params;
             return [
                 'text' => '{"status":"MATCHED","confidence":0.91}',
                 'usage' => [
@@ -73,6 +76,15 @@ namespace {
             'max_output_tokens' => 120,
         ],
         'user_message' => 'clasifica este negocio',
+        'prompt_contract' => [
+            'OUTPUT_FORMAT' => [
+                'status' => 'MATCHED|NEW_BUSINESS|NEEDS_CLARIFICATION|INVALID_REQUEST',
+                'confidence' => '0.0-1.0',
+                'needs_normalized' => ['string'],
+                'documents_normalized' => ['string'],
+                'clarifying_question' => '<si aplica>',
+            ],
+        ],
     ];
 
     $failures = [];
@@ -95,6 +107,22 @@ namespace {
         $errors = is_array($result['provider_errors'] ?? null) ? (array) $result['provider_errors'] : [];
         if (!isset($errors['groq'])) {
             $failures[] = 'Errores por proveedor no registran fallo inicial.';
+        }
+        $schema = \App\Tests\LLM\Providers\SuccessProvider::$lastParams['response_schema'] ?? [];
+        $statusEnum = is_array($schema['properties']['status']['enum'] ?? null)
+            ? $schema['properties']['status']['enum']
+            : [];
+        if (!in_array('MATCHED', $statusEnum, true) || !in_array('NEW_BUSINESS', $statusEnum, true)) {
+            $failures[] = 'Response schema no expone enum esperado para status.';
+        }
+        $needsType = (string) ($schema['properties']['needs_normalized']['type'] ?? '');
+        $needsItemType = (string) ($schema['properties']['needs_normalized']['items']['type'] ?? '');
+        if ($needsType !== 'array' || $needsItemType !== 'string') {
+            $failures[] = 'Response schema no tipa needs_normalized como array<string>.';
+        }
+        $confidenceType = (string) ($schema['properties']['confidence']['type'] ?? '');
+        if ($confidenceType !== 'number') {
+            $failures[] = 'Response schema no tipa confidence como number.';
         }
     } catch (\Throwable $e) {
         $failures[] = 'Fallo inesperado en escenario de failover: ' . $e->getMessage();

@@ -377,7 +377,11 @@
                 "restaurante",
                 "cafeteria",
                 "comidas",
-                "bar"
+                "bar",
+                "panaderia",
+                "pasteleria",
+                "reposteria",
+                "asadero"
             ],
             "entities": [
                 "clientes",
@@ -432,7 +436,11 @@
                 "ropa",
                 "calzado",
                 "boutique",
-                "almacen"
+                "almacen",
+                "miscelanea",
+                "bazar",
+                "papeleria",
+                "zapateria"
             ],
             "entities": [
                 "clientes",

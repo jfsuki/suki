@@ -51,6 +51,9 @@ if ($mode === 'post') {
     if ((string) (getenv('QA_INCLUDE_LLM_SMOKE') ?: '0') === '1') {
         $steps[] = ['name' => 'llm_smoke', 'cmd' => 'php framework/tests/llm_smoke.php', 'parser' => 'llm_smoke'];
     }
+    if ((string) (getenv('QA_INCLUDE_LLM_GEMINI_SMOKE') ?: '0') === '1') {
+        $steps[] = ['name' => 'llm_gemini_staging_smoke', 'cmd' => 'php framework/tests/llm_gemini_staging_smoke.php', 'parser' => 'llm_smoke'];
+    }
 }
 
 $report = [

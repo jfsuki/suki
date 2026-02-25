@@ -375,8 +375,12 @@ final class LLMRouter
             if ($name === '') {
                 continue;
             }
+            $propertySchema = $this->descriptorToSchema($descriptor);
+            if ($propertySchema === []) {
+                continue;
+            }
             $required[] = $name;
-            $properties[$name] = ['type' => $this->mapSchemaType($descriptor)];
+            $properties[$name] = $propertySchema;
         }
 
         if ($properties === []) {
@@ -389,6 +393,164 @@ final class LLMRouter
             'required' => $required,
             'additionalProperties' => false,
         ];
+    }
+
+    private function descriptorToSchema($descriptor): array
+    {
+        if (is_object($descriptor)) {
+            $descriptor = (array) $descriptor;
+        }
+
+        if (is_array($descriptor)) {
+            if ($descriptor === []) {
+                return ['type' => 'array', 'items' => ['type' => 'string']];
+            }
+            $isAssociative = array_keys($descriptor) !== range(0, count($descriptor) - 1);
+            if ($isAssociative) {
+                if (isset($descriptor['type'])) {
+                    $schema = ['type' => $this->mapSchemaType($descriptor['type'])];
+                    if (!empty($descriptor['enum']) && is_array($descriptor['enum'])) {
+                        $enum = [];
+                        foreach ($descriptor['enum'] as $item) {
+                            $itemText = trim((string) $item);
+                            if ($itemText !== '') {
+                                $enum[] = $itemText;
+                            }
+                        }
+                        if ($enum !== []) {
+                            $schema['enum'] = array_values(array_unique($enum));
+                        }
+                    }
+                    if (isset($descriptor['minimum']) && is_numeric($descriptor['minimum'])) {
+                        $schema['minimum'] = (float) $descriptor['minimum'];
+                    }
+                    if (isset($descriptor['maximum']) && is_numeric($descriptor['maximum'])) {
+                        $schema['maximum'] = (float) $descriptor['maximum'];
+                    }
+                    if (!empty($descriptor['properties']) && is_array($descriptor['properties'])) {
+                        $props = [];
+                        $req = [];
+                        foreach ($descriptor['properties'] as $name => $nestedDescriptor) {
+                            $key = trim((string) $name);
+                            if ($key === '') {
+                                continue;
+                            }
+                            $nested = $this->descriptorToSchema($nestedDescriptor);
+                            if ($nested === []) {
+                                continue;
+                            }
+                            $props[$key] = $nested;
+                            $req[] = $key;
+                        }
+                        if ($props !== []) {
+                            $schema['properties'] = $props;
+                            $schema['required'] = $req;
+                        }
+                    }
+                    if (array_key_exists('items', $descriptor)) {
+                        $items = $this->descriptorToSchema($descriptor['items']);
+                        if ($items === []) {
+                            $items = ['type' => 'string'];
+                        }
+                        $schema['items'] = $items;
+                    }
+                    if (array_key_exists('additionalProperties', $descriptor)) {
+                        $schema['additionalProperties'] = (bool) $descriptor['additionalProperties'];
+                    }
+                    return $schema;
+                }
+
+                $props = [];
+                $req = [];
+                foreach ($descriptor as $name => $nestedDescriptor) {
+                    $key = trim((string) $name);
+                    if ($key === '') {
+                        continue;
+                    }
+                    $nested = $this->descriptorToSchema($nestedDescriptor);
+                    if ($nested === []) {
+                        continue;
+                    }
+                    $props[$key] = $nested;
+                    $req[] = $key;
+                }
+                if ($props === []) {
+                    return [];
+                }
+                return [
+                    'type' => 'object',
+                    'properties' => $props,
+                    'required' => $req,
+                    'additionalProperties' => false,
+                ];
+            }
+
+            $first = reset($descriptor);
+            $itemSchema = $this->descriptorToSchema($first);
+            if ($itemSchema === []) {
+                $itemSchema = ['type' => 'string'];
+            }
+            return [
+                'type' => 'array',
+                'items' => $itemSchema,
+            ];
+        }
+
+        $descriptorText = trim((string) $descriptor);
+        if ($descriptorText === '') {
+            return ['type' => 'string'];
+        }
+
+        if (preg_match('/^\s*[0-9]+(?:\.[0-9]+)?\s*-\s*[0-9]+(?:\.[0-9]+)?\s*$/', $descriptorText) === 1) {
+            $parts = preg_split('/\s*-\s*/', $descriptorText);
+            $min = isset($parts[0]) && is_numeric($parts[0]) ? (float) $parts[0] : 0.0;
+            $max = isset($parts[1]) && is_numeric($parts[1]) ? (float) $parts[1] : 1.0;
+            return [
+                'type' => 'number',
+                'minimum' => $min,
+                'maximum' => $max,
+            ];
+        }
+
+        $enum = $this->parseEnumDescriptor($descriptorText);
+        if (count($enum) >= 2) {
+            return [
+                'type' => 'string',
+                'enum' => $enum,
+            ];
+        }
+
+        $type = $this->mapSchemaType($descriptorText);
+        if ($type === 'array') {
+            return [
+                'type' => 'array',
+                'items' => ['type' => 'string'],
+            ];
+        }
+        return ['type' => $type];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function parseEnumDescriptor(string $descriptor): array
+    {
+        if (!str_contains($descriptor, '|')) {
+            return [];
+        }
+        $parts = explode('|', $descriptor);
+        $enum = [];
+        foreach ($parts as $part) {
+            $token = trim((string) $part);
+            if ($token === '') {
+                continue;
+            }
+            if (!preg_match('/^[A-Za-z0-9_.:\\-]{2,80}$/', $token)) {
+                return [];
+            }
+            $enum[] = $token;
+        }
+        return array_values(array_unique($enum));
     }
 
     private function mapSchemaType($descriptor): string

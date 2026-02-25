@@ -25,6 +25,8 @@ final class UnitTestRunner
         $tests[] = $this->wrap('mode_context_isolation', fn() => $this->checkModeContextIsolation());
         $tests[] = $this->wrap('business_reprofile_mid_flow', fn() => $this->checkBusinessReprofileMidFlow());
         $tests[] = $this->wrap('unknown_business_discovery', fn() => $this->checkUnknownBusinessDiscovery());
+        $tests[] = $this->wrap('unknown_business_llm_quality', fn() => $this->checkUnknownBusinessLlmQuality());
+        $tests[] = $this->wrap('unknown_business_quality_report', fn() => $this->checkUnknownBusinessQualityReport());
         $tests[] = $this->wrap('mode_guard_policy', fn() => $this->checkModeGuardPolicy());
         $tests[] = $this->wrap('builder_onboarding_flow', fn() => $this->checkBuilderOnboardingFlow());
         $tests[] = $this->wrap('builder_guidance', fn() => $this->checkBuilderGuidance());
@@ -417,16 +419,58 @@ final class UnitTestRunner
             throw new \RuntimeException('Unknown business discovery requiere bloque amplio de preguntas.');
         }
 
-        $result = $start;
+        $result = $gateway->handle(
+            $tenantId,
+            $user,
+            'ventas, inventario y facturacion',
+            'builder',
+            $projectId
+        );
+        $stepOneState = is_array($result['state'] ?? null) ? (array) $result['state'] : [];
+        $stepOneFlow = is_array($stepOneState['unknown_business_discovery'] ?? null)
+            ? (array) $stepOneState['unknown_business_discovery']
+            : [];
+        if ((int) ($stepOneFlow['current_index'] ?? -1) !== 1) {
+            throw new \RuntimeException('Unknown business discovery debe avanzar a pregunta 2 tras primera respuesta valida.');
+        }
+
+        $frustration = $gateway->handle(
+            $tenantId,
+            $user,
+            'no estas entendiendo',
+            'builder',
+            $projectId
+        );
+        $frustrationReply = mb_strtolower((string) ($frustration['reply'] ?? ''), 'UTF-8');
+        if (!str_contains($frustrationReply, 'pregunta 2/')) {
+            throw new \RuntimeException('Unknown business discovery no debe avanzar cuando la respuesta no aporta dato.');
+        }
+        $frustrationState = is_array($frustration['state'] ?? null) ? (array) $frustration['state'] : [];
+        $frustrationFlow = is_array($frustrationState['unknown_business_discovery'] ?? null)
+            ? (array) $frustrationState['unknown_business_discovery']
+            : [];
+        if ((int) ($frustrationFlow['current_index'] ?? -1) !== 1) {
+            throw new \RuntimeException('Unknown business discovery debe mantener el indice en respuestas no validas.');
+        }
+
+        $result = $frustration;
         $answerCount = count($questions);
-        for ($i = 0; $i < $answerCount; $i++) {
+        for ($i = 1; $i < $answerCount; $i++) {
+            $answer = 'respuesta ' . ($i + 1) . ' proceso produccion, ventas, factura y control de calidad';
+            if ($i === 2) {
+                $answer = 'ventas, contabilidad, pagos y lo que me pide la dian';
+            }
             $result = $gateway->handle(
                 $tenantId,
                 $user,
-                'respuesta ' . ($i + 1) . ' proceso produccion, ventas, factura y control de calidad',
+                $answer,
                 'builder',
                 $projectId
             );
+            $loopReply = mb_strtolower((string) ($result['reply'] ?? ''), 'UTF-8');
+            if (str_contains($loopReply, 'flujo sugerido:') || str_contains($loopReply, 'facturacion electronica en colombia')) {
+                throw new \RuntimeException('Unknown business discovery no debe ser interrumpido por builder guidance.');
+            }
         }
 
         $finalReply = mb_strtolower((string) ($result['reply'] ?? ''), 'UTF-8');
@@ -442,6 +486,16 @@ final class UnitTestRunner
         if ($technicalPrompt === '') {
             throw new \RuntimeException('Unknown business discovery debe guardar prompt tecnico para LLM.');
         }
+    }
+
+    private function checkUnknownBusinessLlmQuality(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/unknown_business_llm_quality_test.php');
+    }
+
+    private function checkUnknownBusinessQualityReport(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/unknown_business_quality_report_test.php');
     }
 
     private function checkModeGuardPolicy(): void
@@ -608,6 +662,38 @@ final class UnitTestRunner
         }
         if ((string) ($restart['state']['onboarding_step'] ?? '') !== 'business_type') {
             throw new \RuntimeException('Flow restart debe volver a business_type.');
+        }
+
+        $gateway->handle('default', $user, 'mi empresa es una ferreteria', 'builder', $projectId);
+        $gateway->handle('default', $user, 'mixto', 'builder', $projectId);
+        $gateway->handle('default', $user, 'inventario, facturacion, pagos', 'builder', $projectId);
+        $beforeReset = $gateway->handle('default', $user, 'factura, cotizacion', 'builder', $projectId);
+        if (stripos((string) ($beforeReset['reply'] ?? ''), 'Negocio: Ferreteria') === false) {
+            throw new \RuntimeException('Flow control setup esperaba resumen de ferreteria antes de reset.');
+        }
+
+        $gateway->handle('default', $user, 'reiniciar', 'builder', $projectId);
+        $afterReset = $gateway->handle('default', $user, 'mi empresa es una panaderia y cafeteria', 'builder', $projectId);
+        $afterResetReply = mb_strtolower((string) ($afterReset['reply'] ?? ''), 'UTF-8');
+        if (str_contains($afterResetReply, 'negocio: ferreteria') || str_contains($afterResetReply, 'ruta inicial sugerida: clientes, productos, marcas')) {
+            throw new \RuntimeException('Flow restart no debe arrastrar perfil previo de ferreteria.');
+        }
+
+        $invalidPayment = $gateway->handle('default', $user, 'las ventas', 'builder', $projectId);
+        $invalidPaymentReply = mb_strtolower((string) ($invalidPayment['reply'] ?? ''), 'UTF-8');
+        if (!str_contains($invalidPaymentReply, 'contado, credito o mixto')) {
+            throw new \RuntimeException('Onboarding paso 2 debe exigir forma de pago valida.');
+        }
+        if (str_starts_with(trim($invalidPaymentReply), 'perfecto.')) {
+            throw new \RuntimeException('Onboarding paso 2 no debe aceptar respuestas no validas como confirmadas.');
+        }
+
+        $gateway->handle('default', $user, 'contado', 'builder', $projectId);
+        $gateway->handle('default', $user, 'ventas, contabilidad, pagos, cartera y dian', 'builder', $projectId);
+        $finalScope = $gateway->handle('default', $user, 'factura, ticket', 'builder', $projectId);
+        $finalScopeReply = mb_strtolower((string) ($finalScope['reply'] ?? ''), 'UTF-8');
+        if (!str_contains($finalScopeReply, 'forma de pago: contado')) {
+            throw new \RuntimeException('Onboarding no debe mutar forma de pago por texto de cartera/reportes.');
         }
     }
 

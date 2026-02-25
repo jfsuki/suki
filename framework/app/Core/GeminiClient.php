@@ -130,6 +130,25 @@ final class GeminiClient
             $mapped['items'] = $this->toGeminiSchema($schema['items']);
         }
 
+        if (!empty($schema['enum']) && is_array($schema['enum'])) {
+            $enum = [];
+            foreach ($schema['enum'] as $value) {
+                $text = trim((string) $value);
+                if ($text !== '') {
+                    $enum[] = $text;
+                }
+            }
+            if ($enum !== []) {
+                $mapped['enum'] = array_values(array_unique($enum));
+            }
+        }
+
+        if (isset($schema['minimum']) && is_numeric($schema['minimum'])) {
+            $mapped['minimum'] = (float) $schema['minimum'];
+        }
+        if (isset($schema['maximum']) && is_numeric($schema['maximum'])) {
+            $mapped['maximum'] = (float) $schema['maximum'];
+        }
         return $mapped;
     }
 }
