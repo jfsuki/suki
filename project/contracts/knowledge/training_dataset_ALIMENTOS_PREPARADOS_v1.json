@@ -1,0 +1,1680 @@
+{
+    "batch_id": "ALIMENTOS_PREPARADOS_v1",
+    "language": "es-CO",
+    "context_pack": {
+        "business_type": "comercio_pyme",
+        "country": "CO",
+        "currency": "COP",
+        "tax_regime": "rts_iva",
+        "payment_methods": [
+            "efectivo",
+            "transferencia",
+            "nequi",
+            "daviplata",
+            "tarjeta",
+            "credito"
+        ],
+        "document_flows": [
+            "cotizacion -> pedido -> factura -> recaudo",
+            "compra -> ingreso inventario -> cuenta por pagar -> pago proveedor"
+        ],
+        "channels": [
+            "whatsapp",
+            "telegram",
+            "web_chat"
+        ],
+        "volume_profile": "pyme_alta_rotacion",
+        "chart_of_accounts_min": [
+            {
+                "code": "110505",
+                "name": "Caja general"
+            },
+            {
+                "code": "111005",
+                "name": "Bancos"
+            },
+            {
+                "code": "130505",
+                "name": "Clientes nacionales"
+            },
+            {
+                "code": "240805",
+                "name": "IVA generado"
+            },
+            {
+                "code": "413595",
+                "name": "Ingresos por ventas"
+            }
+        ],
+        "posting_rules": [
+            {
+                "trigger": "factura_contado",
+                "debit_account": "110505",
+                "credit_account": "413595"
+            },
+            {
+                "trigger": "factura_credito",
+                "debit_account": "130505",
+                "credit_account": "413595"
+            },
+            {
+                "trigger": "recaudo_cliente",
+                "debit_account": "111005",
+                "credit_account": "130505"
+            }
+        ]
+    },
+    "intents_expansion": [
+        {
+            "intent": "APP_CREATE",
+            "action": "FRAMEWORK_APP_CREATE",
+            "utterances_explicit": [
+                "Crear app para restaurante con mesas, pedidos, cocina y domicilios",
+                "Crear app de alimentos con tablas Clientes, Direcciones, Pedidos, DetallesPedido",
+                "Crear app con tabla Mesas y estados (libre/ocupada/cobrando)",
+                "Crear app con tabla Comandas/KDS para cocina (pendiente/en preparación/listo/entregado)",
+                "Crear app con tabla Domicilios y repartidores con estado (asignado/en ruta/entregado)",
+                "Crear app con tabla Menú (platos, bebidas, combos) y categorías",
+                "Crear app con tabla Recetas y BOM (ingredientes por plato)",
+                "Crear app con tabla Ingredientes inventariables (kilo, gramo, unidad)",
+                "Crear app con tabla Compras y Proveedores",
+                "Crear app con tabla Recepciones/Ingresos a inventario por compra",
+                "Crear app con tabla Producción/prep diaria (mise en place)",
+                "Crear app con fórmula costo_plato = SUM(ingrediente.costo_unit * cantidad_receta)",
+                "Crear app con fórmula margen = precio_venta - costo_plato",
+                "Crear app con fórmula margen_pct = (margen/precio_venta)*100",
+                "Crear app con fórmula total_pedido = subtotal + iva - descuento + servicio",
+                "Crear app con fórmula servicio = subtotal*0.10 (si aplica)",
+                "Crear app con fórmula saldo = total_pedido - pagado",
+                "Crear app con validación: no dejar pedido sin mesa o sin dirección (según tipo)",
+                "Crear app con campo tipo_pedido (mesa/domicilio/para_llevar)",
+                "Crear app con campo observaciones por ítem (sin cebolla, término medio)",
+                "Crear app con lógica: al marcar pedido 'listo' notificar a mesero/repartidor",
+                "Crear app con tabla MétodosPago y registro de propinas",
+                "Crear app con tabla Caja y cierres por turno",
+                "Crear app con reporte: ventas por día, por categoría y por producto",
+                "Crear app con reporte: ventas por canal (mesa/domicilio/para llevar)",
+                "Crear app con reporte: tiempos de preparación (promedio por plato)",
+                "Crear app con reporte: top productos y combos",
+                "Crear app con reporte: consumo de ingredientes por receta",
+                "Crear app con reporte: faltantes/stock mínimo y mermas",
+                "Crear app con reporte: compras por proveedor y variación de precios",
+                "Crear app con tabla Mermas/Desperdicio y motivo (daño, vencido, error cocina)",
+                "Crear app con tabla Promociones y cupones",
+                "Crear app con tabla Reservas (fecha, hora, personas)",
+                "Crear app con roles admin, caja, mesero, cocina, compras, contador",
+                "Crear app con flujo mesa: pedido->comanda->factura->recaudo",
+                "Crear app con flujo domicilio: pedido->pago/contraentrega->entrega->recaudo",
+                "Crear app con prefijos por punto de venta (FV-RES-A, FV-RES-B)",
+                "Crear app con control de crédito a empresas (factura a crédito y CxC)",
+                "Crear app con inventario y salida automática por receta al confirmar venta",
+                "Crear app restaurante #40 con pedidos y cocina"
+            ],
+            "utterances_implicit": [
+                "Necesito un sistema para mesas, domicilios y cocina sin enredarme",
+                "Quiero llevar pedidos con observaciones tipo sin sal, sin cebolla",
+                "Necesito una comanda para que cocina vea lo que entra",
+                "Quiero que el domiciliario reciba el pedido y estado en ruta",
+                "Necesito controlar recetas e ingredientes para saber costos reales",
+                "Quiero que al vender se descuente inventario por receta",
+                "Necesito compras y proveedores, y registrar entradas a inventario",
+                "Quiero controlar mermas y desperdicios del día",
+                "Necesito cierres de caja por turno con medios de pago y propinas",
+                "Quiero reportes de ventas por producto y por categoría",
+                "Necesito reporte por canal: mesa vs domicilio vs para llevar",
+                "Quiero saber qué platos dejan más margen",
+                "Necesito alertas de stock mínimo de ingredientes",
+                "Quiero ver tiempos de preparación y dónde se demora cocina",
+                "Necesito manejar reservas para fines de semana",
+                "Quiero un menú con combos y adicionales",
+                "Necesito que el pedido tenga estado y no se pierda",
+                "Quiero facturar la venta y luego registrar el recaudo",
+                "Si pagan a crédito, que quede cuenta por cobrar",
+                "Que el pago baje la deuda del cliente",
+                "Necesito prefijos por sede para facturas y recibos",
+                "Quiero control de propina por mesero y por factura",
+                "Necesito registrar devoluciones o anulaciones (pero separado)",
+                "Quiero controlar caja menor para gastos rápidos",
+                "Necesito compras a crédito y pagos a proveedores",
+                "Quiero que sugiera tablas, campos y fórmulas del restaurante",
+                "Necesito controlar inventario de bebidas y empaques",
+                "Quiero ventas por hora pico y por mesero",
+                "Necesito cuentas para el contador sin complicarme",
+                "Quiero manejar pedidos por WhatsApp y pasarlos a domicilio",
+                "Quiero que el sistema me diga qué ingredientes se consumen más",
+                "Necesito costo por plato para ajustar precios",
+                "Quiero reportes de compras por proveedor",
+                "Necesito registrar comisiones de datáfono",
+                "Quiero imprimir factura después (pero primero registrarla)",
+                "Necesito flujo completo con cocina y caja",
+                "Quiero registrar adicionales (queso extra, papas extra)",
+                "Necesito controlar inventario por lote y vencimiento (si aplica)",
+                "Quiero que el sistema genere recibo de caja del pago",
+                "Necesito app de restaurante #40 para pedidos y caja"
+            ],
+            "hard_negatives": [
+                "Consultar apps existentes de restaurante",
+                "Listar apps creadas",
+                "Editar la app del restaurante",
+                "Eliminar la app",
+                "Cambiar nombre de la app",
+                "Actualizar módulos de la app",
+                "Configurar colores/tema",
+                "Ver logs del runtime",
+                "Depurar error del framework",
+                "Optimizar performance del grid",
+                "Migrar datos desde otro sistema",
+                "Importar pedidos desde Excel",
+                "Exportar base de datos",
+                "Conectar pasarela de pagos",
+                "Integración con Rappi/UberEats (consulta)",
+                "Conectar WhatsApp API",
+                "Crear dashboard BI externo",
+                "Configurar DIAN",
+                "Configurar IVA global",
+                "Crear usuarios del sistema",
+                "Resetear contraseña",
+                "Asignar permisos masivos",
+                "Soporte: no abre el módulo",
+                "Soporte: error 500",
+                "Manual del sistema",
+                "Tutorial de uso",
+                "Cotizar desarrollo a medida",
+                "Diseño de logo",
+                "Campañas de marketing",
+                "Registrar factura de venta (no crear app)",
+                "Registrar recaudo (no crear app)",
+                "Crear cliente (no crear app)",
+                "Crear ítem (no crear app)",
+                "Crear asiento (no crear app)",
+                "Consultar movimientos de caja",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Imprimir factura existente",
+                "Descargar PDF existente",
+                "Editar una factura existente"
+            ],
+            "slots": [
+                {
+                    "name": "sector",
+                    "required": true
+                },
+                {
+                    "name": "procesos_criticos",
+                    "required": true
+                },
+                {
+                    "name": "documentos_criticos",
+                    "required": true
+                },
+                {
+                    "name": "roles",
+                    "required": true
+                },
+                {
+                    "name": "modulos_prioritarios",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "sector",
+                    "question": "¿Confirmas que la app es para Restaurante/venta y preparación de alimentos?"
+                },
+                {
+                    "missing_slot": "procesos_criticos",
+                    "question": "¿Qué procesos son prioridad (pedidos mesa/domicilio, cocina, recetas, compras, inventario, facturación, recaudo)?"
+                },
+                {
+                    "missing_slot": "documentos_criticos",
+                    "question": "¿Qué documentos críticos manejarás (comanda, pedido, factura, recibo_caja, orden_compra)?"
+                },
+                {
+                    "missing_slot": "roles",
+                    "question": "¿Qué roles usarán la app (admin, caja, mesero, cocina, compras, contador, domiciliario)?"
+                },
+                {
+                    "missing_slot": "modulos_prioritarios",
+                    "question": "¿Qué módulos salen primero (pedidos/mesas, cocina/comandas, domicilios, inventario/recetas, facturación, caja/bancos)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ App de Restaurante creada con pedidos (mesa/domicilio/para llevar), cocina (comandas), recetas/BOM, compras, inventario y caja.",
+            "error_reply_template": "No pude crear la app. Falta definir procesos, documentos y módulos prioritarios."
+        },
+        {
+            "intent": "ERP_FACTURA_VENTA",
+            "action": "ERP_INVOICE_SALES",
+            "utterances_explicit": [
+                "Registrar factura por pedido de mesa",
+                "Crear factura por domicilio",
+                "Emitir factura por para llevar",
+                "Registrar factura por combo familiar",
+                "Crear factura por almuerzo del día",
+                "Registrar factura por hamburguesa + bebida",
+                "Crear factura por pizza + adicional",
+                "Registrar factura por bebida (cerveza/gaseosa)",
+                "Crear factura por postre",
+                "Registrar factura por evento/catering",
+                "Crear factura por reserva con anticipo",
+                "Registrar factura por consumo de empresa (a crédito)",
+                "Crear factura por servicio de buffet",
+                "Registrar factura por menú ejecutivo",
+                "Crear factura por adicionales (queso extra)",
+                "Registrar factura con descuento promo",
+                "Registrar factura con propina/servicio",
+                "Registrar factura con IVA 19% (según ítem)",
+                "Registrar factura de contado",
+                "Registrar factura pagada por Nequi",
+                "Registrar factura pagada por tarjeta",
+                "Registrar factura pagada por transferencia",
+                "Registrar factura a crédito con vencimiento",
+                "Registrar factura con prefijo FV-RES-A",
+                "Registrar factura con prefijo FV-RES-B",
+                "Crear factura por venta de bebida inventariable",
+                "Registrar factura por venta de empaque/bolsa",
+                "Crear factura por catering a empresa",
+                "Registrar factura por consumo en mesa 12",
+                "Crear factura por domicilio con dirección",
+                "Registrar factura por pedido con observaciones",
+                "Crear factura por consumo de bar",
+                "Registrar factura por snack/entrada",
+                "Crear factura por recargo de envío a domicilio",
+                "Registrar factura por servicio a la mesa",
+                "Crear factura por pedido grande (grupo)",
+                "Registrar factura por add-ons múltiples",
+                "Crear factura por promoción 2x1",
+                "Registrar factura por cliente frecuente",
+                "Crear factura con ítems detallados"
+            ],
+            "utterances_implicit": [
+                "El cliente pidió la factura del pedido",
+                "Falta dejar facturado el domicilio de hoy",
+                "Necesito el documento fiscal para cierre de caja",
+                "La caja no cuadra porque falta una factura",
+                "Ya salió el pedido y no está facturado",
+                "Tengo la comanda lista, falta la factura",
+                "Necesito emitir factura para enviar al correo",
+                "La empresa pide factura a crédito",
+                "Va a crédito, que quede cuenta por cobrar",
+                "Necesito el consecutivo de factura del punto de venta",
+                "Cobré pero no he facturado",
+                "Necesito factura con propina/servicio",
+                "Hay descuento de promo, dejarlo en factura",
+                "Faltó facturar los adicionales",
+                "Necesito facturar el recargo de domicilio",
+                "Para el cierre del turno falta esa factura",
+                "Quiero soporte de la venta del combo",
+                "Falta facturar el catering",
+                "Necesito el número de factura para el recibo",
+                "Quiero la factura con ítems detallados y observaciones",
+                "Me falta registrar IVA generado en ventas",
+                "La orden de mesa 12 está lista, falta factura",
+                "El domiciliario ya entregó, falta facturar",
+                "Necesito facturar bebidas y postres aparte",
+                "El contador me pidió esa factura registrada",
+                "Falta emitir la factura del menú ejecutivo",
+                "Necesito factura para reembolso del cliente",
+                "No quedó facturado lo de hoy",
+                "Me piden la factura ya",
+                "Ayúdame a facturar ese pedido",
+                "Falta factura por para llevar",
+                "Necesito factura de evento",
+                "Falta factura con descuento 2x1",
+                "Me falta factura de la reserva",
+                "Necesito factura del bar",
+                "La venta quedó en borrador, toca emitirla",
+                "Necesito facturar un pedido con muchas observaciones",
+                "Quiero factura a nombre de empresa",
+                "Necesito facturar el servicio",
+                "Falta emitir factura restaurante #40"
+            ],
+            "hard_negatives": [
+                "Consultar factura por número",
+                "Buscar factura FV-RES-A-000123",
+                "Descargar PDF de una factura existente",
+                "Imprimir factura ya emitida",
+                "Reenviar factura existente",
+                "Editar una factura existente",
+                "Corregir ítems de factura existente",
+                "Anular factura existente",
+                "Eliminar factura",
+                "Listar facturas del mes",
+                "Ver estado de factura",
+                "Ver facturas por cliente",
+                "Ver cuentas por cobrar (consulta)",
+                "Registrar recaudo/pago (solo pago)",
+                "Aplicar pago a factura existente",
+                "Consultar movimientos de caja",
+                "Abrir caja",
+                "Cerrar caja",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Crear cliente",
+                "Editar cliente",
+                "Crear ítem menú/producto",
+                "Editar ítem",
+                "Ajustar inventario",
+                "Registrar compra proveedor",
+                "Orden de compra",
+                "Nota crédito",
+                "Devolución/reembolso (sin factura nueva)",
+                "Crear asiento contable",
+                "Consultar asientos contables",
+                "Configurar IVA",
+                "Configurar numeración DIAN",
+                "Ver pedidos del día (consulta)",
+                "Ver comandas (consulta)",
+                "Soporte: no imprime",
+                "Exportar facturas a Excel",
+                "Importar facturas desde Excel",
+                "Consultar/editar factura existente #39",
+                "Consultar/editar factura existente #40"
+            ],
+            "slots": [
+                {
+                    "name": "cliente",
+                    "required": true
+                },
+                {
+                    "name": "items",
+                    "required": true
+                },
+                {
+                    "name": "impuestos",
+                    "required": true
+                },
+                {
+                    "name": "forma_pago",
+                    "required": true
+                },
+                {
+                    "name": "prefijo_numeracion",
+                    "required": true
+                },
+                {
+                    "name": "vencimiento",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "cliente",
+                    "question": "¿A nombre de quién emito la factura (cliente/empresa), con CC/NIT?"
+                },
+                {
+                    "missing_slot": "items",
+                    "question": "¿Qué ítems van en la factura (platos/bebidas/adicionales), cantidad y valor?"
+                },
+                {
+                    "missing_slot": "impuestos",
+                    "question": "¿Qué IVA aplica (porcentaje)?"
+                },
+                {
+                    "missing_slot": "forma_pago",
+                    "question": "¿Cómo se paga (efectivo/transferencia/nequi/daviplata/tarjeta/crédito)?"
+                },
+                {
+                    "missing_slot": "prefijo_numeracion",
+                    "question": "¿Qué prefijo y consecutivo uso (ej. FV-RES-A-000123)?"
+                },
+                {
+                    "missing_slot": "vencimiento",
+                    "question": "Si es a crédito, ¿qué fecha de vencimiento lleva?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Factura de venta registrada para el pedido del restaurante.",
+            "error_reply_template": "No pude registrar la factura. Revisa cliente, ítems, IVA y numeración."
+        },
+        {
+            "intent": "ERP_CAJAYBANCOS",
+            "action": "ERP_CASH_BANK",
+            "utterances_explicit": [
+                "Registrar recaudo de factura de mesa",
+                "Registrar pago del domicilio por Nequi",
+                "Registrar pago por Daviplata",
+                "Registrar pago por transferencia a bancos",
+                "Registrar pago por tarjeta (datáfono)",
+                "Registrar ingreso en efectivo de mesa",
+                "Registrar propina recibida",
+                "Registrar pago parcial (abono) de catering",
+                "Registrar pago total de factura",
+                "Registrar egreso por compra de ingredientes",
+                "Registrar egreso por compra de bebidas",
+                "Registrar egreso por compra de empaques",
+                "Registrar egreso por pago a proveedor",
+                "Registrar egreso por pago de arriendo",
+                "Registrar egreso por servicios públicos",
+                "Registrar egreso por comisión datáfono",
+                "Registrar egreso por gas/energía cocina",
+                "Registrar egreso por mantenimiento de cocina",
+                "Registrar ingreso por evento/catering",
+                "Registrar recibo de caja del pago",
+                "Aplicar pago a factura FV-RES",
+                "Registrar ingreso por para llevar",
+                "Registrar salida por caja menor (mercado urgente)",
+                "Registrar egreso por transporte/domicilios",
+                "Registrar recaudo de cuenta por cobrar (empresa)",
+                "Registrar devolución (salida) por reembolso",
+                "Registrar consignación a bancos",
+                "Registrar transferencia caja->bancos",
+                "Registrar ingreso por bar",
+                "Registrar egreso por nómina (si aplica)",
+                "Registrar ingreso por propina en tarjeta",
+                "Registrar egreso por compra de aceite",
+                "Registrar ingreso por venta de bebidas",
+                "Registrar egreso por publicidad local",
+                "Registrar ingreso por reserva con anticipo",
+                "Registrar egreso por compra de carne/pollo",
+                "Registrar ingreso por pedidos WhatsApp (domicilio)",
+                "Registrar egreso por pago a domiciliario",
+                "Registrar ingreso por combo familiar",
+                "Registrar egreso por limpieza"
+            ],
+            "utterances_implicit": [
+                "Ya me pagaron la mesa, falta registrarlo",
+                "Entró un Nequi del domicilio, súbelo al sistema",
+                "Cayó transferencia de una empresa",
+                "Pagaron con tarjeta y no quedó el movimiento",
+                "El cliente abonó el catering, no pagó todo",
+                "Recibí efectivo y no hice el recibo",
+                "Falta aplicar el pago a la factura",
+                "Me llegó un pago pero no sé la factura",
+                "Pagué al proveedor, falta el egreso",
+                "Salió plata para mercado/ingredientes",
+                "Compramos bebidas y falta registrarlo",
+                "Hay comisión del datáfono por registrar",
+                "No me cuadra la caja por un pago",
+                "Para cierre de caja faltan movimientos",
+                "Entró Daviplata, falta meterlo",
+                "Me consignaron y no lo registré",
+                "Falta el movimiento del evento",
+                "Necesito que el pago baje la CxC de la empresa",
+                "Es ingreso, pero va a bancos por transferencia",
+                "Es salida, pago a proveedor",
+                "Tengo un reembolso, debo registrar salida",
+                "Me falta el recibo de caja del pago",
+                "El banco reflejó el ingreso hoy",
+                "Quiero registrar el pago ya",
+                "Toca dejar trazabilidad con referencia de factura",
+                "Sin ese movimiento no cuadra el cierre",
+                "Se pagó gas/energía y falta el egreso",
+                "Pagamos al domiciliario, falta registrarlo",
+                "Entró plata por bar, falta movimiento",
+                "Me pagaron por Nequi y no lo metí",
+                "Me llegó pago sin referencia, ayúdame",
+                "Pagamos servicios públicos, registra el egreso",
+                "Entró un anticipo de reserva",
+                "Se devolvió plata a un cliente",
+                "Necesito registrar ingreso por para llevar",
+                "Necesito registrar egreso por empaques",
+                "Falta registrar propina en caja",
+                "Me falta registrar salida de caja menor",
+                "Ayúdame a registrar ese recaudo",
+                "Necesito registrar egreso de ingredientes hoy"
+            ],
+            "hard_negatives": [
+                "Consultar movimientos de caja de hoy",
+                "Ver saldo de caja",
+                "Ver saldo de bancos",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Editar un movimiento existente",
+                "Anular un recaudo registrado",
+                "Eliminar un movimiento",
+                "Imprimir recibo existente",
+                "Descargar comprobante existente",
+                "Reenviar recibo existente",
+                "Abrir caja",
+                "Cerrar caja (solo consulta)",
+                "Arqueo de caja (consulta)",
+                "Registrar factura de venta",
+                "Consultar factura",
+                "Anular factura",
+                "Editar factura",
+                "Crear cliente",
+                "Editar cliente",
+                "Crear ítem menú/producto",
+                "Editar ítem",
+                "Ajustar inventario",
+                "Registrar compra proveedor",
+                "Orden de compra",
+                "Crear asiento contable",
+                "Consultar asientos",
+                "Reporte de ingresos (consulta)",
+                "Reporte de gastos (consulta)",
+                "Ver CxC (consulta)",
+                "Ver CxP (consulta)",
+                "Configurar medios de pago",
+                "Configurar bancos",
+                "Configurar cajas",
+                "Soporte: no registra pago",
+                "Exportar movimientos",
+                "Importar movimientos",
+                "Ver pedidos (consulta)",
+                "Ver comandas (consulta)",
+                "Crear app"
+            ],
+            "slots": [
+                {
+                    "name": "tipo_movimiento",
+                    "required": true
+                },
+                {
+                    "name": "tercero",
+                    "required": true
+                },
+                {
+                    "name": "monto",
+                    "required": true
+                },
+                {
+                    "name": "medio",
+                    "required": true
+                },
+                {
+                    "name": "referencia_documento",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tipo_movimiento",
+                    "question": "¿Es un ingreso (recaudo) o una salida (pago/egreso)?"
+                },
+                {
+                    "missing_slot": "tercero",
+                    "question": "¿De quién es el movimiento (cliente/empresa, proveedor o tercero)?"
+                },
+                {
+                    "missing_slot": "monto",
+                    "question": "¿Cuál es el valor en COP?"
+                },
+                {
+                    "missing_slot": "medio",
+                    "question": "¿Qué medio usaste (efectivo/transferencia/nequi/daviplata/tarjeta/crédito)?"
+                },
+                {
+                    "missing_slot": "referencia_documento",
+                    "question": "¿A qué documento lo relaciono (factura FV-RES / recibo / soporte)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Movimiento de caja/bancos registrado y asociado al pedido/factura.",
+            "error_reply_template": "No pude registrar el movimiento. Revisa tipo, tercero, monto, medio y referencia."
+        },
+        {
+            "intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "action": "APP_ENTITY_CREATE_CUSTOMER",
+            "utterances_explicit": [
+                "Crear cliente para pedido a domicilio con cédula",
+                "Crear cliente con nombre y celular",
+                "Crear cliente con dirección de entrega",
+                "Crear cliente empresa para consumos a crédito (NIT)",
+                "Crear cliente con correo para factura",
+                "Crear cliente con condición contado",
+                "Crear cliente con condición crédito 30 días",
+                "Registrar tercero para facturar",
+                "Crear cliente frecuente",
+                "Crear cliente para reserva",
+                "Crear cliente para catering",
+                "Crear cliente para bar",
+                "Crear cliente para mesa (factura a nombre)",
+                "Crear cliente con observaciones (alergias)",
+                "Crear cliente con dos direcciones",
+                "Crear cliente con contacto alterno",
+                "Crear cliente para cuenta por cobrar",
+                "Crear cliente para anticipo",
+                "Crear cliente rápido para cobrar",
+                "Crear cliente con CC y apellido",
+                "Crear cliente con WhatsApp como contacto",
+                "Crear cliente con email y celular",
+                "Crear cliente con condición crédito 15 días",
+                "Crear cliente con condición crédito 45 días",
+                "Crear cliente con convenio empresarial",
+                "Crear cliente para pedidos recurrentes",
+                "Crear cliente para domicilio por barrio",
+                "Crear cliente para recoger en tienda",
+                "Crear tercero para caja/bancos",
+                "Crear cliente con razón social",
+                "Crear cliente con NIT y razón social",
+                "Crear cliente para factura electrónica",
+                "Crear cliente para delivery corporativo",
+                "Crear cliente para plan alimentación semanal",
+                "Crear cliente para evento fin de semana",
+                "Crear cliente para cumpleaños (evento)",
+                "Crear cliente para pedido WhatsApp",
+                "Crear cliente para mesa 12",
+                "Crear cliente para domicilio urgente",
+                "Crear cliente para servicio a la mesa"
+            ],
+            "utterances_implicit": [
+                "No aparece el cliente, toca crearlo",
+                "Voy a facturar y el cliente no existe",
+                "No puedo cobrar sin tercero",
+                "Ese cliente es nuevo, agréguelo",
+                "Solo tengo el celular y nombre, créalo",
+                "Es empresa, toca crearla con NIT",
+                "Necesito guardar dirección para el domicilio",
+                "Necesito correo para enviar factura",
+                "Ese cliente va a crédito, pon condición",
+                "Es contado, déjalo contado",
+                "No lo encuentro por CC, créalo",
+                "Necesito tercero para registrar el recaudo",
+                "No me deja facturar sin cliente",
+                "Crea el cliente y seguimos con el pedido",
+                "Necesito registrarlo rápido pa cobrar",
+                "Me falta el tercero para la factura",
+                "El cliente compra por convenio, regístralo",
+                "Necesito crear cliente empresa del catering",
+                "Me falta el contacto del cliente",
+                "El cliente pide factura electrónica y falta email",
+                "Déjalo con crédito a 30 días",
+                "Solo tengo WhatsApp, pero créalo",
+                "No aparece en lista, créalo",
+                "Falta crear cliente para reserva",
+                "Falta crear cliente para catering",
+                "Necesito cliente para CxC",
+                "No lo encuentra por nombre, créalo por CC",
+                "Necesito crear el cliente ya",
+                "Voy a registrar pago y falta tercero",
+                "Necesito crear el dueño del domicilio",
+                "Me pasaron el NIT y razón social, falta registrarlo",
+                "Necesito el tercero pa bancos",
+                "Me falta crear cliente para mesa",
+                "Me falta crear cliente para pedidos recurrentes",
+                "Ayúdame a crear el cliente",
+                "No puedo enviar factura sin correo",
+                "No puedo despachar sin dirección",
+                "Falta el cliente para el pedido WhatsApp",
+                "Necesito crear el cliente del evento",
+                "No existe el cliente, crear #40"
+            ],
+            "hard_negatives": [
+                "Consultar cliente por cédula",
+                "Buscar cliente existente",
+                "Ver ficha del cliente",
+                "Editar teléfono del cliente",
+                "Actualizar correo del cliente",
+                "Cambiar condición comercial",
+                "Eliminar cliente",
+                "Inactivar cliente",
+                "Ver estado de cuenta del cliente",
+                "Ver facturas del cliente",
+                "Ver CxC del cliente",
+                "Registrar factura de venta",
+                "Consultar factura",
+                "Registrar recaudo",
+                "Consultar movimientos caja",
+                "Crear ítem menú/producto",
+                "Editar ítem",
+                "Crear asiento contable",
+                "Consultar asientos",
+                "Crear pedido (operación)",
+                "Editar pedido",
+                "Anular pedido",
+                "Ver pedidos (consulta)",
+                "Ver comandas (consulta)",
+                "Editar receta",
+                "Importar clientes Excel",
+                "Exportar clientes",
+                "Crear proveedor",
+                "Consultar proveedores",
+                "Soporte: cliente no carga",
+                "Resetear contraseña",
+                "Crear usuario",
+                "Asignar roles a usuario",
+                "Reporte de clientes (consulta)",
+                "Enviar mensajes masivos",
+                "Crear app",
+                "Editar app",
+                "Conciliar bancos",
+                "Cargar extracto",
+                "Consultar/editar cliente (no crear) #40"
+            ],
+            "slots": [
+                {
+                    "name": "tipo",
+                    "required": true
+                },
+                {
+                    "name": "nit_cc",
+                    "required": true
+                },
+                {
+                    "name": "razon_social_nombre",
+                    "required": true
+                },
+                {
+                    "name": "contacto",
+                    "required": true
+                },
+                {
+                    "name": "condicion_comercial",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tipo",
+                    "question": "¿El cliente es persona natural o empresa?"
+                },
+                {
+                    "missing_slot": "nit_cc",
+                    "question": "¿Cuál es el NIT o la cédula?"
+                },
+                {
+                    "missing_slot": "razon_social_nombre",
+                    "question": "¿Cuál es el nombre completo o razón social?"
+                },
+                {
+                    "missing_slot": "contacto",
+                    "question": "¿Qué contacto registro (celular y/o email)?"
+                },
+                {
+                    "missing_slot": "condicion_comercial",
+                    "question": "¿Es contado o crédito (y a cuántos días)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Cliente creado y listo para pedidos/facturar/recaudar.",
+            "error_reply_template": "No pude crear el cliente. Verifica tipo, documento y nombre."
+        },
+        {
+            "intent": "APP_RUNTIME_CREATE_ITEM",
+            "action": "APP_ENTITY_CREATE_ITEM",
+            "utterances_explicit": [
+                "Crear ítem plato hamburguesa artesanal (servicio/venta)",
+                "Crear ítem plato pizza personal",
+                "Crear ítem plato menú ejecutivo",
+                "Crear ítem plato almuerzo del día",
+                "Crear ítem bebida gaseosa 400ml (producto inventariable)",
+                "Crear ítem bebida cerveza (producto inventariable)",
+                "Crear ítem postre brownie",
+                "Crear ítem combo familiar",
+                "Crear ítem adicional queso extra",
+                "Crear ítem adicional papas extra",
+                "Crear ítem servicio recargo domicilio",
+                "Crear ítem servicio propina sugerida",
+                "Crear ítem catering por persona",
+                "Crear ítem servicio reserva (anticipo)",
+                "Crear ítem empaque/bolsa (producto inventariable)",
+                "Crear ítem salsa adicional",
+                "Crear ítem entrada nachos",
+                "Crear ítem plato pollo a la plancha",
+                "Crear ítem plato ensalada",
+                "Crear ítem plato pasta",
+                "Crear producto ingrediente carne (inventariable)",
+                "Crear producto ingrediente pollo (inventariable)",
+                "Crear producto ingrediente queso (inventariable)",
+                "Crear producto ingrediente pan (inventariable)",
+                "Crear producto ingrediente aceite (inventariable)",
+                "Crear producto ingrediente gaseosa (inventariable)",
+                "Crear producto ingrediente arroz (inventariable)",
+                "Crear producto ingrediente papa (inventariable)",
+                "Crear ítem con IVA 19",
+                "Crear ítem exento (si aplica)",
+                "Crear ítem con SKU y precio",
+                "Crear ítem con costo y margen",
+                "Crear ítem con unidad (kg, gr, und)",
+                "Crear ítem inventariable sí (producto)",
+                "Crear ítem inventariable no (plato/servicio)",
+                "Crear ítem menú con categoría (bebidas, platos, combos)",
+                "Crear ítem para bar (coctel)",
+                "Crear ítem para plan semanal de comidas",
+                "Crear ítem para evento/cumpleaños",
+                "Crear ítem de restaurante #40 con precio e IVA"
+            ],
+            "utterances_implicit": [
+                "No me sale el plato en el menú, toca crearlo",
+                "Voy a facturar y falta el ítem del combo",
+                "Ese adicional no está, agrégalo",
+                "Necesito el código del plato",
+                "Ese producto va a inventario (gaseosa, cerveza, empaque)",
+                "Ese plato es servicio/venta, no inventario",
+                "Falta crear recargo de domicilio",
+                "Quiero que calcule IVA desde el ítem",
+                "Necesito precio para poder cobrar",
+                "Falta el ítem de menú ejecutivo",
+                "Falta el ítem de almuerzo del día",
+                "No aparece la gaseosa, créala",
+                "No aparece el empaque, créalo",
+                "Ese ítem va sin IVA (si aplica)",
+                "Necesito crear propina sugerida como ítem",
+                "Necesito crear catering por persona",
+                "No encuentro postre, agrégalo",
+                "Necesito stock mínimo para bebidas",
+                "Ese producto debe ser inventariable sí",
+                "Ese servicio debe ser inventariable no",
+                "Me falta el ítem pa la factura",
+                "Crea el ítem y seguimos",
+                "Solo tengo nombre y precio, créalo",
+                "Ponle IVA 19 y listo",
+                "Necesito crear ingrediente (carne) para inventario",
+                "Necesito crear ingrediente (aceite) para compras",
+                "Falta el ítem de pizza personal",
+                "Falta el ítem de hamburguesa",
+                "Necesito crear adicional queso extra",
+                "Necesito crear adicional papas extra",
+                "Falta el ítem de coctel del bar",
+                "Necesito crear paquete plan semanal",
+                "Falta el ítem de entrada nachos",
+                "No aparece salsa adicional, créala",
+                "Quiero categoría bebidas y platos",
+                "Ayúdame a crear ese ítem",
+                "Crear el item para facturar",
+                "Falta el SKU del producto",
+                "Necesito definir si es inventariable",
+                "Necesito costo para calcular margen"
+            ],
+            "hard_negatives": [
+                "Consultar ítem por SKU",
+                "Buscar producto existente",
+                "Ver kardex del producto",
+                "Ajustar inventario",
+                "Editar precio de ítem existente",
+                "Cambiar IVA de ítem existente",
+                "Eliminar ítem",
+                "Inactivar ítem",
+                "Importar menú desde Excel",
+                "Exportar menú",
+                "Crear cliente",
+                "Editar cliente",
+                "Registrar factura",
+                "Consultar factura",
+                "Anular factura",
+                "Registrar recaudo",
+                "Consultar movimientos caja",
+                "Crear asiento contable",
+                "Consultar asientos",
+                "Registrar compra proveedor",
+                "Ingreso a inventario",
+                "Traslado bodegas",
+                "Configurar bodegas",
+                "Configurar unidades",
+                "Configurar impuestos globales",
+                "Crear lista de precios",
+                "Aplicar descuento masivo",
+                "Reporte inventario (consulta)",
+                "Reporte ventas (consulta)",
+                "Crear pedido (operación)",
+                "Ver comandas",
+                "Actualizar receta (no crear ítem)",
+                "Soporte: no carga catálogo",
+                "Crear app",
+                "Editar app",
+                "Listar apps",
+                "Conciliar bancos",
+                "Cargar extracto",
+                "Consultar/editar ítem existente #39",
+                "Consultar/editar ítem existente #40"
+            ],
+            "slots": [
+                {
+                    "name": "tipo",
+                    "required": true
+                },
+                {
+                    "name": "precio",
+                    "required": true
+                },
+                {
+                    "name": "impuesto",
+                    "required": true
+                },
+                {
+                    "name": "sku_codigo",
+                    "required": true
+                },
+                {
+                    "name": "inventariable",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tipo",
+                    "question": "¿Es producto inventariable (bebida/empaque/ingrediente) o servicio/plato del menú?"
+                },
+                {
+                    "missing_slot": "precio",
+                    "question": "¿Cuál es el precio de venta en COP?"
+                },
+                {
+                    "missing_slot": "impuesto",
+                    "question": "¿Qué IVA aplica (porcentaje)?"
+                },
+                {
+                    "missing_slot": "sku_codigo",
+                    "question": "¿Cuál es el código/SKU del ítem?"
+                },
+                {
+                    "missing_slot": "inventariable",
+                    "question": "Si es producto, ¿es inventariable (sí/no)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Ítem creado (menú/producto) con precio, IVA y código.",
+            "error_reply_template": "No pude crear el ítem. Verifica tipo, precio, IVA y código."
+        },
+        {
+            "intent": "ERP_ASIENTO_CONTABLE",
+            "action": "ERP_ACCOUNTING_JOURNAL",
+            "utterances_explicit": [
+                "Registrar asiento por descuadre de caja del restaurante",
+                "Crear asiento por IVA generado del día",
+                "Registrar asiento por comisión datáfono",
+                "Crear asiento por arriendo del local",
+                "Registrar asiento por servicios públicos",
+                "Crear asiento por compra de ingredientes (si se contabiliza manual)",
+                "Registrar asiento por ajuste de inventario (mermas)",
+                "Crear asiento por traslado caja a bancos",
+                "Registrar asiento por reembolso a cliente",
+                "Crear asiento con centro de costo Cocina",
+                "Crear asiento con centro de costo Salón",
+                "Registrar asiento con documento soporte (arqueo)",
+                "Crear comprobante contable diario",
+                "Registrar asiento por pago a proveedor",
+                "Crear asiento por caja menor (mercado urgente)",
+                "Registrar asiento por nómina (si aplica)",
+                "Crear asiento por depreciación de equipos de cocina",
+                "Registrar asiento por gastos bancarios",
+                "Crear asiento por pago a domiciliarios",
+                "Registrar asiento por publicidad local",
+                "Crear asiento por limpieza y aseo",
+                "Registrar asiento por compra de empaques",
+                "Crear asiento por devolución de dinero",
+                "Registrar asiento por provisión",
+                "Crear asiento por ajuste de cartera (empresa)",
+                "Registrar asiento por castigo de cartera",
+                "Crear asiento por póliza/seguro",
+                "Registrar asiento por gasto de gas",
+                "Crear asiento por mantenimiento de neveras",
+                "Registrar asiento por compra a crédito",
+                "Crear asiento por pago de factura proveedor",
+                "Registrar asiento con líneas débito/crédito",
+                "Crear asiento por cierre de turno",
+                "Registrar asiento por diferencia de bancos",
+                "Crear asiento por ingreso de evento/catering",
+                "Registrar asiento por costo de ventas (si aplica)",
+                "Crear asiento por merma registrada",
+                "Registrar asiento por propinas (si se contabiliza)",
+                "Crear asiento por traslado entre cajas",
+                "Registrar asiento por ajuste contable"
+            ],
+            "utterances_implicit": [
+                "El contador pidió un comprobante manual",
+                "Falta pasar esto a contabilidad",
+                "Necesito un comprobante con soporte",
+                "Hay descuadre y toca ajustar",
+                "Debo reconocer IVA en libros",
+                "La comisión del banco no está registrada",
+                "Falta el asiento del arriendo",
+                "Falta el asiento de servicios públicos",
+                "Necesito asociar documento soporte al asiento",
+                "Me falta centro de costo",
+                "Eso debe ir al diario hoy",
+                "Necesito líneas débito/crédito",
+                "Falta el comprobante del pago a proveedor",
+                "Quiero contabilizar traslado a bancos",
+                "Se registró merma, falta ajuste contable",
+                "Hubo reembolso a un cliente, falta asiento",
+                "Necesito asiento por publicidad",
+                "Necesito registrar gastos bancarios",
+                "No quedó registrado en libros",
+                "Debo imputar a cocina o salón",
+                "Me falta el concepto del asiento",
+                "Faltan las líneas del asiento",
+                "Necesito asiento por caja menor",
+                "Debo contabilizar devolución de dinero",
+                "Necesito asiento por ajuste de cartera",
+                "Necesito asiento por castigo de cartera",
+                "Falta el asiento del día",
+                "Hay diferencia entre factura y pago",
+                "Necesito registrar provisión",
+                "El soporte está, falta asiento",
+                "Toca meter comprobante contable",
+                "Necesito asiento por pago a domiciliario",
+                "Falta asiento por compra de empaques",
+                "Necesito asiento por gasto de gas",
+                "Necesito asiento por mantenimiento de equipos",
+                "Ayúdame con ese comprobante",
+                "Quiero registrar el asiento ya",
+                "Necesito asiento por evento/catering",
+                "Falta contabilizar cierre de turno",
+                "Necesito asiento por propinas"
+            ],
+            "hard_negatives": [
+                "Consultar asientos contables",
+                "Listar comprobantes del mes",
+                "Imprimir comprobante existente",
+                "Descargar comprobante existente",
+                "Editar un asiento registrado",
+                "Anular un asiento existente",
+                "Eliminar comprobante",
+                "Ver libro diario (consulta)",
+                "Ver balance general",
+                "Ver estado de resultados",
+                "Configurar plan de cuentas",
+                "Crear cuenta contable nueva",
+                "Cambiar códigos contables",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Registrar factura de venta",
+                "Consultar factura",
+                "Anular factura",
+                "Registrar recaudo",
+                "Consultar movimientos de caja",
+                "Crear cliente",
+                "Crear ítem",
+                "Ajustar inventario (operativo)",
+                "Cerrar caja",
+                "Abrir caja",
+                "Reporte de ventas (consulta)",
+                "Reporte de IVA (consulta)",
+                "Crear app",
+                "Editar app",
+                "Soporte: error contable",
+                "Exportar contabilidad",
+                "Importar asientos",
+                "Crear usuario",
+                "Resetear contraseña",
+                "Manual contable",
+                "Tutorial contable",
+                "Ver CxC (consulta)",
+                "Ver CxP (consulta)",
+                "Registrar compra",
+                "Orden de compra"
+            ],
+            "slots": [
+                {
+                    "name": "fecha",
+                    "required": true
+                },
+                {
+                    "name": "concepto",
+                    "required": true
+                },
+                {
+                    "name": "lineas_debito_credito",
+                    "required": true
+                },
+                {
+                    "name": "centro_costo",
+                    "required": true
+                },
+                {
+                    "name": "documento_soporte",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "fecha",
+                    "question": "¿Qué fecha debe llevar el asiento?"
+                },
+                {
+                    "missing_slot": "concepto",
+                    "question": "¿Cuál es el concepto/descripcion del asiento?"
+                },
+                {
+                    "missing_slot": "lineas_debito_credito",
+                    "question": "Dime las líneas (cuenta, débito/crédito y valor) para registrar el asiento."
+                },
+                {
+                    "missing_slot": "centro_costo",
+                    "question": "¿Qué centro de costo aplica (ej. Cocina/Salón/Sede)?"
+                },
+                {
+                    "missing_slot": "documento_soporte",
+                    "question": "¿Cuál es el documento soporte (número/archivo/referencia)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Asiento contable registrado con soporte y centro de costo.",
+            "error_reply_template": "No pude registrar el asiento. Revisa fecha, líneas y soporte."
+        }
+    ],
+    "multi_turn_dialogues": [
+        {
+            "id": "ALIM-DLG-01",
+            "scenario": "Corrección: factura de mesa con numeración",
+            "turns": [
+                {
+                    "user": "hazme la factura de la mesa 12"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                },
+                {
+                    "user": "a nombre de Carlos Gómez cc 1022334455"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                },
+                {
+                    "user": "hamburguesa 2 a 28000 y gaseosa 2 a 6000"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:impuestos"
+                },
+                {
+                    "user": "iva 19"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:forma_pago"
+                },
+                {
+                    "user": "tarjeta"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:prefijo_numeracion"
+                },
+                {
+                    "user": "FV-RES-A-000123"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        },
+        {
+            "id": "ALIM-DLG-02",
+            "scenario": "Frustración: recaudo implícito",
+            "turns": [
+                {
+                    "user": "ya me pagaron el domicilio y no me cuadra la caja 😡"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo_movimiento"
+                },
+                {
+                    "user": "ingreso, pago del cliente"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:referencia_documento"
+                }
+            ]
+        },
+        {
+            "id": "ALIM-DLG-03",
+            "scenario": "Pago sin referencia clara",
+            "turns": [
+                {
+                    "user": "me entró un nequi pero no sé de qué pedido era"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tercero"
+                },
+                {
+                    "user": "de Juliana Ruiz cc 100200300"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:monto"
+                }
+            ]
+        },
+        {
+            "id": "ALIM-DLG-04",
+            "scenario": "Desambiguación: factura vs recibo",
+            "turns": [
+                {
+                    "user": "necesito el recibo de esa venta"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo_movimiento"
+                },
+                {
+                    "user": "no, era la factura para la empresa"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                }
+            ]
+        },
+        {
+            "id": "ALIM-DLG-05",
+            "scenario": "Crear cliente con dirección para domicilio",
+            "turns": [
+                {
+                    "user": "ese cliente no existe y es a domicilio, créalo"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo"
+                },
+                {
+                    "user": "persona"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:nit_cc"
+                }
+            ]
+        },
+        {
+            "id": "ALIM-DLG-06",
+            "scenario": "Crear ítem: plato vs producto inventariable",
+            "turns": [
+                {
+                    "user": "no me sale gaseosa 400ml, agrégala"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo"
+                },
+                {
+                    "user": "producto"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:sku_codigo"
+                }
+            ]
+        },
+        {
+            "id": "ALIM-DLG-07",
+            "scenario": "APP_CREATE: procesos críticos restaurante",
+            "turns": [
+                {
+                    "user": "quiero app para restaurante con domicilios, recetas y compras"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:procesos_criticos"
+                },
+                {
+                    "user": "pedidos mesa/domicilio, cocina, recetas, compras, inventario, facturación y recaudo"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:modulos_prioritarios"
+                }
+            ]
+        },
+        {
+            "id": "ALIM-DLG-08",
+            "scenario": "Frustración: app sin tanta pregunta",
+            "turns": [
+                {
+                    "user": "cree la app ya y deje eso andando 😤"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:roles"
+                },
+                {
+                    "user": "admin, caja, mesero, cocina y compras"
+                },
+                {
+                    "assistant_expected_action": "FRAMEWORK_APP_CREATE"
+                }
+            ]
+        },
+        {
+            "id": "ALIM-DLG-09",
+            "scenario": "Asiento por comisión datáfono",
+            "turns": [
+                {
+                    "user": "necesito un asiento por comisión del datáfono"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:fecha"
+                },
+                {
+                    "user": "hoy"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:lineas_debito_credito"
+                }
+            ]
+        },
+        {
+            "id": "ALIM-DLG-10",
+            "scenario": "Desambiguación: crear vs anular factura",
+            "turns": [
+                {
+                    "user": "anula la factura FV-RES-A-000120"
+                },
+                {
+                    "assistant_expected_action": "NEEDS_DISAMBIGUATION"
+                },
+                {
+                    "user": "perdón, era crear la factura del pedido de hoy"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                }
+            ]
+        }
+    ],
+    "emotion_cases": [
+        {
+            "emotion": "frustracion",
+            "user_samples": [
+                "no joda, tengo la fila y necesito cobrar ya",
+                "otra vez pidiendo lo mismo 😡",
+                "se me está enfriando el pedido por estar en esto",
+                "me tiene mamado, solo registre el pago"
+            ],
+            "assistant_style": "empático, breve, sin discutir; valida emoción y pide 1 dato crítico",
+            "expected_next_step": "aplicar one_question_policy del slot más crítico para avanzar"
+        },
+        {
+            "emotion": "duda",
+            "user_samples": [
+                "no sé si es factura o recibo de caja",
+                "eso va a caja o a contabilidad?",
+                "registro pago o registro la venta?"
+            ],
+            "assistant_style": "explica en 1-2 líneas y hace una sola pregunta para definir intención",
+            "expected_next_step": "preguntar el dato que define el intent (factura vs recaudo vs asiento)"
+        },
+        {
+            "emotion": "urgencia",
+            "user_samples": [
+                "es para yaaa",
+                "me lo piden en 5 min",
+                "cierre de turno urgente"
+            ],
+            "assistant_style": "directo y resolutivo; 1 pregunta y ejecución inmediata al completar",
+            "expected_next_step": "pedir el slot faltante mínimo y ejecutar acción"
+        }
+    ],
+    "qa_cases": [
+        {
+            "text": "crear app restaurante con mesas, comandas, domicilios, recetas y compras",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "necesito app que descuente inventario por receta al confirmar venta",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "quiero app con observaciones por ítem (sin cebolla, sin sal) y KDS cocina",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "armar app con reportes: ventas por canal, top productos, tiempos de preparación",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "crear app con fórmula costo_plato y margen por plato",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "crear app con cierre de caja por turno y propinas por mesero",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "app con flujo mesa: pedido->comanda->factura->recaudo",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "app con flujo domicilio: pedido->asignar domiciliario->entrega->recaudo",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "crear app con mermas y stock mínimo de ingredientes",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "quiero app con compras, proveedores e ingresos a inventario",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "registrar factura por pedido de mesa con IVA y prefijo FV-RES",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar domicilio con recargo de envío y observaciones",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar catering a empresa a crédito con vencimiento",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "me falta el documento fiscal del menú ejecutivo de hoy",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "necesito consecutivo FV-RES-A para facturar hoy",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar combo familiar con descuento promo",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "emitir factura por bar (coctel + entrada)",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "el cliente me pidió la factura ya",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar adicionales (queso extra, papas extra)",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar reserva con anticipo",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "ya me pagaron por nequi el domicilio, registra el recaudo y aplícalo a la factura",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar abono de catering y dejar saldo",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "pagué al proveedor de ingredientes, registra el egreso",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "pagaron con tarjeta y falta movimiento y comisión datáfono",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "me llegó un pago sin referencia, necesito registrarlo",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "hacer recibo de caja del pago de mesa",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar ingreso por transferencia a bancos de una empresa",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar salida por compra de empaques",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar reembolso a un cliente (salida)",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "no me cuadra el cierre del turno, falta meter un pago",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "crear cliente para domicilio con cc, nombre, celular y dirección",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "no existe el cliente, toca crearlo antes de facturar",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear cliente empresa con NIT para consumos a crédito 30 días",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "me falta el correo del cliente para enviar factura",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "solo tengo nombre y whatsapp, créalo",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear tercero para registrar recaudo en caja/bancos",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear cliente para catering del fin de semana",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear cliente para reserva de mesa",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear cliente con observación de alergias",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear cliente con dos direcciones de entrega",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear ítem hamburguesa artesanal (menú) con precio, IVA y código",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear producto gaseosa 400ml inventariable con SKU",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "no me sale recargo domicilio, créalo como servicio",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "voy a facturar y falta el ítem combo familiar",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "ese es plato/servicio, no inventario",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "ese es producto (bebida/empaque) y debe ser inventariable sí",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear ítem adicional queso extra con precio",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear ingrediente carne inventariable para compras",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear ítem catering por persona con precio e IVA",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear ítem propina sugerida como servicio",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "registrar asiento por descuadre de caja con soporte arqueo",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "registrar asiento por IVA generado del día (240805)",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "crear asiento por comisión datáfono y gasto bancario",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "asiento lines deb 110505 30000 / cred 413595 30000",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "el contador pidió comprobante con centro de costo Cocina",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "necesito asociar documento soporte al asiento",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "crear asiento por merma registrada (ajuste inventario)",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "registrar asiento por pago a proveedor",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "crear asiento por caja menor (mercado urgente)",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "registrar asiento por gasto de gas cocina",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        }
+    ]
+}
