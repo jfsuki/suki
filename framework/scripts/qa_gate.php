@@ -31,6 +31,7 @@ $steps = [
     ['name' => 'db_health', 'cmd' => 'php framework/tests/db_health.php', 'parser' => 'db_health'],
 ];
 if ($mode === 'post') {
+    $includeKpiGate = (string) (getenv('QA_INCLUDE_KPI_GATE') ?: '1') === '1';
     $steps = [
         ['name' => 'run', 'cmd' => 'php framework/tests/run.php', 'parser' => 'run'],
         ['name' => 'chat_acid', 'cmd' => 'php framework/tests/chat_acid.php', 'parser' => 'chat_acid'],
@@ -38,8 +39,17 @@ if ($mode === 'post') {
         ['name' => 'chat_real_20', 'cmd' => 'php framework/tests/chat_real_20.php', 'parser' => 'chat_real_20'],
         ['name' => 'db_health', 'cmd' => 'php framework/tests/db_health.php', 'parser' => 'db_health'],
     ];
+    if ($includeKpiGate || (string) (getenv('QA_INCLUDE_CHAT_REAL_100') ?: '0') === '1') {
+        $steps[] = ['name' => 'chat_real_100', 'cmd' => 'php framework/tests/chat_real_100.php', 'parser' => 'chat_real_100'];
+    }
+    if ($includeKpiGate) {
+        $steps[] = ['name' => 'conversation_kpi_gate', 'cmd' => 'php framework/tests/conversation_kpi_gate.php', 'parser' => 'conversation_kpi_gate'];
+    }
     if ((string) (getenv('QA_INCLUDE_STRESS') ?: '0') === '1') {
         $steps[] = ['name' => 'perf_stress', 'cmd' => 'php framework/tests/perf_stress_report.php', 'parser' => 'perf_stress'];
+    }
+    if ((string) (getenv('QA_INCLUDE_LLM_SMOKE') ?: '0') === '1') {
+        $steps[] = ['name' => 'llm_smoke', 'cmd' => 'php framework/tests/llm_smoke.php', 'parser' => 'llm_smoke'];
     }
 }
 
@@ -121,11 +131,24 @@ function parseStepOutput(string $parser, string $output): bool
         return is_array($summary) && (($summary['ok'] ?? false) === true);
     }
 
+    if ($parser === 'chat_real_100') {
+        $summary = $json['summary'] ?? null;
+        return is_array($summary) && (($summary['ok'] ?? false) === true);
+    }
+
     if ($parser === 'db_health') {
         return (($json['ok'] ?? false) === true);
     }
 
     if ($parser === 'perf_stress') {
+        return (($json['ok'] ?? false) === true);
+    }
+
+    if ($parser === 'llm_smoke') {
+        return (($json['ok'] ?? false) === true);
+    }
+
+    if ($parser === 'conversation_kpi_gate') {
         return (($json['ok'] ?? false) === true);
     }
 

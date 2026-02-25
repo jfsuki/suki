@@ -7146,6 +7146,14 @@ private function parseEntityFromCrudText(string $text): string
             if (!empty($intent['required_entities']) && !empty($entities)) {
                 $score += 0.05;
             }
+            $hardPenalty = $this->hardNegativePenalty(
+                $text,
+                $textTokens,
+                is_array($intent['hard_negatives'] ?? null) ? (array) $intent['hard_negatives'] : []
+            );
+            if ($hardPenalty > 0.0) {
+                $score = max(0.0, $score - $hardPenalty);
+            }
             if ($score > 0.98) {
                 $score = 0.98;
             }
@@ -7245,6 +7253,14 @@ private function parseEntityFromCrudText(string $text): string
             $sectorProfile = $this->normalizeBusinessType((string) ($sector['profile_key'] ?? ''));
             if ($sectorProfile !== '' && $profileBusinessType !== '' && $sectorProfile === $profileBusinessType) {
                 $score += 0.08;
+            }
+            $hardPenalty = $this->hardNegativePenalty(
+                $text,
+                $textTokens,
+                is_array($intent['hard_negatives'] ?? null) ? (array) $intent['hard_negatives'] : []
+            );
+            if ($hardPenalty > 0.0) {
+                $score = max(0.0, $score - $hardPenalty);
             }
 
             if ($score > 0.98) {
@@ -7748,6 +7764,38 @@ private function parseEntityFromCrudText(string $text): string
         }
         $hits = array_intersect($textSet, $utterSet);
         return count($hits) / max(1, count($utterSet));
+    }
+
+    private function hardNegativePenalty(string $text, array $textTokens, array $hardNegatives): float
+    {
+        if (empty($hardNegatives)) {
+            return 0.0;
+        }
+
+        $penalty = 0.0;
+        foreach ($hardNegatives as $negative) {
+            $sample = $this->normalize((string) $negative);
+            if ($sample === '') {
+                continue;
+            }
+            if (str_contains($text, $sample)) {
+                $penalty = max($penalty, 0.62);
+                continue;
+            }
+
+            $negTokens = $this->tokenizeTraining($sample);
+            if (empty($negTokens) || empty($textTokens)) {
+                continue;
+            }
+            $overlap = $this->tokenOverlap($textTokens, $negTokens);
+            if ($overlap >= 0.55) {
+                $penalty = max($penalty, 0.35 + ($overlap * 0.35));
+            } elseif ($overlap >= 0.40) {
+                $penalty = max($penalty, 0.22 + ($overlap * 0.25));
+            }
+        }
+
+        return min(0.80, $penalty);
     }
 
     private function isProfileHint(string $text): bool

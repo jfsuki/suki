@@ -33,7 +33,9 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - ChatAgent (API) con routing local + LLM fallback.
 - ConversationGateway local-first con memoria por tenant.
 - LLMRouter multi-proveedor con fallback.
+- LLMRouter con control de cuota por sesion y failover por error de cuota/rate-limit.
 - Telemetry JSONL + AgentNurtureJob para lexicon.
+- KPI gate conversacional (accuracy intents, correction success, unknown-business success, fallback rate y tokens/costo por sesion).
 - CommandLayer (CRUD + validacion + auditoria).
 - Report runtime (preview + PDF MVP) + Dashboard runtime.
 - IntegrationContract + InvoiceContract + Alanube client + webhooks.
@@ -446,3 +448,70 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - QA operativa:
   - `qa_gate post` acepta gate adicional de performance via `QA_INCLUDE_STRESS=1`.
   - resultado validado en verde con p95/p99 bajo umbrales configurados.
+
+## Checkpoint (2026-02-24, LLM staging smoke Gemini)
+- Se agrega prueba real de LLM para staging:
+  - `framework/tests/llm_smoke.php`.
+- Validaciones cubiertas:
+  - fallback de proveedor en `LLMRouter` (auto -> Gemini),
+  - salida JSON estructurada con contrato de prompt:
+    - `ROLE`, `CONTEXT`, `INPUT`, `CONSTRAINTS`, `OUTPUT_FORMAT`, `FAIL_RULES`,
+  - registro de tokens/costo en `ops_token_usage` y resumen de telemetria.
+- Gate opcional:
+  - `QA_INCLUDE_LLM_SMOKE=1 php framework/scripts/qa_gate.php post`.
+- Evidencia exportada:
+  - `framework/tests/tmp/llm_smoke_report.json`.
+
+## Checkpoint (2026-02-24, escalamiento conversacional + limpieza release)
+- Politica de higiene pre-release:
+  - script reproducible `framework/scripts/cleanup_runtime_artifacts.php` (`--check|--apply` + opciones extendidas).
+  - `.gitignore` actualizado para artefactos runtime/test frecuentes.
+- Escalamiento de dominio:
+  - `solver_intents`: 15 (antes 9).
+  - `sector_playbooks`: 15 (antes 9).
+  - cada sector con `hard_negatives` y cada solver con `utterances=45`.
+  - nuevos sectores: `INMOBILIARIA`, `LOGISTICA`, `EVENTOS`, `TURISMO_HOTELERIA`, `AGRO`, `ECOMMERCE`.
+- Clasificacion robusta:
+  - `ConversationGateway` descuenta score por `hard_negatives` en training y playbooks.
+- QA extendida:
+  - nueva suite `framework/tests/chat_real_100.php`.
+  - gate opcional: `QA_INCLUDE_CHAT_REAL_100=1`.
+
+## Checkpoint (2026-02-24, LLM strict JSON + release checklist + training plan)
+- Router LLM endurecido para contrato estricto:
+  - `requires_strict_json=true` ahora fuerza JSON valido por proveedor; si falla, hace failover.
+  - se deriva `response_schema` desde `prompt_contract.OUTPUT_FORMAT` para providers compatibles.
+  - `LLMRouter` incluye diagnostico agregado de `provider_errors` al fallar todos los proveedores.
+- Clientes/proveedores actualizados para salida JSON estricta:
+  - Gemini usa `responseMimeType=application/json` (+ schema cuando aplica).
+  - Groq/OpenRouter usan `response_format={type:json_object}` en modo estricto.
+- Perfil staging recomendado en `.env`:
+  - primario `openrouter` con `qwen/qwen3-coder-next`, secundario `gemini`.
+  - cuotas por sesion y rate-limit por proveedor activados.
+- `llm_smoke` validado en verde con salida estructurada estricta y tokens/costo reales.
+- Gobierno operativo agregado:
+  - `framework/docs/PREPROD_RELEASE_CHECKLIST.md` (gate y umbrales KPI definitivos).
+  - `framework/docs/AGENT_TRAINING_PLAN.md` (plan builder/app agent, unknown text, correcciones, emocion y promotion loop).
+
+## Checkpoint (2026-02-24, plantilla interna para dataset conversacional)
+- Nuevo template contract-first para ingesta de entrenamiento:
+  - `project/contracts/knowledge/training_dataset_template.json`
+- Nuevo schema oficial de lote:
+  - `framework/contracts/schemas/training_dataset_ingest.schema.json`
+- Nuevo validador reutilizable:
+  - `App\Core\TrainingDatasetValidator`
+  - `php framework/scripts/validate_training_dataset.php`
+- Cobertura automatica agregada:
+  - `framework/tests/training_dataset_validator_test.php`
+  - `UnitTestRunner` incluye `training_dataset_validator`.
+- El template ahora viene prellenado con contexto operativo:
+  - `context_pack` fiscal/contable (CO, moneda, flujo documental, cuentas base, posting rules).
+  - intents seed para factura, asiento contable, pagos/recaudos, cliente, producto/servicio y creacion de app.
+  - dialogos multi-turn + casos de emocion + QA de clasificacion/accion.
+
+## Checkpoint (2026-02-24, auditoria de lote ERP 6 intents y contexto reusable)
+- Se agrego libreria de contexto consolidado para evitar repeticion por intent:
+  - `project/contracts/knowledge/training_context_library.json`
+  - incluye action catalog, dependencia de slots, plan de cuentas minimo CO, posting rules, mapa de ambiguedad y sectores faltantes.
+- Se documenta auditoria y normalizacion del lote `esco-erp6intents...` en:
+  - `framework/docs/TRAINING_AUDIT_ESCO_ERP6INTENTS_V1.md`

@@ -39,6 +39,8 @@ final class UnitTestRunner
         $tests[] = $this->wrap('command_bus', fn() => $this->checkCommandBus());
         $tests[] = $this->wrap('observability_metrics', fn() => $this->checkObservabilityMetrics());
         $tests[] = $this->wrap('canonical_storage_new_project', fn() => $this->checkCanonicalStorageNewProject());
+        $tests[] = $this->wrap('llm_router_failover', fn() => $this->checkLlmRouterFailover());
+        $tests[] = $this->wrap('training_dataset_validator', fn() => $this->checkTrainingDatasetValidator());
 
         $summary = [
             'passed' => count(array_filter($tests, fn($t) => $t['status'] === 'pass')),
@@ -893,15 +895,27 @@ final class UnitTestRunner
         $service->recordIntentMetric([
             'tenant_id' => 'default',
             'project_id' => 'unit_obs',
+            'session_id' => 'unit_obs_sess_a',
             'mode' => 'builder',
             'intent' => 'APP_CREATE',
             'action' => 'ask_user',
             'latency_ms' => 70,
             'status' => 'success',
         ]);
+        $service->recordIntentMetric([
+            'tenant_id' => 'default',
+            'project_id' => 'unit_obs',
+            'session_id' => 'unit_obs_sess_a',
+            'mode' => 'builder',
+            'intent' => 'APP_CREATE',
+            'action' => 'send_to_llm',
+            'latency_ms' => 120,
+            'status' => 'success',
+        ]);
         $service->recordCommandMetric([
             'tenant_id' => 'default',
             'project_id' => 'unit_obs',
+            'session_id' => 'unit_obs_sess_b',
             'mode' => 'app',
             'command_name' => 'CreateEntity',
             'latency_ms' => 25,
@@ -911,6 +925,7 @@ final class UnitTestRunner
         $service->recordGuardrailEvent([
             'tenant_id' => 'default',
             'project_id' => 'unit_obs',
+            'session_id' => 'unit_obs_sess_b',
             'mode' => 'app',
             'guardrail' => 'mode_guard',
             'reason' => 'blocked by mode',
@@ -918,6 +933,7 @@ final class UnitTestRunner
         $service->recordTokenUsage([
             'tenant_id' => 'default',
             'project_id' => 'unit_obs',
+            'session_id' => 'unit_obs_sess_a',
             'provider' => 'gemini',
             'prompt_tokens' => 90,
             'completion_tokens' => 30,
@@ -928,6 +944,9 @@ final class UnitTestRunner
         if ((int) ($summary['intent_metrics']['count'] ?? 0) < 1) {
             throw new \RuntimeException('Observability: intent metric not persisted.');
         }
+        if (!isset($summary['intent_metrics']['fallback_rate'])) {
+            throw new \RuntimeException('Observability: fallback rate metric missing.');
+        }
         if ((int) ($summary['command_metrics']['blocked'] ?? 0) < 1) {
             throw new \RuntimeException('Observability: blocked command metric missing.');
         }
@@ -936,6 +955,9 @@ final class UnitTestRunner
         }
         if ((int) ($summary['token_usage']['total_tokens'] ?? 0) < 120) {
             throw new \RuntimeException('Observability: token usage not persisted.');
+        }
+        if ((float) ($summary['token_usage']['avg_tokens_per_session'] ?? 0.0) <= 0.0) {
+            throw new \RuntimeException('Observability: avg tokens per session missing.');
         }
     }
 
@@ -980,6 +1002,16 @@ final class UnitTestRunner
         if ($table !== 'clientes') {
             throw new \RuntimeException('Canonical project should resolve logical table without namespace.');
         }
+    }
+
+    private function checkLlmRouterFailover(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/llm_router_failover_test.php');
+    }
+
+    private function checkTrainingDatasetValidator(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/training_dataset_validator_test.php');
     }
 
     private function runExternalTestScript(string $scriptPath): void

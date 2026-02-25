@@ -19,9 +19,11 @@ SUKI_TEST_BASE="http://suki.test:8080/api" powershell -File framework/scripts/ac
 php framework/tests/chat_acid.php
 php framework/tests/chat_golden.php
 php framework/tests/chat_api_single_demo.php
+php framework/tests/chat_real_100.php
 ```
 Debe devolver `failed = 0` y `training_error = "No error"`.
 `chat_golden.php` y `chat_api_single_demo.php` deben devolver `summary.ok = true`.
+`chat_real_100.php` debe devolver `summary.ok = true`.
 Reporte CLI: `framework/tests/tmp/chat_acid_result.json`
 Reporte desde chat ("Probar sistema"): `project/storage/reports/chat_acid_default.json`
 
@@ -51,16 +53,78 @@ DB_USER=suki
 DB_PASS=suki_pass
 ```
 
-## 2) Conectar API de IA (Groq + Gemini)
+## 2) Conectar API de IA (perfil recomendado staging)
 Editar `project/.env`:
 ```
 GROQ_API_KEY=TU_KEY
 GROQ_MODEL=llama-3.1-8b-instant
 GEMINI_API_KEY=TU_KEY
 GEMINI_MODEL=gemini-2.5-flash-lite
-LLM_ROUTER_MODE=auto
+OPENROUTER_API_KEY=TU_KEY
+OPENROUTER_MODEL=qwen/qwen3-coder-next
+LLM_ROUTER_MODE=openrouter
 ```
 Si no pones keys, el chat funciona solo con comandos simples (local).
+
+## 2.1) Smoke real LLM (Gemini) con salida estructurada/tokens/costo
+Ejecuta:
+```
+php framework/tests/llm_smoke.php
+```
+Reporte:
+```
+framework/tests/tmp/llm_smoke_report.json
+```
+
+Que valida:
+- fallback de router (auto -> Gemini real),
+- salida estructurada (JSON con llaves requeridas),
+- consumo de tokens y costo estimado (telemetria SQL).
+
+Integracion opcional en QA post:
+```
+QA_INCLUDE_LLM_SMOKE=1 php framework/scripts/qa_gate.php post
+QA_INCLUDE_CHAT_REAL_100=1 php framework/scripts/qa_gate.php post
+```
+
+Variables utiles:
+```
+LLM_SMOKE_TENANT_ID=default
+LLM_SMOKE_PROJECT_ID=staging_llm_smoke
+LLM_SMOKE_MODE=openrouter
+LLM_SMOKE_PRIMARY=openrouter
+LLM_SMOKE_MAX_TOKENS=320
+```
+
+## 2.2) Control de cuota LLM + failover automatico
+Variables de proteccion de consumo:
+```
+LLM_SESSION_QUOTA_ENABLED=1
+LLM_MAX_REQUESTS_PER_SESSION=120
+LLM_SESSION_QUOTA_WINDOW_SECONDS=86400
+LLM_MAX_REQUESTS_PER_MINUTE=0
+LLM_MAX_REQUESTS_PER_MINUTE_GEMINI=0
+LLM_MAX_REQUESTS_PER_MINUTE_GROQ=0
+LLM_MAX_REQUESTS_PER_MINUTE_OPENROUTER=0
+```
+
+Comportamiento:
+- Si la sesion excede cuota, el router bloquea nuevas llamadas LLM en esa sesion.
+- Si un proveedor devuelve error de cuota/rate-limit, el router hace failover al siguiente proveedor habilitado.
+- El modo `gemini` mantiene fallback cruzado a otros proveedores habilitados.
+
+Prueba dedicada:
+```
+php framework/tests/llm_router_failover_test.php
+```
+
+Regla de construccion de prompt (contract-first):
+- ROLE
+- CONTEXT
+- INPUT
+- CONSTRAINTS
+- OUTPUT_FORMAT
+- FAIL_RULES
 
 ## 3) Probar generador (Editor JSON)
 1) Abrir: `/editor_json/formjson.html` (framework host).
@@ -188,3 +252,59 @@ API:
 UI:
 - `project/public/chat_builder.html` (panel derecho > Calidad conversacional)
 - `project/public/chat_app.html` (panel derecho > Calidad conversacional)
+
+## 14) Limpieza reproducible pre-release (runtime/test artifacts)
+Previsualizar limpieza:
+```
+php framework/scripts/cleanup_runtime_artifacts.php --check
+```
+Aplicar limpieza base (segura):
+```
+php framework/scripts/cleanup_runtime_artifacts.php --apply
+```
+Aplicar limpieza extendida (incluye estado runtime + contratos workflow generados):
+```
+php framework/scripts/cleanup_runtime_artifacts.php --apply --include-runtime-state --include-generated-contracts
+```
+
+## 15) KPI gate de precision conversacional (pre-release)
+KPI gate dedicado:
+```
+php framework/tests/conversation_kpi_gate.php
+```
+
+Se integra al `qa_gate post` (activo por defecto):
+```
+php framework/scripts/qa_gate.php post
+```
+
+Thresholds ajustables:
+```
+KPI_MIN_INTENT_ACCURACY=0.90
+KPI_MIN_CORRECTION_SUCCESS=1.0
+KPI_MIN_UNKNOWN_SUCCESS=0.90
+KPI_MAX_FALLBACK_RATE=0.45
+KPI_MAX_TOKENS_PER_SESSION=12000
+KPI_MAX_COST_PER_SESSION_USD=0.05
+```
+
+## 16) Validar lote de entrenamiento conversacional (template ingest)
+Template interno:
+```
+project/contracts/knowledge/training_dataset_template.json
+```
+
+Validacion base:
+```
+php framework/scripts/validate_training_dataset.php
+```
+
+Validacion estricta:
+```
+php framework/scripts/validate_training_dataset.php project/contracts/knowledge/training_dataset_esco_erp6intents_v1.json --strict --min-explicit=40 --min-implicit=40 --min-hard-negatives=40 --min-dialogues=10 --min-qa=10
+```
+
+Validacion baseline de template (sin gate estricto):
+```
+php framework/scripts/validate_training_dataset.php project/contracts/knowledge/training_dataset_template.json --min-explicit=1 --min-implicit=1 --min-hard-negatives=1 --min-dialogues=1 --min-qa=1
+```

@@ -188,6 +188,7 @@ final class ChatAgent
                 $this->telemetryService()->recordIntentMetric([
                     'tenant_id' => $tenantId,
                     'project_id' => $projectId,
+                    'session_id' => $sessionId,
                     'mode' => $mode,
                     'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
                     'action' => $action,
@@ -245,6 +246,7 @@ final class ChatAgent
                 $this->telemetryService()->recordCommandMetric([
                     'tenant_id' => $tenantId,
                     'project_id' => $projectId,
+                    'session_id' => $sessionId,
                     'mode' => $mode,
                     'command_name' => $commandName,
                     'latency_ms' => $this->latencyMs($commandStartedAt),
@@ -255,6 +257,7 @@ final class ChatAgent
                     $this->telemetryService()->recordGuardrailEvent([
                         'tenant_id' => $tenantId,
                         'project_id' => $projectId,
+                        'session_id' => $sessionId,
                         'mode' => $mode,
                         'guardrail' => 'mode_guard',
                         'reason' => $commandReply,
@@ -278,6 +281,7 @@ final class ChatAgent
                 $this->telemetryService()->recordIntentMetric([
                     'tenant_id' => $tenantId,
                     'project_id' => $projectId,
+                    'session_id' => $sessionId,
                     'mode' => $mode,
                     'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
                     'action' => $action,
@@ -292,12 +296,19 @@ final class ChatAgent
 
         if ($route->isLlmRequest()) {
             try {
-                $llmResult = $this->llmRouter()->chat($route->llmRequest());
+                $llmResult = $this->llmRouter()->chat($route->llmRequest(), [
+                    'mode' => $mode,
+                    'tenant_id' => $tenantId,
+                    'project_id' => $projectId,
+                    'session_id' => $sessionId,
+                    'user_id' => $userId,
+                ]);
             } catch (\Throwable $e) {
                 try {
                     $this->telemetryService()->recordIntentMetric([
                         'tenant_id' => $tenantId,
                         'project_id' => $projectId,
+                        'session_id' => $sessionId,
                         'mode' => $mode,
                         'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
                         'action' => $action,
@@ -329,6 +340,7 @@ final class ChatAgent
                 $this->telemetryService()->recordIntentMetric([
                     'tenant_id' => $tenantId,
                     'project_id' => $projectId,
+                    'session_id' => $sessionId,
                     'mode' => $mode,
                     'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
                     'action' => $action,
@@ -338,6 +350,7 @@ final class ChatAgent
                 $this->telemetryService()->recordTokenUsage([
                     'tenant_id' => $tenantId,
                     'project_id' => $projectId,
+                    'session_id' => $sessionId,
                     'provider' => (string) $provider,
                     'prompt_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
                     'completion_tokens' => (int) ($usage['completion_tokens'] ?? 0),
@@ -372,6 +385,7 @@ final class ChatAgent
             $this->telemetryService()->recordIntentMetric([
                 'tenant_id' => $tenantId,
                 'project_id' => $projectId,
+                'session_id' => $sessionId,
                 'mode' => $mode,
                 'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
                 'action' => 'error',

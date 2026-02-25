@@ -25,6 +25,7 @@ $projectId = 'obs_project';
 $service->recordIntentMetric([
     'tenant_id' => $tenantId,
     'project_id' => $projectId,
+    'session_id' => 'sess_a',
     'mode' => 'builder',
     'intent' => 'APP_CREATE',
     'action' => 'ask_user',
@@ -34,6 +35,7 @@ $service->recordIntentMetric([
 $service->recordIntentMetric([
     'tenant_id' => $tenantId,
     'project_id' => $projectId,
+    'session_id' => 'sess_a',
     'mode' => 'builder',
     'intent' => 'APP_CREATE',
     'action' => 'send_to_llm',
@@ -44,6 +46,7 @@ $service->recordIntentMetric([
 $service->recordCommandMetric([
     'tenant_id' => $tenantId,
     'project_id' => $projectId,
+    'session_id' => 'sess_a',
     'mode' => 'builder',
     'command_name' => 'CreateEntity',
     'latency_ms' => 120,
@@ -53,6 +56,7 @@ $service->recordCommandMetric([
 $service->recordCommandMetric([
     'tenant_id' => $tenantId,
     'project_id' => $projectId,
+    'session_id' => 'sess_b',
     'mode' => 'app',
     'command_name' => 'CreateEntity',
     'latency_ms' => 25,
@@ -62,6 +66,7 @@ $service->recordCommandMetric([
 $service->recordGuardrailEvent([
     'tenant_id' => $tenantId,
     'project_id' => $projectId,
+    'session_id' => 'sess_b',
     'mode' => 'app',
     'guardrail' => 'mode_guard',
     'reason' => 'Estas en modo app. Usa el chat creador para crear tablas.',
@@ -70,6 +75,7 @@ $service->recordGuardrailEvent([
 $service->recordTokenUsage([
     'tenant_id' => $tenantId,
     'project_id' => $projectId,
+    'session_id' => 'sess_a',
     'provider' => 'gemini',
     'prompt_tokens' => 110,
     'completion_tokens' => 55,
@@ -88,6 +94,9 @@ if (!isset($summary['intent_metrics']['p99_latency_ms'])) {
 if ((int) ($summary['intent_metrics']['fallback_llm'] ?? 0) < 1) {
     $failures[] = 'llm fallback metric missing';
 }
+if (!isset($summary['intent_metrics']['fallback_rate'])) {
+    $failures[] = 'intent fallback rate missing in summary';
+}
 if ((int) ($summary['command_metrics']['count'] ?? 0) < 2) {
     $failures[] = 'command metrics were not persisted';
 }
@@ -105,6 +114,12 @@ if ((int) ($summary['token_usage']['total_tokens'] ?? 0) < 165) {
 }
 if ((float) ($summary['token_usage']['estimated_cost_usd'] ?? 0.0) <= 0.0) {
     $failures[] = 'token cost was not estimated';
+}
+if ((int) ($summary['token_usage']['sessions'] ?? 0) < 1) {
+    $failures[] = 'token usage sessions metric missing';
+}
+if ((float) ($summary['token_usage']['avg_tokens_per_session'] ?? 0.0) <= 0.0) {
+    $failures[] = 'avg tokens per session metric missing';
 }
 
 $ok = empty($failures);

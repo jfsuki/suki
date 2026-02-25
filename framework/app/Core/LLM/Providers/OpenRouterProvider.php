@@ -23,6 +23,9 @@ final class OpenRouterProvider
             'temperature' => $params['temperature'] ?? 0.2,
             'max_tokens' => $params['max_tokens'] ?? 600,
         ];
+        if (!empty($params['strict_json'])) {
+            $payload['response_format'] = ['type' => 'json_object'];
+        }
 
         $response = $this->request($baseUrl, $payload, [
             'Authorization: Bearer ' . $apiKey,

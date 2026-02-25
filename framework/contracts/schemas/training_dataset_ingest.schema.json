@@ -1,0 +1,345 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Training Dataset Ingest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "batch_id",
+    "language",
+    "intents_expansion",
+    "multi_turn_dialogues",
+    "emotion_cases",
+    "qa_cases"
+  ],
+  "properties": {
+    "batch_id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2
+    },
+    "context_pack": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "business_type": {
+          "type": "string",
+          "minLength": 2
+        },
+        "country": {
+          "type": "string",
+          "minLength": 2
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 3
+        },
+        "tax_regime": {
+          "type": "string",
+          "minLength": 2
+        },
+        "payment_methods": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2
+          }
+        },
+        "document_flows": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 2
+          }
+        },
+        "volume_profile": {
+          "type": "string",
+          "minLength": 2
+        },
+        "chart_of_accounts_min": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "code",
+              "name"
+            ],
+            "properties": {
+              "code": {
+                "type": "string",
+                "minLength": 2
+              },
+              "name": {
+                "type": "string",
+                "minLength": 2
+              }
+            }
+          }
+        },
+        "posting_rules": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "required": [
+              "trigger",
+              "debit_account",
+              "credit_account"
+            ],
+            "properties": {
+              "trigger": {
+                "type": "string",
+                "minLength": 2
+              },
+              "debit_account": {
+                "type": "string",
+                "minLength": 2
+              },
+              "credit_account": {
+                "type": "string",
+                "minLength": 2
+              }
+            }
+          }
+        }
+      }
+    },
+    "intents_expansion": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intent",
+          "action",
+          "utterances_explicit",
+          "utterances_implicit",
+          "hard_negatives",
+          "slots",
+          "one_question_policy",
+          "confirm_required",
+          "success_reply_template",
+          "error_reply_template"
+        ],
+        "properties": {
+          "intent": {
+            "type": "string",
+            "minLength": 3
+          },
+          "action": {
+            "type": "string",
+            "minLength": 3
+          },
+          "utterances_explicit": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 3
+            }
+          },
+          "utterances_implicit": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 3
+            }
+          },
+          "hard_negatives": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 3
+            }
+          },
+          "slots": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "name",
+                "required"
+              ],
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 2
+                },
+                "required": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "one_question_policy": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "missing_slot",
+                "question"
+              ],
+              "properties": {
+                "missing_slot": {
+                  "type": "string",
+                  "minLength": 2
+                },
+                "question": {
+                  "type": "string",
+                  "minLength": 5
+                }
+              }
+            }
+          },
+          "confirm_required": {
+            "type": "boolean"
+          },
+          "success_reply_template": {
+            "type": "string",
+            "minLength": 5
+          },
+          "error_reply_template": {
+            "type": "string",
+            "minLength": 5
+          }
+        }
+      }
+    },
+    "multi_turn_dialogues": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "id",
+          "scenario",
+          "turns"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 3
+          },
+          "scenario": {
+            "type": "string",
+            "minLength": 3
+          },
+          "turns": {
+            "type": "array",
+            "minItems": 2,
+            "items": {
+              "type": "object",
+              "oneOf": [
+                {
+                  "required": [
+                    "user"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "user": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                },
+                {
+                  "required": [
+                    "assistant_expected_action"
+                  ],
+                  "additionalProperties": false,
+                  "properties": {
+                    "assistant_expected_action": {
+                      "type": "string",
+                      "minLength": 1
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    "emotion_cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "emotion",
+          "user_samples",
+          "assistant_style",
+          "expected_next_step"
+        ],
+        "properties": {
+          "emotion": {
+            "type": "string",
+            "minLength": 3
+          },
+          "user_samples": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 2
+            }
+          },
+          "assistant_style": {
+            "type": "string",
+            "minLength": 2
+          },
+          "expected_next_step": {
+            "type": "string",
+            "minLength": 2
+          }
+        }
+      }
+    },
+    "qa_cases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "text",
+          "expect_intent",
+          "expect_action"
+        ],
+        "properties": {
+          "text": {
+            "type": "string",
+            "minLength": 3
+          },
+          "expect_intent": {
+            "type": "string",
+            "minLength": 3
+          },
+          "expect_action": {
+            "type": "string",
+            "minLength": 3
+          }
+        }
+      }
+    }
+  }
+}

@@ -26,6 +26,17 @@ final class GeminiClient
     {
         $url = $this->baseUrl . '/models/' . rawurlencode($this->model) . ':generateContent';
 
+        $generationConfig = [
+            'temperature' => $options['temperature'] ?? 0.2,
+            'maxOutputTokens' => $options['max_tokens'] ?? 800,
+        ];
+        if (!empty($options['strict_json'])) {
+            $generationConfig['responseMimeType'] = 'application/json';
+            if (!empty($options['response_schema']) && is_array($options['response_schema'])) {
+                $generationConfig['responseSchema'] = $this->toGeminiSchema($options['response_schema']);
+            }
+        }
+
         $payload = [
             'contents' => [
                 [
@@ -35,10 +46,7 @@ final class GeminiClient
                     ],
                 ],
             ],
-            'generationConfig' => [
-                'temperature' => $options['temperature'] ?? 0.2,
-                'maxOutputTokens' => $options['max_tokens'] ?? 800,
-            ],
+            'generationConfig' => $generationConfig,
         ];
 
         $response = $this->request('POST', $url, $payload);
@@ -88,5 +96,40 @@ final class GeminiClient
         }
 
         return ['status' => $status, 'data' => $data];
+    }
+
+    private function toGeminiSchema(array $schema): array
+    {
+        $type = strtoupper(trim((string) ($schema['type'] ?? 'OBJECT')));
+        $mapped = ['type' => $type];
+
+        if (!empty($schema['properties']) && is_array($schema['properties'])) {
+            $mapped['properties'] = [];
+            foreach ($schema['properties'] as $key => $propSchema) {
+                if (!is_string($key) || trim($key) === '' || !is_array($propSchema)) {
+                    continue;
+                }
+                $mapped['properties'][$key] = $this->toGeminiSchema($propSchema);
+            }
+        }
+
+        if (!empty($schema['required']) && is_array($schema['required'])) {
+            $required = [];
+            foreach ($schema['required'] as $field) {
+                $fieldName = trim((string) $field);
+                if ($fieldName !== '') {
+                    $required[] = $fieldName;
+                }
+            }
+            if ($required !== []) {
+                $mapped['required'] = array_values(array_unique($required));
+            }
+        }
+
+        if (!empty($schema['items']) && is_array($schema['items'])) {
+            $mapped['items'] = $this->toGeminiSchema($schema['items']);
+        }
+
+        return $mapped;
     }
 }

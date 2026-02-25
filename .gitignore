@@ -1,6 +1,11 @@
 /vendor/
-/framework/tests/tmp/*.json
+/framework/tests/tmp/
 /framework/tests/*_result.json
 /project/storage/backups/
 /project/storage/tenants/*/working_memory/
 /project/storage/tenants/*/telemetry/*.log.jsonl
+/project/storage/cache/contracts/
+/project/storage/cache/entities.schema.cache.json
+/project/storage/security/
+/project/storage/workflows/
+/project/contracts/workflows/

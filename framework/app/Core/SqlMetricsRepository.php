@@ -25,14 +25,15 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
     {
         $stmt = $this->db->prepare(
             'INSERT INTO ops_intent_metrics (
-                tenant_id, project_id, mode, intent, action, latency_ms, status, created_at
+                tenant_id, project_id, session_id, mode, intent, action, latency_ms, status, created_at
              ) VALUES (
-                :tenant_id, :project_id, :mode, :intent, :action, :latency_ms, :status, :created_at
+                :tenant_id, :project_id, :session_id, :mode, :intent, :action, :latency_ms, :status, :created_at
              )'
         );
         $stmt->execute([
             ':tenant_id' => $this->normTenant($metric['tenant_id'] ?? ''),
             ':project_id' => $this->normProject($metric['project_id'] ?? ''),
+            ':session_id' => $this->normSession($metric['session_id'] ?? ''),
             ':mode' => $this->normMode($metric['mode'] ?? ''),
             ':intent' => $this->normText($metric['intent'] ?? 'unknown'),
             ':action' => $this->normText($metric['action'] ?? 'unknown'),
@@ -46,14 +47,15 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
     {
         $stmt = $this->db->prepare(
             'INSERT INTO ops_command_metrics (
-                tenant_id, project_id, mode, command_name, latency_ms, status, blocked, created_at
+                tenant_id, project_id, session_id, mode, command_name, latency_ms, status, blocked, created_at
              ) VALUES (
-                :tenant_id, :project_id, :mode, :command_name, :latency_ms, :status, :blocked, :created_at
+                :tenant_id, :project_id, :session_id, :mode, :command_name, :latency_ms, :status, :blocked, :created_at
              )'
         );
         $stmt->execute([
             ':tenant_id' => $this->normTenant($metric['tenant_id'] ?? ''),
             ':project_id' => $this->normProject($metric['project_id'] ?? ''),
+            ':session_id' => $this->normSession($metric['session_id'] ?? ''),
             ':mode' => $this->normMode($metric['mode'] ?? ''),
             ':command_name' => $this->normText($metric['command_name'] ?? 'unknown'),
             ':latency_ms' => $this->intValue($metric['latency_ms'] ?? 0),
@@ -67,14 +69,15 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
     {
         $stmt = $this->db->prepare(
             'INSERT INTO ops_guardrail_events (
-                tenant_id, project_id, mode, guardrail, reason, created_at
+                tenant_id, project_id, session_id, mode, guardrail, reason, created_at
              ) VALUES (
-                :tenant_id, :project_id, :mode, :guardrail, :reason, :created_at
+                :tenant_id, :project_id, :session_id, :mode, :guardrail, :reason, :created_at
              )'
         );
         $stmt->execute([
             ':tenant_id' => $this->normTenant($event['tenant_id'] ?? ''),
             ':project_id' => $this->normProject($event['project_id'] ?? ''),
+            ':session_id' => $this->normSession($event['session_id'] ?? ''),
             ':mode' => $this->normMode($event['mode'] ?? ''),
             ':guardrail' => $this->normText($event['guardrail'] ?? 'unknown'),
             ':reason' => $this->normText($event['reason'] ?? ''),
@@ -95,14 +98,15 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
 
         $stmt = $this->db->prepare(
             'INSERT INTO ops_token_usage (
-                tenant_id, project_id, provider, prompt_tokens, completion_tokens, total_tokens, estimated_cost_usd, created_at
+                tenant_id, project_id, session_id, provider, prompt_tokens, completion_tokens, total_tokens, estimated_cost_usd, created_at
              ) VALUES (
-                :tenant_id, :project_id, :provider, :prompt_tokens, :completion_tokens, :total_tokens, :estimated_cost_usd, :created_at
+                :tenant_id, :project_id, :session_id, :provider, :prompt_tokens, :completion_tokens, :total_tokens, :estimated_cost_usd, :created_at
              )'
         );
         $stmt->execute([
             ':tenant_id' => $this->normTenant($usage['tenant_id'] ?? ''),
             ':project_id' => $this->normProject($usage['project_id'] ?? ''),
+            ':session_id' => $this->normSession($usage['session_id'] ?? ''),
             ':provider' => $this->normText($usage['provider'] ?? 'unknown'),
             ':prompt_tokens' => $this->intValue($usage['prompt_tokens'] ?? 0),
             ':completion_tokens' => $this->intValue($usage['completion_tokens'] ?? 0),
@@ -120,44 +124,64 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
         $since = date('Y-m-d H:i:s', time() - ($days * 86400));
 
         $intentRows = $this->selectRows(
-            'SELECT latency_ms, status, action FROM ops_intent_metrics WHERE tenant_id = :tenant AND project_id = :project AND created_at >= :since',
+            'SELECT latency_ms, status, action, session_id FROM ops_intent_metrics WHERE tenant_id = :tenant AND project_id = :project AND created_at >= :since',
             [':tenant' => $tenantId, ':project' => $projectId, ':since' => $since]
         );
         $commandRows = $this->selectRows(
-            'SELECT latency_ms, status, blocked FROM ops_command_metrics WHERE tenant_id = :tenant AND project_id = :project AND created_at >= :since',
+            'SELECT latency_ms, status, blocked, session_id FROM ops_command_metrics WHERE tenant_id = :tenant AND project_id = :project AND created_at >= :since',
             [':tenant' => $tenantId, ':project' => $projectId, ':since' => $since]
         );
         $guardrailRows = $this->selectRows(
-            'SELECT guardrail FROM ops_guardrail_events WHERE tenant_id = :tenant AND project_id = :project AND created_at >= :since',
+            'SELECT guardrail, session_id FROM ops_guardrail_events WHERE tenant_id = :tenant AND project_id = :project AND created_at >= :since',
             [':tenant' => $tenantId, ':project' => $projectId, ':since' => $since]
         );
         $tokenRows = $this->selectRows(
-            'SELECT total_tokens, estimated_cost_usd FROM ops_token_usage WHERE tenant_id = :tenant AND project_id = :project AND created_at >= :since',
+            'SELECT total_tokens, estimated_cost_usd, session_id FROM ops_token_usage WHERE tenant_id = :tenant AND project_id = :project AND created_at >= :since',
             [':tenant' => $tenantId, ':project' => $projectId, ':since' => $since]
         );
 
         $intentLatency = array_map(static fn(array $r): int => (int) ($r['latency_ms'] ?? 0), $intentRows);
         $commandLatency = array_map(static fn(array $r): int => (int) ($r['latency_ms'] ?? 0), $commandRows);
         $intentFallback = 0;
+        $intentSessions = [];
         foreach ($intentRows as $row) {
             if ((string) ($row['action'] ?? '') === 'send_to_llm') {
                 $intentFallback++;
             }
+            $sessionId = trim((string) ($row['session_id'] ?? ''));
+            if ($sessionId !== '') {
+                $intentSessions[$sessionId] = true;
+            }
         }
         $tokenTotal = 0;
         $tokenCost = 0.0;
+        $tokenSessions = [];
         foreach ($tokenRows as $row) {
             $tokenTotal += (int) ($row['total_tokens'] ?? 0);
             $tokenCost += (float) ($row['estimated_cost_usd'] ?? 0.0);
+            $sessionId = trim((string) ($row['session_id'] ?? ''));
+            if ($sessionId !== '') {
+                $tokenSessions[$sessionId] = true;
+            }
         }
+
+        $intentCount = count($intentRows);
+        $fallbackRate = $intentCount > 0 ? round($intentFallback / $intentCount, 6) : 0.0;
+        $localFirstRate = $intentCount > 0 ? round(($intentCount - $intentFallback) / $intentCount, 6) : 0.0;
+        $tokenSessionCount = count($tokenSessions);
+        $avgTokensPerSession = $tokenSessionCount > 0 ? (float) round($tokenTotal / $tokenSessionCount, 4) : 0.0;
+        $avgCostPerSession = $tokenSessionCount > 0 ? (float) round($tokenCost / $tokenSessionCount, 8) : 0.0;
 
         return [
             'intent_metrics' => [
-                'count' => count($intentRows),
+                'count' => $intentCount,
+                'sessions' => count($intentSessions),
                 'p50_latency_ms' => $this->percentile($intentLatency, 50),
                 'p95_latency_ms' => $this->percentile($intentLatency, 95),
                 'p99_latency_ms' => $this->percentile($intentLatency, 99),
                 'fallback_llm' => $intentFallback,
+                'fallback_rate' => $fallbackRate,
+                'local_first_rate' => $localFirstRate,
             ],
             'command_metrics' => [
                 'count' => count($commandRows),
@@ -173,6 +197,9 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
                 'events' => count($tokenRows),
                 'total_tokens' => $tokenTotal,
                 'estimated_cost_usd' => round($tokenCost, 8),
+                'sessions' => $tokenSessionCount,
+                'avg_tokens_per_session' => $avgTokensPerSession,
+                'avg_cost_per_session_usd' => $avgCostPerSession,
             ],
         ];
     }
@@ -184,6 +211,7 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tenant_id TEXT NOT NULL,
                 project_id TEXT NOT NULL,
+                session_id TEXT NOT NULL DEFAULT \'\',
                 mode TEXT NOT NULL,
                 intent TEXT NOT NULL,
                 action TEXT NOT NULL,
@@ -199,6 +227,7 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tenant_id TEXT NOT NULL,
                 project_id TEXT NOT NULL,
+                session_id TEXT NOT NULL DEFAULT \'\',
                 mode TEXT NOT NULL,
                 command_name TEXT NOT NULL,
                 latency_ms INTEGER NOT NULL DEFAULT 0,
@@ -214,6 +243,7 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tenant_id TEXT NOT NULL,
                 project_id TEXT NOT NULL,
+                session_id TEXT NOT NULL DEFAULT \'\',
                 mode TEXT NOT NULL,
                 guardrail TEXT NOT NULL,
                 reason TEXT NOT NULL,
@@ -227,6 +257,7 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 tenant_id TEXT NOT NULL,
                 project_id TEXT NOT NULL,
+                session_id TEXT NOT NULL DEFAULT \'\',
                 provider TEXT NOT NULL,
                 prompt_tokens INTEGER NOT NULL DEFAULT 0,
                 completion_tokens INTEGER NOT NULL DEFAULT 0,
@@ -236,6 +267,16 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
             )'
         );
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ops_tokens_scope ON ops_token_usage (tenant_id, project_id, created_at)');
+
+        $this->ensureColumn('ops_intent_metrics', 'session_id', "ALTER TABLE ops_intent_metrics ADD COLUMN session_id TEXT NOT NULL DEFAULT ''");
+        $this->ensureColumn('ops_command_metrics', 'session_id', "ALTER TABLE ops_command_metrics ADD COLUMN session_id TEXT NOT NULL DEFAULT ''");
+        $this->ensureColumn('ops_guardrail_events', 'session_id', "ALTER TABLE ops_guardrail_events ADD COLUMN session_id TEXT NOT NULL DEFAULT ''");
+        $this->ensureColumn('ops_token_usage', 'session_id', "ALTER TABLE ops_token_usage ADD COLUMN session_id TEXT NOT NULL DEFAULT ''");
+
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ops_intent_session ON ops_intent_metrics (tenant_id, project_id, session_id, created_at)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ops_command_session ON ops_command_metrics (tenant_id, project_id, session_id, created_at)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ops_guardrail_session ON ops_guardrail_events (tenant_id, project_id, session_id, created_at)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ops_tokens_session ON ops_token_usage (tenant_id, project_id, session_id, created_at)');
     }
 
     private function defaultPath(): string
@@ -286,6 +327,11 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
         return $value !== '' ? $value : 'default';
     }
 
+    private function normSession($value): string
+    {
+        return trim((string) $value);
+    }
+
     private function normMode($value): string
     {
         $value = strtolower(trim((string) $value));
@@ -330,5 +376,25 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
         $index = (int) ceil(($percentile / 100) * count($values)) - 1;
         $index = max(0, min(count($values) - 1, $index));
         return (int) $values[$index];
+    }
+
+    private function ensureColumn(string $table, string $column, string $alterSql): void
+    {
+        if ($this->tableHasColumn($table, $column)) {
+            return;
+        }
+        $this->db->exec($alterSql);
+    }
+
+    private function tableHasColumn(string $table, string $column): bool
+    {
+        $stmt = $this->db->query('PRAGMA table_info(' . $table . ')');
+        $rows = $stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        foreach ($rows as $row) {
+            if ((string) ($row['name'] ?? '') === $column) {
+                return true;
+            }
+        }
+        return false;
     }
 }

@@ -1,8 +1,8 @@
 {
     "meta": {
         "name": "domain_playbooks",
-        "version": "0.5.1",
-        "updated_at": "2026-02-23",
+        "version": "0.6.0",
+        "updated_at": "2026-02-24",
         "goal": "Universal business playbooks to create ERP/CRM/accounting and operational mini-apps by conversation.",
         "notes": [
             "Operational guidance only. Legal decisions require accountant validation.",
@@ -12,7 +12,8 @@
             "v0.3.6: +perfil spa_bienestar y aliases de estetica/spa para onboarding.",
             "v0.4.0: +solver_intents por sector, +sector_playbooks accionables y +blueprints mata-excels para asesoria consultiva.",
             "v0.5.0: +playbooks iglesia/educacion/servicios_pro, +builder_guidance ampliada, +guided_conversation_flows y +prompt constitution.",
-            "v0.5.1: +builder_guidance refinado por tipo de campo/relaciones/performance y runtime data-driven en gateway."
+            "v0.5.1: +builder_guidance refinado por tipo de campo/relaciones/performance y runtime data-driven en gateway.",
+            "v0.6.0: +6 sectores (15 total), +hard_negatives por sector, utterances ampliadas a 45."
         ]
     },
     "discovery": {
@@ -1686,7 +1687,29 @@
                 "sugiereme tabla para vender suelto",
                 "no me sirve el pos para conversion de unidades",
                 "necesito controlar materiales por medida",
-                "quiero descontar metros exactos del rollo"
+                "quiero descontar metros exactos del rollo",
+                "necesito pierdo plata con los cables",
+                "quiero pierdo plata con los cables",
+                "me urge pierdo plata con los cables",
+                "ayudame a pierdo plata con los cables",
+                "como hago para pierdo plata con los cables",
+                "no se como pierdo plata con los cables",
+                "tengo problema con pierdo plata con los cables",
+                "necesito compro por rollo y vendo por metro",
+                "quiero compro por rollo y vendo por metro",
+                "me urge compro por rollo y vendo por metro"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "historia clinica",
+                "reserva hotel",
+                "diezmo",
+                "matricula escolar",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
             ]
         },
         {
@@ -1728,7 +1751,29 @@
                 "quiero control de vencimientos para alimentos",
                 "me ayudas a configurar alerta roja por vencido",
                 "quiero checklist de vencimientos diario",
-                "quiero app de farmacia con lotes y alertas"
+                "quiero app de farmacia con lotes y alertas",
+                "necesito se me vencen los medicamentos",
+                "quiero se me vencen los medicamentos",
+                "me urge se me vencen los medicamentos",
+                "ayudame a se me vencen los medicamentos",
+                "como hago para se me vencen los medicamentos",
+                "no se como se me vencen los medicamentos",
+                "tengo problema con se me vencen los medicamentos",
+                "necesito quiero control de fechas de vencimiento",
+                "quiero quiero control de fechas de vencimiento",
+                "me urge quiero control de fechas de vencimiento"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "canon de arriendo",
+                "reserva de salon",
+                "pedido web",
+                "ruta de entrega",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
             ]
         },
         {
@@ -1770,7 +1815,29 @@
                 "quiero analizar variacion de costos semanal",
                 "quiero reportar desperdicio diario",
                 "quiero control de costo de menu",
-                "quiero costeo para restaurante pequeno"
+                "quiero costeo para restaurante pequeno",
+                "necesito no se cuanto me cuesta cada plato",
+                "quiero no se cuanto me cuesta cada plato",
+                "me urge no se cuanto me cuesta cada plato",
+                "ayudame a no se cuanto me cuesta cada plato",
+                "como hago para no se cuanto me cuesta cada plato",
+                "no se como no se cuanto me cuesta cada plato",
+                "tengo problema con no se cuanto me cuesta cada plato",
+                "necesito quiero escandallo automatico",
+                "quiero quiero escandallo automatico",
+                "me urge quiero escandallo automatico"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "diezmo",
+                "boletin escolar",
+                "mantenimiento vehiculo",
+                "control de cultivo",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
             ]
         },
         {
@@ -1812,7 +1879,29 @@
                 "quiero indicador de reincidencia de fallas",
                 "quiero gestionar servicios tecnicos por chat",
                 "necesito flujo de apertura y cierre de ot",
-                "quiero digitalizar mantenimiento industrial"
+                "quiero digitalizar mantenimiento industrial",
+                "necesito quiero generar ordenes de trabajo",
+                "quiero quiero generar ordenes de trabajo",
+                "me urge quiero generar ordenes de trabajo",
+                "ayudame a quiero generar ordenes de trabajo",
+                "como hago para quiero generar ordenes de trabajo",
+                "no se como quiero generar ordenes de trabajo",
+                "tengo problema con quiero generar ordenes de trabajo",
+                "necesito el papel de taller se pierde",
+                "quiero el papel de taller se pierde",
+                "me urge el papel de taller se pierde"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "historia clinica",
+                "reserva hotel",
+                "evento social",
+                "diezmo iglesia",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
             ]
         },
         {
@@ -1854,7 +1943,29 @@
                 "quiero control de merma por linea",
                 "quiero detectar tendencia de desperdicio mensual",
                 "quiero validar limites min max automaticamente",
-                "quiero bitacora de lote por operador"
+                "quiero bitacora de lote por operador",
+                "necesito quiero trazabilidad de lotes",
+                "quiero quiero trazabilidad de lotes",
+                "me urge quiero trazabilidad de lotes",
+                "ayudame a quiero trazabilidad de lotes",
+                "como hago para quiero trazabilidad de lotes",
+                "no se como quiero trazabilidad de lotes",
+                "tengo problema con quiero trazabilidad de lotes",
+                "necesito necesito saber que materia prima use",
+                "quiero necesito saber que materia prima use",
+                "me urge necesito saber que materia prima use"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "checkin hotel",
+                "reserva de salon",
+                "cartera arriendos",
+                "asistencia colegio",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
             ]
         },
         {
@@ -1896,7 +2007,29 @@
                 "quiero recordar vacunas y controles",
                 "quiero mensaje 2 dias antes de retorno",
                 "quiero saber quien cumple anos este mes",
-                "quiero fidelizacion para servicios personales"
+                "quiero fidelizacion para servicios personales",
+                "necesito quiero que mis clientes vuelvan mas",
+                "quiero quiero que mis clientes vuelvan mas",
+                "me urge quiero que mis clientes vuelvan mas",
+                "ayudame a quiero que mis clientes vuelvan mas",
+                "como hago para quiero que mis clientes vuelvan mas",
+                "no se como quiero que mis clientes vuelvan mas",
+                "tengo problema con quiero que mis clientes vuelvan mas",
+                "necesito necesito historial de servicios por cliente",
+                "quiero necesito historial de servicios por cliente",
+                "me urge necesito historial de servicios por cliente"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "orden de despacho",
+                "guia transportadora",
+                "cosecha por lote",
+                "canon de arriendo",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
             ]
         },
         {
@@ -1938,7 +2071,29 @@
                 "quiero consolidar diezmos y ofrendas",
                 "necesito reporte financiero mensual de iglesia",
                 "quiero certificados para donantes",
-                "quienes faltan seguido al servicio"
+                "quienes faltan seguido al servicio",
+                "necesito como llevo el control de los diezmos",
+                "quiero como llevo el control de los diezmos",
+                "me urge como llevo el control de los diezmos",
+                "ayudame a como llevo el control de los diezmos",
+                "como hago para como llevo el control de los diezmos",
+                "no se como como llevo el control de los diezmos",
+                "tengo problema con como llevo el control de los diezmos",
+                "necesito necesito saber quien no ha venido al culto",
+                "quiero necesito saber quien no ha venido al culto",
+                "me urge necesito saber quien no ha venido al culto"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "factura de hospedaje",
+                "orden de trabajo mecanico",
+                "pedido marketplace",
+                "historia clinica",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
             ]
         },
         {
@@ -1980,7 +2135,29 @@
                 "seguimiento de actividades extracurriculares",
                 "quiero reporte de cartera vencida del colegio",
                 "control de estudiantes nuevos y retirados",
-                "quiero digitalizar secretaria academica"
+                "quiero digitalizar secretaria academica",
+                "necesito quien debe la mensualidad",
+                "quiero quien debe la mensualidad",
+                "me urge quien debe la mensualidad",
+                "ayudame a quien debe la mensualidad",
+                "como hago para quien debe la mensualidad",
+                "no se como quien debe la mensualidad",
+                "tengo problema con quien debe la mensualidad",
+                "necesito notas de los alumnos",
+                "quiero notas de los alumnos",
+                "me urge notas de los alumnos"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "diezmo",
+                "reserva hotel",
+                "orden de despacho",
+                "cartera arriendos",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
             ]
         },
         {
@@ -2022,7 +2199,413 @@
                 "control de expedientes por etapa",
                 "tablero de productividad por consultor",
                 "quiero reporte semanal de horas por cliente",
-                "quiero automatizar cuenta de cobro por horas"
+                "quiero automatizar cuenta de cobro por horas",
+                "necesito cuantas horas trabaje en este proyecto",
+                "quiero cuantas horas trabaje en este proyecto",
+                "me urge cuantas horas trabaje en este proyecto",
+                "ayudame a cuantas horas trabaje en este proyecto",
+                "como hago para cuantas horas trabaje en este proyecto",
+                "no se como cuantas horas trabaje en este proyecto",
+                "tengo problema con cuantas horas trabaje en este proyecto",
+                "necesito facturar horas al cliente",
+                "quiero facturar horas al cliente",
+                "me urge facturar horas al cliente"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "inventario por metro",
+                "vencimiento medicamento",
+                "ocupacion hotel",
+                "asistencia dominical",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
+            ]
+        },
+        {
+            "name": "SOLVE_RENT_COLLECTION",
+            "sector_key": "INMOBILIARIA",
+            "action": "APPLY_PLAYBOOK_INMOBILIARIA",
+            "utterances": [
+                "no se quien debe arriendo",
+                "quiero cartera de arriendos",
+                "control de canon mensual",
+                "seguimiento de contratos de alquiler",
+                "alertas de mora de inquilinos",
+                "quiero app para inmobiliaria",
+                "me atraso cobrando arriendos",
+                "control de ocupacion por inmueble",
+                "necesito no se quien debe arriendo",
+                "quiero no se quien debe arriendo",
+                "me urge no se quien debe arriendo",
+                "ayudame a no se quien debe arriendo",
+                "como hago para no se quien debe arriendo",
+                "no se como no se quien debe arriendo",
+                "tengo problema con no se quien debe arriendo",
+                "necesito quiero cartera de arriendos",
+                "quiero quiero cartera de arriendos",
+                "me urge quiero cartera de arriendos",
+                "ayudame a quiero cartera de arriendos",
+                "como hago para quiero cartera de arriendos",
+                "no se como quiero cartera de arriendos",
+                "tengo problema con quiero cartera de arriendos",
+                "necesito control de canon mensual",
+                "quiero control de canon mensual",
+                "me urge control de canon mensual",
+                "ayudame a control de canon mensual",
+                "como hago para control de canon mensual",
+                "no se como control de canon mensual",
+                "tengo problema con control de canon mensual",
+                "necesito seguimiento de contratos de alquiler",
+                "quiero seguimiento de contratos de alquiler",
+                "me urge seguimiento de contratos de alquiler",
+                "ayudame a seguimiento de contratos de alquiler",
+                "como hago para seguimiento de contratos de alquiler",
+                "no se como seguimiento de contratos de alquiler",
+                "tengo problema con seguimiento de contratos de alquiler",
+                "necesito alertas de mora de inquilinos",
+                "quiero alertas de mora de inquilinos",
+                "me urge alertas de mora de inquilinos",
+                "ayudame a alertas de mora de inquilinos",
+                "como hago para alertas de mora de inquilinos",
+                "no se como alertas de mora de inquilinos",
+                "tengo problema con alertas de mora de inquilinos",
+                "necesito quiero app para inmobiliaria",
+                "quiero quiero app para inmobiliaria"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids",
+                "historia clinica",
+                "orden de produccion",
+                "checkin hotel",
+                "pedido marketplace"
+            ]
+        },
+        {
+            "name": "SOLVE_DISPATCH_TRACKING",
+            "sector_key": "LOGISTICA",
+            "action": "APPLY_PLAYBOOK_LOGISTICA",
+            "utterances": [
+                "no se donde van mis pedidos",
+                "quiero trazabilidad de entregas",
+                "me fallan las rutas de despacho",
+                "necesito control de guias",
+                "quiero app para logistica",
+                "entregas atrasadas",
+                "quiero planificador de rutas",
+                "seguimiento por numero de guia",
+                "necesito no se donde van mis pedidos",
+                "quiero no se donde van mis pedidos",
+                "me urge no se donde van mis pedidos",
+                "ayudame a no se donde van mis pedidos",
+                "como hago para no se donde van mis pedidos",
+                "no se como no se donde van mis pedidos",
+                "tengo problema con no se donde van mis pedidos",
+                "necesito quiero trazabilidad de entregas",
+                "quiero quiero trazabilidad de entregas",
+                "me urge quiero trazabilidad de entregas",
+                "ayudame a quiero trazabilidad de entregas",
+                "como hago para quiero trazabilidad de entregas",
+                "no se como quiero trazabilidad de entregas",
+                "tengo problema con quiero trazabilidad de entregas",
+                "necesito me fallan las rutas de despacho",
+                "quiero me fallan las rutas de despacho",
+                "me urge me fallan las rutas de despacho",
+                "ayudame a me fallan las rutas de despacho",
+                "como hago para me fallan las rutas de despacho",
+                "no se como me fallan las rutas de despacho",
+                "tengo problema con me fallan las rutas de despacho",
+                "necesito necesito control de guias",
+                "quiero necesito control de guias",
+                "me urge necesito control de guias",
+                "ayudame a necesito control de guias",
+                "como hago para necesito control de guias",
+                "no se como necesito control de guias",
+                "tengo problema con necesito control de guias",
+                "necesito quiero app para logistica",
+                "quiero quiero app para logistica",
+                "me urge quiero app para logistica",
+                "ayudame a quiero app para logistica",
+                "como hago para quiero app para logistica",
+                "no se como quiero app para logistica",
+                "tengo problema con quiero app para logistica",
+                "necesito entregas atrasadas",
+                "quiero entregas atrasadas"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids",
+                "historia clinica",
+                "tratamiento spa",
+                "cobro de arriendo",
+                "boletin escolar"
+            ]
+        },
+        {
+            "name": "SOLVE_EVENT_BOOKING",
+            "sector_key": "EVENTOS",
+            "action": "APPLY_PLAYBOOK_EVENTOS",
+            "utterances": [
+                "se me cruzan reservas de eventos",
+                "quiero agenda de salones",
+                "control de anticipos y saldos",
+                "quiero app para eventos",
+                "overbooking en fechas especiales",
+                "checklist por evento",
+                "quiero contrato y cotizacion por evento",
+                "rentabilidad por evento",
+                "necesito se me cruzan reservas de eventos",
+                "quiero se me cruzan reservas de eventos",
+                "me urge se me cruzan reservas de eventos",
+                "ayudame a se me cruzan reservas de eventos",
+                "como hago para se me cruzan reservas de eventos",
+                "no se como se me cruzan reservas de eventos",
+                "tengo problema con se me cruzan reservas de eventos",
+                "necesito quiero agenda de salones",
+                "quiero quiero agenda de salones",
+                "me urge quiero agenda de salones",
+                "ayudame a quiero agenda de salones",
+                "como hago para quiero agenda de salones",
+                "no se como quiero agenda de salones",
+                "tengo problema con quiero agenda de salones",
+                "necesito control de anticipos y saldos",
+                "quiero control de anticipos y saldos",
+                "me urge control de anticipos y saldos",
+                "ayudame a control de anticipos y saldos",
+                "como hago para control de anticipos y saldos",
+                "no se como control de anticipos y saldos",
+                "tengo problema con control de anticipos y saldos",
+                "necesito quiero app para eventos",
+                "quiero quiero app para eventos",
+                "me urge quiero app para eventos",
+                "ayudame a quiero app para eventos",
+                "como hago para quiero app para eventos",
+                "no se como quiero app para eventos",
+                "tengo problema con quiero app para eventos",
+                "necesito overbooking en fechas especiales",
+                "quiero overbooking en fechas especiales",
+                "me urge overbooking en fechas especiales",
+                "ayudame a overbooking en fechas especiales",
+                "como hago para overbooking en fechas especiales",
+                "no se como overbooking en fechas especiales",
+                "tengo problema con overbooking en fechas especiales",
+                "necesito checklist por evento",
+                "quiero checklist por evento"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids",
+                "inventario por metro",
+                "vencimiento de lotes",
+                "checkin checkout hotel",
+                "ruta de despacho"
+            ]
+        },
+        {
+            "name": "SOLVE_HOTEL_OCCUPANCY",
+            "sector_key": "TURISMO_HOTELERIA",
+            "action": "APPLY_PLAYBOOK_TURISMO_HOTELERIA",
+            "utterances": [
+                "no se la ocupacion real del hotel",
+                "control de reservas y habitaciones",
+                "me hacen overbooking",
+                "checkin y checkout rapido",
+                "estado de habitaciones",
+                "quiero app para hostal",
+                "reporte de ocupacion diaria",
+                "ingreso por habitacion",
+                "necesito no se la ocupacion real del hotel",
+                "quiero no se la ocupacion real del hotel",
+                "me urge no se la ocupacion real del hotel",
+                "ayudame a no se la ocupacion real del hotel",
+                "como hago para no se la ocupacion real del hotel",
+                "no se como no se la ocupacion real del hotel",
+                "tengo problema con no se la ocupacion real del hotel",
+                "necesito control de reservas y habitaciones",
+                "quiero control de reservas y habitaciones",
+                "me urge control de reservas y habitaciones",
+                "ayudame a control de reservas y habitaciones",
+                "como hago para control de reservas y habitaciones",
+                "no se como control de reservas y habitaciones",
+                "tengo problema con control de reservas y habitaciones",
+                "necesito me hacen overbooking",
+                "quiero me hacen overbooking",
+                "me urge me hacen overbooking",
+                "ayudame a me hacen overbooking",
+                "como hago para me hacen overbooking",
+                "no se como me hacen overbooking",
+                "tengo problema con me hacen overbooking",
+                "necesito checkin y checkout rapido",
+                "quiero checkin y checkout rapido",
+                "me urge checkin y checkout rapido",
+                "ayudame a checkin y checkout rapido",
+                "como hago para checkin y checkout rapido",
+                "no se como checkin y checkout rapido",
+                "tengo problema con checkin y checkout rapido",
+                "necesito estado de habitaciones",
+                "quiero estado de habitaciones",
+                "me urge estado de habitaciones",
+                "ayudame a estado de habitaciones",
+                "como hago para estado de habitaciones",
+                "no se como estado de habitaciones",
+                "tengo problema con estado de habitaciones",
+                "necesito quiero app para hostal",
+                "quiero quiero app para hostal"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids",
+                "diezmo",
+                "boletin escolar",
+                "orden de trabajo mecanico",
+                "control de cultivo"
+            ]
+        },
+        {
+            "name": "SOLVE_AGRO_TRACEABILITY",
+            "sector_key": "AGRO",
+            "action": "APPLY_PLAYBOOK_AGRO",
+            "utterances": [
+                "control de lotes de cultivo",
+                "no se costo por hectarea",
+                "trazabilidad de insumos",
+                "quiero app para finca",
+                "registro de siembra y cosecha",
+                "bitacora de campo",
+                "rendimiento por lote",
+                "inventario de agroinsumos",
+                "necesito control de lotes de cultivo",
+                "quiero control de lotes de cultivo",
+                "me urge control de lotes de cultivo",
+                "ayudame a control de lotes de cultivo",
+                "como hago para control de lotes de cultivo",
+                "no se como control de lotes de cultivo",
+                "tengo problema con control de lotes de cultivo",
+                "necesito no se costo por hectarea",
+                "quiero no se costo por hectarea",
+                "me urge no se costo por hectarea",
+                "ayudame a no se costo por hectarea",
+                "como hago para no se costo por hectarea",
+                "no se como no se costo por hectarea",
+                "tengo problema con no se costo por hectarea",
+                "necesito trazabilidad de insumos",
+                "quiero trazabilidad de insumos",
+                "me urge trazabilidad de insumos",
+                "ayudame a trazabilidad de insumos",
+                "como hago para trazabilidad de insumos",
+                "no se como trazabilidad de insumos",
+                "tengo problema con trazabilidad de insumos",
+                "necesito quiero app para finca",
+                "quiero quiero app para finca",
+                "me urge quiero app para finca",
+                "ayudame a quiero app para finca",
+                "como hago para quiero app para finca",
+                "no se como quiero app para finca",
+                "tengo problema con quiero app para finca",
+                "necesito registro de siembra y cosecha",
+                "quiero registro de siembra y cosecha",
+                "me urge registro de siembra y cosecha",
+                "ayudame a registro de siembra y cosecha",
+                "como hago para registro de siembra y cosecha",
+                "no se como registro de siembra y cosecha",
+                "tengo problema con registro de siembra y cosecha",
+                "necesito bitacora de campo",
+                "quiero bitacora de campo"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids",
+                "reserva de salon",
+                "checkin hotel",
+                "pedido marketplace",
+                "historia clinica paciente"
+            ]
+        },
+        {
+            "name": "SOLVE_ECOMMERCE_OMS",
+            "sector_key": "ECOMMERCE",
+            "action": "APPLY_PLAYBOOK_ECOMMERCE",
+            "utterances": [
+                "pedidos web desordenados",
+                "centralizar pedidos de marketplace",
+                "inventario online no cuadra",
+                "quiero app para ecommerce",
+                "conciliar pagos de pasarela",
+                "control de devoluciones",
+                "ordenes por canal",
+                "estado de fulfillment",
+                "necesito pedidos web desordenados",
+                "quiero pedidos web desordenados",
+                "me urge pedidos web desordenados",
+                "ayudame a pedidos web desordenados",
+                "como hago para pedidos web desordenados",
+                "no se como pedidos web desordenados",
+                "tengo problema con pedidos web desordenados",
+                "necesito centralizar pedidos de marketplace",
+                "quiero centralizar pedidos de marketplace",
+                "me urge centralizar pedidos de marketplace",
+                "ayudame a centralizar pedidos de marketplace",
+                "como hago para centralizar pedidos de marketplace",
+                "no se como centralizar pedidos de marketplace",
+                "tengo problema con centralizar pedidos de marketplace",
+                "necesito inventario online no cuadra",
+                "quiero inventario online no cuadra",
+                "me urge inventario online no cuadra",
+                "ayudame a inventario online no cuadra",
+                "como hago para inventario online no cuadra",
+                "no se como inventario online no cuadra",
+                "tengo problema con inventario online no cuadra",
+                "necesito quiero app para ecommerce",
+                "quiero quiero app para ecommerce",
+                "me urge quiero app para ecommerce",
+                "ayudame a quiero app para ecommerce",
+                "como hago para quiero app para ecommerce",
+                "no se como quiero app para ecommerce",
+                "tengo problema con quiero app para ecommerce",
+                "necesito conciliar pagos de pasarela",
+                "quiero conciliar pagos de pasarela",
+                "me urge conciliar pagos de pasarela",
+                "ayudame a conciliar pagos de pasarela",
+                "como hago para conciliar pagos de pasarela",
+                "no se como conciliar pagos de pasarela",
+                "tengo problema con conciliar pagos de pasarela",
+                "necesito control de devoluciones",
+                "quiero control de devoluciones"
+            ],
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids",
+                "diezmo iglesia",
+                "boletin escolar",
+                "historia clinica",
+                "cita de spa"
             ]
         }
     ],
@@ -2136,7 +2719,19 @@
                     "margen_por_producto",
                     "dias_stock"
                 ]
-            }
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "historia clinica",
+                "reserva hotel",
+                "diezmo",
+                "matricula escolar",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
+            ]
         },
         {
             "sector_key": "FARMACIA",
@@ -2232,7 +2827,19 @@
                     "valor_inventario_vencido",
                     "rotacion_fefo"
                 ]
-            }
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "canon de arriendo",
+                "reserva de salon",
+                "pedido web",
+                "ruta de entrega",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
+            ]
         },
         {
             "sector_key": "RESTAURANTE",
@@ -2315,7 +2922,19 @@
                     "merma_mensual",
                     "plato_estrella"
                 ]
-            }
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "diezmo",
+                "boletin escolar",
+                "mantenimiento vehiculo",
+                "control de cultivo",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
+            ]
         },
         {
             "sector_key": "MANTENIMIENTO",
@@ -2411,7 +3030,19 @@
                     "equipo_mas_falla",
                     "ot_abiertas"
                 ]
-            }
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "historia clinica",
+                "reserva hotel",
+                "evento social",
+                "diezmo iglesia",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
+            ]
         },
         {
             "sector_key": "PRODUCCION",
@@ -2515,7 +3146,19 @@
                     "merma_turno",
                     "cumplimiento_calidad"
                 ]
-            }
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "checkin hotel",
+                "reserva de salon",
+                "cartera arriendos",
+                "asistencia colegio",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
+            ]
         },
         {
             "sector_key": "BELLEZA",
@@ -2599,7 +3242,19 @@
                     "tasa_inasistencia",
                     "clientes_recurrentes"
                 ]
-            }
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "orden de despacho",
+                "guia transportadora",
+                "cosecha por lote",
+                "canon de arriendo",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
+            ]
         },
         {
             "sector_key": "IGLESIA",
@@ -2745,7 +3400,19 @@
                     "asistencia_promedio",
                     "miembros_inactivos"
                 ]
-            }
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "factura de hospedaje",
+                "orden de trabajo mecanico",
+                "pedido marketplace",
+                "historia clinica",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
+            ]
         },
         {
             "sector_key": "EDUCACION",
@@ -2886,7 +3553,19 @@
                     "inasistencia_promedio",
                     "desercion_escolar"
                 ]
-            }
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "diezmo",
+                "reserva hotel",
+                "orden de despacho",
+                "cartera arriendos",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
+            ]
         },
         {
             "sector_key": "SERVICIOS_PRO",
@@ -3034,7 +3713,613 @@
                     "gastos_pendientes_reembolso",
                     "rentabilidad_proyecto"
                 ]
-            }
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "inventario por metro",
+                "vencimiento medicamento",
+                "ocupacion hotel",
+                "asistencia dominical",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids"
+            ]
+        },
+        {
+            "sector_key": "INMOBILIARIA",
+            "profile_key": "inmobiliaria",
+            "triggers": [
+                "inmobiliaria",
+                "arriendo",
+                "alquiler",
+                "canon",
+                "inquilino"
+            ],
+            "pain_points": [
+                {
+                    "detect": "no se quien debe arriendo",
+                    "diagnosis": "Cartera sin alertas por contrato.",
+                    "solution_pitch": "Centraliza propiedades, contratos y recaudos."
+                }
+            ],
+            "mini_apps": [
+                "inmobiliaria_core",
+                "inmobiliaria_ops",
+                "inmobiliaria_fin"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "inmobiliaria_core",
+                        "fields": [
+                            {
+                                "name": "nombre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "inmobiliaria_ops",
+                        "fields": [
+                            {
+                                "name": "inmobiliaria_core_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "detalle",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "inmobiliaria_fin",
+                        "fields": [
+                            {
+                                "name": "inmobiliaria_core_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "monto",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "saldo = total - sum(pagos)",
+                    "si estado = vencido entonces alerta = true"
+                ],
+                "kpis": [
+                    "saldo_pendiente",
+                    "tiempo_ciclo",
+                    "ingreso_neto"
+                ]
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids",
+                "historia clinica",
+                "orden de produccion",
+                "checkin hotel",
+                "pedido marketplace"
+            ]
+        },
+        {
+            "sector_key": "LOGISTICA",
+            "profile_key": "logistica_distribucion",
+            "triggers": [
+                "logistica",
+                "despacho",
+                "ruta",
+                "guia",
+                "entrega"
+            ],
+            "pain_points": [
+                {
+                    "detect": "no se donde van mis pedidos",
+                    "diagnosis": "Despachos sin trazabilidad operativa.",
+                    "solution_pitch": "Usa estados de entrega y eventos por guia."
+                }
+            ],
+            "mini_apps": [
+                "logistica_core",
+                "logistica_ops",
+                "logistica_fin"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "logistica_core",
+                        "fields": [
+                            {
+                                "name": "nombre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "logistica_ops",
+                        "fields": [
+                            {
+                                "name": "logistica_core_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "detalle",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "logistica_fin",
+                        "fields": [
+                            {
+                                "name": "logistica_core_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "monto",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "saldo = total - sum(pagos)",
+                    "si estado = vencido entonces alerta = true"
+                ],
+                "kpis": [
+                    "saldo_pendiente",
+                    "tiempo_ciclo",
+                    "ingreso_neto"
+                ]
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids",
+                "historia clinica",
+                "tratamiento spa",
+                "cobro de arriendo",
+                "boletin escolar"
+            ]
+        },
+        {
+            "sector_key": "EVENTOS",
+            "profile_key": "gestion_eventos",
+            "triggers": [
+                "evento",
+                "reserva",
+                "salon",
+                "boda",
+                "catering"
+            ],
+            "pain_points": [
+                {
+                    "detect": "se me cruzan reservas de eventos",
+                    "diagnosis": "Agenda y pagos sin control.",
+                    "solution_pitch": "Gestiona reservas, anticipos y saldos por evento."
+                }
+            ],
+            "mini_apps": [
+                "eventos_core",
+                "eventos_ops",
+                "eventos_fin"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "eventos_core",
+                        "fields": [
+                            {
+                                "name": "nombre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eventos_ops",
+                        "fields": [
+                            {
+                                "name": "eventos_core_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "detalle",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "eventos_fin",
+                        "fields": [
+                            {
+                                "name": "eventos_core_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "monto",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "saldo = total - sum(pagos)",
+                    "si estado = vencido entonces alerta = true"
+                ],
+                "kpis": [
+                    "saldo_pendiente",
+                    "tiempo_ciclo",
+                    "ingreso_neto"
+                ]
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids",
+                "inventario por metro",
+                "vencimiento de lotes",
+                "checkin checkout hotel",
+                "ruta de despacho"
+            ]
+        },
+        {
+            "sector_key": "TURISMO_HOTELERIA",
+            "profile_key": "hoteleria",
+            "triggers": [
+                "hotel",
+                "hostal",
+                "habitacion",
+                "checkin",
+                "checkout"
+            ],
+            "pain_points": [
+                {
+                    "detect": "no se la ocupacion real del hotel",
+                    "diagnosis": "Disponibilidad y reservas se cruzan.",
+                    "solution_pitch": "Consolida habitaciones, reservas y pagos."
+                }
+            ],
+            "mini_apps": [
+                "turismo_hoteleria_core",
+                "turismo_hoteleria_ops",
+                "turismo_hoteleria_fin"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "turismo_hoteleria_core",
+                        "fields": [
+                            {
+                                "name": "nombre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "turismo_hoteleria_ops",
+                        "fields": [
+                            {
+                                "name": "turismo_hoteleria_core_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "detalle",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "turismo_hoteleria_fin",
+                        "fields": [
+                            {
+                                "name": "turismo_hoteleria_core_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "monto",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "saldo = total - sum(pagos)",
+                    "si estado = vencido entonces alerta = true"
+                ],
+                "kpis": [
+                    "saldo_pendiente",
+                    "tiempo_ciclo",
+                    "ingreso_neto"
+                ]
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids",
+                "diezmo",
+                "boletin escolar",
+                "orden de trabajo mecanico",
+                "control de cultivo"
+            ]
+        },
+        {
+            "sector_key": "AGRO",
+            "profile_key": "agro_produccion",
+            "triggers": [
+                "agro",
+                "finca",
+                "cultivo",
+                "lote",
+                "cosecha"
+            ],
+            "pain_points": [
+                {
+                    "detect": "no se costo real por hectarea",
+                    "diagnosis": "Costos y labores de campo dispersos.",
+                    "solution_pitch": "Registra lotes, aplicaciones y cosechas por trazabilidad."
+                }
+            ],
+            "mini_apps": [
+                "agro_core",
+                "agro_ops",
+                "agro_fin"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "agro_core",
+                        "fields": [
+                            {
+                                "name": "nombre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "agro_ops",
+                        "fields": [
+                            {
+                                "name": "agro_core_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "detalle",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "agro_fin",
+                        "fields": [
+                            {
+                                "name": "agro_core_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "monto",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "saldo = total - sum(pagos)",
+                    "si estado = vencido entonces alerta = true"
+                ],
+                "kpis": [
+                    "saldo_pendiente",
+                    "tiempo_ciclo",
+                    "ingreso_neto"
+                ]
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids",
+                "reserva de salon",
+                "checkin hotel",
+                "pedido marketplace",
+                "historia clinica paciente"
+            ]
+        },
+        {
+            "sector_key": "ECOMMERCE",
+            "profile_key": "ecommerce_oms",
+            "triggers": [
+                "ecommerce",
+                "pedido web",
+                "marketplace",
+                "pasarela",
+                "fulfillment"
+            ],
+            "pain_points": [
+                {
+                    "detect": "pedidos web desordenados",
+                    "diagnosis": "Operacion dividida por canal.",
+                    "solution_pitch": "Centraliza ordenes, pagos y envios en flujo OMS."
+                }
+            ],
+            "mini_apps": [
+                "ecommerce_core",
+                "ecommerce_ops",
+                "ecommerce_fin"
+            ],
+            "blueprint": {
+                "entities": [
+                    {
+                        "name": "ecommerce_core",
+                        "fields": [
+                            {
+                                "name": "nombre",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "ecommerce_ops",
+                        "fields": [
+                            {
+                                "name": "ecommerce_core_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "detalle",
+                                "type": "text"
+                            },
+                            {
+                                "name": "estado",
+                                "type": "text"
+                            }
+                        ]
+                    },
+                    {
+                        "name": "ecommerce_fin",
+                        "fields": [
+                            {
+                                "name": "ecommerce_core_id",
+                                "type": "number"
+                            },
+                            {
+                                "name": "monto",
+                                "type": "decimal"
+                            },
+                            {
+                                "name": "fecha",
+                                "type": "date"
+                            }
+                        ]
+                    }
+                ],
+                "logic_rules": [
+                    "saldo = total - sum(pagos)",
+                    "si estado = vencido entonces alerta = true"
+                ],
+                "kpis": [
+                    "saldo_pendiente",
+                    "tiempo_ciclo",
+                    "ingreso_neto"
+                ]
+            },
+            "hard_negatives": [
+                "elecciones presidenciales",
+                "partido de futbol",
+                "resultado de loteria",
+                "precio del bitcoin",
+                "gestion de reciclaje empresarial",
+                "academia de programacion kids",
+                "diezmo iglesia",
+                "boletin escolar",
+                "historia clinica",
+                "cita de spa"
+            ]
         }
     ],
     "knowledge_prompt_template": {

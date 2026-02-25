@@ -118,6 +118,9 @@ function merge_solver_intent(array $solverIntent, array $existing): array
     $intent['required_entities'] = normalize_list($existing['required_entities'] ?? []);
     $intent['optional_entities'] = normalize_list($existing['optional_entities'] ?? []);
     $intent['utterances'] = $utterances;
+    $intent['hard_negatives'] = normalize_utterances(
+        is_array($solverIntent['hard_negatives'] ?? null) ? $solverIntent['hard_negatives'] : []
+    );
     $intent['slot_filling'] = normalize_array($existing['slot_filling'] ?? []);
     $intent['examples'] = normalize_array($existing['examples'] ?? []);
     $intent['notes'] = normalize_list($existing['notes'] ?? []);

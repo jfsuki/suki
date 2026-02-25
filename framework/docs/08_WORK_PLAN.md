@@ -304,6 +304,39 @@
   - chat: `CHAT_STRESS_CONCURRENCY`, `CHAT_STRESS_ITERATIONS`, `CHAT_STRESS_P95_MAX_MS`, `CHAT_STRESS_P99_MAX_MS`, `CHAT_STRESS_MAX_ERROR_RATE`.
   - canales: `CHANNEL_STRESS_CONCURRENCY`, `CHANNEL_STRESS_ITERATIONS`, `CHANNEL_STRESS_P95_MAX_MS`, `CHANNEL_STRESS_P99_MAX_MS`, `CHANNEL_STRESS_MAX_ERROR_RATE`.
 
+## LLM staging smoke block (2026-02-24)
+- Nueva prueba dedicada:
+  - `framework/tests/llm_smoke.php`.
+- Cobertura:
+  - fallback de router en modo `auto` (proveedor primario falla -> Gemini),
+  - salida estructurada contract-first (`ROLE/CONTEXT/INPUT/CONSTRAINTS/OUTPUT_FORMAT/FAIL_RULES`),
+  - tokens/costo en telemetria SQL (`ops_token_usage` + summary).
+- Integracion opcional en gate:
+  - `QA_INCLUDE_LLM_SMOKE=1 php framework/scripts/qa_gate.php post`.
+- Reporte:
+  - `framework/tests/tmp/llm_smoke_report.json`.
+
+## Release hygiene runtime/test (2026-02-24)
+- Nuevo script reproducible:
+  - `framework/scripts/cleanup_runtime_artifacts.php`.
+- Objetivo:
+  - limpiar artefactos de pruebas y cache runtime antes de empaquetar release.
+- Modos:
+  - `--check` (dry run),
+  - `--apply` (limpieza base),
+  - `--include-runtime-state` y `--include-generated-contracts` para limpieza extendida.
+
+## Conversational scale-up (2026-02-24)
+- Base sectorial ampliada:
+  - `domain_playbooks` pasa de 9 a 15 sectores.
+  - `solver_intents` pasa de 9 a 15.
+  - cada solver intent con `utterances=45` y `hard_negatives` por sector.
+- Sincronizacion training:
+  - `sync_domain_training.php` ahora copia `hard_negatives` a `conversation_training_base.json`.
+- QA extendida:
+  - nueva suite `framework/tests/chat_real_100.php`.
+  - gate opcional: `QA_INCLUDE_CHAT_REAL_100=1 php framework/scripts/qa_gate.php post`.
+
 ## Siguiente bloque recomendado
 - WB-3 full visual graph: drag/drop real, conexiones con mouse y referencias tipadas `@` en inspector.
 - WB-4 advanced: diff visual entre revisiones y restauracion selectiva por nodo.

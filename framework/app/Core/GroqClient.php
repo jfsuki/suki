@@ -30,6 +30,9 @@ final class GroqClient
             'temperature' => $options['temperature'] ?? 0.2,
             'max_tokens' => $options['max_tokens'] ?? 800,
         ];
+        if (!empty($options['strict_json'])) {
+            $payload['response_format'] = ['type' => 'json_object'];
+        }
 
         $response = $this->request('POST', $this->baseUrl, $payload);
         $content = $response['data']['choices'][0]['message']['content'] ?? '';

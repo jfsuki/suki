@@ -1,0 +1,168 @@
+{
+  "version": "1.0.0",
+  "updated_at": "2026-02-24",
+  "language": "es-CO",
+  "purpose": "Bloques reutilizables de contexto para pedir o auditar datasets conversacionales ERP sin repetir informacion por intent.",
+  "action_catalog": {
+    "ERP_FACTURA_VENTA": "ERP_INVOICE_SALES",
+    "ERP_ASIENTO_CONTABLE": "ERP_ACCOUNTING_JOURNAL",
+    "ERP_CAJAYBANCOS": "ERP_CASH_BANK",
+    "APP_RUNTIME_CREATE_CUSTOMER": "APP_ENTITY_CREATE_CUSTOMER",
+    "APP_RUNTIME_CREATE_ITEM": "APP_ENTITY_CREATE_ITEM",
+    "APP_CREATE": "FRAMEWORK_APP_CREATE"
+  },
+  "slot_policy_baseline": {
+    "one_question_only": true,
+    "question_style": "clara, corta, sin tecnicismos",
+    "fallback_on_ambiguous": "NEEDS_DISAMBIGUATION"
+  },
+  "slot_dependency_rules": [
+    {
+      "intent": "ERP_FACTURA_VENTA",
+      "rule": "vencimiento es obligatorio solo si forma_pago=credito"
+    },
+    {
+      "intent": "ERP_FACTURA_VENTA",
+      "rule": "prefijo_numeracion puede ser autogenerado si no existe resolucion manual"
+    },
+    {
+      "intent": "ERP_CAJAYBANCOS",
+      "rule": "si tipo_movimiento=ingreso, tercero prioriza cliente; si salida, tercero prioriza proveedor"
+    },
+    {
+      "intent": "APP_RUNTIME_CREATE_ITEM",
+      "rule": "inventariable solo aplica si tipo=producto; para servicio se fija en no"
+    }
+  ],
+  "chart_of_accounts_min_co": [
+    {
+      "code": "110505",
+      "name": "Caja general"
+    },
+    {
+      "code": "111005",
+      "name": "Bancos"
+    },
+    {
+      "code": "130505",
+      "name": "Clientes nacionales"
+    },
+    {
+      "code": "220505",
+      "name": "Proveedores nacionales"
+    },
+    {
+      "code": "240805",
+      "name": "IVA generado"
+    },
+    {
+      "code": "240810",
+      "name": "IVA descontable"
+    },
+    {
+      "code": "413595",
+      "name": "Ingresos por ventas"
+    },
+    {
+      "code": "613595",
+      "name": "Costo de ventas"
+    }
+  ],
+  "posting_rules_co": [
+    {
+      "trigger": "factura_contado",
+      "debit_account": "110505",
+      "credit_account": "413595"
+    },
+    {
+      "trigger": "factura_credito",
+      "debit_account": "130505",
+      "credit_account": "413595"
+    },
+    {
+      "trigger": "recaudo_cliente",
+      "debit_account": "111005",
+      "credit_account": "130505"
+    },
+    {
+      "trigger": "pago_proveedor",
+      "debit_account": "220505",
+      "credit_account": "111005"
+    }
+  ],
+  "sector_coverage": {
+    "covered_now": [
+      "FERRETERIA",
+      "FARMACIA",
+      "RESTAURANTE",
+      "MANTENIMIENTO",
+      "PRODUCCION",
+      "BELLEZA",
+      "IGLESIA",
+      "EDUCACION",
+      "SERVICIOS_PRO",
+      "INMOBILIARIA",
+      "LOGISTICA",
+      "EVENTOS",
+      "TURISMO_HOTELERIA",
+      "AGRO",
+      "ECOMMERCE",
+      "ODONTOLOGIA",
+      "VETERINARIA",
+      "GIMNASIO_FITNESS",
+      "ALIMENTOS_PREPARADOS",
+      "SERVICIOS_MULTISERVICIO"
+    ],
+    "high_probability_missing": [
+      "PSICOLOGIA",
+      "CONSTRUCCION_CONTRATISTAS",
+      "DISTRIBUCION_MAYORISTA_B2B",
+      "TEXTIL_MODISTERIA_CALZADO",
+      "LAVANDERIA_TINTORERIA",
+      "TRANSPORTE_PASAJEROS",
+      "SEGURIDAD_PRIVADA",
+      "IMPORTACION_EXPORTACION",
+      "ONG_FUNDACION_NO_RELIGIOSA",
+      "CLINICA_MEDICA_AMBULATORIA",
+      "TALLER_AUTOMOTRIZ",
+      "ABOGADOS_CONSULTORIA_LEGAL"
+    ]
+  },
+  "ambiguity_map": [
+    {
+      "user_signal": "consulta factura existente",
+      "do_not_route_to": "ERP_FACTURA_VENTA",
+      "route_to": "FE_STATUS_CONSULTA o intent de consulta documental"
+    },
+    {
+      "user_signal": "anular/editar/eliminar documento",
+      "do_not_route_to": "intents de creacion",
+      "route_to": "intent de modificacion con confirmacion destructiva"
+    },
+    {
+      "user_signal": "recibo vs factura",
+      "do_not_route_to": "ejecucion directa",
+      "route_to": "NEEDS_DISAMBIGUATION con pregunta unica"
+    }
+  ],
+  "request_prompt_context": {
+    "required_fields": [
+      "business_type",
+      "country",
+      "currency",
+      "tax_regime",
+      "document_flows",
+      "payment_methods",
+      "channels",
+      "chart_of_accounts_min",
+      "posting_rules"
+    ],
+    "quality_targets": {
+      "utterances_explicit_per_intent_min": 40,
+      "utterances_implicit_per_intent_min": 40,
+      "hard_negatives_per_intent_min": 40,
+      "multi_turn_dialogues_min": 10,
+      "qa_cases_per_intent_min": 10
+    }
+  }
+}

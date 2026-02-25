@@ -1,0 +1,783 @@
+{
+  "batch_id": "esco_comercio_operaciones_v2",
+  "language": "es-CO",
+  "context_pack": {
+    "business_type": "comercio_pyme",
+    "country": "CO",
+    "currency": "COP",
+    "tax_regime": "rts_iva",
+    "payment_methods": [
+      "efectivo",
+      "transferencia",
+      "nequi",
+      "daviplata",
+      "tarjeta",
+      "credito"
+    ],
+    "document_flows": [
+      "cotizacion -> pedido -> factura -> recaudo",
+      "compra -> ingreso inventario -> cuenta por pagar -> pago proveedor",
+      "venta mostrador -> factura -> cierre caja"
+    ],
+    "channels": [
+      "whatsapp",
+      "telegram",
+      "web_chat"
+    ],
+    "volume_profile": "80 facturas mes, 120 recaudos mes, 400 movimientos inventario mes",
+    "chart_of_accounts_min": [
+      {
+        "code": "110505",
+        "name": "Caja general"
+      },
+      {
+        "code": "111005",
+        "name": "Bancos"
+      },
+      {
+        "code": "130505",
+        "name": "Clientes nacionales"
+      },
+      {
+        "code": "143505",
+        "name": "Inventario mercancias"
+      },
+      {
+        "code": "240805",
+        "name": "IVA generado"
+      },
+      {
+        "code": "413595",
+        "name": "Ingresos por ventas"
+      }
+    ],
+    "posting_rules": [
+      {
+        "trigger": "factura_contado",
+        "debit_account": "110505",
+        "credit_account": "413595"
+      },
+      {
+        "trigger": "factura_credito",
+        "debit_account": "130505",
+        "credit_account": "413595"
+      },
+      {
+        "trigger": "recaudo_cliente",
+        "debit_account": "111005",
+        "credit_account": "130505"
+      }
+    ]
+  },
+  "intents_expansion": [
+    {
+      "intent": "ERP_FACTURA_VENTA",
+      "action": "ERP_INVOICE_SALES",
+      "utterances_explicit": [
+        "registrar factura",
+        "crear factura",
+        "hacer una factura",
+        "emitir factura",
+        "facturar venta",
+        "registrar factura de contado",
+        "registrar factura a credito",
+        "nueva factura",
+        "factura para cliente",
+        "factura de servicio",
+        "factura de producto",
+        "generar factura electronica"
+      ],
+      "utterances_implicit": [
+        "me falta el soporte de esa venta",
+        "el cliente me pidio la factura",
+        "eso quedo vendido pero no esta en sistema",
+        "toca legalizar esa venta",
+        "me falta subir esa venta",
+        "falta el comprobante",
+        "eso va para facturacion",
+        "la DIAN pide ese documento",
+        "me falta el PDF de la venta",
+        "falta el XML de esa venta"
+      ],
+      "hard_negatives": [
+        "ver facturas",
+        "descargar factura",
+        "anular factura",
+        "editar factura",
+        "imprimir factura",
+        "nota credito",
+        "nota debito",
+        "ver ventas del mes",
+        "crear cliente",
+        "crear producto",
+        "registrar pago",
+        "cerrar caja"
+      ],
+      "slots": [
+        {
+          "name": "cliente",
+          "required": true
+        },
+        {
+          "name": "items",
+          "required": true
+        },
+        {
+          "name": "total",
+          "required": true
+        },
+        {
+          "name": "forma_pago",
+          "required": false
+        }
+      ],
+      "one_question_policy": [
+        {
+          "missing_slot": "cliente",
+          "question": "A nombre de que cliente debo crear la factura?"
+        },
+        {
+          "missing_slot": "items",
+          "question": "Que productos o servicios debo incluir?"
+        },
+        {
+          "missing_slot": "total",
+          "question": "Cual es el valor total a facturar?"
+        },
+        {
+          "missing_slot": "forma_pago",
+          "question": "La factura es de contado o credito?"
+        }
+      ],
+      "confirm_required": false,
+      "success_reply_template": "Listo, la factura quedo registrada con cliente {cliente} y total {total}.",
+      "error_reply_template": "No pude registrar la factura porque falta {missing_slot}."
+    },
+    {
+      "intent": "ERP_ASIENTO_CONTABLE",
+      "action": "ERP_ACCOUNTING_JOURNAL",
+      "utterances_explicit": [
+        "registrar asiento contable",
+        "crear asiento contable",
+        "hacer asiento diario",
+        "contabilizar movimiento",
+        "registrar partida contable",
+        "crear poliza contable",
+        "asiento manual",
+        "asiento de ajuste",
+        "asiento de cierre",
+        "registrar asiento de ingreso",
+        "registrar asiento de gasto",
+        "asiento contable hoy"
+      ],
+      "utterances_implicit": [
+        "eso debe ir a contabilidad",
+        "falta pasar eso al diario",
+        "me falta la contrapartida",
+        "no esta cuadrando el libro",
+        "eso no quedo contabilizado",
+        "hay que llevarlo al PUC",
+        "falta debito y credito",
+        "necesito dejar el soporte contable",
+        "el contador pide el asiento",
+        "esto debe afectar cuentas"
+      ],
+      "hard_negatives": [
+        "ver balance",
+        "estado de resultados",
+        "reporte contable",
+        "registrar factura",
+        "registrar pago cliente",
+        "pagar proveedor",
+        "crear cliente",
+        "crear producto",
+        "ajustar inventario",
+        "ver usuarios",
+        "cambiar plan de cuentas",
+        "configurar impuestos"
+      ],
+      "slots": [
+        {
+          "name": "fecha",
+          "required": true
+        },
+        {
+          "name": "detalle",
+          "required": true
+        },
+        {
+          "name": "lineas_debito_credito",
+          "required": true
+        }
+      ],
+      "one_question_policy": [
+        {
+          "missing_slot": "fecha",
+          "question": "Que fecha debe tener el asiento?"
+        },
+        {
+          "missing_slot": "detalle",
+          "question": "Cual es el concepto corto del asiento?"
+        },
+        {
+          "missing_slot": "lineas_debito_credito",
+          "question": "Que cuentas debo debitar y acreditar con sus valores?"
+        }
+      ],
+      "confirm_required": true,
+      "success_reply_template": "Listo, registre el asiento {detalle} para la fecha {fecha}.",
+      "error_reply_template": "No pude registrar el asiento porque falta {missing_slot}."
+    },
+    {
+      "intent": "ERP_CAJAYBANCOS",
+      "action": "ERP_CASH_BANK",
+      "utterances_explicit": [
+        "registrar pago",
+        "registrar recaudo",
+        "crear recibo de caja",
+        "crear egreso",
+        "registrar abono",
+        "recibir pago de factura",
+        "registrar pago proveedor",
+        "registrar salida de caja",
+        "registrar ingreso a banco",
+        "registrar transferencia",
+        "registrar pago por nequi",
+        "registrar pago por daviplata"
+      ],
+      "utterances_implicit": [
+        "me consignaron y falta dejarlo en sistema",
+        "ya me pagaron esa factura",
+        "falta registrar ese abono",
+        "salio plata de caja hoy",
+        "hicimos transferencia al proveedor",
+        "entro plata al banco",
+        "falta el soporte del pago",
+        "me pagaron por QR",
+        "hoy cobramos varias cuentas",
+        "se hizo un pago parcial"
+      ],
+      "hard_negatives": [
+        "ver extracto",
+        "conciliacion bancaria",
+        "cerrar caja",
+        "abrir caja",
+        "ver movimientos",
+        "crear factura",
+        "anular factura",
+        "crear cliente",
+        "crear producto",
+        "reporte de cartera",
+        "dashboard financiero",
+        "configurar medios de pago"
+      ],
+      "slots": [
+        {
+          "name": "tercero",
+          "required": true
+        },
+        {
+          "name": "monto",
+          "required": true
+        },
+        {
+          "name": "tipo_movimiento",
+          "required": true
+        },
+        {
+          "name": "medio_pago",
+          "required": false
+        }
+      ],
+      "one_question_policy": [
+        {
+          "missing_slot": "tercero",
+          "question": "De que cliente o proveedor es este movimiento?"
+        },
+        {
+          "missing_slot": "monto",
+          "question": "Cual fue el valor exacto del pago o recaudo?"
+        },
+        {
+          "missing_slot": "tipo_movimiento",
+          "question": "Es un ingreso (recaudo) o una salida (pago)?"
+        },
+        {
+          "missing_slot": "medio_pago",
+          "question": "Que medio de pago se uso?"
+        }
+      ],
+      "confirm_required": false,
+      "success_reply_template": "Listo, registre el movimiento {tipo_movimiento} por {monto}.",
+      "error_reply_template": "No pude registrar el movimiento porque falta {missing_slot}."
+    },
+    {
+      "intent": "APP_RUNTIME_CREATE_CUSTOMER",
+      "action": "APP_ENTITY_CREATE_CUSTOMER",
+      "utterances_explicit": [
+        "crear cliente",
+        "registrar cliente",
+        "nuevo cliente",
+        "agregar cliente",
+        "ingresar cliente",
+        "crear cliente empresa",
+        "crear cliente persona natural",
+        "registrar cliente con NIT",
+        "registrar cliente con cedula",
+        "guardar cliente",
+        "crear contacto cliente",
+        "alta de cliente"
+      ],
+      "utterances_implicit": [
+        "voy a venderle a alguien nuevo",
+        "necesito guardar este comprador",
+        "me falta crear ese tercero",
+        "quiero dejar ese cliente en base",
+        "ese cliente aun no existe",
+        "necesito registrar los datos del cliente",
+        "el cliente es nuevo",
+        "falta el contacto para facturar",
+        "voy a abrir ficha de cliente",
+        "quiero dejar listo el cliente para ventas"
+      ],
+      "hard_negatives": [
+        "ver clientes",
+        "editar cliente",
+        "eliminar cliente",
+        "buscar cliente",
+        "crear proveedor",
+        "crear producto",
+        "crear factura",
+        "registrar pago",
+        "importar clientes",
+        "exportar clientes",
+        "segmentar clientes",
+        "reporte de clientes"
+      ],
+      "slots": [
+        {
+          "name": "nombre",
+          "required": true
+        },
+        {
+          "name": "documento",
+          "required": true
+        },
+        {
+          "name": "telefono",
+          "required": false
+        },
+        {
+          "name": "email",
+          "required": false
+        }
+      ],
+      "one_question_policy": [
+        {
+          "missing_slot": "nombre",
+          "question": "Cual es el nombre o razon social del cliente?"
+        },
+        {
+          "missing_slot": "documento",
+          "question": "Cual es el NIT o documento del cliente?"
+        },
+        {
+          "missing_slot": "telefono",
+          "question": "Quieres registrar telefono o whatsapp?"
+        },
+        {
+          "missing_slot": "email",
+          "question": "Quieres registrar correo electronico?"
+        }
+      ],
+      "confirm_required": false,
+      "success_reply_template": "Listo, cliente {nombre} creado correctamente.",
+      "error_reply_template": "No pude crear el cliente porque falta {missing_slot}."
+    },
+    {
+      "intent": "APP_RUNTIME_CREATE_ITEM",
+      "action": "APP_ENTITY_CREATE_ITEM",
+      "utterances_explicit": [
+        "crear producto",
+        "crear servicio",
+        "registrar producto",
+        "registrar servicio",
+        "nuevo producto",
+        "nuevo servicio",
+        "agregar item",
+        "crear referencia",
+        "ingresar articulo",
+        "guardar producto",
+        "crear SKU",
+        "crear item de venta"
+      ],
+      "utterances_implicit": [
+        "voy a vender algo nuevo",
+        "ese item no existe en catalogo",
+        "me falta cargar esa referencia",
+        "quiero dejar ese servicio listo para facturar",
+        "necesito registrar ese articulo",
+        "falta crear ese SKU",
+        "quiero agregar ese producto al sistema",
+        "me falta el codigo de ese item",
+        "voy a abrir ficha del producto",
+        "quiero subir un nuevo servicio"
+      ],
+      "hard_negatives": [
+        "ver productos",
+        "editar producto",
+        "eliminar producto",
+        "ajustar inventario",
+        "traslado de stock",
+        "lista de precios",
+        "crear cliente",
+        "crear factura",
+        "registrar pago",
+        "importar productos",
+        "reporte de productos",
+        "anular item"
+      ],
+      "slots": [
+        {
+          "name": "nombre_item",
+          "required": true
+        },
+        {
+          "name": "tipo_item",
+          "required": true
+        },
+        {
+          "name": "precio_venta",
+          "required": true
+        },
+        {
+          "name": "codigo",
+          "required": false
+        }
+      ],
+      "one_question_policy": [
+        {
+          "missing_slot": "nombre_item",
+          "question": "Como se llama el producto o servicio?"
+        },
+        {
+          "missing_slot": "tipo_item",
+          "question": "Es producto o servicio?"
+        },
+        {
+          "missing_slot": "precio_venta",
+          "question": "Cual es el precio de venta?"
+        },
+        {
+          "missing_slot": "codigo",
+          "question": "Quieres guardar codigo interno o SKU?"
+        }
+      ],
+      "confirm_required": false,
+      "success_reply_template": "Listo, item {nombre_item} creado con precio {precio_venta}.",
+      "error_reply_template": "No pude crear el item porque falta {missing_slot}."
+    },
+    {
+      "intent": "APP_CREATE",
+      "action": "FRAMEWORK_APP_CREATE",
+      "utterances_explicit": [
+        "crear una app",
+        "quiero una app para mi negocio",
+        "ayudame a crear la app",
+        "crear sistema de ventas",
+        "crear app de facturacion",
+        "crear app de inventario",
+        "crear app para citas",
+        "crear app para reservas",
+        "armar mini ERP",
+        "crear app desde cero",
+        "montar una app",
+        "necesito el sistema para mi negocio"
+      ],
+      "utterances_implicit": [
+        "estoy cansado del excel",
+        "quiero organizar mejor mi negocio",
+        "necesito controlar ventas e inventario",
+        "quiero digitalizar mi operacion",
+        "me estoy enredando con cuentas y pagos",
+        "necesito algo para manejar clientes y facturas",
+        "quiero una solucion para mi tienda",
+        "me falta control de caja y cartera",
+        "quiero automatizar procesos",
+        "quiero empezar rapido sin codigo"
+      ],
+      "hard_negatives": [
+        "registrar factura",
+        "registrar pago",
+        "crear cliente",
+        "crear producto",
+        "hacer reporte",
+        "ver dashboard",
+        "editar app existente",
+        "eliminar app",
+        "cambiar contrasena",
+        "ver usuarios",
+        "noticias de tecnologia",
+        "soporte tecnico"
+      ],
+      "slots": [
+        {
+          "name": "tipo_negocio",
+          "required": true
+        },
+        {
+          "name": "procesos_clave",
+          "required": true
+        },
+        {
+          "name": "documentos_clave",
+          "required": true
+        },
+        {
+          "name": "forma_pago",
+          "required": false
+        }
+      ],
+      "one_question_policy": [
+        {
+          "missing_slot": "tipo_negocio",
+          "question": "Que tipo de negocio tienes?"
+        },
+        {
+          "missing_slot": "procesos_clave",
+          "question": "Que quieres controlar primero: ventas, inventario, pagos, citas o reservas?"
+        },
+        {
+          "missing_slot": "documentos_clave",
+          "question": "Que documentos necesitas desde el inicio?"
+        },
+        {
+          "missing_slot": "forma_pago",
+          "question": "Tus ventas son de contado, credito o mixto?"
+        }
+      ],
+      "confirm_required": true,
+      "success_reply_template": "Listo, configure el plan inicial de app para {tipo_negocio}.",
+      "error_reply_template": "No puedo crear la app porque falta {missing_slot}."
+    }
+  ],
+  "multi_turn_dialogues": [
+    {
+      "id": "mt_factura_01",
+      "scenario": "registro_factura_con_slot_filling",
+      "turns": [
+        {
+          "user": "hazme la factura"
+        },
+        {
+          "assistant_expected_action": "ask_missing_slot:cliente"
+        },
+        {
+          "user": "cliente juan perez"
+        },
+        {
+          "assistant_expected_action": "ask_missing_slot:items"
+        },
+        {
+          "user": "servicio tecnico y repuesto"
+        },
+        {
+          "assistant_expected_action": "ask_missing_slot:total"
+        },
+        {
+          "user": "120000"
+        },
+        {
+          "assistant_expected_action": "ERP_INVOICE_SALES"
+        }
+      ]
+    },
+    {
+      "id": "mt_asiento_01",
+      "scenario": "asiento_contable_con_confirmacion",
+      "turns": [
+        {
+          "user": "registrar asiento de cierre"
+        },
+        {
+          "assistant_expected_action": "ask_missing_slot:fecha"
+        },
+        {
+          "user": "2026-02-24"
+        },
+        {
+          "assistant_expected_action": "ask_missing_slot:lineas_debito_credito"
+        },
+        {
+          "user": "debito 413595 500000 credito 590505 500000"
+        },
+        {
+          "assistant_expected_action": "ask_user_confirm"
+        },
+        {
+          "user": "si"
+        },
+        {
+          "assistant_expected_action": "ERP_ACCOUNTING_JOURNAL"
+        }
+      ]
+    },
+    {
+      "id": "mt_pago_01",
+      "scenario": "recaudo_implicito",
+      "turns": [
+        {
+          "user": "me pagaron la 1008 por nequi"
+        },
+        {
+          "assistant_expected_action": "ask_missing_slot:monto"
+        },
+        {
+          "user": "380000"
+        },
+        {
+          "assistant_expected_action": "ERP_CASH_BANK"
+        }
+      ]
+    },
+    {
+      "id": "mt_cliente_01",
+      "scenario": "crear_cliente_rapido",
+      "turns": [
+        {
+          "user": "cliente nuevo para facturar"
+        },
+        {
+          "assistant_expected_action": "ask_missing_slot:nombre"
+        },
+        {
+          "user": "Maderas San Jorge"
+        },
+        {
+          "assistant_expected_action": "ask_missing_slot:documento"
+        },
+        {
+          "user": "901333222-1"
+        },
+        {
+          "assistant_expected_action": "APP_ENTITY_CREATE_CUSTOMER"
+        }
+      ]
+    },
+    {
+      "id": "mt_item_01",
+      "scenario": "crear_producto_con_sku",
+      "turns": [
+        {
+          "user": "agrega un producto nuevo"
+        },
+        {
+          "assistant_expected_action": "ask_missing_slot:nombre_item"
+        },
+        {
+          "user": "cable encauchetado 2x14"
+        },
+        {
+          "assistant_expected_action": "ask_missing_slot:precio_venta"
+        },
+        {
+          "user": "7800"
+        },
+        {
+          "assistant_expected_action": "APP_ENTITY_CREATE_ITEM"
+        }
+      ]
+    },
+    {
+      "id": "mt_app_01",
+      "scenario": "descubrimiento_para_crear_app",
+      "turns": [
+        {
+          "user": "necesito una app para mi negocio"
+        },
+        {
+          "assistant_expected_action": "ask_missing_slot:tipo_negocio"
+        },
+        {
+          "user": "tienda de ropa"
+        },
+        {
+          "assistant_expected_action": "ask_missing_slot:procesos_clave"
+        },
+        {
+          "user": "inventario, ventas, pagos y reservas"
+        },
+        {
+          "assistant_expected_action": "FRAMEWORK_APP_CREATE"
+        }
+      ]
+    }
+  ],
+  "emotion_cases": [
+    {
+      "emotion": "frustracion",
+      "user_samples": [
+        "otra vez lo mismo",
+        "siempre me pides lo mismo",
+        "esto no funciona",
+        "no me entiendes"
+      ],
+      "assistant_style": "calmo, empatico, directo",
+      "expected_next_step": "pedir un solo dato faltante con ejemplo corto"
+    },
+    {
+      "emotion": "duda",
+      "user_samples": [
+        "no se como hacerlo",
+        "que me recomiendas",
+        "no entiendo eso",
+        "me perdi"
+      ],
+      "assistant_style": "didactico, no tecnico, guiado",
+      "expected_next_step": "explicar en una linea y dar dos opciones"
+    },
+    {
+      "emotion": "urgencia",
+      "user_samples": [
+        "lo necesito ya",
+        "rapido por favor",
+        "esto es urgente",
+        "en 5 minutos me lo piden"
+      ],
+      "assistant_style": "ejecucion rapida, sin rodeos",
+      "expected_next_step": "capturar solo slots criticos y ejecutar"
+    }
+  ],
+  "qa_cases": [
+    {
+      "text": "me piden la factura de esa venta",
+      "expect_intent": "ERP_FACTURA_VENTA",
+      "expect_action": "ERP_INVOICE_SALES"
+    },
+    {
+      "text": "falta pasar ese movimiento al diario",
+      "expect_intent": "ERP_ASIENTO_CONTABLE",
+      "expect_action": "ERP_ACCOUNTING_JOURNAL"
+    },
+    {
+      "text": "ya me pagaron por transferencia",
+      "expect_intent": "ERP_CAJAYBANCOS",
+      "expect_action": "ERP_CASH_BANK"
+    },
+    {
+      "text": "voy a venderle a un cliente nuevo",
+      "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+      "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+    },
+    {
+      "text": "ese servicio no existe en el catalogo",
+      "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+      "expect_action": "APP_ENTITY_CREATE_ITEM"
+    },
+    {
+      "text": "estoy cansado del excel, quiero app",
+      "expect_intent": "APP_CREATE",
+      "expect_action": "FRAMEWORK_APP_CREATE"
+    }
+  ]
+}
