@@ -1,0 +1,1668 @@
+{
+    "batch_id": "IGLESIA_v2",
+    "language": "es-CO",
+    "context_pack": {
+        "business_type": "comercio_pyme",
+        "country": "CO",
+        "currency": "COP",
+        "tax_regime": "rts_iva",
+        "payment_methods": [
+            "efectivo",
+            "transferencia",
+            "nequi",
+            "daviplata",
+            "tarjeta",
+            "credito"
+        ],
+        "document_flows": [
+            "cotizacion -> pedido -> factura -> recaudo",
+            "compra -> ingreso inventario -> cuenta por pagar -> pago proveedor"
+        ],
+        "channels": [
+            "whatsapp",
+            "telegram",
+            "web_chat"
+        ],
+        "volume_profile": "organizacion_comunitaria",
+        "chart_of_accounts_min": [
+            {
+                "code": "110505",
+                "name": "Caja general"
+            },
+            {
+                "code": "111005",
+                "name": "Bancos"
+            },
+            {
+                "code": "130505",
+                "name": "Clientes nacionales"
+            },
+            {
+                "code": "240805",
+                "name": "IVA generado"
+            },
+            {
+                "code": "413595",
+                "name": "Ingresos por ventas"
+            }
+        ],
+        "posting_rules": [
+            {
+                "trigger": "factura_contado",
+                "debit_account": "110505",
+                "credit_account": "413595"
+            },
+            {
+                "trigger": "factura_credito",
+                "debit_account": "130505",
+                "credit_account": "413595"
+            },
+            {
+                "trigger": "recaudo_cliente",
+                "debit_account": "111005",
+                "credit_account": "130505"
+            }
+        ]
+    },
+    "intents_expansion": [
+        {
+            "intent": "APP_CREATE",
+            "action": "FRAMEWORK_APP_CREATE",
+            "utterances_explicit": [
+                "Crear app para iglesia con miembros, grupos, diezmos y ofrendas",
+                "Crear app iglesia católica con agenda de misas y sacramentos",
+                "Crear app iglesia cristiana con células/grupos y asistencia",
+                "Crear app con tablas Miembros, Familias y Contactos",
+                "Crear app con tabla Ministerios/Grupos (jóvenes, alabanza, catequesis)",
+                "Crear app con tabla Eventos (cultos, misas, retiros) y reservas",
+                "Crear app con tabla Donaciones (diezmo, ofrenda, promesa, campaña)",
+                "Crear app con tabla Recibos de donación y comprobantes",
+                "Crear app con tabla Proyectos/Obras (construcción, ayudas) y presupuestos",
+                "Crear app con fórmula saldo_proyecto = presupuesto - ejecutado",
+                "Crear app con tabla Gastos por proyecto y centro de costo",
+                "Crear app con tabla Compras y Proveedores (sonido, papelería, mercado, velas)",
+                "Crear app con tabla Inventario (biblias, velas, vino, hostias, sillas)",
+                "Crear app con alerta stock mínimo (hostias, velas, papelería)",
+                "Crear app con fórmula total_recibo = monto + comisión - descuento (si aplica)",
+                "Crear app con fórmula saldo = total - pagado",
+                "Crear app con secuencia: donación -> recibo -> recaudo -> registro contable",
+                "Crear app con secuencia: compra -> ingreso inventario -> CxP -> pago proveedor",
+                "Crear app con tabla Servicios pastorales (visitas, consejería)",
+                "Crear app con tabla Sacramentos (bautizo, comunión, confirmación, matrimonio)",
+                "Crear app con requisitos por sacramento (documentos, fechas)",
+                "Crear app con tabla Certificados/Constancias y numeración",
+                "Crear app con roles admin, secretaría, tesorería, pastor/párroco, contador",
+                "Crear app con reporte: diezmos y ofrendas por periodo",
+                "Crear app con reporte: donantes top y recurrencia",
+                "Crear app con reporte: recaudos por medio (nequi, transferencia, efectivo)",
+                "Crear app con reporte: gastos por ministerio/proyecto",
+                "Crear app con reporte: ejecución presupuestal por proyecto",
+                "Crear app con reporte: asistencia por evento/culto/misa",
+                "Crear app con reporte: inventario y vencimientos (vino, hostias)",
+                "Crear app con cierre de caja diario y arqueo",
+                "Crear app con control de cuentas por cobrar (compromisos/promesas)",
+                "Crear app con campo tipo_donación (diezmo/ofrenda/campaña/obra_social)",
+                "Crear app con campo intención (acción de gracias, salud, difunto)",
+                "Crear app con tabla Voluntarios y turnos",
+                "Crear app con tabla Tesorería (caja/bancos) ligada a recibos",
+                "Crear app con fórmula cumplimiento_promesa = pagado/compromiso",
+                "Crear app con tablero de ingresos vs gastos por mes",
+                "Crear app con prefijo de recibos RC-IGL y facturas FV-IGL",
+                "Crear app con control de compras recurrentes (servicios, arriendo, internet)"
+            ],
+            "utterances_implicit": [
+                "Necesito un sistema para llevar diezmos y ofrendas sin enredarme",
+                "Quiero registrar donaciones por Nequi y transferencia",
+                "Necesito sacar recibo de donación y que quede soporte",
+                "Quiero llevar control de miembros y asistencia a cultos/misas",
+                "Necesito agenda de eventos, retiros y reservas",
+                "Quiero controlar proyectos de la iglesia y su presupuesto",
+                "Necesito reportes de ingresos por campaña y por mes",
+                "Quiero ver en qué se está gastando por ministerio",
+                "Necesito compras y proveedores (sonido, papelería, mercado)",
+                "Quiero inventario de biblias, velas, hostias y vino",
+                "Necesito alertas de stock mínimo para cosas del altar",
+                "Quiero control de promesas/compromisos y saldos pendientes",
+                "Necesito cierre de caja diario y arqueo",
+                "Quiero registrar gastos de servicios públicos y arriendo",
+                "Necesito que el pago baje la cuenta por cobrar de una promesa",
+                "Quiero que el sistema me muestre donantes recurrentes",
+                "Necesito certificados/constancias para sacramentos",
+                "Quiero llevar registros de bautizos y matrimonios",
+                "Necesito tabla de voluntarios y turnos",
+                "Quiero reportes para el contador sin complicarme",
+                "Necesito estados: recibo emitido/pagado/anulado",
+                "Quiero separar donación vs venta (si hay bazar)",
+                "Necesito controlar caja y banco por separado",
+                "Quiero registrar comisiones del datáfono",
+                "Necesito manejar intenciones (salud, difuntos) en las ofrendas",
+                "Quiero ver asistencia por evento y por grupo",
+                "Necesito control de gastos de obra social",
+                "Quiero tablero ingresos vs gastos mensual",
+                "Necesito numeración de recibos RC-IGL",
+                "Quiero que sugiera tablas, campos y fórmulas para iglesia",
+                "Necesito flujo completo: recibo -> recaudo -> contabilidad",
+                "Quiero registro de consejerías/visitas pastorales",
+                "Necesito control de compras a crédito y pagos a proveedores",
+                "Quiero controlar inventario de sillas y equipos",
+                "Necesito reporte de ejecución presupuestal por proyecto",
+                "Quiero enviar soporte al donante (pero primero registrar)",
+                "Necesito registrar una donación rápida y listo",
+                "Quiero registrar una promesa y luego los abonos",
+                "Necesito reportes por sede si tengo varias",
+                "Quiero todo organizado para la tesorería"
+            ],
+            "hard_negatives": [
+                "Consultar apps existentes de iglesia",
+                "Listar apps creadas",
+                "Editar la app de iglesia",
+                "Eliminar la app",
+                "Cambiar nombre de la app",
+                "Actualizar módulos de la app",
+                "Configurar colores/tema",
+                "Ver logs del runtime",
+                "Depurar error del framework",
+                "Optimizar performance del grid",
+                "Migrar datos desde otro sistema",
+                "Importar miembros desde Excel",
+                "Exportar base de datos",
+                "Conectar pasarela de pagos",
+                "Conectar WhatsApp API",
+                "Integración con plataforma de streaming (consulta)",
+                "Crear dashboard BI externo",
+                "Configurar DIAN",
+                "Configurar IVA global",
+                "Crear usuarios del sistema",
+                "Resetear contraseña",
+                "Asignar permisos masivos",
+                "Soporte: no abre el módulo",
+                "Soporte: error 500",
+                "Manual del sistema",
+                "Tutorial de uso",
+                "Cotizar desarrollo a medida",
+                "Diseño de logo",
+                "Campañas de marketing",
+                "Registrar factura de venta (no crear app)",
+                "Registrar recaudo (no crear app)",
+                "Crear cliente/miembro (no crear app)",
+                "Crear ítem (no crear app)",
+                "Crear asiento (no crear app)",
+                "Consultar movimientos de caja",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Imprimir recibo existente",
+                "Descargar PDF existente",
+                "Editar un recibo existente"
+            ],
+            "slots": [
+                {
+                    "name": "sector",
+                    "required": true
+                },
+                {
+                    "name": "procesos_criticos",
+                    "required": true
+                },
+                {
+                    "name": "documentos_criticos",
+                    "required": true
+                },
+                {
+                    "name": "roles",
+                    "required": true
+                },
+                {
+                    "name": "modulos_prioritarios",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "sector",
+                    "question": "¿Confirmas que la app es para Iglesia (católica o cristiana)?"
+                },
+                {
+                    "missing_slot": "procesos_criticos",
+                    "question": "¿Qué procesos son prioridad (miembros, eventos, donaciones/diezmos, proyectos, compras, inventario, caja)?"
+                },
+                {
+                    "missing_slot": "documentos_criticos",
+                    "question": "¿Qué documentos críticos manejarás (recibo_donacion, comprobante, factura, orden_compra, certificado)?"
+                },
+                {
+                    "missing_slot": "roles",
+                    "question": "¿Qué roles usarán la app (admin, secretaría, tesorería, líder/párroco, contador)?"
+                },
+                {
+                    "missing_slot": "modulos_prioritarios",
+                    "question": "¿Qué módulos salen primero (tesorería, miembros, donaciones, eventos, proyectos, compras/inventario)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ App de Iglesia creada con tesorería (donaciones/recibos), miembros, eventos, proyectos y compras/inventario.",
+            "error_reply_template": "No pude crear la app. Falta definir procesos, documentos y módulos prioritarios."
+        },
+        {
+            "intent": "ERP_FACTURA_VENTA",
+            "action": "ERP_INVOICE_SALES",
+            "utterances_explicit": [
+                "Registrar factura por alquiler del salón parroquial",
+                "Crear factura por venta de biblias",
+                "Emitir factura por venta de velas",
+                "Registrar factura por venta de libros devocionales",
+                "Crear factura por evento tipo bazar",
+                "Registrar factura por venta de rosarios",
+                "Crear factura por venta de artículos religiosos",
+                "Registrar factura por inscripción a retiro (servicio)",
+                "Crear factura por curso/catequesis (si se cobra)",
+                "Registrar factura por concierto/actividad",
+                "Crear factura por alquiler de sonido/equipos",
+                "Registrar factura por refrigerios en evento",
+                "Crear factura por venta de camisetas campaña",
+                "Registrar factura por venta de souvenirs",
+                "Crear factura con IVA 19% (según ítem)",
+                "Registrar factura con descuento promo",
+                "Registrar factura de contado",
+                "Registrar factura pagada por Nequi",
+                "Registrar factura pagada por transferencia",
+                "Registrar factura pagada por tarjeta",
+                "Registrar factura a crédito con vencimiento",
+                "Registrar factura con prefijo FV-IGL-001",
+                "Crear factura por venta de CD/música",
+                "Registrar factura por servicio de parqueadero en evento",
+                "Crear factura por donación con contraprestación (venta)",
+                "Registrar factura por venta de desayunos (actividad)",
+                "Crear factura por alquiler de sillas",
+                "Registrar factura por servicio de logística en evento",
+                "Crear factura por venta de vino/hostias (si aplica comercial)",
+                "Registrar factura por venta de papelería",
+                "Crear factura por cuota de sostenimiento (si se factura)",
+                "Registrar factura por venta de recordatorios",
+                "Crear factura por venta de tarjetas",
+                "Registrar factura por venta de cuadernos",
+                "Crear factura por servicio de salón + aseo",
+                "Registrar factura por alquiler por horas",
+                "Crear factura por actividad juvenil",
+                "Registrar factura por evento solidario",
+                "Crear factura con ítems detallados",
+                "Registrar factura para empresa patrocinadora"
+            ],
+            "utterances_implicit": [
+                "Necesito facturar el alquiler del salón",
+                "Falta dejar facturada la venta de biblias",
+                "Me pidieron factura por los rosarios",
+                "Necesito el documento fiscal del evento",
+                "La caja no cuadra porque falta una factura",
+                "Ya se vendió y no está la factura",
+                "Necesito emitir factura para enviar al correo",
+                "La empresa patrocinadora pide factura",
+                "Va a crédito, que quede cuenta por cobrar",
+                "Necesito el consecutivo FV-IGL de hoy",
+                "Cobré pero no he facturado",
+                "Hay descuento, dejarlo en factura",
+                "Faltó facturar los refrigerios",
+                "Necesito factura del retiro",
+                "Falta factura del bazar",
+                "Para cierre de caja falta esa factura",
+                "Quiero soporte de esa venta",
+                "Necesito el número de factura para el recibo",
+                "Quiero la factura con ítems detallados",
+                "Me falta registrar IVA generado en ventas",
+                "Falta emitir factura del concierto",
+                "Necesito facturar camisetas de campaña",
+                "El contador pidió esa factura registrada",
+                "No quedó facturado lo de hoy",
+                "Me piden la factura ya",
+                "Ayúdame a facturar eso",
+                "Falta factura por recordatorios",
+                "Necesito factura por logística evento",
+                "Falta factura de papelería",
+                "Necesito factura de alquiler de sillas",
+                "La venta quedó en borrador, toca emitirla",
+                "Necesito factura para reembolso",
+                "Falta factura de souvenirs",
+                "Necesito factura del parqueadero",
+                "Falta factura por actividad juvenil",
+                "Quiero factura a nombre de empresa",
+                "Necesito facturar el servicio del salón",
+                "Falta factura por cuota",
+                "Me falta el soporte fiscal",
+                "Necesito facturar y listo"
+            ],
+            "hard_negatives": [
+                "Consultar factura por número",
+                "Buscar factura FV-IGL-000123",
+                "Descargar PDF de una factura existente",
+                "Imprimir factura ya emitida",
+                "Reenviar factura existente",
+                "Editar una factura existente",
+                "Corregir ítems de factura existente",
+                "Anular factura existente",
+                "Eliminar factura",
+                "Listar facturas del mes",
+                "Ver estado de factura",
+                "Ver facturas por cliente",
+                "Ver cuentas por cobrar (consulta)",
+                "Registrar recaudo/donación (no factura)",
+                "Aplicar pago a factura existente",
+                "Consultar movimientos de caja",
+                "Abrir caja",
+                "Cerrar caja",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Crear miembro/cliente",
+                "Editar miembro/cliente",
+                "Crear ítem catálogo",
+                "Editar ítem",
+                "Ajustar inventario",
+                "Registrar compra proveedor",
+                "Orden de compra",
+                "Nota crédito",
+                "Devolución/reembolso (sin factura nueva)",
+                "Crear asiento contable",
+                "Consultar asientos contables",
+                "Configurar IVA",
+                "Configurar numeración DIAN",
+                "Ver donaciones del mes (consulta)",
+                "Ver eventos (consulta)",
+                "Soporte: no imprime",
+                "Exportar facturas a Excel",
+                "Importar facturas desde Excel",
+                "Consultar/editar factura existente #39",
+                "Consultar/editar factura existente #40"
+            ],
+            "slots": [
+                {
+                    "name": "cliente",
+                    "required": true
+                },
+                {
+                    "name": "items",
+                    "required": true
+                },
+                {
+                    "name": "impuestos",
+                    "required": true
+                },
+                {
+                    "name": "forma_pago",
+                    "required": true
+                },
+                {
+                    "name": "prefijo_numeracion",
+                    "required": true
+                },
+                {
+                    "name": "vencimiento",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "cliente",
+                    "question": "¿A nombre de quién emito la factura (persona/empresa), con CC/NIT?"
+                },
+                {
+                    "missing_slot": "items",
+                    "question": "¿Qué ítems van en la factura (alquiler/venta artículos/inscripción), cantidad y valor?"
+                },
+                {
+                    "missing_slot": "impuestos",
+                    "question": "¿Qué IVA aplica (porcentaje)?"
+                },
+                {
+                    "missing_slot": "forma_pago",
+                    "question": "¿Cómo se paga (efectivo/transferencia/nequi/daviplata/tarjeta/crédito)?"
+                },
+                {
+                    "missing_slot": "prefijo_numeracion",
+                    "question": "¿Qué prefijo y consecutivo uso (ej. FV-IGL-000123)?"
+                },
+                {
+                    "missing_slot": "vencimiento",
+                    "question": "Si es a crédito, ¿qué fecha de vencimiento lleva?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Factura de venta registrada para la iglesia.",
+            "error_reply_template": "No pude registrar la factura. Revisa cliente, ítems, IVA y numeración."
+        },
+        {
+            "intent": "ERP_CAJAYBANCOS",
+            "action": "ERP_CASH_BANK",
+            "utterances_explicit": [
+                "Registrar ingreso por diezmo",
+                "Registrar ingreso por ofrenda",
+                "Registrar ingreso por donación a campaña",
+                "Registrar ingreso por promesa/compromiso",
+                "Registrar recaudo por transferencia a bancos",
+                "Registrar recaudo por Nequi",
+                "Registrar recaudo por Daviplata",
+                "Registrar recaudo por tarjeta (datáfono)",
+                "Registrar ingreso en efectivo de ofrendas",
+                "Registrar recibo de caja de donación",
+                "Aplicar pago a promesa registrada",
+                "Registrar abono parcial de promesa",
+                "Registrar ingreso por venta bazar (caja)",
+                "Registrar egreso por compra de velas y hostias",
+                "Registrar egreso por compra de papelería",
+                "Registrar egreso por mercado para evento",
+                "Registrar egreso por pago a proveedor de sonido",
+                "Registrar egreso por servicios públicos",
+                "Registrar egreso por arriendo",
+                "Registrar egreso por mantenimiento templo",
+                "Registrar egreso por ayuda social (obra)",
+                "Registrar egreso por transporte/visitas",
+                "Registrar egreso por comisión datáfono",
+                "Registrar egreso por pago a contratista (obra)",
+                "Registrar egreso por compra de sillas",
+                "Registrar egreso por compra de biblias para venta",
+                "Registrar consignación caja->bancos",
+                "Registrar transferencia bancos->caja",
+                "Registrar ingreso por patrocinio empresa",
+                "Registrar egreso por impresión de certificados",
+                "Registrar egreso por limpieza y aseo",
+                "Registrar ingreso por alquiler salón (recaudo)",
+                "Registrar egreso por logística evento",
+                "Registrar devolución (salida) por reembolso",
+                "Registrar salida por caja menor",
+                "Registrar ingreso por actividad juvenil",
+                "Registrar egreso por internet/streaming",
+                "Registrar ingreso por concierto",
+                "Registrar egreso por compra de equipos",
+                "Registrar ingreso por cuota (si aplica)"
+            ],
+            "utterances_implicit": [
+                "Ya entró el diezmo por Nequi, falta registrarlo",
+                "Me consignaron una ofrenda y no quedó movimiento",
+                "Entró transferencia de una donación, súbela al sistema",
+                "Pagaron con tarjeta y no quedó el movimiento",
+                "El hermano abonó una promesa, no pagó todo",
+                "Recibí efectivo y no hice el recibo",
+                "Falta aplicar el pago a la promesa",
+                "Me llegó un pago pero no sé de quién es",
+                "Pagué al proveedor, falta el egreso",
+                "Salió plata para velas/hostias",
+                "Compramos papelería y falta registrarlo",
+                "Hay comisión del datáfono por registrar",
+                "No me cuadra la caja por un ingreso",
+                "Para cierre de caja faltan movimientos",
+                "Entró Daviplata, falta meterlo",
+                "Me consignaron y no lo registré",
+                "Falta el movimiento del proyecto/obra",
+                "Necesito que el pago baje la cuenta por cobrar de la promesa",
+                "Es ingreso, pero va a bancos por transferencia",
+                "Es salida, pago a proveedor",
+                "Tengo un reembolso, debo registrar salida",
+                "Me falta el recibo de caja de la donación",
+                "El banco reflejó el ingreso hoy",
+                "Quiero registrar el pago ya",
+                "Toca dejar trazabilidad con referencia (campaña/proyecto)",
+                "Sin ese movimiento no cuadra el cierre",
+                "Se pagó servicios públicos y falta el egreso",
+                "Pagamos a un contratista, falta registrarlo",
+                "Entró plata por bazar, falta movimiento",
+                "Me pagaron el alquiler del salón, falta recaudo",
+                "Me llegó pago sin referencia, ayúdame",
+                "Pagamos logística del evento, registra el egreso",
+                "Entró un patrocinio de empresa",
+                "Se devolvió plata a alguien (reembolso)",
+                "Necesito registrar ingreso por concierto",
+                "Necesito registrar egreso por internet",
+                "Falta registrar salida de caja menor",
+                "Ayúdame a registrar ese recaudo",
+                "Necesito registrar egreso de compra hoy",
+                "Ya me pagaron y quiero el recibo"
+            ],
+            "hard_negatives": [
+                "Consultar movimientos de caja de hoy",
+                "Ver saldo de caja",
+                "Ver saldo de bancos",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Editar un movimiento existente",
+                "Anular un recaudo registrado",
+                "Eliminar un movimiento",
+                "Imprimir recibo existente",
+                "Descargar comprobante existente",
+                "Reenviar recibo existente",
+                "Abrir caja",
+                "Cerrar caja (solo consulta)",
+                "Arqueo de caja (consulta)",
+                "Registrar factura de venta",
+                "Consultar factura",
+                "Anular factura",
+                "Editar factura",
+                "Crear miembro/cliente",
+                "Editar miembro/cliente",
+                "Crear ítem",
+                "Editar ítem",
+                "Ajustar inventario",
+                "Registrar compra proveedor",
+                "Orden de compra",
+                "Crear asiento contable",
+                "Consultar asientos",
+                "Reporte de ingresos (consulta)",
+                "Reporte de gastos (consulta)",
+                "Ver CxC (consulta)",
+                "Ver CxP (consulta)",
+                "Configurar medios de pago",
+                "Configurar bancos",
+                "Configurar cajas",
+                "Soporte: no registra pago",
+                "Exportar movimientos",
+                "Importar movimientos",
+                "Ver miembros (consulta)",
+                "Ver eventos (consulta)",
+                "Crear app"
+            ],
+            "slots": [
+                {
+                    "name": "tipo_movimiento",
+                    "required": true
+                },
+                {
+                    "name": "tercero",
+                    "required": true
+                },
+                {
+                    "name": "monto",
+                    "required": true
+                },
+                {
+                    "name": "medio",
+                    "required": true
+                },
+                {
+                    "name": "referencia_documento",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tipo_movimiento",
+                    "question": "¿Es un ingreso (donación/recaudo) o una salida (pago/egreso)?"
+                },
+                {
+                    "missing_slot": "tercero",
+                    "question": "¿De quién es el movimiento (donante/proveedor/tercero)?"
+                },
+                {
+                    "missing_slot": "monto",
+                    "question": "¿Cuál es el valor en COP?"
+                },
+                {
+                    "missing_slot": "medio",
+                    "question": "¿Qué medio usaste (efectivo/transferencia/nequi/daviplata/tarjeta/crédito)?"
+                },
+                {
+                    "missing_slot": "referencia_documento",
+                    "question": "¿A qué lo relaciono (recibo_donacion / factura / campaña / soporte)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Movimiento de caja/bancos registrado y asociado a su soporte.",
+            "error_reply_template": "No pude registrar el movimiento. Revisa tipo, tercero, monto, medio y referencia."
+        },
+        {
+            "intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "action": "APP_ENTITY_CREATE_CUSTOMER",
+            "utterances_explicit": [
+                "Crear miembro nuevo (persona) con cédula",
+                "Crear donante con nombre y celular",
+                "Crear donante con correo para enviar soporte",
+                "Crear cliente empresa patrocinadora (NIT)",
+                "Crear miembro con dirección",
+                "Crear miembro con condición contado",
+                "Crear miembro con condición crédito (promesa a cuotas)",
+                "Registrar tercero para recibo de donación",
+                "Crear donante frecuente",
+                "Crear miembro para sacramento (bautizo)",
+                "Crear miembro para matrimonio",
+                "Crear miembro para confirmación",
+                "Crear miembro con observación (grupo)",
+                "Crear tercero para caja/bancos",
+                "Crear cliente para cuenta por cobrar (promesa)",
+                "Crear donante para campaña de obra",
+                "Crear miembro para evento/retiro",
+                "Crear empresa con razón social y correo",
+                "Crear miembro rápido para registrar donación",
+                "Crear miembro con CC y apellido",
+                "Crear miembro con WhatsApp como contacto",
+                "Crear miembro con email y celular",
+                "Crear miembro con condición crédito 30 días",
+                "Crear miembro con condición crédito 60 días",
+                "Crear donante por sede",
+                "Crear miembro para grupo jóvenes",
+                "Crear miembro para catequesis",
+                "Crear miembro para voluntariado",
+                "Crear tercero para recaudo",
+                "Crear miembro con fecha de nacimiento",
+                "Crear miembro con género",
+                "Crear miembro para visita pastoral",
+                "Crear miembro para certificado/constancia",
+                "Crear cliente para alquiler del salón",
+                "Crear miembro para promesa de campaña",
+                "Crear donante anónimo (como tercero genérico)",
+                "Crear miembro para bazar",
+                "Crear miembro para concierto",
+                "Crear cliente para venta de artículos",
+                "Crear donante para obra social"
+            ],
+            "utterances_implicit": [
+                "No aparece el donante, toca crearlo",
+                "Voy a registrar la donación y no existe tercero",
+                "No puedo sacar recibo sin tercero",
+                "Ese miembro es nuevo, agréguelo",
+                "Solo tengo la cédula, créalo",
+                "Es empresa, toca crearla con NIT",
+                "Solo tengo nombre y celu, créalo",
+                "Necesito guardar correo para enviar soporte",
+                "Va a promesa en cuotas, pon condición crédito",
+                "Es contado, déjalo contado",
+                "No lo encuentro por CC, créalo",
+                "Falta crear responsable de pago",
+                "Necesito tercero para registrar el recaudo",
+                "Crea el miembro y seguimos",
+                "Necesito registrarlo rápido pa recibir el diezmo",
+                "Me falta el tercero para el recibo",
+                "El donante es de campaña, regístralo",
+                "Necesito crear empresa patrocinadora",
+                "Me falta el contacto del donante",
+                "El donante pide soporte al correo",
+                "Déjalo con crédito a 60 días (promesa)",
+                "Solo tengo WhatsApp, pero créalo",
+                "No aparece en lista, créalo",
+                "Falta crear miembro para bautizo",
+                "Falta crear miembro para matrimonio",
+                "Necesito cliente para CxC (promesas)",
+                "No lo encuentra por nombre, créalo por CC",
+                "Necesito crear el donante ya",
+                "Voy a registrar pago y falta tercero",
+                "Necesito crear el tercero pa bancos",
+                "Me pasaron el NIT y razón social, falta registrarlo",
+                "Me falta crear cliente para alquiler",
+                "Ayúdame a crear el miembro",
+                "No puedo enviar soporte sin correo",
+                "Falta el tercero para la campaña",
+                "Necesito crear el donante del concierto",
+                "Necesito crear el tercero de bazar",
+                "Necesito crear el donante para obra social",
+                "Ayúdame a crear el tercero",
+                "No existe el tercero, crear #40"
+            ],
+            "hard_negatives": [
+                "Consultar miembro por cédula",
+                "Buscar miembro existente",
+                "Ver ficha del miembro",
+                "Editar teléfono del miembro",
+                "Actualizar correo del miembro",
+                "Cambiar condición comercial",
+                "Eliminar miembro",
+                "Inactivar miembro",
+                "Ver estado de cuenta (consulta)",
+                "Ver recibos del donante (consulta)",
+                "Registrar factura de venta",
+                "Consultar factura",
+                "Registrar recaudo (no crear tercero)",
+                "Consultar movimientos caja",
+                "Crear ítem",
+                "Editar ítem",
+                "Crear asiento contable",
+                "Consultar asientos",
+                "Crear evento",
+                "Editar evento",
+                "Anular evento",
+                "Ver eventos (consulta)",
+                "Editar registro de sacramento",
+                "Importar miembros Excel",
+                "Exportar miembros",
+                "Crear proveedor",
+                "Consultar proveedores",
+                "Soporte: miembro no carga",
+                "Resetear contraseña",
+                "Crear usuario",
+                "Asignar roles a usuario",
+                "Reporte de miembros (consulta)",
+                "Enviar mensajes masivos",
+                "Crear app",
+                "Editar app",
+                "Conciliar bancos",
+                "Cargar extracto",
+                "Consultar donaciones (consulta)",
+                "Editar donación/recibo",
+                "Anular recibo existente"
+            ],
+            "slots": [
+                {
+                    "name": "tipo",
+                    "required": true
+                },
+                {
+                    "name": "nit_cc",
+                    "required": true
+                },
+                {
+                    "name": "razon_social_nombre",
+                    "required": true
+                },
+                {
+                    "name": "contacto",
+                    "required": true
+                },
+                {
+                    "name": "condicion_comercial",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tipo",
+                    "question": "¿El tercero es persona natural o empresa?"
+                },
+                {
+                    "missing_slot": "nit_cc",
+                    "question": "¿Cuál es el NIT o la cédula?"
+                },
+                {
+                    "missing_slot": "razon_social_nombre",
+                    "question": "¿Cuál es el nombre completo o razón social?"
+                },
+                {
+                    "missing_slot": "contacto",
+                    "question": "¿Qué contacto registro (celular y/o email)?"
+                },
+                {
+                    "missing_slot": "condicion_comercial",
+                    "question": "¿Es contado o crédito (promesa a cuotas y plazo)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Tercero (miembro/donante/empresa) creado y listo para registrar recibos/facturas.",
+            "error_reply_template": "No pude crear el tercero. Verifica tipo, documento y nombre."
+        },
+        {
+            "intent": "APP_RUNTIME_CREATE_ITEM",
+            "action": "APP_ENTITY_CREATE_ITEM",
+            "utterances_explicit": [
+                "Crear ítem alquiler salón parroquial (servicio)",
+                "Crear ítem inscripción retiro (servicio)",
+                "Crear ítem curso/catequesis (servicio)",
+                "Crear ítem concierto/actividad (servicio)",
+                "Crear ítem logística evento (servicio)",
+                "Crear ítem venta biblia (producto inventariable)",
+                "Crear ítem venta libro devocional (producto inventariable)",
+                "Crear ítem venta vela (producto inventariable)",
+                "Crear ítem venta rosario (producto inventariable)",
+                "Crear ítem venta artículo religioso (producto inventariable)",
+                "Crear ítem venta camiseta campaña (producto inventariable)",
+                "Crear ítem refrigerio evento (producto inventariable)",
+                "Crear ítem recordatorio (producto inventariable)",
+                "Crear ítem papelería (producto inventariable)",
+                "Crear ítem servicio parqueadero evento",
+                "Crear ítem servicio aseo salón",
+                "Crear ítem con IVA 19",
+                "Crear ítem exento (si aplica)",
+                "Crear ítem con SKU y precio",
+                "Crear ítem con costo y margen",
+                "Crear producto vino (inventariable)",
+                "Crear producto hostias (inventariable)",
+                "Crear producto incienso (inventariable)",
+                "Crear producto sillas (activo/inventario)",
+                "Crear ítem alquiler sillas (servicio)",
+                "Crear ítem donación con contraprestación (venta)",
+                "Crear ítem cuota sostenimiento (servicio)",
+                "Crear ítem venta CD/música (producto)",
+                "Crear ítem venta souvenirs (producto)",
+                "Crear ítem impresión certificado (servicio)",
+                "Crear ítem servicio streaming (servicio)",
+                "Crear ítem mercado evento (producto)",
+                "Crear ítem equipo sonido (producto)",
+                "Crear ítem servicio transporte (servicio)",
+                "Crear ítem ofrenda especial (si se registra como ítem venta)",
+                "Crear ítem bazar (servicio)",
+                "Crear ítem alquiler por horas (servicio)",
+                "Crear ítem servicio seguridad evento",
+                "Crear ítem mantenimiento templo (servicio)",
+                "Crear ítem venta cuadernos (producto)"
+            ],
+            "utterances_implicit": [
+                "No me sale el ítem de alquiler, toca crearlo",
+                "Voy a facturar y falta el ítem de biblia",
+                "Ese producto no está en catálogo (velas/rosarios)",
+                "Necesito el SKU del producto",
+                "Ese producto va a inventario",
+                "Ese es servicio, no inventario",
+                "Falta crear inscripción del retiro",
+                "Quiero que calcule IVA desde el ítem",
+                "Necesito precio para poder cobrar",
+                "Falta el ítem de logística del evento",
+                "No aparece el recordatorio, créalo",
+                "No aparece papelería, créala",
+                "Ese ítem va sin IVA (si aplica)",
+                "Necesito crear parqueadero del evento",
+                "Necesito crear impresión de certificados",
+                "No encuentro el libro devocional, agrégalo",
+                "Necesito stock mínimo para velas/hostias",
+                "Ese producto debe ser inventariable sí",
+                "Ese servicio debe ser inventariable no",
+                "Me falta el ítem pa la factura",
+                "Crea el ítem y seguimos",
+                "Solo tengo nombre y precio, créalo",
+                "Ponle IVA 19 y listo",
+                "Necesito crear hostias para inventario",
+                "Necesito crear vino para inventario",
+                "Falta el ítem de camisetas campaña",
+                "Falta el ítem de concierto",
+                "Necesito crear servicio de aseo salón",
+                "Necesito crear alquiler de sillas",
+                "Falta el ítem de souvenirs",
+                "Necesito crear cuota de sostenimiento",
+                "Falta el ítem de CD/música",
+                "No aparece el incienso, créalo",
+                "Quiero categoría artículos religiosos",
+                "Ayúdame a crear ese ítem",
+                "Crear el item para facturar",
+                "Falta el código del ítem",
+                "Necesito definir si es inventariable",
+                "Necesito costo para calcular margen",
+                "Falta el ítem iglesia #40"
+            ],
+            "hard_negatives": [
+                "Consultar ítem por SKU",
+                "Buscar producto existente",
+                "Ver kardex del producto",
+                "Ajustar inventario",
+                "Editar precio de ítem existente",
+                "Cambiar IVA de ítem existente",
+                "Eliminar ítem",
+                "Inactivar ítem",
+                "Importar catálogo Excel",
+                "Exportar catálogo",
+                "Crear miembro/cliente",
+                "Editar miembro/cliente",
+                "Registrar factura",
+                "Consultar factura",
+                "Anular factura",
+                "Registrar recaudo/donación",
+                "Consultar movimientos caja",
+                "Crear asiento contable",
+                "Consultar asientos",
+                "Registrar compra proveedor",
+                "Ingreso a inventario",
+                "Traslado bodegas",
+                "Configurar bodegas",
+                "Configurar unidades",
+                "Configurar impuestos globales",
+                "Crear lista de precios",
+                "Aplicar descuento masivo",
+                "Reporte inventario (consulta)",
+                "Reporte ventas (consulta)",
+                "Crear evento (operación)",
+                "Ver eventos",
+                "Actualizar registro sacramento (no crear ítem)",
+                "Soporte: no carga catálogo",
+                "Crear app",
+                "Editar app",
+                "Listar apps",
+                "Conciliar bancos",
+                "Cargar extracto",
+                "Consultar/editar ítem existente #39",
+                "Consultar/editar ítem existente #40"
+            ],
+            "slots": [
+                {
+                    "name": "tipo",
+                    "required": true
+                },
+                {
+                    "name": "precio",
+                    "required": true
+                },
+                {
+                    "name": "impuesto",
+                    "required": true
+                },
+                {
+                    "name": "sku_codigo",
+                    "required": true
+                },
+                {
+                    "name": "inventariable",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "tipo",
+                    "question": "¿Es producto inventariable (biblias/velas) o servicio (alquiler/inscripción)?"
+                },
+                {
+                    "missing_slot": "precio",
+                    "question": "¿Cuál es el precio en COP?"
+                },
+                {
+                    "missing_slot": "impuesto",
+                    "question": "¿Qué IVA aplica (porcentaje)?"
+                },
+                {
+                    "missing_slot": "sku_codigo",
+                    "question": "¿Cuál es el código/SKU del ítem?"
+                },
+                {
+                    "missing_slot": "inventariable",
+                    "question": "Si es producto, ¿es inventariable (sí/no)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Ítem creado (producto/servicio) con precio, IVA y código.",
+            "error_reply_template": "No pude crear el ítem. Verifica tipo, precio, IVA y código."
+        },
+        {
+            "intent": "ERP_ASIENTO_CONTABLE",
+            "action": "ERP_ACCOUNTING_JOURNAL",
+            "utterances_explicit": [
+                "Registrar asiento por descuadre de caja de la iglesia",
+                "Crear asiento por comisión datáfono",
+                "Registrar asiento por gastos bancarios",
+                "Crear asiento por arriendo",
+                "Registrar asiento por servicios públicos",
+                "Crear asiento por compra de insumos (velas/hostias)",
+                "Registrar asiento por inventario consumido (si aplica)",
+                "Crear asiento por traslado caja a bancos",
+                "Registrar asiento por reembolso",
+                "Crear asiento por gasto de obra/proyecto",
+                "Registrar asiento por ayuda social (obra social)",
+                "Crear asiento por mantenimiento templo",
+                "Registrar asiento por pago a contratista",
+                "Crear asiento por compra de equipos de sonido",
+                "Registrar asiento por papelería",
+                "Crear asiento por nómina (si aplica)",
+                "Registrar asiento por provisión",
+                "Crear asiento por depreciación activos",
+                "Registrar asiento por ingreso de patrocinio (si se ajusta)",
+                "Crear asiento por ajuste de cartera de promesas",
+                "Registrar asiento por castigo de cartera",
+                "Crear asiento con centro de costo Proyecto/Obra",
+                "Registrar asiento con centro de costo Ministerio",
+                "Crear asiento con documento soporte",
+                "Registrar asiento con líneas débito/crédito",
+                "Crear comprobante contable diario",
+                "Registrar asiento por cierre de caja",
+                "Crear asiento por compra a crédito",
+                "Registrar asiento por pago proveedor",
+                "Crear asiento por diferencia de bancos",
+                "Registrar asiento por donación restringida (proyecto)",
+                "Crear asiento por ingreso diferido (cuotas)",
+                "Registrar asiento por gastos de evento",
+                "Crear asiento por limpieza y aseo",
+                "Registrar asiento por internet/streaming",
+                "Crear asiento por compra de sillas",
+                "Registrar asiento por venta bazar (si ajuste)",
+                "Crear asiento por ajuste contable",
+                "Registrar asiento por compra de biblias para venta",
+                "Crear asiento por comisión bancaria adicional"
+            ],
+            "utterances_implicit": [
+                "El contador pidió un comprobante manual",
+                "Falta pasar esto a contabilidad",
+                "Necesito un comprobante con soporte",
+                "Hay descuadre y toca ajustar",
+                "La comisión del banco no está registrada",
+                "Falta el asiento del arriendo",
+                "Falta el asiento de servicios públicos",
+                "Necesito asociar documento soporte al asiento",
+                "Me falta centro de costo",
+                "Eso debe ir al diario hoy",
+                "Necesito líneas débito/crédito",
+                "Falta el comprobante del pago a proveedor",
+                "Quiero contabilizar traslado a bancos",
+                "Hubo reembolso, falta asiento",
+                "Necesito asiento por ayuda social",
+                "Necesito registrar gastos bancarios",
+                "No quedó registrado en libros",
+                "Debo imputar a proyecto o ministerio",
+                "Me falta el concepto del asiento",
+                "Faltan las líneas del asiento",
+                "Necesito asiento por ajuste inventario",
+                "Debo contabilizar devolución de dinero",
+                "Necesito asiento por ajuste de promesas (cartera)",
+                "Necesito asiento por castigo de cartera",
+                "Falta el asiento del día",
+                "Hay diferencia entre factura y pago",
+                "Necesito registrar provisión",
+                "El soporte está, falta asiento",
+                "Toca meter comprobante contable",
+                "Necesito asiento por pago a contratista",
+                "Falta asiento por compra de equipos",
+                "Necesito asiento por internet/streaming",
+                "Falta contabilizar cierre de caja",
+                "Necesito asiento por gastos del evento",
+                "Ayúdame con ese comprobante",
+                "Quiero registrar el asiento ya",
+                "Necesito asiento por donación restringida",
+                "Falta asiento por compra de sillas",
+                "Necesito asiento por mantenimiento templo",
+                "Me falta el asiento de papelería"
+            ],
+            "hard_negatives": [
+                "Consultar asientos contables",
+                "Listar comprobantes del mes",
+                "Imprimir comprobante existente",
+                "Descargar comprobante existente",
+                "Editar un asiento registrado",
+                "Anular un asiento existente",
+                "Eliminar comprobante",
+                "Ver libro diario (consulta)",
+                "Ver balance general",
+                "Ver estado de resultados",
+                "Configurar plan de cuentas",
+                "Crear cuenta contable nueva",
+                "Cambiar códigos contables",
+                "Conciliar bancos",
+                "Cargar extracto bancario",
+                "Registrar factura de venta",
+                "Consultar factura",
+                "Anular factura",
+                "Registrar recaudo/donación",
+                "Consultar movimientos de caja",
+                "Crear miembro/cliente",
+                "Crear ítem",
+                "Ajustar inventario (operativo)",
+                "Cerrar caja",
+                "Abrir caja",
+                "Reporte de ingresos (consulta)",
+                "Reporte de gastos (consulta)",
+                "Crear app",
+                "Editar app",
+                "Soporte: error contable",
+                "Exportar contabilidad",
+                "Importar asientos",
+                "Crear usuario",
+                "Resetear contraseña",
+                "Manual contable",
+                "Tutorial contable",
+                "Ver CxC (consulta)",
+                "Ver CxP (consulta)",
+                "Registrar compra",
+                "Orden de compra"
+            ],
+            "slots": [
+                {
+                    "name": "fecha",
+                    "required": true
+                },
+                {
+                    "name": "concepto",
+                    "required": true
+                },
+                {
+                    "name": "lineas_debito_credito",
+                    "required": true
+                },
+                {
+                    "name": "centro_costo",
+                    "required": true
+                },
+                {
+                    "name": "documento_soporte",
+                    "required": true
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "fecha",
+                    "question": "¿Qué fecha debe llevar el asiento?"
+                },
+                {
+                    "missing_slot": "concepto",
+                    "question": "¿Cuál es el concepto/descripcion del asiento?"
+                },
+                {
+                    "missing_slot": "lineas_debito_credito",
+                    "question": "Dime las líneas (cuenta, débito/crédito y valor) para registrar el asiento."
+                },
+                {
+                    "missing_slot": "centro_costo",
+                    "question": "¿Qué centro de costo aplica (ministerio/proyecto/sede)?"
+                },
+                {
+                    "missing_slot": "documento_soporte",
+                    "question": "¿Cuál es el documento soporte (recibo/factura/soporte)?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo ✅ Asiento contable registrado con soporte y centro de costo.",
+            "error_reply_template": "No pude registrar el asiento. Revisa fecha, líneas y soporte."
+        }
+    ],
+    "multi_turn_dialogues": [
+        {
+            "id": "IGL-DLG-01",
+            "scenario": "Corrección: recaudo de diezmo con referencia",
+            "turns": [
+                {
+                    "user": "ya entró el diezmo por nequi"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tercero"
+                },
+                {
+                    "user": "de Mario López cc 10101010"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:monto"
+                },
+                {
+                    "user": "200000"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:referencia_documento"
+                },
+                {
+                    "user": "recibo_donacion campaña general"
+                },
+                {
+                    "assistant_expected_action": "ERP_CASH_BANK"
+                }
+            ]
+        },
+        {
+            "id": "IGL-DLG-02",
+            "scenario": "Frustración: pide solo 1 dato",
+            "turns": [
+                {
+                    "user": "haga el recibo ya que estoy en plena reunión 😤"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:monto"
+                },
+                {
+                    "user": "50000"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:medio"
+                }
+            ]
+        },
+        {
+            "id": "IGL-DLG-03",
+            "scenario": "Desambiguación: donación vs factura",
+            "turns": [
+                {
+                    "user": "necesito factura por la ayuda que dieron"
+                },
+                {
+                    "assistant_expected_action": "NEEDS_DISAMBIGUATION"
+                },
+                {
+                    "user": "perdón, no es factura, es recibo de donación"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tercero"
+                }
+            ]
+        },
+        {
+            "id": "IGL-DLG-04",
+            "scenario": "Crear tercero (donante) antes de recibo",
+            "turns": [
+                {
+                    "user": "no aparece el donante, créelo"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo"
+                },
+                {
+                    "user": "persona"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:nit_cc"
+                }
+            ]
+        },
+        {
+            "id": "IGL-DLG-05",
+            "scenario": "Factura por alquiler del salón",
+            "turns": [
+                {
+                    "user": "toca facturar el alquiler del salón para una empresa"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                },
+                {
+                    "user": "Empresa ABC nit 900123456"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                }
+            ]
+        },
+        {
+            "id": "IGL-DLG-06",
+            "scenario": "Crear ítem inventariable",
+            "turns": [
+                {
+                    "user": "no me sale el ítem 'vela', agrégalo"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tipo"
+                },
+                {
+                    "user": "producto"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:sku_codigo"
+                }
+            ]
+        },
+        {
+            "id": "IGL-DLG-07",
+            "scenario": "APP_CREATE con módulos prioritarios",
+            "turns": [
+                {
+                    "user": "quiero app para iglesia con miembros, donaciones y proyectos"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:procesos_criticos"
+                },
+                {
+                    "user": "miembros, donaciones/diezmos, proyectos, compras e inventario"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:modulos_prioritarios"
+                }
+            ]
+        },
+        {
+            "id": "IGL-DLG-08",
+            "scenario": "Asiento por comisión datáfono",
+            "turns": [
+                {
+                    "user": "necesito un asiento por comisión del datáfono"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:fecha"
+                },
+                {
+                    "user": "hoy"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:lineas_debito_credito"
+                }
+            ]
+        },
+        {
+            "id": "IGL-DLG-09",
+            "scenario": "Pago sin referencia",
+            "turns": [
+                {
+                    "user": "me llegó una transferencia y no sé de quién es"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:monto"
+                },
+                {
+                    "user": "120000"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:tercero"
+                }
+            ]
+        },
+        {
+            "id": "IGL-DLG-10",
+            "scenario": "Desambiguación: crear vs anular factura",
+            "turns": [
+                {
+                    "user": "anula la factura FV-IGL-000120"
+                },
+                {
+                    "assistant_expected_action": "NEEDS_DISAMBIGUATION"
+                },
+                {
+                    "user": "perdón, era crear la factura del alquiler de hoy"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                }
+            ]
+        }
+    ],
+    "emotion_cases": [
+        {
+            "emotion": "frustracion",
+            "user_samples": [
+                "no joda, necesito registrar eso ya",
+                "otra vez con preguntas 😡",
+                "estoy en reunión, sea breve",
+                "me tiene mamado, solo haga el recibo"
+            ],
+            "assistant_style": "empático, breve; valida y pide 1 dato crítico, ofrece opción rápida",
+            "expected_next_step": "aplicar one_question_policy del slot más crítico para avanzar"
+        },
+        {
+            "emotion": "duda",
+            "user_samples": [
+                "eso es factura o recibo de donación?",
+                "esto va a caja o a contabilidad?",
+                "registro pago o registro la venta?"
+            ],
+            "assistant_style": "aclara en 1-2 líneas y hace una sola pregunta para definir intención",
+            "expected_next_step": "preguntar el dato que define el intent (donación/recaudo vs factura vs asiento)"
+        },
+        {
+            "emotion": "urgencia",
+            "user_samples": [
+                "es para yaaa",
+                "me lo piden en 5 min",
+                "cierre de caja urgente"
+            ],
+            "assistant_style": "directo, resolutivo; 1 pregunta y ejecutar",
+            "expected_next_step": "pedir el slot faltante mínimo y ejecutar acción"
+        }
+    ],
+    "qa_cases": [
+        {
+            "text": "crear app iglesia con miembros, donaciones, proyectos y compras",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "necesito app para diezmos/ofrendas con recibos y recaudos por nequi",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "quiero app con control de promesas y fórmula cumplimiento_promesa",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "app con reportes: donaciones por periodo, donantes recurrentes, gastos por proyecto",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "crear app con inventario de velas/hostias y alertas stock mínimo",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "app con flujo recibo_donacion -> recaudo -> contabilidad",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "crear app con sacramentos (bautizo, matrimonio) y certificados numerados",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "app con cierre de caja diario y arqueo",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "crear app con presupuestos por proyecto y saldo_proyecto",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "quiero app con roles tesorería/secretaría/líder/contador",
+            "expect_intent": "APP_CREATE",
+            "expect_action": "FRAMEWORK_APP_CREATE"
+        },
+        {
+            "text": "registrar factura por alquiler del salón parroquial con prefijo FV-IGL",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar venta de biblias y velas en la misma factura",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar inscripción a retiro a crédito con vencimiento",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "me falta el documento fiscal del bazar de hoy",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "necesito consecutivo FV-IGL para facturar hoy",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar artículos religiosos con IVA",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "emitir factura para empresa patrocinadora",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "el cliente me pidió la factura ya",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar logística de evento",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "facturar venta de souvenirs",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "ya me pagaron el diezmo por nequi, registra el ingreso y recibo",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar abono de promesa y dejar saldo",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "pagué al proveedor de sonido, registra el egreso",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "entró donación por transferencia a bancos, registra movimiento",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "me llegó un pago sin referencia, necesito registrarlo",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "hacer recibo de caja de una ofrenda en efectivo",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar salida por compra de velas y hostias",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar egreso por ayuda social (obra social)",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "registrar reembolso (salida)",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "no me cuadra el cierre, falta meter un ingreso",
+            "expect_intent": "ERP_CAJAYBANCOS",
+            "expect_action": "ERP_CASH_BANK"
+        },
+        {
+            "text": "crear donante persona con cédula, nombre y celular",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "no existe el donante, toca crearlo antes del recibo",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear empresa patrocinadora con NIT y correo",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "me falta el correo del donante para enviar soporte",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "solo tengo nombre y whatsapp, créalo",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear tercero para registrar recaudo en caja/bancos",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear miembro para bautizo",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear miembro para matrimonio",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear donante para campaña de obra",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear tercero genérico para donación anónima",
+            "expect_intent": "APP_RUNTIME_CREATE_CUSTOMER",
+            "expect_action": "APP_ENTITY_CREATE_CUSTOMER"
+        },
+        {
+            "text": "crear ítem alquiler salón (servicio) con precio, IVA y código",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear producto biblia inventariable con SKU",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "no me sale inscripción retiro, créala como servicio",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "voy a facturar y falta el ítem de rosario",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "ese es servicio, no inventario",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "ese es producto (velas) inventariable sí",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear ítem impresión certificado con precio",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear producto hostias inventariable con SKU",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear ítem logística evento con precio e IVA",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "crear ítem venta souvenirs con código",
+            "expect_intent": "APP_RUNTIME_CREATE_ITEM",
+            "expect_action": "APP_ENTITY_CREATE_ITEM"
+        },
+        {
+            "text": "registrar asiento por descuadre de caja con soporte arqueo",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "crear asiento por comisión datáfono y gastos bancarios",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "el contador pidió comprobante con centro de costo Proyecto/Obra",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "asiento lines deb 110505 50000 / cred 413595 50000",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "necesito asociar documento soporte al asiento",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "crear asiento por ayuda social (obra social)",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "registrar asiento por mantenimiento del templo",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "crear asiento por compra de equipos de sonido",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "registrar asiento por ajuste de cartera de promesas",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        },
+        {
+            "text": "registrar asiento por gasto de servicios públicos",
+            "expect_intent": "ERP_ASIENTO_CONTABLE",
+            "expect_action": "ERP_ACCOUNTING_JOURNAL"
+        }
+    ]
+}
