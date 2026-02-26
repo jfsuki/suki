@@ -11545,6 +11545,169 @@ private function parseEntityFromCrudText(string $text): string
             'Puedes hacer preguntas sobre los datos ya cargados.',
         ]);
     }
+
+    // ─── CAMINO 1/2/3: Reportes, Facturas, Cartera ─────────────────────────
+
+    private function isReportRequest(string $text): bool
+    {
+        $patterns = [
+            // Facturas y tickets
+            'factura', 'ticket.*pos', 'pos.*ticket', 'recibo.*venta', 'comprobante',
+            // Ventas y comparativos
+            'reporte.*venta', 'informe.*venta', 'ventas.*2024', 'ventas.*2025',
+            '2024.*vs.*2025', '2025.*vs.*2024', 'comparativo.*anual', 'comparar.*ventas',
+            'ventas.*mes', 'ventas.*semana', 'ventas.*periodo',
+            // Cartera
+            'reporte.*cartera', 'cartera.*vencida', 'cuentas.*cobrar', 'cartera.*cliente',
+            'envejecimiento.*cartera', 'cartera.*dias', 'saldo.*vencido',
+            // Genéricos
+            'genera.*reporte', 'genera.*informe', 'muestra.*reporte',
+            'dame.*reporte', 'ver.*reporte', 'descargar.*pdf', 'imprimir.*reporte',
+        ];
+        foreach ($patterns as $p) {
+            if (preg_match('/' . $p . '/ui', $text)) return true;
+        }
+        return false;
+    }
+
+    /**
+     * Extrae filtros NLP del texto y construye la URL del reporte.
+     * @return array{reply: string, command: ?array}
+     */
+    private function buildReportReply(string $text, string $tenantId, array $state, array $profile): array
+    {
+        $appUrl = rtrim((string)(getenv('APP_URL') ?: ''), '/');
+
+        // ── Determinar tipo de reporte ────────────────────────────────────────
+        $form     = 'reporte_ventas';
+        $report   = 'ventas_periodo';
+        $filters  = ['tenant_id' => $tenantId];
+        $emoji    = '📊';
+        $nombre   = 'Reporte de Ventas';
+
+        if (preg_match('/factura|comprobante|electronica/ui', $text)) {
+            $form   = 'factura_venta';
+            $report = 'factura_electronica';
+            $emoji  = '📄';
+            $nombre = 'Factura Electrónica';
+        } elseif (preg_match('/ticket|pos|recibo/ui', $text)) {
+            $form   = 'ticket_pos';
+            $report = 'ticket_pos';
+            $emoji  = '🧾';
+            $nombre = 'Ticket POS';
+        } elseif (preg_match('/cartera|cobrar|vencida|vencido|saldo/ui', $text)) {
+            $form   = 'reporte_cartera';
+            $report = 'cartera_general';
+            $emoji  = '💼';
+            $nombre = 'Reporte de Cartera';
+
+            // Envejecimiento
+            if (preg_match('/envejecimiento|por.*rango|antiguedad/ui', $text)) {
+                $report = 'envejecimiento_cartera';
+                $nombre = 'Envejecimiento de Cartera';
+            }
+        } elseif (preg_match('/2024.*vs.*2025|comparativo|anual/ui', $text)) {
+            $form   = 'reporte_ventas';
+            $report = 'comparativo_anual';
+            $emoji  = '📈';
+            $nombre = 'Comparativo 2024 vs 2025';
+        }
+
+        // ── Extraer filtros de fechas ─────────────────────────────────────────
+        // "desde enero", "desde 2025-01-01", "desde el 1 de enero"
+        if (preg_match('/desde\s+(\d{4}-\d{2}-\d{2}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/ui', $text, $m)) {
+            $filters['periodo_desde'] = $this->normalizeDate($m[1]);
+        }
+        if (preg_match('/hasta\s+(\d{4}-\d{2}-\d{2}|\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/ui', $text, $m)) {
+            $filters['periodo_hasta'] = $this->normalizeDate($m[1]);
+        }
+        // "año 2024" → desde 2024-01-01 hasta 2024-12-31
+        if (preg_match('/a[ñn]o\s+(20\d{2})/ui', $text, $m)) {
+            $filters['periodo_desde'] = $m[1] . '-01-01';
+            $filters['periodo_hasta'] = $m[1] . '-12-31';
+        }
+        // Fechas implícitas por año comparativo
+        if ($report === 'comparativo_anual' && !isset($filters['periodo_desde'])) {
+            $filters['periodo_desde'] = '2024-01-01';
+            $filters['periodo_hasta'] = date('Y-m-d');
+        }
+
+        // ── Extraer filtro de cliente ─────────────────────────────────────────
+        if (preg_match('/cliente\s+([A-Za-záéíóúÁÉÍÓÚñÑ\s]{2,30}?)(?:\s+con|\s+de|\s*$)/ui', $text, $m)) {
+            $filters['cliente'] = trim($m[1]);
+        }
+
+        // ── Extraer filtro de saldo mínimo ────────────────────────────────────
+        // "mayor a 500", "saldo mayor 1000000"
+        if (preg_match('/(?:saldo|cartera)\s+(?:mayor|m[áa]s|superior)\s+(?:a|de)?\s*\$?\s*([\d.,]+)/ui', $text, $m)) {
+            $filters['saldo_minimo'] = (float) str_replace(['.', ','], ['', '.'], $m[1]);
+        }
+
+        // ── Extraer días vencidos ─────────────────────────────────────────────
+        if (preg_match('/(\d+)\s*d[íi]as?\s*(?:de\s*)?vencid[ao]/ui', $text, $m)) {
+            $filters['dias_minimos'] = (int) $m[1];
+        }
+
+        // ── Extraer estado ────────────────────────────────────────────────────
+        if      (preg_match('/pagad[ao]/ui', $text))   $filters['estado'] = 'pagada';
+        elseif  (preg_match('/pendiente/ui', $text))    $filters['estado'] = 'pendiente';
+        elseif  (preg_match('/vencid[ao]/ui', $text))   $filters['estado'] = 'vencida';
+
+        // ── Construir URL ─────────────────────────────────────────────────────
+        $qs  = http_build_query($filters + ['form' => $form, 'report' => $report]);
+        $url = "{$appUrl}/report.php?{$qs}";
+        $pdfUrl = $url . '&format=pdf';
+
+        // ── Construir reply ───────────────────────────────────────────────────
+        $filterDesc = '';
+        if (!empty($filters)) {
+            $parts = [];
+            if (isset($filters['periodo_desde'])) $parts[] = "desde **{$filters['periodo_desde']}**";
+            if (isset($filters['periodo_hasta'])) $parts[] = "hasta **{$filters['periodo_hasta']}**";
+            if (isset($filters['cliente']))        $parts[] = "cliente **{$filters['cliente']}**";
+            if (isset($filters['estado']))         $parts[] = "estado **{$filters['estado']}**";
+            if (isset($filters['saldo_minimo']))   $parts[] = "saldo ≥ **$ " . number_format($filters['saldo_minimo'], 0, '.', ',') . "**";
+            if (isset($filters['dias_minimos']))   $parts[] = "≥ **{$filters['dias_minimos']} días** vencido";
+            if ($parts) $filterDesc = "\n🔍 Filtros: " . implode(' · ', $parts);
+        }
+
+        $reply = implode("\n", [
+            "{$emoji} **{$nombre}** listo para visualizar.",
+            $filterDesc,
+            '',
+            "👁️ **[Ver reporte HTML]({$url})**",
+            "📄 **[Descargar PDF]({$pdfUrl})**",
+            '',
+            '_El reporte incluye gráficos interactivos, KPIs y la opción de imprimir / guardar PDF desde el navegador._',
+        ]);
+
+        return [
+            'reply'   => trim($reply),
+            'command' => [
+                'type'    => 'open_url',
+                'url'     => $url,
+                'pdf_url' => $pdfUrl,
+                'form'    => $form,
+                'report'  => $report,
+                'filters' => $filters,
+            ],
+        ];
+    }
+
+    /**
+     * Normaliza fechas en distintos formatos a Y-m-d.
+     */
+    private function normalizeDate(string $raw): string
+    {
+        $raw = trim($raw);
+        if (preg_match('/^\d{4}-\d{2}-\d{2}$/', $raw)) return $raw;
+        // dd/mm/yyyy o dd-mm-yyyy
+        if (preg_match('/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{2,4})$/', $raw, $m)) {
+            $y = strlen($m[3]) === 2 ? '20' . $m[3] : $m[3];
+            return sprintf('%04d-%02d-%02d', $y, $m[2], $m[1]);
+        }
+        return $raw;
+    }
 }
 
 

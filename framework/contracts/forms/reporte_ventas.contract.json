@@ -1,0 +1,272 @@
+{
+    "id": "reporte_ventas",
+    "name": "Reporte de Ventas",
+    "version": "1.0.0",
+    "entity": "ventas",
+    "title": "Reporte de Ventas",
+    "fields": [
+        {
+            "id": "periodo_desde",
+            "name": "periodo_desde",
+            "type": "date",
+            "label": "Desde"
+        },
+        {
+            "id": "periodo_hasta",
+            "name": "periodo_hasta",
+            "type": "date",
+            "label": "Hasta"
+        },
+        {
+            "id": "vendedor",
+            "name": "vendedor",
+            "type": "string",
+            "label": "Vendedor"
+        },
+        {
+            "id": "categoria",
+            "name": "categoria",
+            "type": "string",
+            "label": "Categoría"
+        }
+    ],
+    "grids": [
+        {
+            "name": "detalle_ventas",
+            "label": "Detalle de Ventas",
+            "columns": [
+                {
+                    "name": "fecha",
+                    "label": "Fecha",
+                    "type": "date"
+                },
+                {
+                    "name": "numero",
+                    "label": "No. Factura",
+                    "type": "string"
+                },
+                {
+                    "name": "cliente",
+                    "label": "Cliente",
+                    "type": "string"
+                },
+                {
+                    "name": "vendedor",
+                    "label": "Vendedor",
+                    "type": "string"
+                },
+                {
+                    "name": "subtotal",
+                    "label": "Subtotal",
+                    "type": "decimal"
+                },
+                {
+                    "name": "iva",
+                    "label": "IVA",
+                    "type": "decimal"
+                },
+                {
+                    "name": "total",
+                    "label": "Total",
+                    "type": "decimal"
+                },
+                {
+                    "name": "estado",
+                    "label": "Estado",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "comparativo_anual",
+            "label": "Comparativo Anual",
+            "columns": [
+                {
+                    "name": "mes",
+                    "label": "Mes",
+                    "type": "string"
+                },
+                {
+                    "name": "ventas_2024",
+                    "label": "Ventas 2024",
+                    "type": "decimal"
+                },
+                {
+                    "name": "ventas_2025",
+                    "label": "Ventas 2025",
+                    "type": "decimal"
+                },
+                {
+                    "name": "variacion",
+                    "label": "Variación %",
+                    "type": "decimal"
+                }
+            ]
+        }
+    ],
+    "summary": [
+        {
+            "name": "total_ventas",
+            "label": "Total Ventas",
+            "type": "sum",
+            "source": {
+                "grid": "detalle_ventas",
+                "field": "total"
+            }
+        },
+        {
+            "name": "total_iva",
+            "label": "Total IVA",
+            "type": "sum",
+            "source": {
+                "grid": "detalle_ventas",
+                "field": "iva"
+            }
+        },
+        {
+            "name": "num_facturas",
+            "label": "Nro Facturas",
+            "type": "count",
+            "source": {
+                "grid": "detalle_ventas",
+                "field": "numero"
+            }
+        },
+        {
+            "name": "ticket_prom",
+            "label": "Ticket Promedio",
+            "type": "formula",
+            "expression": "total_ventas / (num_facturas + 0.001)"
+        }
+    ],
+    "reports": [
+        {
+            "id": "ventas_periodo",
+            "name": "Ventas por Período",
+            "layout": {
+                "header": {
+                    "subtitle": "Análisis de ventas consolidado"
+                },
+                "meta": {
+                    "label": "Período",
+                    "fields": [
+                        "periodo_desde",
+                        "periodo_hasta",
+                        "vendedor",
+                        "categoria"
+                    ]
+                },
+                "issuer": {
+                    "label": "",
+                    "fields": []
+                },
+                "buyer": {
+                    "label": "",
+                    "fields": []
+                },
+                "grid": {
+                    "name": "detalle_ventas",
+                    "columns": [
+                        "fecha",
+                        "numero",
+                        "cliente",
+                        "vendedor",
+                        "subtotal",
+                        "iva",
+                        "total",
+                        "estado"
+                    ]
+                },
+                "totals": [
+                    "total_ventas",
+                    "total_iva",
+                    "num_facturas",
+                    "ticket_prom"
+                ]
+            }
+        },
+        {
+            "id": "comparativo_anual",
+            "name": "Comparativo 2024 vs 2025",
+            "layout": {
+                "header": {
+                    "subtitle": "Comparativo de ventas año a año"
+                },
+                "meta": {
+                    "label": "Período",
+                    "fields": []
+                },
+                "issuer": {
+                    "label": "",
+                    "fields": []
+                },
+                "buyer": {
+                    "label": "",
+                    "fields": []
+                },
+                "grid": {
+                    "name": "comparativo_anual",
+                    "columns": [
+                        "mes",
+                        "ventas_2024",
+                        "ventas_2025",
+                        "variacion"
+                    ],
+                    "chartType": "bar",
+                    "chartSeries": [
+                        "ventas_2024",
+                        "ventas_2025"
+                    ],
+                    "chartLabel": "mes"
+                },
+                "totals": [
+                    "total_ventas"
+                ]
+            }
+        }
+    ],
+    "filters": [
+        {
+            "name": "periodo_desde",
+            "type": "date",
+            "label": "Desde",
+            "field": "fecha",
+            "operator": ">="
+        },
+        {
+            "name": "periodo_hasta",
+            "type": "date",
+            "label": "Hasta",
+            "field": "fecha",
+            "operator": "<="
+        },
+        {
+            "name": "vendedor",
+            "type": "string",
+            "label": "Vendedor",
+            "field": "vendedor",
+            "operator": "LIKE"
+        },
+        {
+            "name": "estado",
+            "type": "select",
+            "label": "Estado",
+            "field": "estado",
+            "operator": "=",
+            "options": [
+                {
+                    "value": "pagada",
+                    "label": "Pagada"
+                },
+                {
+                    "value": "pendiente",
+                    "label": "Pendiente"
+                },
+                {
+                    "value": "vencida",
+                    "label": "Vencida"
+                }
+            ]
+        }
+    ]
+}

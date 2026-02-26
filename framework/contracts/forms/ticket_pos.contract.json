@@ -1,0 +1,157 @@
+{
+    "id": "ticket_pos",
+    "name": "Ticket POS",
+    "version": "1.0.0",
+    "entity": "ventas_pos",
+    "title": "Ticket de Venta",
+    "fields": [
+        {
+            "id": "numero",
+            "name": "numero",
+            "type": "string",
+            "label": "Ticket #"
+        },
+        {
+            "id": "fecha",
+            "name": "fecha",
+            "type": "date",
+            "label": "Fecha"
+        },
+        {
+            "id": "hora",
+            "name": "hora",
+            "type": "string",
+            "label": "Hora"
+        },
+        {
+            "id": "cajero",
+            "name": "cajero",
+            "type": "string",
+            "label": "Cajero"
+        },
+        {
+            "id": "caja",
+            "name": "caja",
+            "type": "string",
+            "label": "Caja"
+        },
+        {
+            "id": "cliente_nombre",
+            "name": "cliente_nombre",
+            "type": "string",
+            "label": "Cliente"
+        },
+        {
+            "id": "forma_pago",
+            "name": "forma_pago",
+            "type": "string",
+            "label": "Pago"
+        },
+        {
+            "id": "notas",
+            "name": "notas",
+            "type": "string",
+            "label": "Notas"
+        }
+    ],
+    "grids": [
+        {
+            "name": "items",
+            "label": "Artículos",
+            "columns": [
+                {
+                    "name": "descripcion",
+                    "label": "Artículo",
+                    "type": "string"
+                },
+                {
+                    "name": "cantidad",
+                    "label": "Cant.",
+                    "type": "decimal"
+                },
+                {
+                    "name": "precio",
+                    "label": "P.Unit",
+                    "type": "decimal"
+                },
+                {
+                    "name": "subtotal",
+                    "label": "Total",
+                    "type": "decimal"
+                }
+            ]
+        }
+    ],
+    "summary": [
+        {
+            "name": "subtotal",
+            "label": "Subtotal",
+            "type": "sum",
+            "source": {
+                "grid": "items",
+                "field": "subtotal"
+            }
+        },
+        {
+            "name": "iva",
+            "label": "IVA 19%",
+            "type": "formula",
+            "expression": "subtotal * 0.19"
+        },
+        {
+            "name": "total",
+            "label": "TOTAL",
+            "type": "formula",
+            "expression": "subtotal + iva"
+        }
+    ],
+    "reports": [
+        {
+            "id": "ticket_pos",
+            "name": "Ticket POS",
+            "layout": {
+                "header": {
+                    "subtitle": "Gracias por su compra"
+                },
+                "meta": {
+                    "label": "Venta",
+                    "fields": [
+                        "numero",
+                        "fecha",
+                        "hora",
+                        "cajero",
+                        "caja",
+                        "forma_pago"
+                    ]
+                },
+                "issuer": {
+                    "label": "Tienda",
+                    "fields": []
+                },
+                "buyer": {
+                    "label": "Cliente",
+                    "fields": [
+                        "cliente_nombre"
+                    ]
+                },
+                "grid": {
+                    "name": "items",
+                    "columns": [
+                        "descripcion",
+                        "cantidad",
+                        "precio",
+                        "subtotal"
+                    ]
+                },
+                "totals": [
+                    "subtotal",
+                    "iva",
+                    "total"
+                ],
+                "footer": {
+                    "text": "Regresa pronto · No se aceptan devoluciones sin ticket"
+                }
+            }
+        }
+    ]
+}

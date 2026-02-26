@@ -1,0 +1,287 @@
+{
+    "id": "factura_venta",
+    "name": "Factura de Venta Electrónica",
+    "version": "1.0.0",
+    "entity": "ventas",
+    "title": "Factura de Venta",
+    "fields": [
+        {
+            "id": "numero",
+            "name": "numero",
+            "type": "string",
+            "label": "No. Factura"
+        },
+        {
+            "id": "fecha",
+            "name": "fecha",
+            "type": "date",
+            "label": "Fecha"
+        },
+        {
+            "id": "prefijo",
+            "name": "prefijo",
+            "type": "string",
+            "label": "Prefijo"
+        },
+        {
+            "id": "consecutivo",
+            "name": "consecutivo",
+            "type": "int",
+            "label": "Consecutivo"
+        },
+        {
+            "id": "forma_pago",
+            "name": "forma_pago",
+            "type": "string",
+            "label": "Forma de Pago"
+        },
+        {
+            "id": "condicion_pago",
+            "name": "condicion_pago",
+            "type": "string",
+            "label": "Condición de Pago"
+        },
+        {
+            "id": "vence",
+            "name": "vence",
+            "type": "date",
+            "label": "Vence"
+        },
+        {
+            "id": "moneda",
+            "name": "moneda",
+            "type": "string",
+            "label": "Moneda"
+        },
+        {
+            "id": "emisor_nombre",
+            "name": "emisor_nombre",
+            "type": "string",
+            "label": "Nombre Empresa"
+        },
+        {
+            "id": "emisor_nit",
+            "name": "emisor_nit",
+            "type": "string",
+            "label": "NIT"
+        },
+        {
+            "id": "emisor_dir",
+            "name": "emisor_dir",
+            "type": "string",
+            "label": "Dirección"
+        },
+        {
+            "id": "emisor_tel",
+            "name": "emisor_tel",
+            "type": "string",
+            "label": "Teléfono"
+        },
+        {
+            "id": "emisor_email",
+            "name": "emisor_email",
+            "type": "string",
+            "label": "Correo"
+        },
+        {
+            "id": "emisor_ciudad",
+            "name": "emisor_ciudad",
+            "type": "string",
+            "label": "Ciudad"
+        },
+        {
+            "id": "cliente_nombre",
+            "name": "cliente_nombre",
+            "type": "string",
+            "label": "Cliente"
+        },
+        {
+            "id": "cliente_nit",
+            "name": "cliente_nit",
+            "type": "string",
+            "label": "NIT/CC Cliente"
+        },
+        {
+            "id": "cliente_dir",
+            "name": "cliente_dir",
+            "type": "string",
+            "label": "Dirección Cliente"
+        },
+        {
+            "id": "cliente_tel",
+            "name": "cliente_tel",
+            "type": "string",
+            "label": "Teléfono Cliente"
+        },
+        {
+            "id": "cliente_email",
+            "name": "cliente_email",
+            "type": "string",
+            "label": "Correo Cliente"
+        },
+        {
+            "id": "cliente_ciudad",
+            "name": "cliente_ciudad",
+            "type": "string",
+            "label": "Ciudad Cliente"
+        },
+        {
+            "id": "notas",
+            "name": "notas",
+            "type": "string",
+            "label": "Notas"
+        },
+        {
+            "id": "cufe",
+            "name": "cufe",
+            "type": "string",
+            "label": "CUFE"
+        }
+    ],
+    "grids": [
+        {
+            "name": "items",
+            "label": "Productos / Servicios",
+            "columns": [
+                {
+                    "name": "codigo",
+                    "label": "Código",
+                    "type": "string"
+                },
+                {
+                    "name": "descripcion",
+                    "label": "Descripción",
+                    "type": "string"
+                },
+                {
+                    "name": "cantidad",
+                    "label": "Cant.",
+                    "type": "decimal"
+                },
+                {
+                    "name": "unidad",
+                    "label": "Unidad",
+                    "type": "string"
+                },
+                {
+                    "name": "precio",
+                    "label": "Precio Unit.",
+                    "type": "decimal"
+                },
+                {
+                    "name": "descuento",
+                    "label": "Desc. %",
+                    "type": "decimal"
+                },
+                {
+                    "name": "iva",
+                    "label": "IVA %",
+                    "type": "decimal"
+                },
+                {
+                    "name": "subtotal",
+                    "label": "Subtotal",
+                    "type": "decimal"
+                }
+            ]
+        }
+    ],
+    "summary": [
+        {
+            "name": "subtotal",
+            "label": "Subtotal",
+            "type": "sum",
+            "source": {
+                "grid": "items",
+                "field": "subtotal"
+            }
+        },
+        {
+            "name": "descuento_tot",
+            "label": "Descuento",
+            "type": "sum",
+            "source": {
+                "grid": "items",
+                "field": "descuento"
+            }
+        },
+        {
+            "name": "iva_tot",
+            "label": "IVA",
+            "type": "formula",
+            "expression": "subtotal * 0.19"
+        },
+        {
+            "name": "total",
+            "label": "TOTAL",
+            "type": "formula",
+            "expression": "subtotal + iva_tot"
+        }
+    ],
+    "reports": [
+        {
+            "id": "factura_electronica",
+            "name": "Factura Electrónica",
+            "layout": {
+                "header": {
+                    "subtitle": "Documento equivalente - Colombia"
+                },
+                "meta": {
+                    "label": "Datos del Documento",
+                    "fields": [
+                        "numero",
+                        "fecha",
+                        "forma_pago",
+                        "condicion_pago",
+                        "vence",
+                        "moneda"
+                    ]
+                },
+                "issuer": {
+                    "label": "Emisor",
+                    "fields": [
+                        "emisor_nombre",
+                        "emisor_nit",
+                        "emisor_dir",
+                        "emisor_ciudad",
+                        "emisor_tel",
+                        "emisor_email"
+                    ]
+                },
+                "buyer": {
+                    "label": "Cliente",
+                    "fields": [
+                        "cliente_nombre",
+                        "cliente_nit",
+                        "cliente_dir",
+                        "cliente_ciudad",
+                        "cliente_tel",
+                        "cliente_email"
+                    ]
+                },
+                "grid": {
+                    "name": "items",
+                    "columns": [
+                        "codigo",
+                        "descripcion",
+                        "cantidad",
+                        "unidad",
+                        "precio",
+                        "descuento",
+                        "iva",
+                        "subtotal"
+                    ]
+                },
+                "totals": [
+                    "subtotal",
+                    "descuento_tot",
+                    "iva_tot",
+                    "total"
+                ],
+                "footer": {
+                    "text": "CUFE: {{cufe}} | Este documento es una Factura de Venta Electrónica válida para efectos tributarios en Colombia."
+                }
+            }
+        }
+    ]
+}

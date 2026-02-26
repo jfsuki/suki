@@ -1,0 +1,270 @@
+{
+    "id": "reporte_cartera",
+    "name": "Reporte de Cartera",
+    "version": "1.0.0",
+    "entity": "cartera",
+    "title": "Reporte de Cartera",
+    "fields": [
+        {
+            "id": "corte_fecha",
+            "name": "corte_fecha",
+            "type": "date",
+            "label": "Fecha de Corte"
+        },
+        {
+            "id": "cliente",
+            "name": "cliente",
+            "type": "string",
+            "label": "Cliente"
+        },
+        {
+            "id": "vendedor",
+            "name": "vendedor",
+            "type": "string",
+            "label": "Vendedor"
+        }
+    ],
+    "grids": [
+        {
+            "name": "detalle_cartera",
+            "label": "Detalle de Cartera",
+            "columns": [
+                {
+                    "name": "numero",
+                    "label": "Factura",
+                    "type": "string"
+                },
+                {
+                    "name": "cliente",
+                    "label": "Cliente",
+                    "type": "string"
+                },
+                {
+                    "name": "fecha_emision",
+                    "label": "Fecha Emisión",
+                    "type": "date"
+                },
+                {
+                    "name": "fecha_vence",
+                    "label": "Vencimiento",
+                    "type": "date"
+                },
+                {
+                    "name": "dias_vencido",
+                    "label": "Días Vencidos",
+                    "type": "int"
+                },
+                {
+                    "name": "total",
+                    "label": "Valor Total",
+                    "type": "decimal"
+                },
+                {
+                    "name": "pagado",
+                    "label": "Abonado",
+                    "type": "decimal"
+                },
+                {
+                    "name": "saldo",
+                    "label": "Saldo",
+                    "type": "decimal"
+                },
+                {
+                    "name": "estado",
+                    "label": "Estado",
+                    "type": "string"
+                }
+            ]
+        },
+        {
+            "name": "envejecimiento",
+            "label": "Envejecimiento de Cartera",
+            "columns": [
+                {
+                    "name": "rango",
+                    "label": "Rango",
+                    "type": "string"
+                },
+                {
+                    "name": "valor",
+                    "label": "Valor",
+                    "type": "decimal"
+                },
+                {
+                    "name": "porcentaje",
+                    "label": "% del Total",
+                    "type": "decimal"
+                }
+            ]
+        }
+    ],
+    "summary": [
+        {
+            "name": "cartera_total",
+            "label": "Cartera Total",
+            "type": "sum",
+            "source": {
+                "grid": "detalle_cartera",
+                "field": "saldo"
+            }
+        },
+        {
+            "name": "cartera_vencida",
+            "label": "Cartera Vencida",
+            "type": "sum",
+            "source": {
+                "grid": "detalle_cartera",
+                "field": "saldo"
+            }
+        },
+        {
+            "name": "cartera_vigente",
+            "label": "Cartera Vigente",
+            "type": "formula",
+            "expression": "cartera_total - cartera_vencida"
+        }
+    ],
+    "reports": [
+        {
+            "id": "cartera_general",
+            "name": "Cartera General",
+            "layout": {
+                "header": {
+                    "subtitle": "Reporte de cuentas por cobrar"
+                },
+                "meta": {
+                    "label": "Corte",
+                    "fields": [
+                        "corte_fecha",
+                        "cliente",
+                        "vendedor"
+                    ]
+                },
+                "issuer": {
+                    "label": "",
+                    "fields": []
+                },
+                "buyer": {
+                    "label": "",
+                    "fields": []
+                },
+                "grid": {
+                    "name": "detalle_cartera",
+                    "columns": [
+                        "numero",
+                        "cliente",
+                        "fecha_emision",
+                        "fecha_vence",
+                        "dias_vencido",
+                        "total",
+                        "pagado",
+                        "saldo",
+                        "estado"
+                    ]
+                },
+                "totals": [
+                    "cartera_total",
+                    "cartera_vencida",
+                    "cartera_vigente"
+                ]
+            }
+        },
+        {
+            "id": "envejecimiento_cartera",
+            "name": "Envejecimiento de Cartera",
+            "layout": {
+                "header": {
+                    "subtitle": "Análisis por antigüedad de deuda"
+                },
+                "meta": {
+                    "label": "Corte",
+                    "fields": [
+                        "corte_fecha"
+                    ]
+                },
+                "issuer": {
+                    "label": "",
+                    "fields": []
+                },
+                "buyer": {
+                    "label": "",
+                    "fields": []
+                },
+                "grid": {
+                    "name": "envejecimiento",
+                    "columns": [
+                        "rango",
+                        "valor",
+                        "porcentaje"
+                    ],
+                    "chartType": "pie",
+                    "chartSeries": [
+                        "valor"
+                    ],
+                    "chartLabel": "rango"
+                },
+                "totals": [
+                    "cartera_total"
+                ]
+            }
+        }
+    ],
+    "filters": [
+        {
+            "name": "corte_fecha",
+            "type": "date",
+            "label": "Fecha Corte",
+            "field": "fecha_vence",
+            "operator": "<="
+        },
+        {
+            "name": "cliente",
+            "type": "string",
+            "label": "Cliente",
+            "field": "cliente",
+            "operator": "LIKE"
+        },
+        {
+            "name": "vendedor",
+            "type": "string",
+            "label": "Vendedor",
+            "field": "vendedor",
+            "operator": "LIKE"
+        },
+        {
+            "name": "dias_minimos",
+            "type": "int",
+            "label": "Días Venc. ≥",
+            "field": "dias_vencido",
+            "operator": ">="
+        },
+        {
+            "name": "saldo_minimo",
+            "type": "decimal",
+            "label": "Saldo ≥",
+            "field": "saldo",
+            "operator": ">="
+        },
+        {
+            "name": "estado",
+            "type": "select",
+            "label": "Estado",
+            "field": "estado",
+            "operator": "=",
+            "options": [
+                {
+                    "value": "vigente",
+                    "label": "Vigente"
+                },
+                {
+                    "value": "vencida",
+                    "label": "Vencida"
+                },
+                {
+                    "value": "pagada",
+                    "label": "Pagada"
+                }
+            ]
+        }
+    ]
+}
