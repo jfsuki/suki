@@ -109,7 +109,16 @@ final class LLMRouter
             }
         }
         return [
-            'providers' => [],
+            'providers' => [
+                'deepseek' => [
+                    'class' => \App\Core\LLM\Providers\DeepSeekProvider::class,
+                    'enabled' => !empty(getenv('DEEPSEEK_API_KEY')),
+                ],
+                'gemini' => [
+                    'class' => \App\Core\LLM\Providers\GeminiProvider::class,
+                    'enabled' => !empty(getenv('GEMINI_API_KEY')),
+                ],
+            ],
             'models' => [],
             'limits' => ['timeout' => 20, 'max_tokens' => 600],
         ];
@@ -120,7 +129,7 @@ final class LLMRouter
         $mode = strtolower((string) ($options['mode'] ?? getenv('LLM_ROUTER_MODE') ?? 'auto'));
         $order = [];
 
-        if (in_array($mode, ['groq', 'gemini', 'openrouter', 'claude'], true)) {
+        if (in_array($mode, ['groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
             $order[] = $mode;
         } else {
             $latency = (int) ($policy['latency_budget_ms'] ?? 1200);

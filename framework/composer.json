@@ -26,6 +26,7 @@
     ]
   },
   "require": {
-    "opis/json-schema": "^2.6"
+    "opis/json-schema": "^2.6",
+    "phpoffice/phpspreadsheet": "^5.4"
   }
 }

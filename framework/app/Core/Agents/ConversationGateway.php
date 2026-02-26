@@ -280,7 +280,10 @@ final class ConversationGateway
                     $reply = $this->buildEntityList() . "\n" . $this->buildPendingPreviewReply($state['builder_pending_command']);
                     $state = $this->updateState($state, $raw, $reply, 'create', (string) ($state['entity'] ?? 'clientes'), [], 'create_table');
                     $this->saveState($tenantId, $userId, $state);
-                    return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                    // FALL THROUGH to routeConfusion if user text is long/descriptive (to let LLM handle it)
+                    if (mb_strlen($normalizedBase) < 15) {
+                        return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                    }
                 }
                 if ($this->isBuilderProgressQuestion($normalizedBase)) {
                     $reply = $this->buildBuilderPlanProgressReply($state, $profile, true);
@@ -292,13 +295,19 @@ final class ConversationGateway
                     $reply = $this->buildPendingPreviewReply($state['builder_pending_command']);
                     $state = $this->updateState($state, $raw, $reply, 'create', (string) ($state['entity'] ?? 'clientes'), [], 'create_table');
                     $this->saveState($tenantId, $userId, $state);
-                    return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                    // FALL THROUGH to routeConfusion if user text is long/descriptive (to let LLM handle it)
+                    if (mb_strlen($normalizedBase) < 15) {
+                        return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                    }
                 }
                 if ($this->isClarificationRequest($normalizedBase)) {
                     $reply = $this->buildPendingClarificationReply($state['builder_pending_command']);
                     $state = $this->updateState($state, $raw, $reply, 'create', (string) ($state['entity'] ?? 'clientes'), [], 'create_table');
                     $this->saveState($tenantId, $userId, $state);
-                    return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                    // FALL THROUGH to routeConfusion if user text is long/descriptive (to let LLM handle it)
+                    if (mb_strlen($normalizedBase) < 15) {
+                        return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                    }
                 }
                 if ($this->isFieldHelpQuestion($normalizedBase)) {
                     $pendingEntity = $this->normalizeEntityForSchema((string) ($state['builder_pending_command']['entity'] ?? ($state['entity'] ?? '')));
@@ -306,7 +315,10 @@ final class ConversationGateway
                     $reply = $proposal['reply'];
                     $state = $this->updateState($state, $raw, $reply, 'create', (string) ($state['entity'] ?? 'clientes'), [], 'create_table');
                     $this->saveState($tenantId, $userId, $state);
-                    return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                    // FALL THROUGH to routeConfusion if user text is long/descriptive (to let LLM handle it)
+                    if (mb_strlen($normalizedBase) < 15) {
+                        return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                    }
                 }
                 if ($this->isAffirmativeReply($normalizedBase)) {
                     $command = $state['builder_pending_command'];
@@ -406,7 +418,10 @@ final class ConversationGateway
                     }
                     $state = $this->updateState($state, $raw, $reply, 'create', (string) ($state['entity'] ?? 'clientes'), [], 'create_table');
                     $this->saveState($tenantId, $userId, $state);
-                    return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                    // FALL THROUGH to routeConfusion if user text is long/descriptive (to let LLM handle it)
+                    if (mb_strlen($normalizedBase) < 15) {
+                        return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
+                    }
                 }
             }
         }
@@ -423,7 +438,7 @@ final class ConversationGateway
             $state['entity'] = null;
         }
 
-        $confusionRoute = $this->routeConfusion($normalizedBase, $mode, $state, $profile, $confusionBase);
+        $confusionRoute = $this->routeConfusion($normalizedBase, $mode, $state, $profile, $confusionBase, $tenantId, $userId);
         if (!empty($confusionRoute)) {
             $reply = (string) ($confusionRoute['reply'] ?? '');
             $state = $this->updateState(
@@ -444,13 +459,18 @@ final class ConversationGateway
                 }
             }
             $this->saveState($tenantId, $userId, $state);
+                        $telemetry = $this->telemetry('confusion_router', true, $confusionRoute);
+            if (isset($confusionRoute['llm_telemetry'])) {
+                $telemetry['llm_telemetry'] = $confusionRoute['llm_telemetry'];
+            }
+            $this->saveState($tenantId, $userId, $state);
             return $this->result(
                 (string) ($confusionRoute['action'] ?? 'respond_local'),
                 $reply,
                 $confusionRoute['command'] ?? null,
                 null,
                 $state,
-                $this->telemetry('confusion_router', true, $confusionRoute)
+                $telemetry
             );
         }
 
@@ -2083,10 +2103,16 @@ final class ConversationGateway
 
         if ($hasCreate && !$hasTable && !$hasForm) {
             if (preg_match('/\b(programa|app|aplicacion|sistema)\b/u', $text) === 1 && !$this->hasFieldPairs($text)) {
-                return [];
+                $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
             }
             if (($state['active_task'] ?? '') !== 'create_table' && $this->isQuestionLike($text) && !$this->hasFieldPairs($text)) {
-                return [];
+                $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
             }
             $entity = $this->parseEntityFromCrudText($text);
             if ($entity !== '') {
@@ -2166,6 +2192,9 @@ final class ConversationGateway
             }
             return ['command' => ['command' => 'CreateForm', 'entity' => $entity], 'entity' => $entity, 'collected' => []];
         }
+
+        $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
 
         return [];
     }
@@ -3706,7 +3735,10 @@ final class ConversationGateway
     {
         $candidate = trim($candidate);
         if ($candidate === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $playbook = $this->loadDomainPlaybook();
@@ -3715,7 +3747,10 @@ final class ConversationGateway
             : [];
         $enabled = (bool) ($unknownProtocol['enabled'] ?? true);
         if (!$enabled) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $hasGemini = trim((string) getenv('GEMINI_API_KEY')) !== '';
@@ -5019,7 +5054,10 @@ final class ConversationGateway
     private function findDomainProfile(string $businessType, array $playbook = []): array
     {
         if ($businessType === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         if (empty($playbook)) {
             $playbook = $this->loadDomainPlaybook();
@@ -5031,6 +5069,9 @@ final class ConversationGateway
                 return is_array($profile) ? $profile : [];
             }
         }
+        $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
         return [];
     }
 
@@ -5371,7 +5412,10 @@ final class ConversationGateway
         }
 
         if (empty($found)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $ordered = [];
@@ -5427,7 +5471,10 @@ final class ConversationGateway
         }
 
         if (empty($found)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $ordered = [];
@@ -5475,7 +5522,10 @@ final class ConversationGateway
             }
         }
         if (empty($excluded)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $ordered = [];
         foreach (array_keys($map) as $key) {
@@ -5578,14 +5628,14 @@ final class ConversationGateway
         return implode("\n", $lines);
     }
 
-    private function buildCreateTableProposal(string $entity, array $profile = []): array
+    private function buildCreateTableProposal(string $entity, array $profile = [], array $fields = []): array
     {
         $entity = $this->normalizeEntityForSchema($entity);
         $entity = $this->adaptEntityToBusinessContext($entity, $profile);
         if ($entity === '') {
             $entity = 'clientes';
         }
-        $suggested = $this->suggestFieldsForEntity($entity, $profile);
+        $suggested = !empty($fields) ? $fields : $this->suggestFieldsForEntity($entity, $profile);
         $fieldsCommand = $this->suggestedFieldsToCommand($suggested);
         $fieldNames = [];
         foreach ($suggested as $field) {
@@ -5761,16 +5811,25 @@ final class ConversationGateway
     {
         $target = $this->normalizeEntityForSchema($entity);
         if ($target === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $rules = $this->loadEntityDependencyRules();
         if (empty($rules[$target]) || !is_array($rules[$target])) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $rule = $rules[$target];
         $requiresGroups = is_array($rule['requires'] ?? null) ? $rule['requires'] : [];
         if (empty($requiresGroups)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $missingGroups = [];
@@ -5795,12 +5854,18 @@ final class ConversationGateway
             }
         }
         if (empty($missingGroups)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $nextEntity = $missingGroups[0][0] ?? '';
         if ($nextEntity === '' || $nextEntity === $target) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $proposal = $this->buildCreateTableProposal($nextEntity, $profile);
         $readableTarget = $this->entityDisplayName($target);
@@ -5868,11 +5933,14 @@ final class ConversationGateway
         }
         $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
 
-        if (str_contains($text, 'paciente') || str_contains($text, 'pacientes')) {
+        // Only force 'pacientes' if the sector is medical or if explicitly requested in a medical context
+        $isMedical = in_array($businessType, ['clinica_medica', 'odontologia', 'veterinaria', 'spa_bienestar'], true);
+
+        if ($isMedical && (str_contains($text, 'paciente') || str_contains($text, 'pacientes'))) {
             return 'pacientes';
         }
 
-        if (in_array($businessType, ['clinica_medica', 'odontologia'], true) && in_array($entity, ['clientes', 'cliente'], true)) {
+        if ($isMedical && in_array($entity, ['clientes', 'cliente'], true)) {
             return 'pacientes';
         }
 
@@ -6090,7 +6158,10 @@ final class ConversationGateway
                 $command = $this->buildCommand($intent, $entity, $collected);
                 return ['command' => $command, 'intent' => $intent, 'entity' => $entity, 'collected' => $collected];
             }
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $explicitEntity = $this->parseEntityFromCrudText($text);
@@ -6454,10 +6525,16 @@ private function parseEntityFromCrudText(string $text): string
     private function missingRequired(string $entity, array $collected, string $intent): array
     {
         if ($intent === 'list') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         if (in_array($intent, ['update', 'delete'], true)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         if ($entity === '') {
             return ['entidad'];
@@ -6836,7 +6913,10 @@ private function parseEntityFromCrudText(string $text): string
             $route = $this->classifyWithPlaybookIntents($text, $profile);
         }
         if (empty($route['intent'])) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $intentName = (string) $route['intent'];
         $action = (string) ($route['action'] ?? '');
@@ -6860,7 +6940,10 @@ private function parseEntityFromCrudText(string $text): string
             'PROJECT_SWITCH',
         ];
         if ($this->hasCrudSignals($text) && !$isPlaybookAction && !in_array($action, $allowedTrainingActions, true)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         if ($confidence < $threshold || $missing) {
@@ -6873,7 +6956,10 @@ private function parseEntityFromCrudText(string $text): string
                     'active_task' => 'training'
                 ];
             }
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         if ($isPlaybookAction) {
@@ -6885,7 +6971,10 @@ private function parseEntityFromCrudText(string $text): string
                 if ($mode !== 'builder') {
                     $entityInText = $this->detectEntity($text, $lexicon, $state);
                     if ($entityInText !== '' || str_contains($text, 'listar') || str_contains($text, 'lista') || str_contains($text, 'ver ')) {
-                        return [];
+                        $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
                     }
                 }
                 if ($mode === 'builder') {
@@ -6899,11 +6988,17 @@ private function parseEntityFromCrudText(string $text): string
                         || str_contains($text, 'entidad')
                         || str_contains($text, 'entidades');
                     if (!$wantsCatalog) {
-                        return [];
+                        $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
                     }
                     $detectedEntity = $this->detectEntity($text, $lexicon, $state);
                     if ($detectedEntity !== '' || $this->isDataListRequest($text) || !$wantsCatalog) {
-                        return [];
+                        $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
                     }
                 }
                 return ['action' => 'respond_local', 'reply' => $this->buildEntityList(), 'intent' => $intentName];
@@ -6916,7 +7011,10 @@ private function parseEntityFromCrudText(string $text): string
                         || str_contains($text, 'vista')
                         || str_contains($text, 'vistas');
                     if (!$wantsFormsCatalog || $this->isDataListRequest($text) || str_contains($text, 'crear ') || str_contains($text, 'usar ')) {
-                        return [];
+                        $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
                     }
                 }
                 return ['action' => 'respond_local', 'reply' => $this->buildFormList(), 'intent' => $intentName];
@@ -6924,7 +7022,10 @@ private function parseEntityFromCrudText(string $text): string
                 return ['action' => 'respond_local', 'reply' => $this->buildCapabilities($profile, $training, $mode), 'intent' => $intentName];
             case 'CRUD_GUIDE':
                 if (!$this->isCrudGuideRequest($text, $state, $training)) {
-                    return [];
+                    $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
                 }
                 $entity = '';
                 if (!empty($route['entities']['entity'])) {
@@ -7041,29 +7142,44 @@ private function parseEntityFromCrudText(string $text): string
                 $flowState = $state;
                 $flowRoute = $this->routeFlowControl($flowText, $flowState, $profile, $mode, $tenantId, $userId);
                 if (empty($flowRoute)) {
-                    return [];
+                    $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
                 }
                 $flowRoute['intent'] = $intentName;
                 $flowRoute['state_patch'] = $flowState;
                 return $flowRoute;
             default:
-                return [];
+                $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
     }
 
     private function routeWorkflowBuilder(string $text, string $mode, array $state): array
     {
         if ($mode !== 'builder') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         if (!empty($state['builder_pending_command']) && is_array($state['builder_pending_command'])) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $hasWorkflowKeyword = preg_match('/\b(workflow|flujo|dag|nodos)\b/u', $text) === 1;
         $hasBuildVerb = preg_match('/\b(crear|compilar|armar|disenar|diseñar|generar)\b/u', $text) === 1;
         if (!$hasWorkflowKeyword || !$hasBuildVerb) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $workflowId = $this->deriveWorkflowId($text);
@@ -7108,22 +7224,37 @@ private function parseEntityFromCrudText(string $text): string
     private function routeBuilderGuidance(string $text, array $training, array $state, array $lexicon, string $mode): array
     {
         if ($mode !== 'builder') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         if (trim($text) === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         if (!empty($state['builder_pending_command']) && is_array($state['builder_pending_command'])) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $activeTask = (string) ($state['active_task'] ?? '');
         if (in_array($activeTask, ['builder_onboarding', 'unknown_business_discovery', 'business_research_confirmation'], true)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $guides = $this->loadBuilderGuidance($training);
         if (empty($guides)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $bestGuide = [];
@@ -7157,18 +7288,27 @@ private function parseEntityFromCrudText(string $text): string
         }
 
         if (empty($bestGuide)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $topic = strtoupper(trim((string) ($bestGuide['topic'] ?? 'GENERAL')));
         $template = trim((string) ($bestGuide['agent_response_template'] ?? ''));
         if ($template === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $reply = $this->renderBuilderGuidanceTemplate($template, $text, $state, $lexicon);
         if ($reply === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $flowHint = $this->guidanceFlowHint($topic);
         if ($flowHint !== '') {
@@ -7236,7 +7376,10 @@ private function parseEntityFromCrudText(string $text): string
     {
         $command = strtolower(trim($command));
         if ($command === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $rules = is_array($training['feedback_rules'] ?? null) ? $training['feedback_rules'] : [];
         $byCommand = is_array($rules['commands'] ?? null) ? $rules['commands'] : [];
@@ -7261,7 +7404,10 @@ private function parseEntityFromCrudText(string $text): string
             $source = $this->normalizeEntityForSchema((string) ($tables['tabla_A'] ?? ''));
             $target = $this->normalizeEntityForSchema((string) ($tables['tabla_B'] ?? ''));
             if ($source === '' || $target === '' || $source === $target) {
-                return [];
+                $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
             }
 
             return [
@@ -7277,7 +7423,10 @@ private function parseEntityFromCrudText(string $text): string
             $entity = $this->detectGuidanceEntityFromText($text, $state, $lexicon);
             $field = $this->detectGuidanceFieldFromText($text);
             if ($entity === '' || $field === '') {
-                return [];
+                $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
             }
 
             return [
@@ -7287,6 +7436,9 @@ private function parseEntityFromCrudText(string $text): string
                 'index_name' => 'idx_' . $entity . '_' . $field,
             ];
         }
+
+        $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
 
         return [];
     }
@@ -8185,6 +8337,9 @@ private function parseEntityFromCrudText(string $text): string
                 return $guide;
             }
         }
+        $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
         return [];
     }
 
@@ -8321,38 +8476,59 @@ private function parseEntityFromCrudText(string $text): string
     private function routeFlowRuntimeExpiry(string $text, array &$state, string $mode, array $profile): array
     {
         if ($mode !== 'builder') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $runtime = $this->normalizeFlowRuntime(is_array($state['flow_runtime'] ?? null) ? $state['flow_runtime'] : []);
         $step = trim((string) ($state['onboarding_step'] ?? ($runtime['current_step'] ?? '')));
         if ($step === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $lastActivityRaw = (string) ($runtime['last_activity_at'] ?? '');
         if ($lastActivityRaw === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $lastActivityAt = strtotime($lastActivityRaw);
         if ($lastActivityAt === false) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $ttlSeconds = $this->flowRuntimeTtlSeconds();
         if ($ttlSeconds <= 0 || (time() - $lastActivityAt) < $ttlSeconds) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $intent = $this->detectFlowControlIntent($text);
         if ($intent !== '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $alreadyNotified = (bool) ($state['flow_expiry_notice_sent'] ?? false);
         if ($alreadyNotified) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $runtime['paused'] = true;
@@ -8394,7 +8570,10 @@ private function parseEntityFromCrudText(string $text): string
     ): array {
         $intent = $this->detectFlowControlIntent($text);
         if ($intent === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $state['flow_expiry_notice_sent'] = false;
 
@@ -8581,6 +8760,9 @@ private function parseEntityFromCrudText(string $text): string
             ];
         }
 
+        $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
         return [];
     }
 
@@ -8707,14 +8889,23 @@ private function parseEntityFromCrudText(string $text): string
     private function routeFeedbackLoop(string $text, array &$state, string $mode, string $tenantId, string $userId): array
     {
         if ($mode !== 'builder') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         if (is_array($state['builder_pending_command'] ?? null)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $pending = is_array($state['feedback_pending'] ?? null) ? (array) $state['feedback_pending'] : [];
         if (empty($pending)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $normalized = trim(preg_replace('/\s+/', ' ', strtolower($text)) ?? strtolower($text));
@@ -8734,7 +8925,10 @@ private function parseEntityFromCrudText(string $text): string
                     'active_task' => $state['active_task'] ?? null,
                 ];
             }
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $entry = [
@@ -8871,7 +9065,10 @@ private function parseEntityFromCrudText(string $text): string
         $playbook = $this->loadDomainPlaybook();
         $intents = is_array($playbook['solver_intents'] ?? null) ? $playbook['solver_intents'] : [];
         if (empty($intents)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $textTokens = $this->tokenizeTraining($text);
@@ -8944,7 +9141,10 @@ private function parseEntityFromCrudText(string $text): string
         }
 
         if ((string) ($best['intent'] ?? '') === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         return [
@@ -8971,14 +9171,20 @@ private function parseEntityFromCrudText(string $text): string
     ): array {
         $sectorKey = $this->sectorKeyByPlaybookAction($action);
         if ($sectorKey === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $playbook = $this->loadDomainPlaybook();
         $sector = $this->findSectorPlaybook($sectorKey, $playbook);
         if (empty($sector)) {
             $sample = 'requested_action=' . $action . '; source=playbook_router';
             $this->appendResearchTopic($tenantId, $sectorKey . ':playbook_missing', $userId, mb_substr($sample, 0, 220));
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $updatedProfile = $profile;
@@ -9098,7 +9304,10 @@ private function parseEntityFromCrudText(string $text): string
     {
         $sectorKey = strtoupper(trim($sectorKey));
         if ($sectorKey === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         if (empty($playbook)) {
             $playbook = $this->loadDomainPlaybook();
@@ -9112,6 +9321,9 @@ private function parseEntityFromCrudText(string $text): string
                 return $sector;
             }
         }
+        $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
         return [];
     }
 
@@ -9197,10 +9409,13 @@ private function parseEntityFromCrudText(string $text): string
         return false;
     }
 
-    private function routeConfusion(string $text, string $mode, array $state, array $profile, array $confusionBase): array
+    private function routeConfusion(string $text, string $mode, array $state, array $profile, array $confusionBase, string $tenantId = "default", string $userId = "anon"): array
     {
         if (empty($confusionBase) || empty($confusionBase['confusion_sets']) || !is_array($confusionBase['confusion_sets'])) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $capabilitiesSet = $this->confusionSetById($confusionBase, 'ASK_CAPABILITIES');
@@ -9238,9 +9453,7 @@ private function parseEntityFromCrudText(string $text): string
             ];
         }
 
-        if ($mode !== 'builder') {
-            return [];
-        }
+
 
         $pending = is_array($state['builder_pending_command'] ?? null) ? $state['builder_pending_command'] : [];
         if ($this->isBuilderProgressQuestion($text)) {
@@ -9285,6 +9498,13 @@ private function parseEntityFromCrudText(string $text): string
             }
         }
 
+        if ($mode === 'builder') {
+            $llmResolution = $this->resolveBuilderEntityConfusionWithLLM($text, $state, $profile, $tenantId, $userId);
+            if (!empty($llmResolution)) {
+                return $llmResolution;
+            }
+        }
+
         $askNextSet = $this->confusionSetById($confusionBase, 'ASK_NEXT_STEP');
         $isStepQuestion = $this->confusionMatches($text, $askNextSet);
         if ($isStepQuestion && empty($pending) && ($state['active_task'] ?? '') === 'builder_onboarding' && !$this->hasBuildSignals($text)) {
@@ -9316,7 +9536,215 @@ private function parseEntityFromCrudText(string $text): string
             ];
         }
 
+        $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
         return [];
+    }
+
+        private function appendLlmTelemetry(string $reply, array $state): string
+    {
+        $usage = $state['llm_usage'] ?? null;
+        if (!$usage || empty($usage['last'])) return $reply;
+
+        $last = $usage['last'];
+        $provider = strtoupper((string) ($last['provider'] ?? 'LLM'));
+        $count = (int) ($usage['count'] ?? 0);
+        $quality = (string) ($last['quality'] ?? 'Media');
+        $quota = $count > 50 ? '⚠️ Baja' : '✅ OK';
+
+        $footer = "\n\n---\n";
+        $footer .= "🤖 **Amigo invocado**: {$provider} | ";
+        $footer .= "📊 **Llamada**: #{$count} | ";
+        $footer .= "⚡ **Calidad**: {$quality} | ";
+        $footer .= "🔋 **Cuota**: {$quota}";
+
+        return $reply . $footer;
+    }
+
+    private function executeEmergencyLlmCall(string $text, array &$state, array $profile, string $tenantId, string $userId): array
+    {
+        $hasGemini = trim((string) getenv('GEMINI_API_KEY')) !== '';
+                $hasDeepSeek = trim((string) getenv('DEEPSEEK_API_KEY')) !== '';
+        
+        // 0. Silent Learning: Check if we solved this recently
+        $cacheKey = md5(trim(strtolower($text)));
+        if (isset($state['llm_usage']['history'][$cacheKey])) {
+            return $state['llm_usage']['history'][$cacheKey];
+        }
+        if (!$hasGemini && !$hasDeepSeek) return [];
+
+        $capsule = [
+            'intent' => 'EMERGENCY_MICROPPROMPT',
+            'user_message' => $text,
+            'policy' => ['requires_strict_json' => true, 'max_output_tokens' => 500],
+            'prompt_contract' => [
+                'ROLE' => 'SISTEMA DE EMERGENCIA (LLAMADA AL AMIGO)',
+                'GOAL' => 'El usuario esta confundido o el bot no entiende. Analiza el contexto y da una salida clara.',
+                'KNOWLEDGE_CONTEXT' => [
+                    'sector' => $profile['business_type'] ?? 'desconocido',
+                    'active_task' => $state['active_task'] ?? 'chico_listo',
+                    'last_decision' => end($state['last_messages']) ?: 'Ninguna'
+                ],
+                'INSTRUCTION' => 'Encuentra si la respuesta esta en el sector o pide UNA aclaracion clave. Responde en JSON.',
+                'OUTPUT_FORMAT' => [
+                    'reply' => ['type' => 'string'],
+                    'intent' => ['type' => 'string'],
+                    'need_more_context' => ['type' => 'boolean']
+                ]
+            ]
+        ];
+
+        try {
+            $router = new \App\Core\LLM\LLMRouter();
+            $result = $router->chat($capsule, ['mode' => $hasDeepSeek ? 'deepseek' : 'gemini']);
+            $json = $result['json'] ?? [];
+            if (empty($json)) return [];
+
+                        $emergencyResponse = [
+                'action' => 'ask_user',
+                'reply' => (string) ($json['reply'] ?? 'No estoy seguro, pero puedo investigar mas.'),
+                'intent' => (string) ($json['intent'] ?? 'llm_emergency_resolution'),
+                'llm_telemetry' => [
+                    'provider' => $result['provider'] ?? 'unknown',
+                    'usage' => $result['usage'] ?? [],
+                    'quality' => 'Alta (Emergencia)'
+                ]
+            ];
+        } catch (\Exception $e) { return []; }
+    }
+    private function resolveBuilderEntityConfusionWithLLM(string $text, array $state, array $profile, string $tenantId, string $userId): array
+    {
+        $hasGemini = trim((string) getenv('GEMINI_API_KEY')) !== '';
+                $hasDeepSeek = trim((string) getenv('DEEPSEEK_API_KEY')) !== '';
+        
+        // 0. Silent Learning: Check if we solved this recently
+        $cacheKey = md5(trim(strtolower($text)));
+        if (isset($state['llm_usage']['history'][$cacheKey])) {
+            return $state['llm_usage']['history'][$cacheKey];
+        }
+        if (!$hasGemini && !$hasDeepSeek) return [];
+
+        // 1. Build STATE_JSON with PENDING context
+        $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
+        $plan = is_array($state['builder_plan'] ?? null) ? (array) $state['builder_plan'] : [];
+        $progress = $this->computeBuilderPlanProgress($plan, $state);
+        $pending = is_array($state['builder_pending_command'] ?? null) ? $state['builder_pending_command'] : [];
+
+        $stateJson = [
+            'current_sector' => ($businessType !== '') ? $businessType : 'general',
+            'entities_done' => array_values($progress['done_entities']),
+            'plan_missing_entities' => array_values($progress['missing_entities']),
+            'pending_action' => !empty($pending) ? [
+                'command' => $pending['command'] ?? 'None',
+                'entity' => $pending['entity'] ?? 'None',
+                'current_fields' => $pending['fields'] ?? []
+            ] : null,
+            'constraints' => is_array($state['constraints_log'] ?? null) ? array_values((array) $state['constraints_log']) : [],
+        ];
+
+        // 2. Build ROL DEL AGENTE prompt - Now with full control over pending state
+        $promptContract = [
+            'ROLE' => 'AGENTE ARQUITECTO DETERMINISTICO (FULL CONTROL)',
+            'CONTEXT' => [
+                'goal' => 'Gestionar la creacion de la app. El Agente puede: CREAR, MODIFICAR pendientes, o REINICIAR sector.',
+                'state_json' => $stateJson,
+            ],
+            'RULES' => [
+                '1_PENDING_HANDLING' => 'Si el user_text rechaza la accion pendiente o propone OTRA tabla, emite patch_type="clear_pending" o "modify_pending".',
+                '2_SECTOR_SYNC' => 'Si el rubro mencionado (ej: reposteria) no coincide con current_sector, emite patch_type="change_sector".',
+                '3_FIELD_CUSTOMIZATION' => 'Si el usuario pide campos especificos (ej: "que diga de que eps"), emite patch_type="modify_pending" con los nuevos campos.',
+            ],
+            'OUTPUT_FORMAT' => [
+                'intent_classification' => ['type' => 'string', 'enum' => ['DETERMINISTICO', 'AMBIGUO', 'EXPLICATIVO']],
+                'phase_1_plan' => [
+                    'proposed_reply' => ['type' => 'string'],
+                ],
+                'phase_2_patch' => [
+                    'patch_type' => ['type' => 'string', 'enum' => ['add_entity', 'modify_pending', 'clear_pending', 'change_sector', 'ask_question']],
+                    'new_sector' => ['type' => 'string'],
+                    'entity' => ['type' => 'string'],
+                    'fields' => ['type' => 'array', 'items' => ['type' => 'string', 'description' => 'formato nombre:tipo']],
+                ]
+            ]
+        ];
+
+        $capsule = [
+            'intent' => 'BUILDER_JSON_ASSISTANT',
+            'user_message' => $text,
+            'policy' => ['requires_strict_json' => true, 'max_output_tokens' => 800],
+            'prompt_contract' => $promptContract,
+        ];
+
+        try {
+            $router = new \App\Core\LLM\LLMRouter();
+            $llm = $router->chat($capsule, ['mode' => $hasDeepSeek ? 'deepseek' : 'gemini', 'temperature' => 0.1]);
+            $llmUsageData = [
+                'provider' => $llm['provider'] ?? 'unknown',
+                'usage' => $llm['usage'] ?? [],
+                'quality' => !empty($llm['json']) ? 'Alta' : 'Baja'
+            ];
+            $json = is_array($llm['json'] ?? null) ? $llm['json'] : [];
+            if (empty($json)) return [];
+
+            $reply = (string) ($json['phase_1_plan']['proposed_reply'] ?? 'Entiendo.');
+            $patch = $json['phase_2_patch'] ?? [];
+            $patchType = (string) ($patch['patch_type'] ?? 'ask_question');
+
+            // --- Handler: Change Sector ---
+            if ($patchType === 'change_sector') {
+                $newSector = $this->normalizeBusinessType((string) ($patch['new_sector'] ?? ''));
+                if ($newSector !== '') {
+                    $profile['business_type'] = $newSector;
+                    $this->saveProfile($tenantId, $this->profileUserKey($userId), $profile);
+                    $playbook = $this->loadDomainPlaybook();
+                    $sectorData = $this->findSectorPlaybook($newSector, $playbook);
+                    $newPlan = !empty($sectorData['blueprint']) ? $sectorData['blueprint'] : [];
+                    $state['builder_plan'] = $newPlan;
+                    $this->clearBuilderPendingCommand($state);
+                    $state['active_task'] = 'builder_onboarding';
+                    $targetEntity = (string) ($patch['entity'] ?? ($newPlan['entities'][0]['name'] ?? 'clientes'));
+                    $proposal = $this->buildCreateTableProposal($targetEntity, $profile);
+                    return [ 'llm_telemetry' => $llmUsageData, 'action' => 'ask_user', 'reply' => $reply . "\n\n" . $proposal['reply'],
+                        'intent' => 'llm_change_sector',
+                        'entity' => $proposal['entity'],
+                        'pending_command' => $proposal['command'],
+                        'state_patch' => ['builder_plan' => $newPlan, 'active_task' => 'create_table']
+                    ];
+                }
+            }
+
+            // --- Handler: Modify Pending ---
+            if ($patchType === 'modify_pending' || $patchType === 'clear_pending') {
+                $this->clearBuilderPendingCommand($state);
+                if ($patchType === 'clear_pending' || empty($patch['entity'])) {
+                    return ['action' => 'ask_user', 'reply' => $reply, 'intent' => 'llm_clear_pending'];
+                }
+                $newEntity = $this->normalizeEntityForSchema($patch['entity']);
+                $fields = is_array($patch['fields'] ?? null) ? $patch['fields'] : [];
+                $proposal = $this->buildCreateTableProposal($newEntity, $profile, $fields);
+                return [ 'llm_telemetry' => $llmUsageData, 'action' => 'ask_user', 'reply' => $reply . "\n\n" . $proposal['reply'],
+                    'intent' => 'llm_modify_pending',
+                    'entity' => $proposal['entity'],
+                    'pending_command' => $proposal['command'],
+                    'active_task' => 'create_table'
+                ];
+            }
+
+            // --- Handler: Add Entity ---
+            if ($patchType === 'add_entity') {
+                $entity = (string) ($patch['entity'] ?? '');
+                if ($entity !== '') {
+                    $proposal = $this->buildCreateTableProposal($entity, $profile);
+                    return [ 'llm_telemetry' => $llmUsageData, 'action' => 'ask_user', 'reply' => $reply . "\n\n" . $proposal['reply'],
+                        'intent' => 'llm_add_entity', 'entity' => $proposal['entity'],
+                        'pending_command' => $proposal['command'], 'active_task' => 'create_table'
+                    ];
+                }
+            }
+
+            return ['action' => 'ask_user', 'reply' => $reply, 'intent' => 'llm_clarify'];
+        } catch (\Exception $e) { return []; }
     }
 
     private function confusionSetById(array $confusionBase, string $id): array
@@ -9330,6 +9758,9 @@ private function parseEntityFromCrudText(string $text): string
                 return $set;
             }
         }
+        $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
         return [];
     }
 
@@ -9414,7 +9845,10 @@ private function parseEntityFromCrudText(string $text): string
         $text = preg_replace('/[^\\p{L}\\p{N}\\s]/u', ' ', $text) ?? $text;
         $text = preg_replace('/\\s+/', ' ', trim($text)) ?? $text;
         if ($text === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $tokens = preg_split('/\\s+/', $text) ?: [];
         return array_values(array_filter($tokens, fn($t) => mb_strlen($t, 'UTF-8') >= 2));
@@ -9752,20 +10186,12 @@ private function parseEntityFromCrudText(string $text): string
             }
         }
         if (!is_file($path)) {
-            $this->trainingBaseCache[$cacheKey] = [
-                'data' => [],
-                'base_mtime' => $baseMtime,
-                'override_hash' => $overrideHash,
-            ];
+            $this->confusionBaseCache = [];
             return [];
         }
         $raw = file_get_contents($path);
         if ($raw === false || $raw === '') {
-            $this->trainingBaseCache[$cacheKey] = [
-                'data' => [],
-                'base_mtime' => $baseMtime,
-                'override_hash' => $overrideHash,
-            ];
+            $this->confusionBaseCache = [];
             return [];
         }
         $raw = ltrim($raw, "\xEF\xBB\xBF");
@@ -9918,6 +10344,7 @@ private function parseEntityFromCrudText(string $text): string
 
         $path = $this->projectRoot . '/storage/tenants/' . $this->safe($tenantId) . '/training_overrides.json';
         if (!is_file($path)) {
+            $this->confusionBaseCache = [];
             return [];
         }
         $legacy = $this->readJson($path, []);
@@ -10066,8 +10493,16 @@ private function parseEntityFromCrudText(string $text): string
         ];
     }
 
-    private function result(string $action, string $reply, ?array $command, ?array $llmRequest, array $state, array $telemetry): array
+        private function result(string $action, string $reply, ?array $command, ?array $llmRequest, array $state, array $telemetry): array
     {
+        if (isset($telemetry['llm_telemetry']) || isset($llmRequest['llm_telemetry'])) {
+            $llmRes = $telemetry['llm_telemetry'] ?? $llmRequest['llm_telemetry'];
+            $usage = $state['llm_usage'] ?? ['count' => 0, 'last' => null, 'history' => []];
+            $usage['count']++;
+            $usage['last'] = $llmRes;
+            $state['llm_usage'] = $usage;
+            $reply = $this->appendLlmTelemetry($reply, $state);
+        }
         $this->appendShortTermLog('out', $reply, [
             'action' => $action,
             'intent' => (string) ($telemetry['intent'] ?? ''),
@@ -10151,6 +10586,7 @@ private function parseEntityFromCrudText(string $text): string
             'feedback_pending' => null,
             'feedback_log' => [],
             'last_messages' => [],
+            'llm_usage' => ['count' => 0, 'last' => null, 'history' => []],
             'summary' => null,
         ];
 
@@ -10397,7 +10833,8 @@ private function parseEntityFromCrudText(string $text): string
         $frameworkRoot = defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__, 3);
         $path = $frameworkRoot . '/contracts/agents/WORKING_MEMORY_SCHEMA.json';
         if (!is_file($path)) {
-            throw new RuntimeException('Schema de working memory no existe: ' . $path);
+            $this->confusionBaseCache = [];
+            return [];
         }
         $raw = file_get_contents($path);
         if (!is_string($raw) || trim($raw) === '') {
@@ -10482,11 +10919,14 @@ private function parseEntityFromCrudText(string $text): string
         $frameworkPath = $frameworkRoot . '/contracts/agents/domain_playbooks.json';
         if (!is_file($frameworkPath)) {
             $this->domainPlaybookCache = [];
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $raw = file_get_contents($frameworkPath);
         if ($raw === false || $raw === '') {
-            $this->domainPlaybookCache = [];
+            $this->confusionBaseCache = [];
             return [];
         }
         $raw = ltrim($raw, "\xEF\xBB\xBF");
@@ -10531,12 +10971,12 @@ private function parseEntityFromCrudText(string $text): string
         $frameworkRoot = defined('FRAMEWORK_ROOT') ? FRAMEWORK_ROOT : dirname(__DIR__, 3);
         $path = $frameworkRoot . '/contracts/agents/accounting_tax_knowledge_co.json';
         if (!is_file($path)) {
-            $this->accountingKnowledgeCache = [];
+            $this->confusionBaseCache = [];
             return [];
         }
         $raw = file_get_contents($path);
         if ($raw === false || $raw === '') {
-            $this->accountingKnowledgeCache = [];
+            $this->confusionBaseCache = [];
             return [];
         }
         $raw = ltrim($raw, "\xEF\xBB\xBF");
@@ -10553,12 +10993,12 @@ private function parseEntityFromCrudText(string $text): string
         $frameworkRoot = defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__, 3);
         $path = $frameworkRoot . '/contracts/agents/unspsc_co_common.json';
         if (!is_file($path)) {
-            $this->unspscCommonCache = [];
+            $this->confusionBaseCache = [];
             return [];
         }
         $raw = file_get_contents($path);
         if ($raw === false || $raw === '') {
-            $this->unspscCommonCache = [];
+            $this->confusionBaseCache = [];
             return [];
         }
         $raw = ltrim($raw, "\xEF\xBB\xBF");
@@ -10571,7 +11011,10 @@ private function parseEntityFromCrudText(string $text): string
     {
         $items = is_array($knowledge['common_codes'] ?? null) ? $knowledge['common_codes'] : [];
         if (empty($items)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $matches = [];
         foreach ($items as $item) {
@@ -10629,7 +11072,10 @@ private function parseEntityFromCrudText(string $text): string
             $codes = (array) $reco['default'];
         }
         if (empty($codes)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $items = is_array($knowledge['common_codes'] ?? null) ? $knowledge['common_codes'] : [];
@@ -10804,7 +11250,10 @@ private function parseEntityFromCrudText(string $text): string
             . $this->safe($profileUserKey)
             . '.json';
         if (!is_file($legacyPath)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $legacy = $this->readJson($legacyPath, []);
         if (!empty($legacy)) {
@@ -10827,7 +11276,10 @@ private function parseEntityFromCrudText(string $text): string
 
         $legacyPath = $this->projectRoot . '/storage/chat/glossary/' . $this->safe($tenantId) . '.json';
         if (!is_file($legacyPath)) {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
         $legacy = $this->readJson($legacyPath, []);
         if (!empty($legacy)) {
@@ -10845,7 +11297,10 @@ private function parseEntityFromCrudText(string $text): string
     {
         $topic = trim($topic);
         if ($topic === '') {
-            return [];
+            $emergency = $this->executeEmergencyLlmCall($text, $state, $profile, $tenantId, $userId);
+        if (!empty($emergency)) return $emergency;
+
+        return [];
         }
 
         $queue = $this->memory->getTenantMemory($tenantId, 'research_queue', ['topics' => []]);
@@ -11005,12 +11460,13 @@ private function parseEntityFromCrudText(string $text): string
     private function readJson(string $path, array $default): array
     {
         if (!is_file($path)) {
-            $this->writeJson($path, $default);
-            return $default;
+            $this->confusionBaseCache = [];
+            return [];
         }
         $raw = file_get_contents($path);
         if ($raw === false || $raw === '') {
-            return $default;
+            $this->confusionBaseCache = [];
+            return [];
         }
         $decoded = json_decode($raw, true);
         return is_array($decoded) ? $decoded : $default;
@@ -11037,6 +11493,57 @@ private function parseEntityFromCrudText(string $text): string
     {
         $value = preg_replace('/[^a-zA-Z0-9_\\-]/', '_', $value) ?? 'default';
         return trim($value, '_');
+    }
+
+    private function isExcelImportStatusQuestion(string $text): bool
+    {
+        $patterns = [
+            'subi.*excel', 'cargue.*excel', 'subi.*archivo', 'cargue.*archivo',
+            'importa.*excel', 'import.*xlsx', 'excel.*import', 'archivo.*excel',
+            'subio.*excel', 'cargar.*excel', 'subir.*excel',
+        ];
+        foreach ($patterns as $pattern) {
+            if (preg_match('/' . $pattern . '/ui', $text)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function buildExcelImportStatusReply(array $state, array $profile): string
+    {
+        $lastImport = $state['last_excel_import'] ?? null;
+        if (!$lastImport) {
+            $url = rtrim(getenv('APP_URL') ?: '', '/') . '/excel_import.php';
+            return implode("\n", [
+                '📊 **Importación de Excel**',
+                '',
+                'Puedes subir archivos `.xlsx` directamente al sistema. El agente:',
+                '- Leerá automáticamente cada hoja del libro.',
+                '- Creará una tabla por hoja (usando la primera fila como columnas).',
+                '- Guardará todos los datos en la base de datos.',
+                '',
+                "**Endpoint:** `POST {$url}`",
+                '**Parámetros:** `file` (.xlsx), `tenant_id`',
+                '',
+                '💡 Una vez importado, puedes preguntar cosas como: *"¿cuántos productos tengo?"* o *"busca cliente Juan"*.',
+            ]);
+        }
+
+        $sheets    = (int) ($lastImport['sheets_processed'] ?? 0);
+        $rows      = (int) ($lastImport['rows_inserted'] ?? 0);
+        $entities  = implode(', ', (array) ($lastImport['entities_created'] ?? []));
+        $timestamp = (string) ($lastImport['imported_at'] ?? 'hace un momento');
+
+        return implode("\n", [
+            '✅ **Última importación**',
+            "- Hojas procesadas: **{$sheets}**",
+            "- Tablas creadas: **{$entities}**",
+            "- Filas guardadas: **{$rows}**",
+            "- Fecha: {$timestamp}",
+            '',
+            'Puedes hacer preguntas sobre los datos ya cargados.',
+        ]);
     }
 }
 
