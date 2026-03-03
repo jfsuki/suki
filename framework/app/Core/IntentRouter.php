@@ -6,11 +6,17 @@ namespace App\Core;
 final class IntentRouter
 {
     private ContractRegistry $contracts;
+    private RouterPolicyEvaluator $policyEvaluator;
     private string $enforcementMode;
 
-    public function __construct(?ContractRegistry $contracts = null, ?string $enforcementMode = null)
+    public function __construct(
+        ?ContractRegistry $contracts = null,
+        ?string $enforcementMode = null,
+        ?RouterPolicyEvaluator $policyEvaluator = null
+    )
     {
         $this->contracts = $contracts ?? new ContractRegistry();
+        $this->policyEvaluator = $policyEvaluator ?? new RouterPolicyEvaluator();
         $this->enforcementMode = $this->normalizeEnforcementMode(
             $enforcementMode ?? (string) (getenv('ENFORCEMENT_MODE') ?: 'off')
         );
@@ -33,7 +39,12 @@ final class IntentRouter
             'agentops_metrics_contract' => 'unknown',
         ];
         $catalog = [];
-        $routerPolicy = [];
+        $routerPolicy = [
+            'route_order' => $routeOrder,
+            'rules' => ['llm_is_last_resort' => true],
+            'minimum_evidence' => [],
+            'missing_evidence_actions' => ['default_action' => 'ASK'],
+        ];
         try {
             $routerPolicy = $this->contracts->getRouterPolicy();
             $actionCatalog = $this->contracts->getActionCatalog();
@@ -55,18 +66,43 @@ final class IntentRouter
         }
 
         $actionCatalogEntry = null;
+        $catalogActionName = '';
+        $allowlisted = true;
         if ($action === 'execute_command') {
             $commandName = (string) ($command['command'] ?? '');
             $catalogActionName = $this->mapCommandToCatalogAction($commandName);
             $actionCatalogEntry = $this->resolveCatalogEntry($catalog, $catalogActionName);
             if ($catalogActionName === '') {
                 $violations[] = 'action_catalog_mapping_missing_for_command:' . $commandName;
+                $allowlisted = false;
             } elseif ($actionCatalogEntry === null) {
                 $violations[] = 'action_not_allowlisted:' . $catalogActionName;
+                $allowlisted = false;
             }
         }
 
-        $gateDecision = $this->resolveGateDecision($violations);
+        $evaluation = $this->policyEvaluator->evaluate(
+            [
+                'action' => $action,
+                'command' => $command,
+                'llm_request' => $llmRequest,
+                'route_order' => $routeOrder,
+                'route_path_steps' => $routePathSteps,
+                'catalog_action_name' => $catalogActionName,
+                'allowlisted' => $allowlisted,
+                'pre_violations' => $violations,
+                'evidence' => is_array($gatewayResult['evidence'] ?? null) ? (array) $gatewayResult['evidence'] : [],
+            ],
+            $routerPolicy,
+            is_array($actionCatalogEntry) ? (array) $actionCatalogEntry : null,
+            $context,
+            $this->enforcementMode
+        );
+        $violations = is_array($evaluation['violations'] ?? null) ? (array) $evaluation['violations'] : [];
+        $gateDecision = (string) ($evaluation['gate_decision'] ?? $this->resolveGateDecision($violations));
+        $routePathSteps = is_array($evaluation['route_path_steps'] ?? null)
+            ? (array) $evaluation['route_path_steps']
+            : $routePathSteps;
         $versions = [
             'prompt_version' => (string) (getenv('PROMPT_VERSION') ?: 'unknown'),
             'router_policy_version' => $contractVersions['router_policy'],
@@ -79,9 +115,14 @@ final class IntentRouter
             'route_path' => $routePath,
             'route_path_steps' => $routePathSteps,
             'gate_decision' => $gateDecision,
+            'final_decision' => (string) ($evaluation['final_decision'] ?? 'allow'),
+            'resolve_criteria_code' => (string) ($evaluation['resolve_criteria_code'] ?? 'INFORMATIVE_RESPONSE_VALID'),
             'contract_versions' => $contractVersions,
             'versions' => $versions,
             'enforcement_mode' => $this->enforcementMode,
+            'gate_results' => is_array($evaluation['gate_results'] ?? null) ? (array) $evaluation['gate_results'] : [],
+            'evidence_status' => is_array($evaluation['evidence_status'] ?? null) ? (array) $evaluation['evidence_status'] : [],
+            'evidence_used' => is_array($evaluation['evidence_used'] ?? null) ? (array) $evaluation['evidence_used'] : [],
         ];
         if (!empty($violations)) {
             $agentOps['contract_violations'] = $violations;
@@ -95,9 +136,42 @@ final class IntentRouter
         }
         $telemetry = array_merge($telemetry, $agentOps);
 
-        if ($this->mustBlock($violations)) {
+        if ($gateDecision === 'blocked') {
+            $overrideAction = trim((string) ($evaluation['action_override'] ?? ''));
+            $replyOverride = trim((string) ($evaluation['reply_override'] ?? ''));
+            $replyBlocked = $replyOverride !== '' ? $replyOverride : $this->buildBlockedReply($routerPolicy, $violations);
+            if ($overrideAction === 'ask_user') {
+                return new IntentRouteResult('ask_user', $replyBlocked, [], [], $state, $telemetry, $agentOps);
+            }
             $safeReply = $this->buildBlockedReply($routerPolicy, $violations);
-            return new IntentRouteResult('respond_local', $safeReply, [], [], $state, $telemetry, $agentOps);
+            return new IntentRouteResult('respond_local', $replyOverride !== '' ? $replyOverride : $safeReply, [], [], $state, $telemetry, $agentOps);
+        }
+
+        if ($gateDecision === 'warn') {
+            $overrideAction = trim((string) ($evaluation['action_override'] ?? ''));
+            $replyOverride = trim((string) ($evaluation['reply_override'] ?? ''));
+            if ($overrideAction === 'ask_user') {
+                return new IntentRouteResult(
+                    'ask_user',
+                    $replyOverride !== '' ? $replyOverride : 'Falta evidencia minima para continuar.',
+                    [],
+                    [],
+                    $state,
+                    $telemetry,
+                    $agentOps
+                );
+            }
+            if ($overrideAction === 'respond_local') {
+                return new IntentRouteResult(
+                    'respond_local',
+                    $replyOverride !== '' ? $replyOverride : 'No hay evidencia minima suficiente para ejecutar.',
+                    [],
+                    [],
+                    $state,
+                    $telemetry,
+                    $agentOps
+                );
+            }
         }
 
         if (in_array($action, ['respond_local', 'ask_user'], true)) {

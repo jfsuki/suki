@@ -226,6 +226,8 @@ $whatsAppBadSig = runApiRouteE2E($helper, [
     'method' => 'POST',
     'env' => [
         'WHATSAPP_APP_SECRET' => $waSecret,
+        'APP_ENV' => 'local',
+        'ALLOW_RUNTIME_SCHEMA' => '1',
     ],
     'payload' => $waPayload,
 ]);
@@ -239,6 +241,8 @@ $whatsAppReplayA = runApiRouteE2E($helper, [
     'method' => 'POST',
     'env' => [
         'WHATSAPP_APP_SECRET' => $waSecret,
+        'APP_ENV' => 'local',
+        'ALLOW_RUNTIME_SCHEMA' => '1',
     ],
     'headers' => [
         'X-Hub-Signature-256' => $waSig,
@@ -250,6 +254,8 @@ $whatsAppReplayB = runApiRouteE2E($helper, [
     'method' => 'POST',
     'env' => [
         'WHATSAPP_APP_SECRET' => $waSecret,
+        'APP_ENV' => 'local',
+        'ALLOW_RUNTIME_SCHEMA' => '1',
     ],
     'headers' => [
         'X-Hub-Signature-256' => $waSig,

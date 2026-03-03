@@ -33,6 +33,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('flow_control', fn() => $this->checkFlowControl());
         $tests[] = $this->wrap('domain_training_sync', fn() => $this->checkDomainTrainingSync());
         $tests[] = $this->wrap('secrets_guard', fn() => $this->checkSecretsGuard());
+        $tests[] = $this->wrap('sensitive_log_redaction', fn() => $this->checkSensitiveLogRedaction());
         $tests[] = $this->wrap('security_state_repository', fn() => $this->checkSecurityStateRepository());
         $tests[] = $this->wrap('openapi_importer', fn() => $this->checkOpenApiIntegrationImporter());
         $tests[] = $this->wrap('api_security_guard', fn() => $this->checkApiSecurityGuard());
@@ -40,7 +41,11 @@ final class UnitTestRunner
         $tests[] = $this->wrap('records_get_with_signed_token_ok', fn() => $this->checkRecordsGetWithSignedTokenOk());
         $tests[] = $this->wrap('records_get_with_expired_token_fail', fn() => $this->checkRecordsGetWithExpiredTokenFail());
         $tests[] = $this->wrap('records_get_token_tenant_mismatch_fail', fn() => $this->checkRecordsGetTokenTenantMismatchFail());
+        $tests[] = $this->wrap('whatsapp_fast_ack', fn() => $this->checkWhatsAppFastAck());
+        $tests[] = $this->wrap('whatsapp_enqueue', fn() => $this->checkWhatsAppEnqueue());
+        $tests[] = $this->wrap('whatsapp_idempotency', fn() => $this->checkWhatsAppIdempotency());
         $tests[] = $this->wrap('operational_queue_schema_guard', fn() => $this->checkOperationalQueueSchemaGuard());
+        $tests[] = $this->wrap('schema_runtime_guard', fn() => $this->checkSchemaRuntimeGuard());
         $tests[] = $this->wrap('framework_hygiene', fn() => $this->checkFrameworkHygiene());
         $tests[] = $this->wrap('public_excel_import_e2e', fn() => $this->checkPublicExcelImportE2E());
         $tests[] = $this->wrap('public_report_e2e', fn() => $this->checkPublicReportE2E());
@@ -49,6 +54,10 @@ final class UnitTestRunner
         $tests[] = $this->wrap('intent_router', fn() => $this->checkIntentRouter());
         $tests[] = $this->wrap('router_contract_enforcement', fn() => $this->checkRouterContractEnforcement());
         $tests[] = $this->wrap('action_allowlist_enforcement', fn() => $this->checkActionAllowlistEnforcement());
+        $tests[] = $this->wrap('enforcement_minimum_evidence_strict_blocks_when_missing', fn() => $this->checkEnforcementMinimumEvidenceStrictBlocksWhenMissing());
+        $tests[] = $this->wrap('enforcement_warn_allows_but_logs_when_missing', fn() => $this->checkEnforcementWarnAllowsButLogsWhenMissing());
+        $tests[] = $this->wrap('gates_required_block_action_when_schema_invalid', fn() => $this->checkGatesRequiredBlockActionWhenSchemaInvalid());
+        $tests[] = $this->wrap('gates_required_block_action_when_not_allowlisted', fn() => $this->checkGatesRequiredBlockActionWhenNotAllowlisted());
         $tests[] = $this->wrap('command_bus', fn() => $this->checkCommandBus());
         $tests[] = $this->wrap('observability_metrics', fn() => $this->checkObservabilityMetrics());
         $tests[] = $this->wrap('canonical_storage_new_project', fn() => $this->checkCanonicalStorageNewProject());
@@ -734,6 +743,11 @@ final class UnitTestRunner
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/secrets_guard_test.php');
     }
 
+    private function checkSensitiveLogRedaction(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/sensitive_log_redaction_test.php');
+    }
+
     private function checkOpenApiIntegrationImporter(): void
     {
         $openapi = [
@@ -830,9 +844,29 @@ final class UnitTestRunner
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/records_get_token_tenant_mismatch_fail_test.php');
     }
 
+    private function checkWhatsAppFastAck(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/whatsapp_fast_ack_test.php');
+    }
+
+    private function checkWhatsAppEnqueue(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/whatsapp_enqueue_test.php');
+    }
+
+    private function checkWhatsAppIdempotency(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/whatsapp_idempotency_test.php');
+    }
+
     private function checkOperationalQueueSchemaGuard(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/operational_queue_schema_guard_test.php');
+    }
+
+    private function checkSchemaRuntimeGuard(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/schema_runtime_guard_test.php');
     }
 
     private function checkFrameworkHygiene(): void
@@ -877,6 +911,26 @@ final class UnitTestRunner
     private function checkActionAllowlistEnforcement(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/action_allowlist_enforcement_test.php');
+    }
+
+    private function checkEnforcementMinimumEvidenceStrictBlocksWhenMissing(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/enforcement_minimum_evidence_strict_blocks_when_missing_test.php');
+    }
+
+    private function checkEnforcementWarnAllowsButLogsWhenMissing(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/enforcement_warn_allows_but_logs_when_missing_test.php');
+    }
+
+    private function checkGatesRequiredBlockActionWhenSchemaInvalid(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/gates_required_block_action_when_schema_invalid_test.php');
+    }
+
+    private function checkGatesRequiredBlockActionWhenNotAllowlisted(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/gates_required_block_action_when_not_allowlisted_test.php');
     }
 
     private function checkCommandBus(): void
@@ -1045,75 +1099,92 @@ final class UnitTestRunner
         if (is_file($dbPath)) {
             unlink($dbPath);
         }
-        $repo = new SqlMetricsRepository(null, $dbPath);
-        $service = new TelemetryService($repo);
+        $previousAllow = getenv('ALLOW_RUNTIME_SCHEMA');
+        $previousAppEnv = getenv('APP_ENV');
+        putenv('APP_ENV=local');
+        putenv('ALLOW_RUNTIME_SCHEMA=1');
+        try {
+            $repo = new SqlMetricsRepository(null, $dbPath);
+            $service = new TelemetryService($repo);
 
-        $service->recordIntentMetric([
-            'tenant_id' => 'default',
-            'project_id' => 'unit_obs',
-            'session_id' => 'unit_obs_sess_a',
-            'mode' => 'builder',
-            'intent' => 'APP_CREATE',
-            'action' => 'ask_user',
-            'latency_ms' => 70,
-            'status' => 'success',
-        ]);
-        $service->recordIntentMetric([
-            'tenant_id' => 'default',
-            'project_id' => 'unit_obs',
-            'session_id' => 'unit_obs_sess_a',
-            'mode' => 'builder',
-            'intent' => 'APP_CREATE',
-            'action' => 'send_to_llm',
-            'latency_ms' => 120,
-            'status' => 'success',
-        ]);
-        $service->recordCommandMetric([
-            'tenant_id' => 'default',
-            'project_id' => 'unit_obs',
-            'session_id' => 'unit_obs_sess_b',
-            'mode' => 'app',
-            'command_name' => 'CreateEntity',
-            'latency_ms' => 25,
-            'status' => 'error',
-            'blocked' => 1,
-        ]);
-        $service->recordGuardrailEvent([
-            'tenant_id' => 'default',
-            'project_id' => 'unit_obs',
-            'session_id' => 'unit_obs_sess_b',
-            'mode' => 'app',
-            'guardrail' => 'mode_guard',
-            'reason' => 'blocked by mode',
-        ]);
-        $service->recordTokenUsage([
-            'tenant_id' => 'default',
-            'project_id' => 'unit_obs',
-            'session_id' => 'unit_obs_sess_a',
-            'provider' => 'gemini',
-            'prompt_tokens' => 90,
-            'completion_tokens' => 30,
-            'total_tokens' => 120,
-        ]);
+            $service->recordIntentMetric([
+                'tenant_id' => 'default',
+                'project_id' => 'unit_obs',
+                'session_id' => 'unit_obs_sess_a',
+                'mode' => 'builder',
+                'intent' => 'APP_CREATE',
+                'action' => 'ask_user',
+                'latency_ms' => 70,
+                'status' => 'success',
+            ]);
+            $service->recordIntentMetric([
+                'tenant_id' => 'default',
+                'project_id' => 'unit_obs',
+                'session_id' => 'unit_obs_sess_a',
+                'mode' => 'builder',
+                'intent' => 'APP_CREATE',
+                'action' => 'send_to_llm',
+                'latency_ms' => 120,
+                'status' => 'success',
+            ]);
+            $service->recordCommandMetric([
+                'tenant_id' => 'default',
+                'project_id' => 'unit_obs',
+                'session_id' => 'unit_obs_sess_b',
+                'mode' => 'app',
+                'command_name' => 'CreateEntity',
+                'latency_ms' => 25,
+                'status' => 'error',
+                'blocked' => 1,
+            ]);
+            $service->recordGuardrailEvent([
+                'tenant_id' => 'default',
+                'project_id' => 'unit_obs',
+                'session_id' => 'unit_obs_sess_b',
+                'mode' => 'app',
+                'guardrail' => 'mode_guard',
+                'reason' => 'blocked by mode',
+            ]);
+            $service->recordTokenUsage([
+                'tenant_id' => 'default',
+                'project_id' => 'unit_obs',
+                'session_id' => 'unit_obs_sess_a',
+                'provider' => 'gemini',
+                'prompt_tokens' => 90,
+                'completion_tokens' => 30,
+                'total_tokens' => 120,
+            ]);
 
-        $summary = $service->summary('default', 'unit_obs', 7);
-        if ((int) ($summary['intent_metrics']['count'] ?? 0) < 1) {
-            throw new \RuntimeException('Observability: intent metric not persisted.');
-        }
-        if (!isset($summary['intent_metrics']['fallback_rate'])) {
-            throw new \RuntimeException('Observability: fallback rate metric missing.');
-        }
-        if ((int) ($summary['command_metrics']['blocked'] ?? 0) < 1) {
-            throw new \RuntimeException('Observability: blocked command metric missing.');
-        }
-        if ((int) ($summary['guardrail_events']['count'] ?? 0) < 1) {
-            throw new \RuntimeException('Observability: guardrail event missing.');
-        }
-        if ((int) ($summary['token_usage']['total_tokens'] ?? 0) < 120) {
-            throw new \RuntimeException('Observability: token usage not persisted.');
-        }
-        if ((float) ($summary['token_usage']['avg_tokens_per_session'] ?? 0.0) <= 0.0) {
-            throw new \RuntimeException('Observability: avg tokens per session missing.');
+            $summary = $service->summary('default', 'unit_obs', 7);
+            if ((int) ($summary['intent_metrics']['count'] ?? 0) < 1) {
+                throw new \RuntimeException('Observability: intent metric not persisted.');
+            }
+            if (!isset($summary['intent_metrics']['fallback_rate'])) {
+                throw new \RuntimeException('Observability: fallback rate metric missing.');
+            }
+            if ((int) ($summary['command_metrics']['blocked'] ?? 0) < 1) {
+                throw new \RuntimeException('Observability: blocked command metric missing.');
+            }
+            if ((int) ($summary['guardrail_events']['count'] ?? 0) < 1) {
+                throw new \RuntimeException('Observability: guardrail event missing.');
+            }
+            if ((int) ($summary['token_usage']['total_tokens'] ?? 0) < 120) {
+                throw new \RuntimeException('Observability: token usage not persisted.');
+            }
+            if ((float) ($summary['token_usage']['avg_tokens_per_session'] ?? 0.0) <= 0.0) {
+                throw new \RuntimeException('Observability: avg tokens per session missing.');
+            }
+        } finally {
+            if ($previousAllow === false) {
+                putenv('ALLOW_RUNTIME_SCHEMA');
+            } else {
+                putenv('ALLOW_RUNTIME_SCHEMA=' . $previousAllow);
+            }
+            if ($previousAppEnv === false) {
+                putenv('APP_ENV');
+            } else {
+                putenv('APP_ENV=' . $previousAppEnv);
+            }
         }
     }
 
@@ -1141,22 +1212,38 @@ final class UnitTestRunner
         putenv('PROJECT_REGISTRY_DB_PATH=' . $registryPath);
         putenv('DB_CANONICAL_NEW_PROJECTS=1');
         putenv('DB_NAMESPACE_BY_PROJECT=1');
+        $previousAllow = getenv('ALLOW_RUNTIME_SCHEMA');
+        $previousAppEnv = getenv('APP_ENV');
+        putenv('APP_ENV=local');
+        putenv('ALLOW_RUNTIME_SCHEMA=1');
+        try {
+            StorageModel::clearCache();
+            TableNamespace::clearCache();
 
-        StorageModel::clearCache();
-        TableNamespace::clearCache();
+            $registry = new ProjectRegistry($registryPath);
+            $registry->ensureProject('unit_can_app', 'Unit Canonical');
+            $project = $registry->getProject('unit_can_app') ?? [];
+            if ((string) ($project['storage_model'] ?? '') !== 'canonical') {
+                throw new \RuntimeException('Canonical storage model was not persisted for new project.');
+            }
 
-        $registry = new ProjectRegistry($registryPath);
-        $registry->ensureProject('unit_can_app', 'Unit Canonical');
-        $project = $registry->getProject('unit_can_app') ?? [];
-        if ((string) ($project['storage_model'] ?? '') !== 'canonical') {
-            throw new \RuntimeException('Canonical storage model was not persisted for new project.');
-        }
-
-        StorageModel::clearCache();
-        TableNamespace::clearCache();
-        $table = TableNamespace::resolve('clientes', 'unit_can_app');
-        if ($table !== 'clientes') {
-            throw new \RuntimeException('Canonical project should resolve logical table without namespace.');
+            StorageModel::clearCache();
+            TableNamespace::clearCache();
+            $table = TableNamespace::resolve('clientes', 'unit_can_app');
+            if ($table !== 'clientes') {
+                throw new \RuntimeException('Canonical project should resolve logical table without namespace.');
+            }
+        } finally {
+            if ($previousAllow === false) {
+                putenv('ALLOW_RUNTIME_SCHEMA');
+            } else {
+                putenv('ALLOW_RUNTIME_SCHEMA=' . $previousAllow);
+            }
+            if ($previousAppEnv === false) {
+                putenv('APP_ENV');
+            } else {
+                putenv('APP_ENV=' . $previousAppEnv);
+            }
         }
     }
 

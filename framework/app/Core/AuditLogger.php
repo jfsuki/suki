@@ -8,6 +8,7 @@ use PDO;
 final class AuditLogger
 {
     private PDO $db;
+    private bool $tableEnsured = false;
 
     public function __construct(?PDO $db = null)
     {
@@ -20,6 +21,7 @@ final class AuditLogger
         $actorId = $this->getActorId();
         $actorLabel = $this->getActorLabel();
         $tenantId = TenantContext::getTenantId();
+        $sanitizedPayload = LogSanitizer::sanitizeArray($payload);
 
         $sql = 'INSERT INTO audit_log (action, entity, record_id, tenant_id, actor_id, actor_label, payload, created_at) VALUES (:action, :entity, :record_id, :tenant_id, :actor_id, :actor_label, :payload, :created_at)';
         $stmt = $this->db->prepare($sql);
@@ -29,40 +31,56 @@ final class AuditLogger
         $stmt->bindValue(':tenant_id', $tenantId);
         $stmt->bindValue(':actor_id', $actorId);
         $stmt->bindValue(':actor_label', $actorLabel);
-        $stmt->bindValue(':payload', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $stmt->bindValue(':payload', json_encode($sanitizedPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         $stmt->bindValue(':created_at', date('Y-m-d H:i:s'));
         $stmt->execute();
     }
 
     private function ensureTable(): void
     {
+        if ($this->tableEnsured) {
+            return;
+        }
+
         $driver = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
         $payloadType = $driver === 'sqlite' ? 'TEXT' : 'JSON';
-        $sql = "CREATE TABLE IF NOT EXISTS audit_log (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            action VARCHAR(32) NOT NULL,
-            entity VARCHAR(128) NOT NULL,
-            record_id VARCHAR(64) NULL,
-            tenant_id INT NULL,
-            actor_id VARCHAR(64) NULL,
-            actor_label VARCHAR(128) NULL,
-            payload {$payloadType} NULL,
-            created_at DATETIME NOT NULL
-        )";
-        if ($driver === 'mysql') {
-            $sql = "CREATE TABLE IF NOT EXISTS audit_log (
-                id INT AUTO_INCREMENT PRIMARY KEY,
-                action VARCHAR(32) NOT NULL,
-                entity VARCHAR(128) NOT NULL,
-                record_id VARCHAR(64) NULL,
-                tenant_id INT NULL,
-                actor_id VARCHAR(64) NULL,
-                actor_label VARCHAR(128) NULL,
-                payload {$payloadType} NULL,
-                created_at DATETIME NOT NULL
-            )";
-        }
-        $this->db->exec($sql);
+        RuntimeSchemaPolicy::bootstrap(
+            $this->db,
+            'AuditLogger',
+            function () use ($driver, $payloadType): void {
+                $sql = "CREATE TABLE IF NOT EXISTS audit_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    action VARCHAR(32) NOT NULL,
+                    entity VARCHAR(128) NOT NULL,
+                    record_id VARCHAR(64) NULL,
+                    tenant_id INT NULL,
+                    actor_id VARCHAR(64) NULL,
+                    actor_label VARCHAR(128) NULL,
+                    payload {$payloadType} NULL,
+                    created_at DATETIME NOT NULL
+                )";
+                if ($driver === 'mysql') {
+                    $sql = "CREATE TABLE IF NOT EXISTS audit_log (
+                        id INT AUTO_INCREMENT PRIMARY KEY,
+                        action VARCHAR(32) NOT NULL,
+                        entity VARCHAR(128) NOT NULL,
+                        record_id VARCHAR(64) NULL,
+                        tenant_id INT NULL,
+                        actor_id VARCHAR(64) NULL,
+                        actor_label VARCHAR(128) NULL,
+                        payload {$payloadType} NULL,
+                        created_at DATETIME NOT NULL
+                    )";
+                }
+                $this->db->exec($sql);
+            },
+            ['audit_log'],
+            [],
+            [],
+            'db/migrations/' . $driver . '/20260303_004_runtime_infra_schema.sql'
+        );
+
+        $this->tableEnsured = true;
     }
 
     private function getActorId(): ?string

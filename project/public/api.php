@@ -46,6 +46,7 @@ use App\Core\OpenApiIntegrationImporter;
 use App\Core\ApiSecurityGuard;
 use App\Core\SecurityStateRepository;
 use App\Core\OperationalQueueStore;
+use App\Core\LogSanitizer;
 use App\Core\Agents\ConversationQualityDashboard;
 
 $route = trim($_GET['route'] ?? '');
@@ -404,12 +405,55 @@ function auditRecordsReadAccess(
         'tenant_id' => $tenantId !== '' ? sanitizeKey($tenantId) : '',
         'reason' => $reason,
     ];
+    $payload = LogSanitizer::sanitizeArray($payload);
 
     $line = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     if ($line === false) {
         return;
     }
     @file_put_contents($dir . '/records_read_access.log.jsonl', $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+}
+
+function auditChannelQueueMetric(
+    string $channel,
+    string $route,
+    string $tenantId,
+    string $idempotencyKey,
+    bool $enqueued,
+    string $queueId,
+    int $enqueueLatencyMs
+): void {
+    $dir = PROJECT_ROOT . '/storage/security';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    if (!is_dir($dir)) {
+        return;
+    }
+
+    $requestId = trim((string) ($_SERVER['HTTP_X_REQUEST_ID'] ?? ''));
+    if ($requestId === '') {
+        $requestId = substr(hash('sha256', microtime(true) . ':' . random_int(1000, 9999)), 0, 24);
+    }
+
+    $payload = [
+        'ts' => date('c'),
+        'request_id' => $requestId,
+        'channel' => sanitizeKey($channel),
+        'endpoint' => $route,
+        'tenant_id' => $tenantId !== '' ? sanitizeKey($tenantId) : '',
+        'idempotency_key_hash' => hash('sha256', $idempotencyKey),
+        'enqueue_latency_ms' => max(0, $enqueueLatencyMs),
+        'dedupe_hit' => !$enqueued,
+        'queue_id' => trim($queueId),
+    ];
+    $payload = LogSanitizer::sanitizeArray($payload);
+
+    $line = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($line === false) {
+        return;
+    }
+    @file_put_contents($dir . '/channel_queue_metrics.log.jsonl', $line . PHP_EOL, FILE_APPEND | LOCK_EX);
 }
 
 function respondJson(Response $response, string $status, string $message, array $data = [], int $code = 200): void
@@ -1069,6 +1113,7 @@ if ($route === 'channels/telegram/webhook') {
         'raw_update' => $update,
     ];
 
+    $enqueueStart = microtime(true);
     try {
         $queue = new OperationalQueueStore();
         $enqueue = $queue->enqueueIfNotExists(
@@ -1083,8 +1128,20 @@ if ($route === 'channels/telegram/webhook') {
         respondJson($response, 'error', $e->getMessage(), [], 500);
         return;
     }
+    $enqueueLatencyMs = (int) round((microtime(true) - $enqueueStart) * 1000);
 
     $enqueued = (bool) ($enqueue['enqueued'] ?? false);
+    $queueId = (string) ($enqueue['job_id'] ?? '');
+    $dedupeHit = !$enqueued;
+    auditChannelQueueMetric(
+        'telegram',
+        $route,
+        $tenantId,
+        $idempotencyKey,
+        $enqueued,
+        $queueId,
+        $enqueueLatencyMs
+    );
     $message = $enqueued
         ? 'Telegram update encolado'
         : 'Telegram update duplicado ignorado';
@@ -1097,7 +1154,11 @@ if ($route === 'channels/telegram/webhook') {
         'ok' => true,
         'enqueued' => $enqueued,
         'idempotency_key' => $idempotencyKey,
-        'job_id' => (string) ($enqueue['job_id'] ?? ''),
+        'job_id' => $queueId,
+        'channel' => 'telegram',
+        'enqueue_latency_ms' => $enqueueLatencyMs,
+        'dedupe_hit' => $dedupeHit,
+        'queue_id' => $queueId,
     ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     return;
 }
@@ -1117,6 +1178,7 @@ if ($route === 'channels/whatsapp/webhook') {
         return;
     }
 
+    $enqueueStart = microtime(true);
     $rawBody = requestRawBody();
     if (!verifyWhatsAppSignature($rawBody)) {
         respondJson($response, 'error', 'WhatsApp signature invalida', [], 401);
@@ -1129,39 +1191,15 @@ if ($route === 'channels/whatsapp/webhook') {
     $value = is_array($changes['value'] ?? null) ? (array) $changes['value'] : [];
     $messages = is_array($value['messages'] ?? null) ? (array) $value['messages'] : [];
     $message = is_array($messages[0] ?? null) ? (array) $messages[0] : [];
-    $from = trim((string) ($message['from'] ?? ''));
-    $textNode = is_array($message['text'] ?? null) ? (array) $message['text'] : [];
-    $text = trim((string) ($textNode['body'] ?? ''));
-
-    if ($from === '') {
-        respondJson($response, 'success', 'WhatsApp update ignorado', ['ignored' => true]);
-        return;
-    }
-
     $statuses = is_array($value['statuses'] ?? null) ? (array) $value['statuses'] : [];
     $statusNode = is_array($statuses[0] ?? null) ? (array) $statuses[0] : [];
+    $from = trim((string) ($message['from'] ?? ($statusNode['recipient_id'] ?? '')));
+    $textNode = is_array($message['text'] ?? null) ? (array) $message['text'] : [];
+    $text = trim((string) ($textNode['body'] ?? ''));
     $messageId = trim((string) ($message['id'] ?? $statusNode['id'] ?? ''));
-    $fallbackPayload = $rawBody !== '' ? $rawBody : ((string) (json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: ''));
-    $replayNonce = $messageId !== '' ? ('msg:' . $messageId) : ('hash:' . sha1($fallbackPayload));
-    $replayTtl = (int) (getenv('WHATSAPP_REPLAY_TTL_SEC') ?: 86400);
-    try {
-        $fresh = securityStateRepository()->rememberReplayNonce('whatsapp', $replayNonce, $replayTtl);
-        if (!$fresh) {
-            respondJson($response, 'success', 'WhatsApp update duplicado ignorado', [
-                'ignored' => true,
-                'reason' => 'replay_detected',
-            ]);
-            return;
-        }
-    } catch (\Throwable $e) {
-        if ((string) (getenv('API_SECURITY_STRICT') ?: '0') === '1') {
-            respondJson($response, 'error', 'No se pudo validar anti-replay de WhatsApp', [], 503);
-            return;
-        }
-    }
-
-    if ($text === '') {
-        $text = 'hola';
+    if ($messageId === '' && $from === '' && empty($messages) && empty($statuses)) {
+        respondJson($response, 'success', 'WhatsApp update ignorado', ['ignored' => true]);
+        return;
     }
 
     $tenantId = trim((string) (getenv('WHATSAPP_DEFAULT_TENANT') ?: 'default'));
@@ -1179,59 +1217,71 @@ if ($route === 'channels/whatsapp/webhook') {
         }
     }
 
-    $safeChat = sanitizeKey($from);
-    $chatPayload = [
-        'message' => $text,
-        'mode' => 'app',
+    $fallbackPayload = $rawBody !== '' ? $rawBody : ((string) (json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: ''));
+    $payloadHash = hash('sha256', $fallbackPayload);
+    $idempotencyKey = $messageId !== ''
+        ? ('whatsapp:message:' . $messageId)
+        : ('whatsapp:hash:' . $payloadHash);
+
+    $queuePayload = [
+        'source' => 'whatsapp.webhook',
         'channel' => 'whatsapp',
         'tenant_id' => $tenantId,
         'project_id' => $projectId !== '' ? $projectId : 'default',
-        'user_id' => 'wa:' . $safeChat,
-        'session_id' => 'wa:' . $safeChat . ':app',
+        'received_at' => date('Y-m-d H:i:s'),
+        'message_id' => $messageId,
+        'from' => $from,
+        'text' => $text,
+        'status' => (string) ($statusNode['status'] ?? ''),
+        'raw_update' => $payload,
     ];
-    setTenantContext($chatPayload);
 
     try {
-        $agent = new \App\Core\ChatAgent();
-        $result = $agent->handle($chatPayload);
+        $queue = new OperationalQueueStore();
+        $enqueue = $queue->enqueueIfNotExists(
+            $tenantId,
+            'whatsapp',
+            $idempotencyKey,
+            'whatsapp.inbound',
+            $queuePayload,
+            $payloadHash
+        );
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 500);
         return;
     }
+    $enqueueLatencyMs = (int) round((microtime(true) - $enqueueStart) * 1000);
 
-    $replyText = trim((string) ($result['data']['reply'] ?? $result['message'] ?? 'OK'));
-    if ($replyText === '') {
-        $replyText = 'OK';
-    }
-    if ((string) (getenv('WHATSAPP_WEBHOOK_DRY_RUN') ?: '0') === '1') {
-        respondJson(
-            $response,
-            'success',
-            'WhatsApp webhook procesado (dry-run)',
-            [
-                'from' => $from,
-                'reply_preview' => $replyText,
-                'dry_run' => true,
-            ],
-            200
-        );
-        return;
-    }
-    $token = trim((string) (getenv('WHATSAPP_CLOUD_TOKEN') ?: ''));
-    $phoneNumberId = trim((string) (getenv('WHATSAPP_PHONE_NUMBER_ID') ?: ''));
-    $delivery = sendWhatsAppMessage($token, $phoneNumberId, $from, $replyText);
-    $delivered = (bool) ($delivery['ok'] ?? false);
-
-    respondJson(
-        $response,
-        $delivered ? 'success' : 'error',
-        $delivered ? 'Mensaje WhatsApp entregado' : 'No se pudo enviar respuesta a WhatsApp',
-        [
-            'from' => $from,
-            'delivery' => $delivery,
-        ],
-        $delivered ? 200 : 502
+    $enqueued = (bool) ($enqueue['enqueued'] ?? false);
+    $queueId = (string) ($enqueue['job_id'] ?? '');
+    $dedupeHit = !$enqueued;
+    $message = $enqueued
+        ? 'WhatsApp update encolado'
+        : 'WhatsApp update duplicado ignorado';
+    auditChannelQueueMetric(
+        'whatsapp',
+        $route,
+        $tenantId,
+        $idempotencyKey,
+        $enqueued,
+        $queueId,
+        $enqueueLatencyMs
     );
+
+    http_response_code(200);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'status' => 'success',
+        'message' => $message,
+        'ok' => true,
+        'enqueued' => $enqueued,
+        'idempotency_key' => $idempotencyKey,
+        'job_id' => $queueId,
+        'channel' => 'whatsapp',
+        'enqueue_latency_ms' => $enqueueLatencyMs,
+        'dedupe_hit' => $dedupeHit,
+        'queue_id' => $queueId,
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     return;
 }
 

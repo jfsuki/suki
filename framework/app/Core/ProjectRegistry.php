@@ -16,7 +16,15 @@ final class ProjectRegistry
         $this->dbPath = $dbPath ?: $this->defaultPath();
         $this->db = new PDO('sqlite:' . $this->dbPath);
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
-        $this->ensureSchema();
+        RuntimeSchemaPolicy::bootstrap(
+            $this->db,
+            'ProjectRegistry',
+            fn() => $this->ensureSchema(),
+            $this->requiredTables(),
+            [],
+            $this->requiredColumns(),
+            'db/migrations/sqlite/20260303_004_runtime_infra_schema.sql'
+        );
     }
 
     public function ensureProject(
@@ -485,6 +493,33 @@ final class ProjectRegistry
             status TEXT,
             created_at TEXT
         )');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function requiredTables(): array
+    {
+        return [
+            'projects',
+            'users',
+            'project_users',
+            'entities',
+            'chat_sessions',
+            'auth_users',
+            'auth_codes',
+            'deploys',
+        ];
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function requiredColumns(): array
+    {
+        return [
+            'projects' => ['storage_model'],
+        ];
     }
 
     private function defaultPath(): string

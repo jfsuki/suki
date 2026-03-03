@@ -14,7 +14,7 @@ final class IntegrationStore
     {
         $this->db = $db ?? Database::connection();
         $this->migrator = new IntegrationMigrator($this->db);
-        $this->migrator->ensureTables();
+        $this->migrator->bootstrapSchemaPolicy();
     }
 
     public function saveConnection(array $integration): void
@@ -68,6 +68,8 @@ final class IntegrationStore
     public function saveDocument(string $integrationId, ?string $entity, ?string $recordId, ?string $externalId, ?string $status, array $request, array $response): void
     {
         $now = date('Y-m-d H:i:s');
+        $sanitizedRequest = LogSanitizer::sanitizeArray($request);
+        $sanitizedResponse = LogSanitizer::sanitizeArray($response);
         $sql = "INSERT INTO integration_documents (integration_id, entity, record_id, external_id, status, request_payload, response_payload, created_at, updated_at) VALUES (:integration_id, :entity, :record_id, :external_id, :status, :request_payload, :response_payload, :created_at, :updated_at)";
         $stmt = $this->db->prepare($sql);
         $stmt->bindValue(':integration_id', $integrationId);
@@ -75,8 +77,8 @@ final class IntegrationStore
         $stmt->bindValue(':record_id', $recordId);
         $stmt->bindValue(':external_id', $externalId);
         $stmt->bindValue(':status', $status);
-        $stmt->bindValue(':request_payload', json_encode($request, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
-        $stmt->bindValue(':response_payload', json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $stmt->bindValue(':request_payload', json_encode($sanitizedRequest, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $stmt->bindValue(':response_payload', json_encode($sanitizedResponse, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         $stmt->bindValue(':created_at', $now);
         $stmt->bindValue(':updated_at', $now);
         $stmt->execute();
@@ -84,10 +86,11 @@ final class IntegrationStore
 
     public function updateDocumentStatus(string $integrationId, string $externalId, string $status, array $response = []): void
     {
+        $sanitizedResponse = LogSanitizer::sanitizeArray($response);
         $sql = "UPDATE integration_documents SET status = :status, response_payload = :response_payload, updated_at = :updated_at WHERE integration_id = :integration_id AND external_id = :external_id";
         $stmt = $this->db->prepare($sql);
         $stmt->bindValue(':status', $status);
-        $stmt->bindValue(':response_payload', json_encode($response, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $stmt->bindValue(':response_payload', json_encode($sanitizedResponse, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         $stmt->bindValue(':updated_at', date('Y-m-d H:i:s'));
         $stmt->bindValue(':integration_id', $integrationId);
         $stmt->bindValue(':external_id', $externalId);
@@ -96,12 +99,13 @@ final class IntegrationStore
 
     public function logWebhook(string $integrationId, ?string $event, ?string $externalId, array $payload): void
     {
+        $sanitizedPayload = LogSanitizer::sanitizeArray($payload);
         $sql = "INSERT INTO integration_webhooks (integration_id, event, external_id, payload, created_at) VALUES (:integration_id, :event, :external_id, :payload, :created_at)";
         $stmt = $this->db->prepare($sql);
         $stmt->bindValue(':integration_id', $integrationId);
         $stmt->bindValue(':event', $event);
         $stmt->bindValue(':external_id', $externalId);
-        $stmt->bindValue(':payload', json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
+        $stmt->bindValue(':payload', json_encode($sanitizedPayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
         $stmt->bindValue(':created_at', date('Y-m-d H:i:s'));
         $stmt->execute();
     }

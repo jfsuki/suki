@@ -18,7 +18,15 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
             $this->db = new PDO('sqlite:' . $path);
             $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         }
-        $this->ensureSchema();
+        RuntimeSchemaPolicy::bootstrap(
+            $this->db,
+            'SqlMetricsRepository',
+            fn() => $this->ensureSchema(),
+            $this->requiredTables(),
+            $this->requiredIndexes(),
+            $this->requiredColumns(),
+            'db/migrations/sqlite/20260303_004_runtime_infra_schema.sql'
+        );
     }
 
     public function saveIntentMetric(array $metric): void
@@ -384,6 +392,45 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
             return;
         }
         $this->db->exec($alterSql);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function requiredTables(): array
+    {
+        return [
+            'ops_intent_metrics',
+            'ops_command_metrics',
+            'ops_guardrail_events',
+            'ops_token_usage',
+        ];
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function requiredIndexes(): array
+    {
+        return [
+            'ops_intent_metrics' => ['idx_ops_intent_scope', 'idx_ops_intent_session'],
+            'ops_command_metrics' => ['idx_ops_command_scope', 'idx_ops_command_session'],
+            'ops_guardrail_events' => ['idx_ops_guardrail_scope', 'idx_ops_guardrail_session'],
+            'ops_token_usage' => ['idx_ops_tokens_scope', 'idx_ops_tokens_session'],
+        ];
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function requiredColumns(): array
+    {
+        return [
+            'ops_intent_metrics' => ['session_id'],
+            'ops_command_metrics' => ['session_id'],
+            'ops_guardrail_events' => ['session_id'],
+            'ops_token_usage' => ['session_id'],
+        ];
     }
 
     private function tableHasColumn(string $table, string $column): bool

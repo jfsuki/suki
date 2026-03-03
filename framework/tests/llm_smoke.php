@@ -8,7 +8,12 @@ require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/autoload.php';
 
 use App\Core\LLM\LLMRouter;
+use App\Core\LogSanitizer;
 use App\Core\TelemetryService;
+
+$appEnv = strtolower(trim((string) (getenv('APP_ENV') ?: getenv('SUKI_ENV') ?: 'local')));
+$allowSkip = (string) (getenv('ALLOW_LLM_SMOKE_SKIP') ?: '0') === '1';
+$mandatoryEnv = in_array($appEnv, ['staging', 'stage', 'production', 'prod'], true);
 
 $tenantId = trim((string) (getenv('LLM_SMOKE_TENANT_ID') ?: 'default'));
 $projectId = trim((string) (getenv('LLM_SMOKE_PROJECT_ID') ?: 'staging_llm_smoke'));
@@ -19,6 +24,8 @@ $startedAt = microtime(true);
 $failures = [];
 $attempts = 1;
 $sleepSeconds = [];
+$skipped = false;
+$skipReason = '';
 
 $geminiKey = trim((string) getenv('GEMINI_API_KEY'));
 $groqKey = trim((string) getenv('GROQ_API_KEY'));
@@ -40,9 +47,23 @@ if ($claudeKey !== '') {
     $providerCatalog['claude'] = \App\Core\LLM\Providers\ClaudeProvider::class;
 }
 if (empty($providerCatalog)) {
-    $failures[] = 'No hay proveedores LLM configurados (GEMINI/GROQ/OPENROUTER/CLAUDE).';
+    $missingMessage = 'No hay proveedores LLM configurados (GEMINI/GROQ/OPENROUTER/CLAUDE).';
+    if (!$mandatoryEnv && $allowSkip) {
+        $skipped = true;
+        $skipReason = $missingMessage . ' SKIP autorizado por ALLOW_LLM_SMOKE_SKIP=1 en APP_ENV=' . $appEnv . '.';
+    } else {
+        $hint = $mandatoryEnv
+            ? ' APP_ENV=' . $appEnv . ' exige llm_smoke obligatorio.'
+            : ' Activa ALLOW_LLM_SMOKE_SKIP=1 solo para avanzar en local sin llaves.';
+        $failures[] = $missingMessage . $hint;
+    }
 }
-if (!isset($providerCatalog[$preferredProvider])) {
+if ($skipped && $mandatoryEnv) {
+    $skipped = false;
+    $skipReason = '';
+    $failures[] = 'LLM smoke no puede omitirse en APP_ENV=' . $appEnv . '.';
+}
+if (!$skipped && !isset($providerCatalog[$preferredProvider])) {
     $preferredProvider = (string) array_key_first($providerCatalog);
 }
 
@@ -88,7 +109,7 @@ $capsule = [
 $llmResult = null;
 $lastError = null;
 
-if (empty($failures)) {
+if (empty($failures) && !$skipped) {
     $providersConfig = [];
     foreach ($providerCatalog as $name => $className) {
         $providersConfig[$name] = [
@@ -127,7 +148,7 @@ if (empty($failures)) {
         ]);
         $lastError = null;
     } catch (\Throwable $e) {
-        $lastError = $e->getMessage();
+        $lastError = LogSanitizer::sanitizeString((string) $e->getMessage());
     }
 }
 
@@ -138,6 +159,7 @@ $usage = normalizeUsage($usageRaw);
 $json = is_array($llmResult['json'] ?? null) ? (array) $llmResult['json'] : [];
 $attemptedProviders = is_array($llmResult['attempted_providers'] ?? null) ? (array) $llmResult['attempted_providers'] : [];
 $providerErrors = is_array($llmResult['provider_errors'] ?? null) ? (array) $llmResult['provider_errors'] : [];
+$providerErrors = LogSanitizer::sanitizeArray($providerErrors);
 $failoverCount = (int) ($llmResult['failover_count'] ?? 0);
 $primaryHadQuota = false;
 foreach ($providerErrors as $error) {
@@ -179,56 +201,65 @@ if (trim((string) ($json['reason'] ?? '')) !== '') {
 $fieldPrecision = round($presentKeys / count($expectedKeys), 4);
 $typePrecision = round($typeChecks / count($expectedKeys), 4);
 $overallPrecision = round(($fieldPrecision * 0.6) + ($typePrecision * 0.4), 4);
-$structuredOk = ($presentKeys === count($expectedKeys)) && ($typeChecks >= 4);
-$fallbackOk = $lastError === null && (!$primaryHadQuota || $fallbackUsed);
-$tokensOk = (int) ($usage['total_tokens'] ?? 0) > 0;
+$didAttemptLlm = !$skipped && !empty($providerCatalog);
+$structuredOk = !$didAttemptLlm ? true : (($presentKeys === count($expectedKeys)) && ($typeChecks >= 4));
+$fallbackOk = !$didAttemptLlm ? true : ($lastError === null && (!$primaryHadQuota || $fallbackUsed));
+$tokensOk = !$didAttemptLlm ? true : ((int) ($usage['total_tokens'] ?? 0) > 0);
 
-if ($lastError !== null) {
+if ($lastError !== null && !$skipped) {
     $diagnostic = probeGeminiDiagnostic();
     $suffix = $diagnostic !== '' ? ' | Gemini diagnostic: ' . $diagnostic : '';
     $failures[] = 'Fallo LLM: ' . $lastError . $suffix;
 }
-if (!$fallbackOk) {
+if (!$fallbackOk && !$skipped) {
     $failures[] = 'Fallback por quota no verificado. Provider=' . ($provider !== '' ? $provider : 'none');
 }
-if (!$structuredOk) {
+if (!$structuredOk && !$skipped) {
     $failures[] = 'Salida estructurada invalida. Presentes=' . $presentKeys . ' TiposOK=' . $typeChecks;
 }
-if (!$tokensOk) {
+if (!$tokensOk && !$skipped) {
     $failures[] = 'No se detectaron tokens en uso LLM.';
 }
 
-$telemetry = new TelemetryService();
-$status = empty($failures) ? 'success' : 'error';
-$telemetry->recordIntentMetric([
-    'tenant_id' => $tenantId,
-    'project_id' => $projectId,
-    'mode' => 'builder',
-    'intent' => 'LLM_SMOKE',
-    'action' => 'send_to_llm',
-    'latency_ms' => $durationMs,
-    'status' => $status,
-]);
+$summary = [];
+if (!$skipped) {
+    $telemetry = new TelemetryService();
+    $status = empty($failures) ? 'success' : 'error';
+    $telemetry->recordIntentMetric([
+        'tenant_id' => $tenantId,
+        'project_id' => $projectId,
+        'mode' => 'builder',
+        'intent' => 'LLM_SMOKE',
+        'action' => 'send_to_llm',
+        'latency_ms' => $durationMs,
+        'status' => $status,
+    ]);
 
-$providerForUsage = $provider !== '' ? $provider : 'gemini';
-$telemetry->recordTokenUsage([
-    'tenant_id' => $tenantId,
-    'project_id' => $projectId,
-    'provider' => $providerForUsage,
-    'prompt_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
-    'completion_tokens' => (int) ($usage['completion_tokens'] ?? 0),
-    'total_tokens' => (int) ($usage['total_tokens'] ?? 0),
-]);
-$summary = $telemetry->summary($tenantId, $projectId, 1);
+    $providerForUsage = $provider !== '' ? $provider : 'gemini';
+    $telemetry->recordTokenUsage([
+        'tenant_id' => $tenantId,
+        'project_id' => $projectId,
+        'provider' => $providerForUsage,
+        'prompt_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
+        'completion_tokens' => (int) ($usage['completion_tokens'] ?? 0),
+        'total_tokens' => (int) ($usage['total_tokens'] ?? 0),
+    ]);
+    $summary = $telemetry->summary($tenantId, $projectId, 1);
+}
 
 $report = [
-    'ok' => empty($failures),
+    'ok' => $skipped ? true : empty($failures),
+    'skipped' => $skipped,
+    'skip_reason' => $skipReason,
     'generated_at' => date('c'),
     'scope' => [
         'tenant_id' => $tenantId,
         'project_id' => $projectId,
         'mode' => $mode,
         'preferred_provider' => $preferredProvider,
+        'app_env' => $appEnv,
+        'allow_llm_smoke_skip' => $allowSkip,
+        'llm_smoke_mandatory' => $mandatoryEnv,
     ],
     'attempts' => $attempts,
     'retry_sleep_seconds' => $sleepSeconds,
@@ -241,9 +272,11 @@ $report = [
         'provider_errors' => $providerErrors,
         'latency_ms' => $durationMs,
         'usage' => $usage,
+        'attempt_executed' => $didAttemptLlm,
     ],
     'structured_output' => [
         'ok' => $structuredOk,
+        'validation_skipped' => !$didAttemptLlm,
         'required_keys' => $expectedKeys,
         'json' => $json,
     ],
@@ -265,6 +298,7 @@ $report = [
     ],
     'failures' => $failures,
 ];
+$report = LogSanitizer::sanitizeArray($report);
 
 $reportPath = __DIR__ . '/tmp/llm_smoke_report.json';
 if (!is_dir(dirname($reportPath))) {
@@ -274,7 +308,7 @@ file_put_contents($reportPath, json_encode($report, JSON_PRETTY_PRINT | JSON_UNE
 $report['report'] = $reportPath;
 
 echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
-exit(empty($failures) ? 0 : 1);
+exit(($skipped || empty($failures)) ? 0 : 1);
 
 function normalizeUsage(array $usage): array
 {
@@ -306,6 +340,6 @@ function probeGeminiDiagnostic(): string
         $client->generate('ping', ['max_tokens' => 5, 'temperature' => 0.0]);
         return 'ping_ok';
     } catch (\Throwable $e) {
-        return trim((string) $e->getMessage());
+        return LogSanitizer::sanitizeString(trim((string) $e->getMessage()));
     }
 }

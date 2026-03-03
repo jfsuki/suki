@@ -14,6 +14,19 @@ final class IntegrationMigrator
         $this->db = $db ?? Database::connection();
     }
 
+    public function bootstrapSchemaPolicy(): void
+    {
+        RuntimeSchemaPolicy::bootstrap(
+            $this->db,
+            'IntegrationMigrator',
+            fn() => $this->ensureTables(),
+            $this->requiredTables(),
+            [],
+            [],
+            'db/migrations/' . $this->driver() . '/20260303_004_runtime_infra_schema.sql'
+        );
+    }
+
     public function ensureTables(): void
     {
         $driver = $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
@@ -77,5 +90,24 @@ final class IntegrationMigrator
             payload {$jsonType} NULL,
             created_at DATETIME NOT NULL
         )");
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function requiredTables(): array
+    {
+        return [
+            'integration_connections',
+            'integration_tokens',
+            'integration_documents',
+            'integration_outbox',
+            'integration_webhooks',
+        ];
+    }
+
+    private function driver(): string
+    {
+        return (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
     }
 }

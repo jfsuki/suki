@@ -56,12 +56,16 @@ function processQueuedJob(array $job): array
     $jobType = trim((string) ($job['job_type'] ?? ''));
     $payload = is_array($job['payload'] ?? null) ? (array) $job['payload'] : [];
 
-    if ($jobType === 'telegram.inbound') {
+    if ($jobType === 'telegram.inbound' || $jobType === 'whatsapp.inbound') {
+        $channel = $jobType === 'whatsapp.inbound' ? 'whatsapp' : 'telegram';
         $idempotencyHint = trim((string) ($payload['update_id'] ?? $payload['message_id'] ?? ''));
         return [
             'processed' => true,
+            'channel' => $channel,
             'job_type' => $jobType,
             'idempotency_hint' => $idempotencyHint,
+            'route_path' => 'queue>router>gates>action',
+            'gate_decision' => 'plumbing_only',
             'mode' => 'plumbing_only',
         ];
     }

@@ -22,7 +22,15 @@ final class SecurityStateRepository
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
         $this->db->exec('PRAGMA busy_timeout = 3000');
         $this->db->exec('PRAGMA journal_mode = WAL');
-        $this->ensureSchema();
+        RuntimeSchemaPolicy::bootstrap(
+            $this->db,
+            'SecurityStateRepository',
+            fn() => $this->ensureSchema(),
+            ['api_rate_limits', 'webhook_replay_guard'],
+            ['webhook_replay_guard' => ['idx_webhook_replay_expires_at']],
+            [],
+            'db/migrations/sqlite/20260303_004_runtime_infra_schema.sql'
+        );
     }
 
     /**
@@ -145,4 +153,3 @@ final class SecurityStateRepository
         return PROJECT_ROOT . '/storage/security/security_state.sqlite';
     }
 }
-

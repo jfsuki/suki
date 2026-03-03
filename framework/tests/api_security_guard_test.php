@@ -9,6 +9,12 @@ use App\Core\SecurityStateRepository;
 
 $tmpDir = __DIR__ . '/tmp/security_guard_' . time();
 @mkdir($tmpDir, 0775, true);
+
+$previousAllow = getenv('ALLOW_RUNTIME_SCHEMA');
+$previousAppEnv = getenv('APP_ENV');
+putenv('APP_ENV=local');
+putenv('ALLOW_RUNTIME_SCHEMA=1');
+
 $repo = new SecurityStateRepository($tmpDir . '/security_state.sqlite');
 $guard = new ApiSecurityGuard($repo);
 
@@ -47,4 +53,14 @@ echo json_encode(['ok' => $ok, 'failures' => $failures], JSON_PRETTY_PRINT | JSO
 
 putenv('API_SECURITY_STRICT');
 putenv('API_RATE_LIMIT_CHAT_PER_MIN');
+if ($previousAllow === false) {
+    putenv('ALLOW_RUNTIME_SCHEMA');
+} else {
+    putenv('ALLOW_RUNTIME_SCHEMA=' . $previousAllow);
+}
+if ($previousAppEnv === false) {
+    putenv('APP_ENV');
+} else {
+    putenv('APP_ENV=' . $previousAppEnv);
+}
 exit($ok ? 0 : 1);

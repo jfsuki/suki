@@ -17,9 +17,13 @@ if (is_file($registryPath)) {
     unlink($registryPath);
 }
 
+$previousAllow = getenv('ALLOW_RUNTIME_SCHEMA');
+$previousAppEnv = getenv('APP_ENV');
 putenv('PROJECT_REGISTRY_DB_PATH=' . $registryPath);
 putenv('DB_CANONICAL_NEW_PROJECTS=1');
 putenv('DB_NAMESPACE_BY_PROJECT=1');
+putenv('APP_ENV=local');
+putenv('ALLOW_RUNTIME_SCHEMA=1');
 
 StorageModel::clearCache();
 TableNamespace::clearCache();
@@ -72,5 +76,16 @@ echo json_encode([
     ],
     'failures' => $failures,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+
+if ($previousAllow === false) {
+    putenv('ALLOW_RUNTIME_SCHEMA');
+} else {
+    putenv('ALLOW_RUNTIME_SCHEMA=' . $previousAllow);
+}
+if ($previousAppEnv === false) {
+    putenv('APP_ENV');
+} else {
+    putenv('APP_ENV=' . $previousAppEnv);
+}
 
 exit($ok ? 0 : 1);

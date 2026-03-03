@@ -55,7 +55,11 @@ namespace {
         unlink($quotaDb);
     }
 
+    $previousAllow = getenv('ALLOW_RUNTIME_SCHEMA');
+    $previousAppEnv = getenv('APP_ENV');
     putenv('SECURITY_STATE_DB_PATH=' . $quotaDb);
+    putenv('APP_ENV=local');
+    putenv('ALLOW_RUNTIME_SCHEMA=1');
     putenv('LLM_SESSION_QUOTA_ENABLED=1');
     putenv('LLM_SESSION_QUOTA_WINDOW_SECONDS=60');
     putenv('LLM_MAX_REQUESTS_PER_SESSION=20');
@@ -189,6 +193,17 @@ namespace {
         'db_path' => $quotaDb,
         'failures' => $failures,
     ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+
+    if ($previousAllow === false) {
+        putenv('ALLOW_RUNTIME_SCHEMA');
+    } else {
+        putenv('ALLOW_RUNTIME_SCHEMA=' . $previousAllow);
+    }
+    if ($previousAppEnv === false) {
+        putenv('APP_ENV');
+    } else {
+        putenv('APP_ENV=' . $previousAppEnv);
+    }
 
     exit($ok ? 0 : 1);
 }

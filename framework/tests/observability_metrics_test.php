@@ -16,6 +16,11 @@ if (is_file($dbPath)) {
     unlink($dbPath);
 }
 
+$previousAllow = getenv('ALLOW_RUNTIME_SCHEMA');
+$previousAppEnv = getenv('APP_ENV');
+putenv('APP_ENV=local');
+putenv('ALLOW_RUNTIME_SCHEMA=1');
+
 $repo = new SqlMetricsRepository(null, $dbPath);
 $service = new TelemetryService($repo);
 
@@ -129,5 +134,16 @@ echo json_encode([
     'summary' => $summary,
     'failures' => $failures,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
+
+if ($previousAllow === false) {
+    putenv('ALLOW_RUNTIME_SCHEMA');
+} else {
+    putenv('ALLOW_RUNTIME_SCHEMA=' . $previousAllow);
+}
+if ($previousAppEnv === false) {
+    putenv('APP_ENV');
+} else {
+    putenv('APP_ENV=' . $previousAppEnv);
+}
 
 exit($ok ? 0 : 1);

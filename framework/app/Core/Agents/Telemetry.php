@@ -3,6 +3,8 @@
 
 namespace App\Core\Agents;
 
+use App\Core\LogSanitizer;
+
 final class Telemetry
 {
     private string $projectRoot;
@@ -22,6 +24,7 @@ final class Telemetry
         }
         $file = $dir . '/' . date('Y-m-d') . '.log.jsonl';
         $payload['ts'] = $payload['ts'] ?? time();
+        $payload = LogSanitizer::sanitizeArray($payload);
         $line = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
         if ($line !== false) {
             file_put_contents($file, $line . PHP_EOL, FILE_APPEND | LOCK_EX);

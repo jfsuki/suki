@@ -14,7 +14,15 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
     public function __construct(?PDO $db = null)
     {
         $this->db = $db ?? Database::connection();
-        $this->ensureTables();
+        RuntimeSchemaPolicy::bootstrap(
+            $this->db,
+            'SqlMemoryRepository',
+            fn() => $this->ensureTables(),
+            $this->requiredTables(),
+            $this->requiredIndexes(),
+            [],
+            'db/migrations/' . $this->driver() . '/20260303_004_runtime_infra_schema.sql'
+        );
     }
 
     public function getGlobalMemory(string $category, string $key, array $default = []): array
@@ -248,6 +256,32 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
         );
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_log (tenant_id, session_id, created_at)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_log (tenant_id, user_id, created_at)');
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function requiredTables(): array
+    {
+        return ['mem_global', 'mem_tenant', 'mem_user', 'chat_log'];
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function requiredIndexes(): array
+    {
+        return [
+            'mem_global' => ['idx_mem_global_category_updated'],
+            'mem_tenant' => ['idx_mem_tenant_updated'],
+            'mem_user' => ['idx_mem_user_updated'],
+            'chat_log' => ['idx_chat_session', 'idx_chat_user'],
+        ];
+    }
+
+    private function driver(): string
+    {
+        return (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
     }
 
     private function upsertGlobal(string $category, string $key, array $value): void
