@@ -9,6 +9,13 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Mandatory developer pre-check: `php framework/scripts/codex_self_check.php --strict`.
 - Temporary testing artifacts policy: only under `framework/tests/tmp/`.
 
+## Checkpoint (2026-03-03, pre-P0 secrets hardening)
+- Baseline frozen for pending tracking before structural hardening.
+- Open blockers at snapshot time:
+  - `domain_training_sync` drift blocking full green in `run.php`.
+  - `project/.env` tracked in git (security risk).
+  - `ConversationGateway.php` still oversized and pending deeper split.
+
 ## Canon consolidation (2026-03-02)
 This project now recognizes `docs/canon/*` and `docs/contracts/*` as official governance sources for architecture and agent policy.
 

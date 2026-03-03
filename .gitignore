@@ -1,3 +1,18 @@
+# Secrets and credentials (never commit)
+.env
+.env.*
+!.env.example
+/project/.env
+/project/.env.*
+!/project/.env.example
+*.key
+*.pem
+*.p12
+secrets/
+credentials/
+**/secrets/
+**/credentials/
+
 /vendor/
 /framework/tests/tmp/
 /framework/tests/*_result.json

@@ -14,7 +14,7 @@ final class OperationalQueueStore
     public function __construct(?PDO $db = null)
     {
         $this->db = $db ?? Database::connection();
-        $this->ensureSchema();
+        $this->bootstrapSchemaPolicy();
     }
 
     /**
@@ -287,6 +287,198 @@ final class OperationalQueueStore
             return;
         }
         $this->ensureSchemaSqlite();
+    }
+
+    private function bootstrapSchemaPolicy(): void
+    {
+        if ($this->runtimeSchemaEnabled()) {
+            $this->ensureSchema();
+            return;
+        }
+
+        $issues = $this->collectSchemaIssues();
+        $missingTables = is_array($issues['missing_tables'] ?? null) ? (array) $issues['missing_tables'] : [];
+        $missingIndexes = is_array($issues['missing_indexes'] ?? null) ? (array) $issues['missing_indexes'] : [];
+        if (empty($missingTables) && empty($missingIndexes)) {
+            return;
+        }
+
+        $driver = $this->driver();
+        $migrationHint = 'Aplica migraciones formales en db/migrations/' . $driver . '/';
+
+        if (!empty($missingIndexes)) {
+            error_log(
+                '[OperationalQueueStore] runtime schema changes are disabled; missing_indexes='
+                . implode(',', $missingIndexes)
+                . '. '
+                . $migrationHint
+            );
+        }
+
+        if (empty($missingTables)) {
+            return;
+        }
+
+        $details = ['missing_tables=' . implode(',', $missingTables)];
+        if (!empty($missingIndexes)) {
+            $details[] = 'missing_indexes=' . implode(',', $missingIndexes);
+        }
+        throw new RuntimeException(
+            'OperationalQueueStore: runtime schema changes are disabled. '
+            . implode(' | ', $details)
+            . '. '
+            . $migrationHint
+            . ' Habilita ALLOW_RUNTIME_SCHEMA=1 solo en local dev.'
+        );
+    }
+
+    private function runtimeSchemaEnabled(): bool
+    {
+        if ((string) (getenv('ALLOW_RUNTIME_SCHEMA') ?: '0') !== '1') {
+            return false;
+        }
+        if ($this->isProductionEnvironment()) {
+            return false;
+        }
+        return $this->isLocalEnvironment();
+    }
+
+    private function isProductionEnvironment(): bool
+    {
+        $appEnv = strtolower(trim((string) (getenv('APP_ENV') ?: getenv('SUKI_ENV') ?: '')));
+        return in_array($appEnv, ['production', 'prod'], true);
+    }
+
+    private function isLocalEnvironment(): bool
+    {
+        $appEnv = strtolower(trim((string) (getenv('APP_ENV') ?: getenv('SUKI_ENV') ?: '')));
+        if (in_array($appEnv, ['local', 'development', 'dev', 'testing', 'test'], true)) {
+            return true;
+        }
+
+        $appUrl = trim((string) (getenv('APP_URL') ?: ''));
+        if ($appUrl !== '') {
+            $host = strtolower((string) parse_url($appUrl, PHP_URL_HOST));
+            if (in_array($host, ['localhost', '127.0.0.1', '::1'], true) || str_ends_with($host, '.local')) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array{missing_tables: array<int, string>, missing_indexes: array<int, string>}
+     */
+    private function collectSchemaIssues(): array
+    {
+        $missingTables = [];
+        foreach ($this->requiredTables() as $table) {
+            if (!$this->tableExists($table)) {
+                $missingTables[] = $table;
+            }
+        }
+
+        $missingIndexes = [];
+        foreach ($this->requiredIndexes() as $table => $indexes) {
+            if (!$this->tableExists($table)) {
+                continue;
+            }
+            foreach ($indexes as $index) {
+                if (!$this->indexExists($table, $index)) {
+                    $missingIndexes[] = $table . '.' . $index;
+                }
+            }
+        }
+
+        return [
+            'missing_tables' => $missingTables,
+            'missing_indexes' => $missingIndexes,
+        ];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function requiredTables(): array
+    {
+        return ['event_dedupe', 'jobs_queue'];
+    }
+
+    /**
+     * @return array<string, array<int, string>>
+     */
+    private function requiredIndexes(): array
+    {
+        return [
+            'event_dedupe' => [
+                'uq_event_dedupe_tenant_channel_key',
+                'idx_event_dedupe_tenant_first_seen',
+                'idx_event_dedupe_status_last_seen',
+            ],
+            'jobs_queue' => [
+                'idx_jobs_queue_tenant_created',
+                'idx_jobs_queue_status_available',
+                'idx_jobs_queue_tenant_status_available',
+            ],
+        ];
+    }
+
+    private function tableExists(string $table): bool
+    {
+        $table = trim($table);
+        if ($table === '') {
+            return false;
+        }
+
+        if ($this->driver() === 'mysql') {
+            $stmt = $this->db->prepare(
+                'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :table_name'
+            );
+            $stmt->execute([':table_name' => $table]);
+            return (int) $stmt->fetchColumn() > 0;
+        }
+
+        $stmt = $this->db->prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = :table_name LIMIT 1");
+        $stmt->execute([':table_name' => $table]);
+        $value = $stmt->fetchColumn();
+        return is_string($value) && $value !== '';
+    }
+
+    private function indexExists(string $table, string $index): bool
+    {
+        $table = trim($table);
+        $index = trim($index);
+        if ($table === '' || $index === '') {
+            return false;
+        }
+
+        if ($this->driver() === 'mysql') {
+            $stmt = $this->db->prepare(
+                'SELECT COUNT(*) FROM information_schema.statistics
+                 WHERE table_schema = DATABASE() AND table_name = :table_name AND index_name = :index_name'
+            );
+            $stmt->execute([
+                ':table_name' => $table,
+                ':index_name' => $index,
+            ]);
+            return (int) $stmt->fetchColumn() > 0;
+        }
+
+        $safeTable = preg_replace('/[^a-zA-Z0-9_]/', '', $table) ?? '';
+        if ($safeTable === '') {
+            return false;
+        }
+        $stmt = $this->db->query("PRAGMA index_list({$safeTable})");
+        if (!$stmt) {
+            return false;
+        }
+        while ($row = $stmt->fetch(PDO::FETCH_ASSOC)) {
+            if ((string) ($row['name'] ?? '') === $index) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function ensureSchemaMySql(): void

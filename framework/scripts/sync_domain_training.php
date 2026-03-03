@@ -12,19 +12,23 @@ $checkOnly = in_array('--check', $argv, true);
 $domain = read_json($domainPath);
 $training = read_json($trainingPath);
 
-$updated = sync_training_from_domain($training, $domain);
-
-$changed = json_encode($training, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
-    !== json_encode($updated, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+$expected = sync_training_from_domain($training, $domain, false);
+$driftIssues = collect_sync_drift_issues($training, $expected, $domain);
 
 if ($checkOnly) {
-    if ($changed) {
+    if (!empty($driftIssues)) {
         fwrite(STDERR, "DRIFT_DETECTED: conversation_training_base.json no esta sincronizado con domain_playbooks.json\n");
+        foreach ($driftIssues as $issue) {
+            fwrite(STDERR, '- ' . $issue . "\n");
+        }
         exit(1);
     }
     echo "OK: domain/training sync sin drift\n";
     exit(0);
 }
+
+$updated = sync_training_from_domain($training, $domain, true);
+$changed = same_json($training, $updated) === false;
 
 if (!$changed) {
     echo "No changes. conversation_training_base.json ya estaba sincronizado.\n";
@@ -34,7 +38,7 @@ if (!$changed) {
 write_json($trainingPath, $updated);
 echo "Synced: " . $trainingPath . "\n";
 
-function sync_training_from_domain(array $training, array $domain): array
+function sync_training_from_domain(array $training, array $domain, bool $touchMetaUpdated): array
 {
     $domainSolverIntents = is_array($domain['solver_intents'] ?? null) ? $domain['solver_intents'] : [];
     $builderGuidance = is_array($domain['builder_guidance'] ?? null) ? $domain['builder_guidance'] : [];
@@ -45,7 +49,7 @@ function sync_training_from_domain(array $training, array $domain): array
 
     $existingByName = [];
     foreach ($training['intents'] as $index => $intent) {
-        $name = trim((string) ($intent['name'] ?? ''));
+        $name = canonical_solver_intent_name((string) ($intent['name'] ?? ''));
         if ($name !== '') {
             $existingByName[$name] = $index;
         }
@@ -56,19 +60,24 @@ function sync_training_from_domain(array $training, array $domain): array
         if (!is_array($solverIntent)) {
             continue;
         }
-        $name = trim((string) ($solverIntent['name'] ?? ''));
+        $name = canonical_solver_intent_name((string) ($solverIntent['name'] ?? ''));
         if ($name === '') {
             continue;
         }
+        $solverIntent['name'] = $name;
         $domainSolverByName[$name] = $solverIntent;
     }
 
-    // Remove stale solver intents from training (single source: domain playbooks).
+    // Sync law: domain_playbooks.json is the single source of truth for solver intents.
     $filtered = [];
     foreach ($training['intents'] as $intent) {
-        $name = trim((string) ($intent['name'] ?? ''));
-        if (str_starts_with($name, 'SOLVE_') && !isset($domainSolverByName[$name])) {
+        $rawName = trim((string) ($intent['name'] ?? ''));
+        $canonicalName = canonical_solver_intent_name($rawName);
+        if (is_solver_intent_name($canonicalName) && !isset($domainSolverByName[$canonicalName])) {
             continue;
+        }
+        if (is_solver_intent_name($canonicalName) && $canonicalName !== $rawName) {
+            $intent['name'] = $canonicalName;
         }
         $filtered[] = $intent;
     }
@@ -77,7 +86,7 @@ function sync_training_from_domain(array $training, array $domain): array
     // Rebuild lookup after filtering.
     $existingByName = [];
     foreach ($training['intents'] as $index => $intent) {
-        $name = trim((string) ($intent['name'] ?? ''));
+        $name = canonical_solver_intent_name((string) ($intent['name'] ?? ''));
         if ($name !== '') {
             $existingByName[$name] = $index;
         }
@@ -98,7 +107,7 @@ function sync_training_from_domain(array $training, array $domain): array
 
     ensure_flow_control_back($training['intents']);
     $training['builder_guidance'] = $builderGuidance;
-    ensure_sync_note($training);
+    ensure_sync_note($training, $touchMetaUpdated);
     return $training;
 }
 
@@ -152,7 +161,7 @@ function merge_solver_intent(array $solverIntent, array $existing): array
     return $intent;
 }
 
-function ensure_sync_note(array &$training): void
+function ensure_sync_note(array &$training, bool $touchMetaUpdated): void
 {
     if (!isset($training['meta']) || !is_array($training['meta'])) {
         $training['meta'] = [];
@@ -165,7 +174,9 @@ function ensure_sync_note(array &$training): void
     if (!in_array($note, $training['meta']['notes'], true)) {
         $training['meta']['notes'][] = $note;
     }
-    $training['meta']['updated'] = date('Y-m-d');
+    if ($touchMetaUpdated) {
+        $training['meta']['updated'] = date('Y-m-d');
+    }
 }
 
 function ensure_flow_control_back(array &$intents): void
@@ -238,6 +249,141 @@ function normalize_array(mixed $values): array
     return is_array($values) ? array_values($values) : [];
 }
 
+function collect_sync_drift_issues(array $training, array $expected, array $domain): array
+{
+    $issues = [];
+
+    $domainNames = extract_domain_solver_names($domain);
+    $trainingNames = extract_training_solver_names($training);
+
+    $missingInTraining = array_values(array_diff(array_keys($domainNames), array_keys($trainingNames)));
+    sort($missingInTraining);
+    foreach ($missingInTraining as $name) {
+        $issues[] = "intent {$name} existe en domain_playbooks y no en conversation_training_base";
+    }
+
+    $orphanInTraining = array_values(array_diff(array_keys($trainingNames), array_keys($domainNames)));
+    sort($orphanInTraining);
+    foreach ($orphanInTraining as $name) {
+        $issues[] = "intent {$name} existe en conversation_training_base y no en domain_playbooks";
+    }
+
+    foreach (($training['intents'] ?? []) as $intent) {
+        if (!is_array($intent)) {
+            continue;
+        }
+        $raw = trim((string) ($intent['name'] ?? ''));
+        $canonical = canonical_solver_intent_name($raw);
+        if (!is_solver_intent_name($canonical)) {
+            continue;
+        }
+        if ($raw !== $canonical) {
+            $issues[] = "intent {$raw} debe normalizarse como {$canonical} (case/underscores)";
+        }
+    }
+
+    $trainingBuilderGuidance = is_array($training['builder_guidance'] ?? null) ? $training['builder_guidance'] : [];
+    $expectedBuilderGuidance = is_array($expected['builder_guidance'] ?? null) ? $expected['builder_guidance'] : [];
+    if (!same_json($trainingBuilderGuidance, $expectedBuilderGuidance)) {
+        $issues[] = 'builder_guidance desalineado entre domain_playbooks y conversation_training_base';
+    }
+
+    if (!has_intent_name($training['intents'] ?? [], 'FLOW_CONTROL_BACK')) {
+        $issues[] = 'intent FLOW_CONTROL_BACK obligatorio no existe en conversation_training_base';
+    }
+
+    if (empty($issues)) {
+        $trainingComparable = $training;
+        $expectedComparable = $expected;
+        if (isset($trainingComparable['meta']['updated'])) {
+            unset($trainingComparable['meta']['updated']);
+        }
+        if (isset($expectedComparable['meta']['updated'])) {
+            unset($expectedComparable['meta']['updated']);
+        }
+        if (!same_json($trainingComparable, $expectedComparable)) {
+            $issues[] = 'drift estructural detectado fuera de intents/builder_guidance; ejecutar sync_domain_training.php para reparar';
+        }
+    }
+
+    return $issues;
+}
+
+function extract_domain_solver_names(array $domain): array
+{
+    $names = [];
+    foreach (($domain['solver_intents'] ?? []) as $intent) {
+        if (!is_array($intent)) {
+            continue;
+        }
+        $canonical = canonical_solver_intent_name((string) ($intent['name'] ?? ''));
+        if ($canonical === '') {
+            continue;
+        }
+        $names[$canonical] = true;
+    }
+    return $names;
+}
+
+function extract_training_solver_names(array $training): array
+{
+    $names = [];
+    foreach (($training['intents'] ?? []) as $intent) {
+        if (!is_array($intent)) {
+            continue;
+        }
+        $canonical = canonical_solver_intent_name((string) ($intent['name'] ?? ''));
+        if (!is_solver_intent_name($canonical)) {
+            continue;
+        }
+        $names[$canonical] = true;
+    }
+    return $names;
+}
+
+function canonical_solver_intent_name(string $name): string
+{
+    $normalized = trim($name);
+    if ($normalized === '') {
+        return '';
+    }
+
+    $normalized = mb_strtoupper($normalized, 'UTF-8');
+    $normalized = preg_replace('/[^A-Z0-9]+/', '_', $normalized) ?? $normalized;
+    $normalized = preg_replace('/_+/', '_', $normalized) ?? $normalized;
+    $normalized = trim($normalized, '_');
+
+    if ($normalized === '') {
+        return '';
+    }
+
+    if (str_starts_with($normalized, 'APPLY_PLAYBOOK_')) {
+        $normalized = 'SOLVE_' . substr($normalized, strlen('APPLY_PLAYBOOK_'));
+    } elseif (str_starts_with($normalized, 'PLAYBOOK_')) {
+        $normalized = 'SOLVE_' . substr($normalized, strlen('PLAYBOOK_'));
+    }
+
+    return $normalized;
+}
+
+function is_solver_intent_name(string $name): bool
+{
+    return $name !== '' && str_starts_with($name, 'SOLVE_');
+}
+
+function has_intent_name(array $intents, string $intentName): bool
+{
+    foreach ($intents as $intent) {
+        if (!is_array($intent)) {
+            continue;
+        }
+        if ((string) ($intent['name'] ?? '') === $intentName) {
+            return true;
+        }
+    }
+    return false;
+}
+
 function read_json(string $path): array
 {
     if (!is_file($path)) {
@@ -264,4 +410,10 @@ function write_json(string $path, array $data): void
     if ($ok === false) {
         throw new RuntimeException('Cannot write file: ' . $path);
     }
+}
+
+function same_json(mixed $left, mixed $right): bool
+{
+    return json_encode($left, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES)
+        === json_encode($right, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
 }

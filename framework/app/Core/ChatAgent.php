@@ -166,10 +166,19 @@ final class ChatAgent
 
         $gateway = $this->gateway();
         $result = $gateway->handle($tenantId, $userId, $text, $mode, $projectId);
-        $route = $this->intentRouter()->route($result);
+        $route = $this->intentRouter()->route($result, [
+            'tenant_id' => $tenantId,
+            'project_id' => $projectId,
+            'session_id' => $sessionId,
+            'user_id' => $userId,
+            'role' => $role,
+            'mode' => $mode,
+            'message_id' => (string) ($payload['message_id'] ?? ''),
+        ]);
         $action = $route->kind();
         $telemetry = $route->telemetry();
         $state = $route->state();
+        $messageId = $this->resolveMessageId($payload, $sessionId, $text);
 
         if ($route->isLocalResponse()) {
             $reply = $this->reply($route->reply(), $channel, $sessionId, $userId);
@@ -183,7 +192,15 @@ final class ChatAgent
                 'project_id' => $projectId,
                 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
                 'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
-            ]));
+            ], $this->buildAgentOpsTelemetryBase(
+                $telemetry,
+                $tenantId,
+                $projectId,
+                $sessionId,
+                $messageId,
+                $this->latencyMs($requestStartedAt),
+                'response.emitted'
+            )));
             try {
                 $this->telemetryService()->recordIntentMetric([
                     'tenant_id' => $tenantId,
@@ -276,7 +293,15 @@ final class ChatAgent
                 'project_id' => $projectId,
                 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
                 'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
-            ]));
+            ], $this->buildAgentOpsTelemetryBase(
+                $telemetry,
+                $tenantId,
+                $projectId,
+                $sessionId,
+                $messageId,
+                $this->latencyMs($requestStartedAt),
+                'response.emitted'
+            )));
             try {
                 $this->telemetryService()->recordIntentMetric([
                     'tenant_id' => $tenantId,
@@ -335,7 +360,15 @@ final class ChatAgent
                 'project_id' => $projectId,
                 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
                 'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
-            ]));
+            ], $this->buildAgentOpsTelemetryBase(
+                $telemetry,
+                $tenantId,
+                $projectId,
+                $sessionId,
+                $messageId,
+                $this->latencyMs($requestStartedAt),
+                'response.emitted'
+            )));
             try {
                 $this->telemetryService()->recordIntentMetric([
                     'tenant_id' => $tenantId,
@@ -380,7 +413,15 @@ final class ChatAgent
             'project_id' => $projectId,
             'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
             'status' => 'error',
-        ]));
+        ], $this->buildAgentOpsTelemetryBase(
+            $telemetry,
+            $tenantId,
+            $projectId,
+            $sessionId,
+            $messageId,
+            $this->latencyMs($requestStartedAt),
+            'response.emitted'
+        )));
         try {
             $this->telemetryService()->recordIntentMetric([
                 'tenant_id' => $tenantId,
@@ -1218,6 +1259,56 @@ final class ChatAgent
             $this->intentRouter = new IntentRouter();
         }
         return $this->intentRouter;
+    }
+
+    private function resolveMessageId(array $payload, string $sessionId, string $message): string
+    {
+        $messageId = trim((string) ($payload['message_id'] ?? ''));
+        if ($messageId !== '') {
+            return $messageId;
+        }
+
+        return $sessionId . ':' . substr(sha1($message), 0, 12);
+    }
+
+    private function buildAgentOpsTelemetryBase(
+        array $routeTelemetry,
+        string $tenantId,
+        string $projectId,
+        string $sessionId,
+        string $messageId,
+        int $latencyMs,
+        string $eventName
+    ): array {
+        $routePath = (string) ($routeTelemetry['route_path'] ?? '');
+        $gateDecision = (string) ($routeTelemetry['gate_decision'] ?? 'unknown');
+        $contractVersions = is_array($routeTelemetry['contract_versions'] ?? null)
+            ? (array) $routeTelemetry['contract_versions']
+            : [];
+        $versions = is_array($routeTelemetry['versions'] ?? null) ? (array) $routeTelemetry['versions'] : [];
+        if (empty($versions)) {
+            $versions = [
+                'prompt_version' => (string) (getenv('PROMPT_VERSION') ?: 'unknown'),
+                'router_policy_version' => (string) ($contractVersions['router_policy'] ?? 'unknown'),
+                'action_catalog_version' => (string) ($contractVersions['action_catalog'] ?? 'unknown'),
+                'akp_version' => (string) (getenv('AKP_VERSION') ?: 'unknown'),
+                'policy_pack_version' => (string) (getenv('POLICY_PACK_VERSION') ?: 'unknown'),
+            ];
+        }
+
+        return [
+            'event_name' => $eventName,
+            'event_time' => date('c'),
+            'tenant_id' => $tenantId,
+            'project_id' => $projectId,
+            'session_id' => $sessionId,
+            'message_id' => $messageId,
+            'route_path' => $routePath,
+            'gate_decision' => $gateDecision,
+            'contract_versions' => $contractVersions,
+            'versions' => $versions,
+            'latency_ms' => $latencyMs,
+        ];
     }
 
     private function commandBus(): CommandBus

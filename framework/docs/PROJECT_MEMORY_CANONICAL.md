@@ -175,3 +175,7 @@ If a decision conflicts with a higher level, it is invalid.
 ## 18) NON-CODE POLICY
 - Runtime artifacts governance source: `docs/canon/RUNTIME_ARTIFACTS_POLICY.md`.
 - Mandatory rule: runtime cache/sqlite state is not source code and must not be committed.
+
+## 19) Secrets Policy (2026-03-03)
+- Secrets never in git; rotate immediately if exposed.
+- `.env` is local runtime state only; commit only `.env.example` with placeholders.

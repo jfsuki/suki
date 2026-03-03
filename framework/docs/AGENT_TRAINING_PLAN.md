@@ -9,13 +9,15 @@ Train two coordinated agents with deterministic behavior, low unresolved turns, 
 ## 1) Training architecture
 
 ### Source of truth
-- Domain source: `project/contracts/knowledge/domain_playbooks.json`
-- Routing/training source: `framework/contracts/agents/conversation_training_base.json`
+- Canonical domain source: `framework/contracts/agents/domain_playbooks.json`
+- Project mirror (derived copy): `project/contracts/knowledge/domain_playbooks.json`
+- Routing/training artifact (derived from canonical domain source): `framework/contracts/agents/conversation_training_base.json`
 - Runtime memory: SQL memory tables (`mem_user`, `mem_tenant`, `chat_log`)
 
 ### Sync discipline
-- Keep domain intents and utterances centralized in domain playbooks.
-- Generate/sync training artifacts via script (`framework/scripts/sync_domain_training.php`).
+- Single sync law: `domain_playbooks.json` is authoritative; `conversation_training_base.json` must sync to it.
+- Keep domain intents and utterances centralized in canonical domain playbooks.
+- Generate/sync training artifacts via script (`framework/scripts/sync_domain_training.php`) and mirror to project knowledge only after sync.
 - Block drift with anti-diff tests in QA.
 
 ## 2) Core skill packs

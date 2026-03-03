@@ -32,12 +32,19 @@ final class UnitTestRunner
         $tests[] = $this->wrap('builder_guidance', fn() => $this->checkBuilderGuidance());
         $tests[] = $this->wrap('flow_control', fn() => $this->checkFlowControl());
         $tests[] = $this->wrap('domain_training_sync', fn() => $this->checkDomainTrainingSync());
+        $tests[] = $this->wrap('secrets_guard', fn() => $this->checkSecretsGuard());
         $tests[] = $this->wrap('security_state_repository', fn() => $this->checkSecurityStateRepository());
         $tests[] = $this->wrap('openapi_importer', fn() => $this->checkOpenApiIntegrationImporter());
         $tests[] = $this->wrap('api_security_guard', fn() => $this->checkApiSecurityGuard());
+        $tests[] = $this->wrap('operational_queue_schema_guard', fn() => $this->checkOperationalQueueSchemaGuard());
+        $tests[] = $this->wrap('framework_hygiene', fn() => $this->checkFrameworkHygiene());
+        $tests[] = $this->wrap('public_excel_import_e2e', fn() => $this->checkPublicExcelImportE2E());
+        $tests[] = $this->wrap('public_report_e2e', fn() => $this->checkPublicReportE2E());
         $tests[] = $this->wrap('workflow_api_e2e', fn() => $this->checkWorkflowApiE2E());
         $tests[] = $this->wrap('security_channels_e2e', fn() => $this->checkSecurityChannelsE2E());
         $tests[] = $this->wrap('intent_router', fn() => $this->checkIntentRouter());
+        $tests[] = $this->wrap('router_contract_enforcement', fn() => $this->checkRouterContractEnforcement());
+        $tests[] = $this->wrap('action_allowlist_enforcement', fn() => $this->checkActionAllowlistEnforcement());
         $tests[] = $this->wrap('command_bus', fn() => $this->checkCommandBus());
         $tests[] = $this->wrap('observability_metrics', fn() => $this->checkObservabilityMetrics());
         $tests[] = $this->wrap('canonical_storage_new_project', fn() => $this->checkCanonicalStorageNewProject());
@@ -710,8 +717,17 @@ final class UnitTestRunner
         $code = 0;
         exec($cmd, $output, $code);
         if ($code !== 0) {
+            $details = trim(implode(PHP_EOL, $output));
+            if ($details !== '') {
+                throw new \RuntimeException("Drift entre domain_playbooks y conversation_training_base. {$details}");
+            }
             throw new \RuntimeException('Drift entre domain_playbooks y conversation_training_base.');
         }
+    }
+
+    private function checkSecretsGuard(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/secrets_guard_test.php');
     }
 
     private function checkOpenApiIntegrationImporter(): void
@@ -790,6 +806,26 @@ final class UnitTestRunner
         }
     }
 
+    private function checkOperationalQueueSchemaGuard(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/operational_queue_schema_guard_test.php');
+    }
+
+    private function checkFrameworkHygiene(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/framework_hygiene_test.php');
+    }
+
+    private function checkPublicExcelImportE2E(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/public_excel_import_e2e_test.php');
+    }
+
+    private function checkPublicReportE2E(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/public_report_e2e_test.php');
+    }
+
     private function checkIntentRouter(): void
     {
         $router = new IntentRouter();
@@ -807,6 +843,16 @@ final class UnitTestRunner
         if (!$llm->isLlmRequest()) {
             throw new \RuntimeException('IntentRouter no enruta send_to_llm.');
         }
+    }
+
+    private function checkRouterContractEnforcement(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/router_contract_enforcement_test.php');
+    }
+
+    private function checkActionAllowlistEnforcement(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/action_allowlist_enforcement_test.php');
     }
 
     private function checkCommandBus(): void

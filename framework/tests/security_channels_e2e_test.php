@@ -130,6 +130,8 @@ $telegramSecret = runApiRouteE2E($helper, [
     'method' => 'POST',
     'env' => [
         'TELEGRAM_WEBHOOK_SECRET' => 'expected-secret',
+        'APP_ENV' => 'local',
+        'ALLOW_RUNTIME_SCHEMA' => '1',
     ],
     'headers' => [
         'X-Telegram-Bot-Api-Secret-Token' => 'invalid-secret',
@@ -149,6 +151,10 @@ if (!is_array($telegramSecretJson) || ($telegramSecretJson['status'] ?? '') !== 
 $telegramReplayA = runApiRouteE2E($helper, [
     'route' => 'channels/telegram/webhook',
     'method' => 'POST',
+    'env' => [
+        'APP_ENV' => 'local',
+        'ALLOW_RUNTIME_SCHEMA' => '1',
+    ],
     'payload' => [
         'update_id' => (int) ('7' . $runToken),
         'message' => [
@@ -160,6 +166,10 @@ $telegramReplayA = runApiRouteE2E($helper, [
 $telegramReplayB = runApiRouteE2E($helper, [
     'route' => 'channels/telegram/webhook',
     'method' => 'POST',
+    'env' => [
+        'APP_ENV' => 'local',
+        'ALLOW_RUNTIME_SCHEMA' => '1',
+    ],
     'payload' => [
         'update_id' => (int) ('7' . $runToken),
         'message' => [

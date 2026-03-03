@@ -11,6 +11,7 @@ final class IntentRouteResult
     private array $llmRequest;
     private array $state;
     private array $telemetry;
+    private array $agentOps;
 
     public function __construct(
         string $kind,
@@ -18,7 +19,8 @@ final class IntentRouteResult
         array $command = [],
         array $llmRequest = [],
         array $state = [],
-        array $telemetry = []
+        array $telemetry = [],
+        array $agentOps = []
     ) {
         $this->kind = $kind;
         $this->reply = $reply;
@@ -26,6 +28,7 @@ final class IntentRouteResult
         $this->llmRequest = $llmRequest;
         $this->state = $state;
         $this->telemetry = $telemetry;
+        $this->agentOps = $agentOps;
     }
 
     public function kind(): string
@@ -58,6 +61,11 @@ final class IntentRouteResult
         return $this->telemetry;
     }
 
+    public function agentOps(): array
+    {
+        return $this->agentOps;
+    }
+
     public function isLocalResponse(): bool
     {
         return in_array($this->kind, ['respond_local', 'ask_user'], true);
@@ -73,4 +81,3 @@ final class IntentRouteResult
         return $this->kind === 'send_to_llm' && !empty($this->llmRequest);
     }
 }
-
