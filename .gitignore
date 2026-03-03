@@ -9,3 +9,5 @@
 /project/storage/security/
 /project/storage/workflows/
 /project/contracts/workflows/
+/project/storage/meta/project_registry.sqlite
+/project/storage/cache/*.cache.json

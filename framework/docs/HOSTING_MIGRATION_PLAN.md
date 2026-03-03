@@ -30,6 +30,10 @@ Objetivo: estabilidad inmediata.
    - no crear tablas duplicadas,
    - usar indices `tenant_id` y `created_at`,
    - purgar tablas demo/acid fuera de horario.
+5. Worker de cola por cron (webhook fast-ack + procesamiento asincrono):
+   - comando recomendado:
+     `* * * * * php /path/bin/worker.php --once`
+   - objetivo: cada webhook responde rapido (HTTP 200) y el procesamiento ocurre fuera de la peticion web.
 
 ### Fase B — VPS administrado (proximo paso)
 Objetivo: pasar de “hosting web” a “servicio de aplicaciones”.

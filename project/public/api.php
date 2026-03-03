@@ -45,6 +45,7 @@ use App\Core\WorkflowCompiler;
 use App\Core\OpenApiIntegrationImporter;
 use App\Core\ApiSecurityGuard;
 use App\Core\SecurityStateRepository;
+use App\Core\OperationalQueueStore;
 use App\Core\Agents\ConversationQualityDashboard;
 
 $route = trim($_GET['route'] ?? '');
@@ -767,43 +768,17 @@ if ($route === 'channels/telegram/webhook') {
         $messageNode = (array) $callback['message'];
     }
 
-    $chatId = trim((string) ($messageNode['chat']['id'] ?? ''));
-    $text = trim((string) ($messageNode['text'] ?? ($callback['data'] ?? '')));
-    if ($chatId === '') {
-        respondJson($response, 'success', 'Telegram update ignorado', ['ignored' => true]);
-        return;
-    }
-
     $updateId = trim((string) ($update['update_id'] ?? ''));
+    $messageId = trim((string) ($messageNode['message_id'] ?? $callback['id'] ?? ''));
     $fallbackPayload = $rawBody !== '' ? $rawBody : ((string) (json_encode($update, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: ''));
-    $replayNonce = $updateId !== '' ? ('upd:' . $updateId) : ('hash:' . sha1($fallbackPayload));
-    $replayTtl = (int) (getenv('TELEGRAM_REPLAY_TTL_SEC') ?: 86400);
-    try {
-        $fresh = securityStateRepository()->rememberReplayNonce('telegram', $replayNonce, $replayTtl);
-        if (!$fresh) {
-            respondJson($response, 'success', 'Telegram update duplicado ignorado', [
-                'ignored' => true,
-                'reason' => 'replay_detected',
-            ]);
-            return;
-        }
-    } catch (\Throwable $e) {
-        if ((string) (getenv('API_SECURITY_STRICT') ?: '0') === '1') {
-            respondJson($response, 'error', 'No se pudo validar anti-replay de Telegram', [], 503);
-            return;
-        }
-    }
+    $payloadHash = hash('sha256', $fallbackPayload);
 
-    $mode = 'app';
-    if (preg_match('/^\\/builder\\b/i', $text) === 1) {
-        $mode = 'builder';
-        $text = trim((string) (preg_replace('/^\\/builder\\b/i', '', $text) ?? $text));
-    } elseif (preg_match('/^\\/app\\b/i', $text) === 1) {
-        $mode = 'app';
-        $text = trim((string) (preg_replace('/^\\/app\\b/i', '', $text) ?? $text));
-    }
-    if ($text === '' || preg_match('/^\\/(start|help)$/i', $text) === 1) {
-        $text = 'hola';
+    if ($updateId !== '') {
+        $idempotencyKey = 'telegram:update:' . $updateId;
+    } elseif ($messageId !== '') {
+        $idempotencyKey = 'telegram:message:' . $messageId;
+    } else {
+        $idempotencyKey = 'telegram:hash:' . $payloadHash;
     }
 
     $tenantId = trim((string) (getenv('TELEGRAM_DEFAULT_TENANT') ?: 'default'));
@@ -820,54 +795,52 @@ if ($route === 'channels/telegram/webhook') {
             $projectId = 'default';
         }
     }
-    $safeChat = sanitizeKey($chatId);
-    $chatPayload = [
-        'message' => $text,
-        'mode' => $mode,
+
+    $chatId = trim((string) ($messageNode['chat']['id'] ?? ''));
+    $text = trim((string) ($messageNode['text'] ?? ($callback['data'] ?? '')));
+    $queuePayload = [
+        'source' => 'telegram.webhook',
         'channel' => 'telegram',
         'tenant_id' => $tenantId,
         'project_id' => $projectId !== '' ? $projectId : 'default',
-        'user_id' => 'tg:' . $safeChat,
-        'session_id' => 'tg:' . $safeChat . ':' . $mode,
+        'received_at' => date('Y-m-d H:i:s'),
+        'update_id' => $updateId,
+        'message_id' => $messageId,
+        'chat_id' => $chatId,
+        'text' => $text,
+        'raw_update' => $update,
     ];
 
-    setTenantContext($chatPayload);
     try {
-        $agent = new \App\Core\ChatAgent();
-        $result = $agent->handle($chatPayload);
+        $queue = new OperationalQueueStore();
+        $enqueue = $queue->enqueueIfNotExists(
+            $tenantId,
+            'telegram',
+            $idempotencyKey,
+            'telegram.inbound',
+            $queuePayload,
+            $payloadHash
+        );
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 500);
         return;
     }
 
-    $replyText = trim((string) ($result['data']['reply'] ?? $result['message'] ?? 'OK'));
-    if ($replyText === '') {
-        $replyText = 'OK';
-    }
-    if ((string) (getenv('TELEGRAM_WEBHOOK_DRY_RUN') ?: '0') === '1') {
-        respondJson($response, 'success', 'Telegram webhook procesado (dry-run)', [
-            'mode' => $mode,
-            'chat_id' => $chatId,
-            'reply_preview' => $replyText,
-            'dry_run' => true,
-        ]);
-        return;
-    }
-    $token = trim((string) (getenv('TELEGRAM_BOT_TOKEN') ?: ''));
-    $delivery = sendTelegramMessage($token, $chatId, $replyText);
-    $delivered = (bool) ($delivery['ok'] ?? false);
-    $httpCode = $delivered ? 200 : 502;
-    respondJson(
-        $response,
-        $delivered ? 'success' : 'error',
-        $delivered ? 'Mensaje Telegram entregado' : 'No se pudo enviar respuesta a Telegram',
-        [
-            'mode' => $mode,
-            'chat_id' => $chatId,
-            'delivery' => $delivery,
-        ],
-        $httpCode
-    );
+    $enqueued = (bool) ($enqueue['enqueued'] ?? false);
+    $message = $enqueued
+        ? 'Telegram update encolado'
+        : 'Telegram update duplicado ignorado';
+
+    http_response_code(200);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'status' => 'success',
+        'message' => $message,
+        'ok' => true,
+        'enqueued' => $enqueued,
+        'idempotency_key' => $idempotencyKey,
+        'job_id' => (string) ($enqueue['job_id'] ?? ''),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
     return;
 }
 

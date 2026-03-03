@@ -1,0 +1,92 @@
+{
+  "contract_id": "agentops_metrics_contract",
+  "version": "1.0.0",
+  "effective_date": "2026-03-02",
+  "addenda_of": null,
+  "status": "canonical_draft",
+  "contract_location": "docs/contracts",
+  "scope": "AgentOps observability and KPI contract without runtime implementation",
+  "traceable_events_minimum": [
+    "router.decision",
+    "gate.evaluation",
+    "intent.classified",
+    "action.classified",
+    "action.executed",
+    "response.emitted",
+    "cost.recorded",
+    "hallucination.flagged"
+  ],
+  "required_event_fields": [
+    "event_name",
+    "event_time",
+    "tenant_id",
+    "project_id",
+    "session_id",
+    "message_id",
+    "route_path",
+    "gate_decision",
+    "versions",
+    "latency_ms"
+  ],
+  "versions_contract": {
+    "required": true,
+    "fields": [
+      "prompt_version",
+      "router_policy_version",
+      "action_catalog_version",
+      "akp_version",
+      "policy_pack_version"
+    ]
+  },
+  "metrics": {
+    "json_valid_pct": {
+      "description": "Percentage of structured responses that are valid JSON.",
+      "formula": "valid_json_responses / total_structured_responses",
+      "target_direction": "higher_is_better",
+      "unit": "ratio"
+    },
+    "akp_correct_pct": {
+      "description": "Percentage of RAG-required responses with correct AKP evidence usage.",
+      "formula": "responses_with_valid_akp_references / rag_required_responses",
+      "target_direction": "higher_is_better",
+      "unit": "ratio"
+    },
+    "fallback_rate": {
+      "description": "Share of requests resolved via LLM stage.",
+      "formula": "llm_resolutions / total_resolutions",
+      "target_direction": "lower_is_better",
+      "unit": "ratio"
+    },
+    "hallucination_flags_rate": {
+      "description": "Share of responses flagged as hallucination during audit.",
+      "formula": "hallucination_flagged_responses / audited_responses",
+      "target_direction": "lower_is_better",
+      "unit": "ratio"
+    },
+    "cost_per_conversation": {
+      "description": "Average total cost per completed conversation.",
+      "formula": "sum(conversation_cost) / total_conversations",
+      "target_direction": "lower_is_better",
+      "unit": "currency"
+    },
+    "latency": {
+      "description": "Latency indicators per routing and response path.",
+      "formula": "aggregate(latency_ms)",
+      "target_direction": "lower_is_better",
+      "unit": "ms",
+      "required_aggregates": [
+        "p50",
+        "p95",
+        "p99"
+      ]
+    }
+  },
+  "metric_aliases_required": [
+    "%json_valid",
+    "%akp_correct",
+    "fallback_rate",
+    "hallucination_flags_rate",
+    "cost_per_conversation",
+    "latency"
+  ]
+}

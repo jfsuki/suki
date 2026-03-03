@@ -1,0 +1,66 @@
+{
+  "contract_id": "router_policy",
+  "version": "1.0.0",
+  "effective_date": "2026-03-02",
+  "addenda_of": null,
+  "status": "canonical_draft",
+  "contract_location": "docs/contracts",
+  "scope": "Deterministic router policy without runtime implementation",
+  "route_order": [
+    "cache",
+    "rules",
+    "rag",
+    "llm"
+  ],
+  "rules": {
+    "llm_is_last_resort": true,
+    "llm_last_resort_statement": "LLM is allowed only after cache, rules, and rag fail to resolve with minimum evidence."
+  },
+  "resolve_criteria": [
+    {
+      "code": "EXECUTION_PLAN_VALID",
+      "description": "Action is classified, all mandatory gates pass, and execution plan is safe to dispatch."
+    },
+    {
+      "code": "INFORMATIVE_RESPONSE_VALID",
+      "description": "Response has no side effects and includes sufficient evidence references when required."
+    },
+    {
+      "code": "FORBIDDEN_RESPONSE_VALID",
+      "description": "Request is denied with explicit policy or guard reason."
+    }
+  ],
+  "minimum_evidence": {
+    "EXECUTABLE": {
+      "required": [
+        "contract_or_rule_reference",
+        "schema_validation_pass",
+        "mode_and_role_guard_pass"
+      ]
+    },
+    "INFORMATIVE": {
+      "required": [
+        "at_least_one_source_reference"
+      ]
+    },
+    "FORBIDDEN": {
+      "required": [
+        "policy_or_guard_reference"
+      ]
+    }
+  },
+  "missing_evidence_actions": {
+    "default_action": "ASK",
+    "allowed_actions": [
+      "ASK",
+      "SAFE_RESPONSE"
+    ],
+    "ask": {
+      "description": "Request one critical missing datum only and pause execution."
+    },
+    "safe_response": {
+      "description": "Return non-executable guidance with no side effects."
+    },
+    "forbidden_on_critical_risk": true
+  }
+}

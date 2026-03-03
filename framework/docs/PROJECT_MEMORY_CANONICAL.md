@@ -136,3 +136,42 @@ If a decision conflicts with a higher level, it is invalid.
   - per-node traces, p50/p95 latency, guardrail errors, token usage.
 - Compatibility rule:
   - existing forms/grids/entities contracts remain valid and unchanged.
+
+## 14) Canon and contracts consolidation (2026-03-02)
+- Official governance references (docs only):
+  - `docs/canon/TEXT_OS_ARCHITECTURE.md`
+  - `docs/canon/ACTION_CONTRACTS.md`
+  - `docs/canon/AGENTOPS_GOVERNANCE.md`
+  - `docs/canon/ROUTER_CANON.md`
+  - `docs/canon/VERSIONING_POLICY.md`
+  - `docs/canon/RUNTIME_ARTIFACTS_POLICY.md`
+- Official machine-readable governance contracts:
+  - `docs/contracts/router_policy.json`
+  - `docs/contracts/action_catalog.json`
+  - `docs/contracts/agentops_metrics_contract.json`
+
+## 15) Canon mandates (explicit)
+- Queue + idempotency are mandatory for executable actions.
+- Deterministic router order is mandatory: cache -> rules -> rag -> llm.
+- LLM is last resort only.
+- Intent-class action governance is mandatory:
+  - `EXECUTABLE`
+  - `INFORMATIVE`
+  - `FORBIDDEN`
+- Quality gates are mandatory pre-release.
+- AgentOps telemetry, regression checks, and rollback are mandatory.
+- Versioning is law/addenda style (additive, traceable, rollback-ready).
+
+## 16) CANON VERSION
+- source_contract: `docs/contracts/router_policy.json`
+- version: `1.0.0`
+- effective_date: `2026-03-02`
+
+## 17) CONTRACTS VERSION
+- `router_policy`: version `1.0.0`, effective_date `2026-03-02`
+- `action_catalog`: version `1.0.0`, effective_date `2026-03-02`
+- `agentops_metrics_contract`: version `1.0.0`, effective_date `2026-03-02`
+
+## 18) NON-CODE POLICY
+- Runtime artifacts governance source: `docs/canon/RUNTIME_ARTIFACTS_POLICY.md`.
+- Mandatory rule: runtime cache/sqlite state is not source code and must not be committed.

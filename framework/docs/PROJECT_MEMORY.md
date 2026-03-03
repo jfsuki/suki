@@ -9,6 +9,44 @@ Core principle: chat-first usage, visual UI only when needed (tables, reports, c
 - Mandatory developer pre-check: `php framework/scripts/codex_self_check.php --strict`.
 - Temporary testing artifacts policy: only under `framework/tests/tmp/`.
 
+## Canon consolidation (2026-03-02)
+This project now recognizes `docs/canon/*` and `docs/contracts/*` as official governance sources for architecture and agent policy.
+
+### Canon docs (official)
+- `docs/canon/TEXT_OS_ARCHITECTURE.md`: formal TextOS architecture, deterministic router, queue + idempotency, and tenant safety.
+- `docs/canon/ACTION_CONTRACTS.md`: canonical intent/action taxonomy and required gates by action type.
+- `docs/canon/AGENTOPS_GOVERNANCE.md`: observability, memory promotion flow, quality metrics, and rollback policy.
+- `docs/canon/ROUTER_CANON.md`: mandatory route order and minimum evidence requirements.
+- `docs/canon/VERSIONING_POLICY.md`: versioning as laws/addenda and rollback discipline.
+- `docs/canon/RUNTIME_ARTIFACTS_POLICY.md`: non-code hygiene policy for runtime/cache artifacts.
+
+### Contracts docs (official)
+- `docs/contracts/router_policy.json`: machine-readable router law (cache -> rules -> rag -> llm), resolve criteria, minimum evidence, and missing-evidence actions.
+- `docs/contracts/action_catalog.json`: machine-readable intent catalog (`EXECUTABLE|INFORMATIVE|FORBIDDEN`) with roles, tools, risk and gates.
+- `docs/contracts/agentops_metrics_contract.json`: machine-readable AgentOps events, required fields, and mandatory KPIs.
+
+### Canon mandates (effective)
+- Queue and idempotency are co-mandatory for executable side effects.
+- Deterministic router is mandatory; LLM is last resort.
+- Actions are governed by intent class (`EXECUTABLE`, `INFORMATIVE`, `FORBIDDEN`).
+- Quality gates are mandatory before release.
+- AgentOps observability and rollback policy are mandatory.
+- Versioning follows law/addenda style (extension-first, no destructive rewrites).
+
+### CANON VERSION
+- Bound canonical policy contract: `router_policy`.
+- version: `1.0.0`
+- effective_date: `2026-03-02`
+
+### CONTRACTS VERSION
+- `router_policy` -> version `1.0.0`, effective_date `2026-03-02`
+- `action_catalog` -> version `1.0.0`, effective_date `2026-03-02`
+- `agentops_metrics_contract` -> version `1.0.0`, effective_date `2026-03-02`
+
+### NON-CODE POLICY
+- Runtime artifacts policy reference: `docs/canon/RUNTIME_ARTIFACTS_POLICY.md`.
+- Rule: do not commit runtime caches or sqlite runtime state (`*.cache.json`, runtime `*.sqlite` under `project/storage/*`).
+
 ## Vision (working memory, 2026-02-19)
 - Meta: generar apps ERP por conversacion (chat-first) con panel visual para lo necesario.
 - North star: cero tecnicismos, JSON-first, IA solo fallback, cambios incrementales.

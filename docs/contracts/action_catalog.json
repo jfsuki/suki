@@ -1,0 +1,142 @@
+{
+  "contract_id": "action_catalog",
+  "version": "1.0.0",
+  "effective_date": "2026-03-02",
+  "addenda_of": null,
+  "status": "canonical_draft",
+  "contract_location": "docs/contracts",
+  "scope": "Intent and action governance contract without runtime implementation",
+  "intent_types": [
+    "EXECUTABLE",
+    "INFORMATIVE",
+    "FORBIDDEN"
+  ],
+  "required_fields_per_intent": [
+    "name",
+    "type",
+    "required_role",
+    "allowed_tools",
+    "rag_required",
+    "json_schema_required",
+    "risk_level",
+    "gates_required"
+  ],
+  "risk_levels": [
+    "low",
+    "medium",
+    "high",
+    "critical"
+  ],
+  "catalog": [
+    {
+      "name": "crud.create",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "medium",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "entity_exists_guard",
+        "idempotency_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "invoice.create",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "IntegrationActionOrchestrator"
+      ],
+      "rag_required": true,
+      "json_schema_required": true,
+      "risk_level": "high",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "policy_guard",
+        "confirmation_guard",
+        "idempotency_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "report.generate",
+      "type": "INFORMATIVE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "QueryReadOnly",
+        "ReportRenderer"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "settings.configure_fe_provider",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "IntegrationActionOrchestrator"
+      ],
+      "rag_required": true,
+      "json_schema_required": true,
+      "risk_level": "critical",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "evidence_guard",
+        "confirmation_guard",
+        "policy_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "support.*",
+      "type": "INFORMATIVE",
+      "required_role": "support",
+      "allowed_tools": [
+        "KnowledgeLookup",
+        "ErrorCatalog"
+      ],
+      "rag_required": true,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "evidence_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "support.bypass_execution_guards",
+      "type": "FORBIDDEN",
+      "required_role": "support",
+      "allowed_tools": [],
+      "rag_required": false,
+      "json_schema_required": false,
+      "risk_level": "critical",
+      "gates_required": [
+        "policy_guard",
+        "audit_guard"
+      ]
+    }
+  ]
+}
