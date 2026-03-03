@@ -261,6 +261,53 @@ if (!is_array($whatsAppReplayJson) || ($whatsAppReplayJson['status'] ?? '') !== 
     $failures[] = 'channels/whatsapp/webhook debe ignorar replay por message.id.';
 }
 
+$alanubeSecret = 'alanube-secret-' . $runToken;
+$alanubePayload = [
+    'integration_id' => 'alanube_main',
+    'event' => 'document.updated',
+    'id' => 'alanube-doc-' . $runToken,
+];
+
+$alanubeBadSig = runApiRouteE2E($helper, [
+    'route' => 'integrations/alanube/webhook',
+    'method' => 'POST',
+    'env' => [
+        'ALANUBE_WEBHOOK_SECRET' => $alanubeSecret,
+    ],
+    'payload' => $alanubePayload,
+]);
+$alanubeBadSigJson = $alanubeBadSig['json'];
+if (!is_array($alanubeBadSigJson) || ($alanubeBadSigJson['status'] ?? '') !== 'error' || !str_contains((string) ($alanubeBadSigJson['message'] ?? ''), 'signature invalida')) {
+    $failures[] = 'integrations/alanube/webhook debe validar secret/firma cuando ALANUBE_WEBHOOK_SECRET esta activo.';
+}
+
+$alanubeReplayA = runApiRouteE2E($helper, [
+    'route' => 'integrations/alanube/webhook',
+    'method' => 'POST',
+    'env' => [
+        'ALANUBE_WEBHOOK_SECRET' => $alanubeSecret,
+    ],
+    'headers' => [
+        'X-Alanube-Webhook-Secret' => $alanubeSecret,
+    ],
+    'payload' => $alanubePayload,
+]);
+$alanubeReplayB = runApiRouteE2E($helper, [
+    'route' => 'integrations/alanube/webhook',
+    'method' => 'POST',
+    'env' => [
+        'ALANUBE_WEBHOOK_SECRET' => $alanubeSecret,
+    ],
+    'headers' => [
+        'X-Alanube-Webhook-Secret' => $alanubeSecret,
+    ],
+    'payload' => $alanubePayload,
+]);
+$alanubeReplayJson = $alanubeReplayB['json'];
+if (!is_array($alanubeReplayJson) || ($alanubeReplayJson['status'] ?? '') !== 'success' || !str_contains((string) ($alanubeReplayJson['message'] ?? ''), 'duplicado')) {
+    $failures[] = 'integrations/alanube/webhook debe ignorar replay por external_id.';
+}
+
 $ok = empty($failures);
 echo json_encode([
     'ok' => $ok,

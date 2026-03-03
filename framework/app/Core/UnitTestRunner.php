@@ -36,6 +36,10 @@ final class UnitTestRunner
         $tests[] = $this->wrap('security_state_repository', fn() => $this->checkSecurityStateRepository());
         $tests[] = $this->wrap('openapi_importer', fn() => $this->checkOpenApiIntegrationImporter());
         $tests[] = $this->wrap('api_security_guard', fn() => $this->checkApiSecurityGuard());
+        $tests[] = $this->wrap('records_get_requires_auth', fn() => $this->checkRecordsGetRequiresAuth());
+        $tests[] = $this->wrap('records_get_with_signed_token_ok', fn() => $this->checkRecordsGetWithSignedTokenOk());
+        $tests[] = $this->wrap('records_get_with_expired_token_fail', fn() => $this->checkRecordsGetWithExpiredTokenFail());
+        $tests[] = $this->wrap('records_get_token_tenant_mismatch_fail', fn() => $this->checkRecordsGetTokenTenantMismatchFail());
         $tests[] = $this->wrap('operational_queue_schema_guard', fn() => $this->checkOperationalQueueSchemaGuard());
         $tests[] = $this->wrap('framework_hygiene', fn() => $this->checkFrameworkHygiene());
         $tests[] = $this->wrap('public_excel_import_e2e', fn() => $this->checkPublicExcelImportE2E());
@@ -804,6 +808,26 @@ final class UnitTestRunner
         if (!(bool) ($ok['ok'] ?? false)) {
             throw new \RuntimeException('ApiSecurityGuard no acepto auth+csrf validos.');
         }
+    }
+
+    private function checkRecordsGetRequiresAuth(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/records_get_requires_auth_test.php');
+    }
+
+    private function checkRecordsGetWithSignedTokenOk(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/records_get_with_signed_token_ok_test.php');
+    }
+
+    private function checkRecordsGetWithExpiredTokenFail(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/records_get_with_expired_token_fail_test.php');
+    }
+
+    private function checkRecordsGetTokenTenantMismatchFail(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/records_get_token_tenant_mismatch_fail_test.php');
     }
 
     private function checkOperationalQueueSchemaGuard(): void

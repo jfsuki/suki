@@ -174,6 +174,244 @@ function requestRawBody(): string
     return $raw;
 }
 
+function base64UrlEncode(string $data): string
+{
+    return rtrim(strtr(base64_encode($data), '+/', '-_'), '=');
+}
+
+function base64UrlDecode(string $data): ?string
+{
+    $data = trim($data);
+    if ($data === '') {
+        return null;
+    }
+    $pad = strlen($data) % 4;
+    if ($pad > 0) {
+        $data .= str_repeat('=', 4 - $pad);
+    }
+    $decoded = base64_decode(strtr($data, '-_', '+/'), true);
+    return $decoded === false ? null : $decoded;
+}
+
+function resolveRecordsReadToken(): string
+{
+    $fromQuery = trim((string) ($_GET['t'] ?? ''));
+    if ($fromQuery !== '') {
+        return $fromQuery;
+    }
+    $fromHeader = trim((string) ($_SERVER['HTTP_X_RECORDS_READ_TOKEN'] ?? ''));
+    if ($fromHeader !== '') {
+        return $fromHeader;
+    }
+    $authorization = trim((string) ($_SERVER['HTTP_AUTHORIZATION'] ?? ''));
+    if (stripos($authorization, 'Bearer ') === 0) {
+        return trim(substr($authorization, 7));
+    }
+    return '';
+}
+
+/**
+ * @return array{ok:bool,code:int,tenant_id:string,reason:string}
+ */
+function verifySignedRecordsReadToken(
+    string $token,
+    string $method,
+    string $path,
+    ?string $requestedTenantId = null,
+    ?string $expectedRecordId = null
+): array {
+    $result = [
+        'ok' => false,
+        'code' => 401,
+        'tenant_id' => '',
+        'reason' => 'missing_token',
+    ];
+
+    if ($token === '') {
+        return $result;
+    }
+
+    $secret = trim((string) (getenv('RECORDS_READ_SECRET') ?: ''));
+    if ($secret === '') {
+        return [
+            'ok' => false,
+            'code' => 403,
+            'tenant_id' => '',
+            'reason' => 'secret_not_configured',
+        ];
+    }
+
+    $parts = explode('.', $token, 3);
+    if (count($parts) !== 2) {
+        return [
+            'ok' => false,
+            'code' => 401,
+            'tenant_id' => '',
+            'reason' => 'malformed_token',
+        ];
+    }
+
+    $payloadJson = base64UrlDecode((string) ($parts[0] ?? ''));
+    $signatureRaw = base64UrlDecode((string) ($parts[1] ?? ''));
+    if (!is_string($payloadJson) || !is_string($signatureRaw)) {
+        return [
+            'ok' => false,
+            'code' => 401,
+            'tenant_id' => '',
+            'reason' => 'decode_failed',
+        ];
+    }
+
+    $expectedSignature = hash_hmac('sha256', $payloadJson, $secret, true);
+    if (!hash_equals($expectedSignature, $signatureRaw)) {
+        return [
+            'ok' => false,
+            'code' => 403,
+            'tenant_id' => '',
+            'reason' => 'invalid_signature',
+        ];
+    }
+
+    $payload = json_decode($payloadJson, true);
+    if (!is_array($payload)) {
+        return [
+            'ok' => false,
+            'code' => 401,
+            'tenant_id' => '',
+            'reason' => 'invalid_payload',
+        ];
+    }
+
+    $scope = trim((string) ($payload['scope'] ?? ''));
+    if ($scope !== 'records:read') {
+        return [
+            'ok' => false,
+            'code' => 403,
+            'tenant_id' => '',
+            'reason' => 'invalid_scope',
+        ];
+    }
+
+    $exp = (int) ($payload['exp'] ?? 0);
+    $ttlSec = (int) (getenv('RECORDS_READ_TTL_SEC') ?: 900);
+    if ($ttlSec <= 0) {
+        $ttlSec = 900;
+    }
+    $now = time();
+    if ($exp <= 0 || $exp < $now) {
+        return [
+            'ok' => false,
+            'code' => 401,
+            'tenant_id' => '',
+            'reason' => 'expired_token',
+        ];
+    }
+    if ($exp > ($now + $ttlSec + 5)) {
+        return [
+            'ok' => false,
+            'code' => 403,
+            'tenant_id' => '',
+            'reason' => 'ttl_exceeded',
+        ];
+    }
+
+    $tenantId = trim((string) ($payload['tenant_id'] ?? ''));
+    if ($tenantId === '') {
+        return [
+            'ok' => false,
+            'code' => 403,
+            'tenant_id' => '',
+            'reason' => 'missing_tenant',
+        ];
+    }
+
+    $requestedTenantId = $requestedTenantId !== null ? trim($requestedTenantId) : null;
+    if ($requestedTenantId !== null && $requestedTenantId !== '' && $requestedTenantId !== $tenantId) {
+        return [
+            'ok' => false,
+            'code' => 403,
+            'tenant_id' => '',
+            'reason' => 'tenant_mismatch',
+        ];
+    }
+
+    $tokenMethod = strtoupper(trim((string) ($payload['method'] ?? '')));
+    if ($tokenMethod !== '' && $tokenMethod !== strtoupper($method)) {
+        return [
+            'ok' => false,
+            'code' => 403,
+            'tenant_id' => '',
+            'reason' => 'method_mismatch',
+        ];
+    }
+
+    $tokenPath = trim((string) ($payload['path'] ?? ''));
+    if ($tokenPath !== '' && $tokenPath !== $path) {
+        return [
+            'ok' => false,
+            'code' => 403,
+            'tenant_id' => '',
+            'reason' => 'path_mismatch',
+        ];
+    }
+
+    $tokenRecordId = trim((string) ($payload['record_id'] ?? $payload['resource_key'] ?? ''));
+    $expectedRecordId = $expectedRecordId !== null ? trim((string) $expectedRecordId) : null;
+    if ($tokenRecordId !== '' && $expectedRecordId !== null && $expectedRecordId !== '' && $tokenRecordId !== $expectedRecordId) {
+        return [
+            'ok' => false,
+            'code' => 403,
+            'tenant_id' => '',
+            'reason' => 'record_mismatch',
+        ];
+    }
+
+    return [
+        'ok' => true,
+        'code' => 200,
+        'tenant_id' => $tenantId,
+        'reason' => 'token_valid',
+    ];
+}
+
+function auditRecordsReadAccess(
+    string $route,
+    string $decision,
+    string $authMode,
+    string $tenantId = '',
+    string $reason = ''
+): void {
+    $dir = PROJECT_ROOT . '/storage/security';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    if (!is_dir($dir)) {
+        return;
+    }
+
+    $requestId = trim((string) ($_SERVER['HTTP_X_REQUEST_ID'] ?? ''));
+    if ($requestId === '') {
+        $requestId = substr(hash('sha256', microtime(true) . ':' . random_int(1000, 9999)), 0, 24);
+    }
+
+    $payload = [
+        'ts' => date('c'),
+        'request_id' => $requestId,
+        'endpoint' => $route,
+        'method' => strtoupper((string) ($_SERVER['REQUEST_METHOD'] ?? 'GET')),
+        'decision' => $decision,
+        'auth_mode' => $authMode,
+        'tenant_id' => $tenantId !== '' ? sanitizeKey($tenantId) : '',
+        'reason' => $reason,
+    ];
+
+    $line = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($line === false) {
+        return;
+    }
+    @file_put_contents($dir . '/records_read_access.log.jsonl', $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+}
+
 function respondJson(Response $response, string $status, string $message, array $data = [], int $code = 200): void
 {
     http_response_code($code);
@@ -239,6 +477,26 @@ function verifyWhatsAppSignature(string $rawBody): bool
     }
     $expected = 'sha256=' . hash_hmac('sha256', $rawBody, $appSecret);
     return hash_equals($expected, $header);
+}
+
+function verifyAlanubeWebhookRequest(string $rawBody): bool
+{
+    $secret = trim((string) (getenv('ALANUBE_WEBHOOK_SECRET') ?: ''));
+    if ($secret === '') {
+        return true;
+    }
+
+    $rawToken = trim((string) ($_SERVER['HTTP_X_ALANUBE_WEBHOOK_SECRET'] ?? $_SERVER['HTTP_X_WEBHOOK_SECRET'] ?? ''));
+    if ($rawToken !== '' && hash_equals($secret, $rawToken)) {
+        return true;
+    }
+
+    $sigHeader = trim((string) ($_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? ''));
+    if ($sigHeader === '' || !str_starts_with($sigHeader, 'sha256=')) {
+        return false;
+    }
+    $expected = 'sha256=' . hash_hmac('sha256', $rawBody, $secret);
+    return hash_equals($expected, $sigHeader);
 }
 
 function sendTelegramMessage(string $token, string $chatId, string $text): array
@@ -2211,6 +2469,17 @@ if ($route === 'integrations/alanube/cancel') {
 }
 
 if ($route === 'integrations/alanube/webhook') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $rawBody = requestRawBody();
+    if (!verifyAlanubeWebhookRequest($rawBody)) {
+        respondJson($response, 'error', 'Alanube webhook signature invalida', [], 401);
+        return;
+    }
+
     $payload = requestData();
     $integrationId = (string) ($payload['integration_id'] ?? $_GET['integration_id'] ?? 'alanube_main');
     $event = (string) ($payload['event'] ?? $payload['type'] ?? $payload['action'] ?? '');
@@ -2222,6 +2491,27 @@ if ($route === 'integrations/alanube/webhook') {
     } elseif (isset($payload['document']['id'])) {
         $externalId = (string) $payload['document']['id'];
     }
+
+    $fallbackPayload = $rawBody !== '' ? $rawBody : ((string) (json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) ?: ''));
+    $replayNonce = $externalId !== null && $externalId !== '' ? ('doc:' . $externalId) : ('hash:' . sha1($fallbackPayload));
+    $replayTtl = (int) (getenv('ALANUBE_REPLAY_TTL_SEC') ?: 86400);
+    try {
+        $fresh = securityStateRepository()->rememberReplayNonce('alanube', $replayNonce, $replayTtl);
+        if (!$fresh) {
+            respondJson($response, 'success', 'Webhook Alanube duplicado ignorado', [
+                'ignored' => true,
+                'reason' => 'replay_detected',
+                'external_id' => $externalId,
+            ]);
+            return;
+        }
+    } catch (\Throwable $e) {
+        if ((string) (getenv('API_SECURITY_STRICT') ?: '0') === '1') {
+            respondJson($response, 'error', 'No se pudo validar anti-replay de Alanube', [], 503);
+            return;
+        }
+    }
+
     try {
         $store = new IntegrationStore();
         $store->logWebhook($integrationId, $event ?: null, $externalId, $payload);
@@ -2246,11 +2536,65 @@ if (str_starts_with($route, 'records/')) {
         return;
     }
 
-    $command = new CommandLayer();
-
     try {
         if ($method === 'GET') {
+            $requestTenantId = trim((string) ($_GET['tenant_id'] ?? ($_SERVER['HTTP_X_TENANT_ID'] ?? '')));
+            $sessionUser = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+            $authTenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+            $authMode = '';
+
+            if (!empty($sessionUser)) {
+                if ($requestTenantId === '' && $authTenantId !== '') {
+                    $_GET['tenant_id'] = $authTenantId;
+                    $requestTenantId = $authTenantId;
+                }
+                if ($requestTenantId === '') {
+                    auditRecordsReadAccess($route, 'denied', 'session', '', 'missing_tenant');
+                    respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 403);
+                    return;
+                }
+                if ($authTenantId !== '' && $requestTenantId !== $authTenantId) {
+                    auditRecordsReadAccess($route, 'denied', 'session', $requestTenantId, 'tenant_mismatch');
+                    respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 403);
+                    return;
+                }
+                $authMode = 'session';
+            } else {
+                $tokenCheck = verifySignedRecordsReadToken(
+                    resolveRecordsReadToken(),
+                    $method,
+                    $route,
+                    $requestTenantId !== '' ? $requestTenantId : null,
+                    $id !== null && $id !== '' ? (string) $id : null
+                );
+                if (!(bool) ($tokenCheck['ok'] ?? false)) {
+                    $code = (int) ($tokenCheck['code'] ?? 401);
+                    $reason = (string) ($tokenCheck['reason'] ?? 'invalid_token');
+                    auditRecordsReadAccess($route, 'denied', 'signed_token', '', $reason);
+                    respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], $code);
+                    return;
+                }
+                $tokenTenantId = trim((string) ($tokenCheck['tenant_id'] ?? ''));
+                if ($tokenTenantId === '') {
+                    auditRecordsReadAccess($route, 'denied', 'signed_token', '', 'missing_tenant');
+                    respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 403);
+                    return;
+                }
+                if ($requestTenantId === '') {
+                    $_GET['tenant_id'] = $tokenTenantId;
+                    $requestTenantId = $tokenTenantId;
+                }
+                if ($requestTenantId !== $tokenTenantId) {
+                    auditRecordsReadAccess($route, 'denied', 'signed_token', $requestTenantId, 'tenant_mismatch');
+                    respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 403);
+                    return;
+                }
+                $authMode = 'signed_token';
+            }
+
             setTenantContext($_GET);
+            auditRecordsReadAccess($route, 'allowed', $authMode, $requestTenantId, 'ok');
+            $command = new CommandLayer();
             if ($id !== null && $id !== '') {
                 $data = $command->readRecord($entity, $id, true);
                 respondJson($response, 'success', 'Registro cargado', $data);
@@ -2270,6 +2614,7 @@ if (str_starts_with($route, 'records/')) {
         if ($method === 'POST') {
             $payload = requestData();
             setTenantContext($payload);
+            $command = new CommandLayer();
             $data = $command->createRecord($entity, $payload);
             respondJson($response, 'success', 'Registro creado', $data);
             return;
@@ -2282,6 +2627,7 @@ if (str_starts_with($route, 'records/')) {
             }
             $payload = requestData();
             setTenantContext($payload);
+            $command = new CommandLayer();
             $data = $command->updateRecord($entity, $id, $payload);
             respondJson($response, 'success', 'Registro actualizado', $data);
             return;
@@ -2293,6 +2639,7 @@ if (str_starts_with($route, 'records/')) {
                 return;
             }
             setTenantContext($_GET);
+            $command = new CommandLayer();
             $data = $command->deleteRecord($entity, $id);
             respondJson($response, 'success', 'Registro eliminado', $data);
             return;
