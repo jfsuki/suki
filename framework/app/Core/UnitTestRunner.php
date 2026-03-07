@@ -9,6 +9,8 @@ final class UnitTestRunner
 {
     public function run(): array
     {
+        $this->cleanupLegacyTestArtifacts();
+
         $tests = [];
         $tests[] = $this->wrap('manifest', fn() => ManifestValidator::validateOrFail());
         $tests[] = $this->wrap('workflow_contract', fn() => $this->checkWorkflowContract());
@@ -41,9 +43,26 @@ final class UnitTestRunner
         $tests[] = $this->wrap('records_get_with_signed_token_ok', fn() => $this->checkRecordsGetWithSignedTokenOk());
         $tests[] = $this->wrap('records_get_with_expired_token_fail', fn() => $this->checkRecordsGetWithExpiredTokenFail());
         $tests[] = $this->wrap('records_get_token_tenant_mismatch_fail', fn() => $this->checkRecordsGetTokenTenantMismatchFail());
+        $tests[] = $this->wrap('records_mutation_requires_auth', fn() => $this->checkRecordsMutationRequiresAuth());
+        $tests[] = $this->wrap('records_mutation_rejects_payload_tenant_override', fn() => $this->checkRecordsMutationRejectsPayloadTenantOverride());
+        $tests[] = $this->wrap('records_mutation_accepts_authenticated_session', fn() => $this->checkRecordsMutationAcceptsAuthenticatedSession());
+        $tests[] = $this->wrap('records_mutation_cross_tenant_block', fn() => $this->checkRecordsMutationCrossTenantBlock());
+        $tests[] = $this->wrap('chat_exec_requires_auth', fn() => $this->checkChatExecRequiresAuth());
+        $tests[] = $this->wrap('chat_exec_no_default_admin', fn() => $this->checkChatExecNoDefaultAdmin());
+        $tests[] = $this->wrap('chat_exec_tenant_binding', fn() => $this->checkChatExecTenantBinding());
+        $tests[] = $this->wrap('chat_informational_without_auth_ok', fn() => $this->checkChatInformationalWithoutAuthOk());
+        $tests[] = $this->wrap('chat_warn_mode_does_not_allow_exec_when_auth_fails', fn() => $this->checkChatWarnModeDoesNotAllowExecWhenAuthFails());
+        $tests[] = $this->wrap('redteam_poc_chat_exec', fn() => $this->checkRedteamPocChatExec());
+        $tests[] = $this->wrap('telegram_rejects_get', fn() => $this->checkTelegramRejectsGet());
+        $tests[] = $this->wrap('whatsapp_rejects_put', fn() => $this->checkWhatsAppRejectsPut());
+        $tests[] = $this->wrap('webhook_fails_closed_when_secret_empty_in_staging', fn() => $this->checkWebhookFailsClosedWhenSecretEmptyInStaging());
+        $tests[] = $this->wrap('webhook_allows_insecure_only_in_dev_when_flag', fn() => $this->checkWebhookAllowsInsecureOnlyInDevWhenFlag());
         $tests[] = $this->wrap('whatsapp_fast_ack', fn() => $this->checkWhatsAppFastAck());
         $tests[] = $this->wrap('whatsapp_enqueue', fn() => $this->checkWhatsAppEnqueue());
         $tests[] = $this->wrap('whatsapp_idempotency', fn() => $this->checkWhatsAppIdempotency());
+        $tests[] = $this->wrap('worker_processes_queued_whatsapp_message', fn() => $this->checkWorkerProcessesQueuedWhatsAppMessage());
+        $tests[] = $this->wrap('worker_respects_idempotency', fn() => $this->checkWorkerRespectsIdempotency());
+        $tests[] = $this->wrap('worker_logs_route_path', fn() => $this->checkWorkerLogsRoutePath());
         $tests[] = $this->wrap('operational_queue_schema_guard', fn() => $this->checkOperationalQueueSchemaGuard());
         $tests[] = $this->wrap('schema_runtime_guard', fn() => $this->checkSchemaRuntimeGuard());
         $tests[] = $this->wrap('framework_hygiene', fn() => $this->checkFrameworkHygiene());
@@ -51,6 +70,9 @@ final class UnitTestRunner
         $tests[] = $this->wrap('public_report_e2e', fn() => $this->checkPublicReportE2E());
         $tests[] = $this->wrap('workflow_api_e2e', fn() => $this->checkWorkflowApiE2E());
         $tests[] = $this->wrap('security_channels_e2e', fn() => $this->checkSecurityChannelsE2E());
+        $tests[] = $this->wrap('gemini_embedding_service', fn() => $this->checkGeminiEmbeddingService());
+        $tests[] = $this->wrap('qdrant_vector_store', fn() => $this->checkQdrantVectorStore());
+        $tests[] = $this->wrap('semantic_memory_service', fn() => $this->checkSemanticMemoryService());
         $tests[] = $this->wrap('intent_router', fn() => $this->checkIntentRouter());
         $tests[] = $this->wrap('router_contract_enforcement', fn() => $this->checkRouterContractEnforcement());
         $tests[] = $this->wrap('action_allowlist_enforcement', fn() => $this->checkActionAllowlistEnforcement());
@@ -58,6 +80,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('enforcement_warn_allows_but_logs_when_missing', fn() => $this->checkEnforcementWarnAllowsButLogsWhenMissing());
         $tests[] = $this->wrap('gates_required_block_action_when_schema_invalid', fn() => $this->checkGatesRequiredBlockActionWhenSchemaInvalid());
         $tests[] = $this->wrap('gates_required_block_action_when_not_allowlisted', fn() => $this->checkGatesRequiredBlockActionWhenNotAllowlisted());
+        $tests[] = $this->wrap('enforcement_default_by_env', fn() => $this->checkEnforcementDefaultByEnv());
         $tests[] = $this->wrap('command_bus', fn() => $this->checkCommandBus());
         $tests[] = $this->wrap('observability_metrics', fn() => $this->checkObservabilityMetrics());
         $tests[] = $this->wrap('canonical_storage_new_project', fn() => $this->checkCanonicalStorageNewProject());
@@ -402,8 +425,13 @@ final class UnitTestRunner
     {
         $gateway = new \App\Core\Agents\ConversationGateway();
         $tenantId = 'default';
-        $user = 'unknown_' . time();
-        $projectId = 'unknown_proj';
+        try {
+            $suffix = substr(bin2hex(random_bytes(4)), 0, 8);
+        } catch (\Throwable $e) {
+            $suffix = (string) mt_rand(100000, 999999);
+        }
+        $user = 'unknown_' . time() . '_' . $suffix;
+        $projectId = 'unknown_proj_' . $suffix;
 
         $gateway->handle(
             $tenantId,
@@ -844,6 +872,76 @@ final class UnitTestRunner
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/records_get_token_tenant_mismatch_fail_test.php');
     }
 
+    private function checkRecordsMutationRequiresAuth(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/records_mutation_requires_auth_test.php');
+    }
+
+    private function checkRecordsMutationRejectsPayloadTenantOverride(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/records_mutation_rejects_payload_tenant_override_test.php');
+    }
+
+    private function checkRecordsMutationAcceptsAuthenticatedSession(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/records_mutation_accepts_authenticated_session_test.php');
+    }
+
+    private function checkRecordsMutationCrossTenantBlock(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/records_mutation_cross_tenant_block_test.php');
+    }
+
+    private function checkChatExecRequiresAuth(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/chat_exec_requires_auth_test.php');
+    }
+
+    private function checkChatExecNoDefaultAdmin(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/chat_exec_no_default_admin_test.php');
+    }
+
+    private function checkChatExecTenantBinding(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/chat_exec_tenant_binding_test.php');
+    }
+
+    private function checkChatInformationalWithoutAuthOk(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/chat_informational_without_auth_ok_test.php');
+    }
+
+    private function checkChatWarnModeDoesNotAllowExecWhenAuthFails(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/chat_warn_mode_does_not_allow_exec_when_auth_fails_test.php');
+    }
+
+    private function checkRedteamPocChatExec(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/redteam_poc_chat_exec_test.php');
+    }
+
+    private function checkTelegramRejectsGet(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/telegram_rejects_get_test.php');
+    }
+
+    private function checkWhatsAppRejectsPut(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/whatsapp_rejects_put_test.php');
+    }
+
+    private function checkWebhookFailsClosedWhenSecretEmptyInStaging(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/webhook_fails_closed_when_secret_empty_in_staging_test.php');
+    }
+
+    private function checkWebhookAllowsInsecureOnlyInDevWhenFlag(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/webhook_allows_insecure_only_in_dev_when_flag_test.php');
+    }
+
     private function checkWhatsAppFastAck(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/whatsapp_fast_ack_test.php');
@@ -857,6 +955,21 @@ final class UnitTestRunner
     private function checkWhatsAppIdempotency(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/whatsapp_idempotency_test.php');
+    }
+
+    private function checkWorkerProcessesQueuedWhatsAppMessage(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/worker_processes_queued_whatsapp_message_test.php');
+    }
+
+    private function checkWorkerRespectsIdempotency(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/worker_respects_idempotency_test.php');
+    }
+
+    private function checkWorkerLogsRoutePath(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/worker_logs_route_path_test.php');
     }
 
     private function checkOperationalQueueSchemaGuard(): void
@@ -886,14 +999,25 @@ final class UnitTestRunner
 
     private function checkIntentRouter(): void
     {
-        $router = new IntentRouter();
+        $router = new IntentRouter(null, 'off');
         $local = $router->route(['action' => 'respond_local', 'reply' => 'ok']);
         if (!$local->isLocalResponse() || $local->reply() !== 'ok') {
             throw new \RuntimeException('IntentRouter no enruta respond_local.');
         }
 
-        $cmd = $router->route(['action' => 'execute_command', 'command' => ['command' => 'CreateEntity']]);
-        if (!$cmd->isCommand() || (string) (($cmd->command()['command'] ?? '')) !== 'CreateEntity') {
+        $cmd = $router->route(
+            ['action' => 'execute_command', 'command' => ['command' => 'CreateForm', 'entity' => 'clientes']],
+            [
+                'tenant_id' => 'default',
+                'project_id' => 'default',
+                'session_id' => 'intent_router_check',
+                'mode' => 'builder',
+                'role' => 'admin',
+                'is_authenticated' => true,
+                'auth_tenant_id' => 'default',
+            ]
+        );
+        if (!$cmd->isCommand() || (string) (($cmd->command()['command'] ?? '')) !== 'CreateForm') {
             throw new \RuntimeException('IntentRouter no enruta execute_command.');
         }
 
@@ -931,6 +1055,11 @@ final class UnitTestRunner
     private function checkGatesRequiredBlockActionWhenNotAllowlisted(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/gates_required_block_action_when_not_allowlisted_test.php');
+    }
+
+    private function checkEnforcementDefaultByEnv(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/enforcement_default_by_env_test.php');
     }
 
     private function checkCommandBus(): void
@@ -1198,6 +1327,21 @@ final class UnitTestRunner
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/security_channels_e2e_test.php');
     }
 
+    private function checkGeminiEmbeddingService(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/gemini_embedding_service_test.php');
+    }
+
+    private function checkQdrantVectorStore(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/qdrant_vector_store_test.php');
+    }
+
+    private function checkSemanticMemoryService(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/semantic_memory_service_test.php');
+    }
+
     private function checkCanonicalStorageNewProject(): void
     {
         $tmpDir = dirname(__DIR__, 2) . '/tests/tmp';
@@ -1255,6 +1399,53 @@ final class UnitTestRunner
     private function checkTrainingDatasetValidator(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/training_dataset_validator_test.php');
+    }
+
+    private function cleanupLegacyTestArtifacts(): void
+    {
+        $entities = ['status_redteam_p0', 'redteam_p0_01'];
+        $projectRoot = dirname(FRAMEWORK_ROOT) . '/project';
+        foreach ($entities as $entity) {
+            @unlink($projectRoot . '/contracts/entities/' . $entity . '.entity.json');
+            @unlink($projectRoot . '/contracts/forms/' . $entity . '.form.json');
+        }
+
+        try {
+            $db = Database::connection();
+            $driver = strtolower((string) $db->getAttribute(\PDO::ATTR_DRIVER_NAME));
+            $projectCandidates = array_values(array_unique([
+                TableNamespace::normalizedProjectId(),
+                'default',
+            ]));
+            foreach ($entities as $entity) {
+                $logicalTable = strtolower(trim((string) preg_replace('/[^a-zA-Z0-9_]/', '', $entity . 's')));
+                if ($logicalTable === '') {
+                    continue;
+                }
+
+                $tables = [$logicalTable];
+                foreach ($projectCandidates as $projectId) {
+                    $tables[] = TableNamespace::resolve($logicalTable, $projectId);
+                }
+                $tables = array_values(array_unique(array_filter(array_map(
+                    static fn($name): string => strtolower(trim((string) $name)),
+                    $tables
+                ))));
+
+                foreach ($tables as $tableName) {
+                    if ($tableName === '') {
+                        continue;
+                    }
+                    if ($driver === 'sqlite') {
+                        $db->exec('DROP TABLE IF EXISTS "' . $tableName . '"');
+                        continue;
+                    }
+                    $db->exec('DROP TABLE IF EXISTS `' . $tableName . '`');
+                }
+            }
+        } catch (\Throwable $ignored) {
+            // test cleanup should never fail the suite bootstrap
+        }
     }
 
     private function runExternalTestScript(string $scriptPath): void

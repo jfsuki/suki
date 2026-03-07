@@ -1,0 +1,39 @@
+{
+  "contract_id": "semantic_memory_payload",
+  "version": "1.0.0",
+  "effective_date": "2026-03-07",
+  "addenda_of": null,
+  "status": "canonical_draft",
+  "scope": "Minimum payload and flow contract for semantic memory indexing and retrieval.",
+  "embedding_profile": {
+    "provider": "google-gemini",
+    "model": "gemini-embedding-001",
+    "output_dimensionality": 768,
+    "distance": "Cosine"
+  },
+  "required_fields": [
+    "tenant_id",
+    "app_id",
+    "source_type",
+    "source_id",
+    "chunk_id",
+    "type",
+    "tags",
+    "version",
+    "quality_score",
+    "created_at"
+  ],
+  "flow": [
+    "ingest",
+    "hygiene",
+    "embedding_768",
+    "upsert_qdrant",
+    "retrieval_cosine"
+  ],
+  "multitenancy": {
+    "tenant_id_required": true,
+    "app_id_nullable": true,
+    "tenant_filter_required_on_retrieval": true
+  }
+}
+

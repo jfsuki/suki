@@ -26,6 +26,8 @@ $result = $router->route([
     'session_id' => 'schema_invalid_gate',
     'role' => 'admin',
     'mode' => 'app',
+    'is_authenticated' => true,
+    'auth_tenant_id' => 'default',
 ]);
 
 $telemetry = $result->telemetry();
@@ -70,4 +72,3 @@ echo json_encode([
     'failures' => $failures,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
 exit($ok ? 0 : 1);
-

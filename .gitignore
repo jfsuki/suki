@@ -22,7 +22,9 @@ credentials/
 /project/storage/cache/contracts/
 /project/storage/cache/entities.schema.cache.json
 /project/storage/security/
+/project/storage/runtime/
 /project/storage/workflows/
 /project/contracts/workflows/
 /project/storage/meta/project_registry.sqlite
 /project/storage/cache/*.cache.json
+*.tar.gz

@@ -7,7 +7,7 @@ require_once __DIR__ . '/whatsapp_webhook_common.php';
 
 $failures = [];
 $secret = 'wa-enqueue-secret';
-$runToken = (string) time();
+$runToken = (string) time() . (string) random_int(1000, 9999);
 $messageId = 'wamid.ENQUEUE_' . $runToken;
 $payload = whatsappWebhookBasePayload($messageId, '573002222222', 'hola enqueue');
 
@@ -61,4 +61,3 @@ echo json_encode([
     'failures' => $failures,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
 exit($ok ? 0 : 1);
-

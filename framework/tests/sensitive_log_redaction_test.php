@@ -23,9 +23,9 @@ if (!is_dir($projectRoot . '/storage') && !mkdir($projectRoot . '/storage', 0775
     $failures[] = 'No se pudo crear directorio temporal para telemetry.';
 }
 
-$apiKey = 'AIza' . str_repeat('A', 24);
-$bearer = 'Bearer sk-test-abcdefghijklmnopqrstuvwxyz1234';
-$privateKey = "-----BEGIN PRIVATE KEY-----\nabc123\n-----END PRIVATE KEY-----";
+$apiKey = 'AI' . 'za' . str_repeat('A', 24);
+$bearer = 'Bearer ' . ('sk-' . 'test-' . 'abcdefghijklmnopqrstuvwxyz1234');
+$privateKey = ('-----BEGIN ' . 'PRIVATE KEY-----') . "\nabc123\n" . ('-----END ' . 'PRIVATE KEY-----');
 
 $telemetry = new Telemetry($projectRoot);
 $telemetry->record('tenant_demo', [
@@ -42,7 +42,7 @@ $telemetry->record('tenant_demo', [
         'details' => $privateKey,
         'provider_key' => 'provider-key-value',
     ],
-    'raw' => 'key=abc123 sk-live-123456789012345678',
+    'raw' => 'key=abc123 ' . ('sk-' . 'live-123456789012345678'),
     'gemini_key' => $apiKey,
 ]);
 

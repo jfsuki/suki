@@ -45,6 +45,13 @@ final class ChatAgent
         $userId = trim((string) ($payload['user_id'] ?? 'anon'));
         $tenantId = trim((string) ($payload['tenant_id'] ?? getenv('TENANT_ID') ?? 'default'));
         $role = trim((string) ($payload['role'] ?? $payload['user_role'] ?? ''));
+        $chatExecAuthRequired = (bool) ($payload['chat_exec_auth_required'] ?? false);
+        $isAuthenticated = array_key_exists('is_authenticated', $payload)
+            ? (bool) $payload['is_authenticated']
+            : !$chatExecAuthRequired;
+        $authUserId = trim((string) ($payload['auth_user_id'] ?? ''));
+        $authTenantId = trim((string) ($payload['auth_tenant_id'] ?? ''));
+        $authProjectId = trim((string) ($payload['auth_project_id'] ?? ''));
         if ($channel === '') {
             $channel = 'local';
         }
@@ -58,7 +65,17 @@ final class ChatAgent
             $tenantId = (string) (getenv('TENANT_ID') ?: 'default');
         }
         if ($role === '') {
-            $role = (string) (getenv('DEFAULT_ROLE') ?: 'admin');
+            $role = $isAuthenticated
+                ? (string) (getenv('DEFAULT_ROLE') ?: 'admin')
+                : 'guest';
+        }
+        if ($isAuthenticated) {
+            if ($authUserId === '') {
+                $authUserId = $userId;
+            }
+            if ($authTenantId === '') {
+                $authTenantId = $tenantId;
+            }
         }
         $role = $this->normalizeRole($role);
         $mode = strtolower((string) ($payload['mode'] ?? 'app'));
@@ -67,6 +84,9 @@ final class ChatAgent
         $manifest = $registry->resolveProjectFromManifest();
         if ($projectId === '') {
             $projectId = $manifest['id'] ?? 'default';
+        }
+        if ($isAuthenticated && $authProjectId === '') {
+            $authProjectId = $projectId;
         }
         $sessionBinding = $registry->getSession($sessionId);
         if (is_array($sessionBinding)) {
@@ -171,14 +191,72 @@ final class ChatAgent
             'project_id' => $projectId,
             'session_id' => $sessionId,
             'user_id' => $userId,
+            'message_text' => $text,
             'role' => $role,
             'mode' => $mode,
             'message_id' => (string) ($payload['message_id'] ?? ''),
+            'is_authenticated' => $isAuthenticated,
+            'auth_user_id' => $authUserId,
+            'auth_tenant_id' => $authTenantId,
+            'auth_project_id' => $authProjectId,
+            'chat_exec_auth_required' => $chatExecAuthRequired,
         ]);
         $action = $route->kind();
         $telemetry = $route->telemetry();
         $state = $route->state();
         $messageId = $this->resolveMessageId($payload, $sessionId, $text);
+
+        $securityBlock = $this->enforceExecutableChatSecurity(
+            $route,
+            $result,
+            $chatExecAuthRequired,
+            $isAuthenticated,
+            $role,
+            $tenantId,
+            $authTenantId,
+            $channel,
+            $sessionId,
+            $userId
+        );
+        if (is_array($securityBlock)) {
+            $this->telemetry()->record($tenantId, array_merge($telemetry, [
+                'message' => $text,
+                'resolved_locally' => true,
+                'action' => 'execute_command',
+                'mode' => $mode,
+                'session_id' => $sessionId,
+                'user_id' => $userId,
+                'project_id' => $projectId,
+                'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
+                'is_authenticated' => $isAuthenticated,
+                'effective_role' => $role,
+                'status' => 'blocked',
+            ], $this->buildAgentOpsTelemetryBase(
+                $telemetry,
+                $tenantId,
+                $projectId,
+                $sessionId,
+                $messageId,
+                $this->latencyMs($requestStartedAt),
+                'response.blocked'
+            )));
+            try {
+                $this->telemetryService()->recordIntentMetric([
+                    'tenant_id' => $tenantId,
+                    'project_id' => $projectId,
+                    'session_id' => $sessionId,
+                    'mode' => $mode,
+                    'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
+                    'action' => 'execute_command',
+                    'latency_ms' => $this->latencyMs($requestStartedAt),
+                    'status' => 'blocked',
+                ]);
+            } catch (\Throwable $e) {
+                // observability must not block chat response
+            }
+            return $securityBlock;
+        }
 
         if ($route->isLocalResponse()) {
             $reply = $this->reply($route->reply(), $channel, $sessionId, $userId);
@@ -192,6 +270,8 @@ final class ChatAgent
                 'project_id' => $projectId,
                 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
                 'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
+                'is_authenticated' => $isAuthenticated,
+                'effective_role' => $role,
             ], $this->buildAgentOpsTelemetryBase(
                 $telemetry,
                 $tenantId,
@@ -293,6 +373,8 @@ final class ChatAgent
                 'project_id' => $projectId,
                 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
                 'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
+                'is_authenticated' => $isAuthenticated,
+                'effective_role' => $role,
             ], $this->buildAgentOpsTelemetryBase(
                 $telemetry,
                 $tenantId,
@@ -360,6 +442,8 @@ final class ChatAgent
                 'project_id' => $projectId,
                 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
                 'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
+                'is_authenticated' => $isAuthenticated,
+                'effective_role' => $role,
             ], $this->buildAgentOpsTelemetryBase(
                 $telemetry,
                 $tenantId,
@@ -413,6 +497,8 @@ final class ChatAgent
             'project_id' => $projectId,
             'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
             'status' => 'error',
+            'is_authenticated' => $isAuthenticated,
+            'effective_role' => $role,
         ], $this->buildAgentOpsTelemetryBase(
             $telemetry,
             $tenantId,
@@ -1159,6 +1245,92 @@ final class ChatAgent
         ];
     }
 
+    private function denyExecutableChat(
+        string $channel,
+        string $sessionId,
+        string $userId,
+        int $httpCode,
+        string $reason
+    ): array {
+        $reply = $this->reply('Acceso no autorizado para este recurso.', $channel, $sessionId, $userId, 'error', [
+            'error_code' => $reason,
+            'http_code' => $httpCode,
+        ]);
+        return $reply;
+    }
+
+    private function isExecutableIntentOrAction(\App\Core\IntentRouteResult $route, array $gatewayResult): bool
+    {
+        if ($route->isCommand()) {
+            return true;
+        }
+
+        $routeTelemetry = $route->telemetry();
+        $actionType = strtoupper(trim((string) ($routeTelemetry['action_type'] ?? '')));
+        if ($actionType === 'EXECUTABLE') {
+            return true;
+        }
+
+        $rawAction = strtolower(trim((string) ($gatewayResult['action'] ?? '')));
+        if ($rawAction === 'execute_command') {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function enforceExecutableChatSecurity(
+        \App\Core\IntentRouteResult $route,
+        array $gatewayResult,
+        bool $chatExecAuthRequired,
+        bool $isAuthenticated,
+        string $role,
+        string $tenantId,
+        string $authTenantId,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): ?array {
+        if (!$chatExecAuthRequired) {
+            return null;
+        }
+        if (!$this->isExecutableIntentOrAction($route, $gatewayResult)) {
+            return null;
+        }
+        if (!$isAuthenticated) {
+            return $this->denyExecutableChat($channel, $sessionId, $userId, 401, 'missing_auth');
+        }
+
+        $normalizedRole = strtolower(trim($role));
+        if ($normalizedRole === '' || $normalizedRole === 'guest') {
+            return $this->denyExecutableChat($channel, $sessionId, $userId, 403, 'invalid_role');
+        }
+
+        if ($authTenantId === '' || $tenantId === '' || $authTenantId !== $tenantId) {
+            return $this->denyExecutableChat($channel, $sessionId, $userId, 403, 'tenant_mismatch');
+        }
+
+        $routeTelemetry = $route->telemetry();
+        $gateResults = is_array($routeTelemetry['gate_results'] ?? null) ? (array) $routeTelemetry['gate_results'] : [];
+        $hardGates = ['allowlist_gate', 'schema_gate', 'auth_rbac_gate', 'tenant_scope_gate'];
+        foreach ($gateResults as $gate) {
+            if (!is_array($gate)) {
+                continue;
+            }
+            $name = strtolower(trim((string) ($gate['name'] ?? '')));
+            if (!in_array($name, $hardGates, true)) {
+                continue;
+            }
+            $required = (bool) ($gate['required'] ?? false);
+            $passed = (bool) ($gate['passed'] ?? true);
+            if ($required && !$passed) {
+                return $this->denyExecutableChat($channel, $sessionId, $userId, 403, 'hard_gate_failed:' . $name);
+            }
+        }
+
+        return null;
+    }
+
     private function normalizeRole(string $role): string
     {
         $role = mb_strtolower(trim($role), 'UTF-8');
@@ -1174,8 +1346,9 @@ final class ChatAgent
             'contadora' => 'accountant',
             'contador' => 'accountant',
             'accountant' => 'accountant',
+            'guest' => 'guest',
         ];
-        return $map[$role] ?? ($role !== '' ? $role : 'admin');
+        return $map[$role] ?? ($role !== '' ? $role : 'guest');
     }
 
     private function stableTenantInt(string $tenantId): int
@@ -1286,6 +1459,9 @@ final class ChatAgent
             ? (array) $routeTelemetry['contract_versions']
             : [];
         $versions = is_array($routeTelemetry['versions'] ?? null) ? (array) $routeTelemetry['versions'] : [];
+        $enforcementMode = trim((string) ($routeTelemetry['enforcement_mode'] ?? ''));
+        $enforcementModeSource = trim((string) ($routeTelemetry['enforcement_mode_source'] ?? ''));
+        $enforcementAppEnv = trim((string) ($routeTelemetry['enforcement_app_env'] ?? ''));
         if (empty($versions)) {
             $versions = [
                 'prompt_version' => (string) (getenv('PROMPT_VERSION') ?: 'unknown'),
@@ -1308,6 +1484,9 @@ final class ChatAgent
             'contract_versions' => $contractVersions,
             'versions' => $versions,
             'latency_ms' => $latencyMs,
+            'enforcement_mode' => $enforcementMode !== '' ? $enforcementMode : 'unknown',
+            'enforcement_mode_source' => $enforcementModeSource !== '' ? $enforcementModeSource : 'unknown',
+            'enforcement_app_env' => $enforcementAppEnv !== '' ? $enforcementAppEnv : 'unknown',
         ];
     }
 

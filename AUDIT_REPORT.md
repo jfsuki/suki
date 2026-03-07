@@ -173,3 +173,13 @@ Criterios NO-GO activos:
   2. desplegar config en todos los nodos,
   3. invalidar links/tokens previos,
   4. revisar logs de acceso denegado/permitido post-rotacion.
+
+## Records Integrity (2026-03-03): write protection hardening P0-S1
+- Mutaciones `records/*` (`POST`, `PUT`, `PATCH`, `DELETE`) ahora exigen autenticacion real de sesion.
+- CSRF por si solo no habilita escritura: sin `auth_user` la mutacion se bloquea.
+- `tenant_id` para mutaciones se liga a la sesion autenticada:
+  - no se confia `tenant_id` de payload/header/query;
+  - si el request intenta override y no coincide con sesion, se bloquea con respuesta generica.
+- Se agrego auditoria minima de mutaciones:
+  - `project/storage/security/records_mutation_access.log.jsonl`
+  - campos: `request_id`, endpoint, metodo, decision, auth_mode, tenant_id (sanitizado), reason.

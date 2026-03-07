@@ -51,14 +51,17 @@ putenv('ENFORCEMENT_MODE=warn');
 $warnRouter = new IntentRouter($registry);
 $warnResult = $warnRouter->route($payload);
 $warnTelemetry = $warnResult->telemetry();
-if (!$warnResult->isLlmRequest()) {
-    $failures[] = 'warn mode no debe bloquear send_to_llm ante violation de policy';
+if (!$warnResult->isLocalResponse()) {
+    $failures[] = 'warn mode debe degradar send_to_llm a respuesta local cuando hay violation de policy';
 }
 if ((string) ($warnTelemetry['gate_decision'] ?? '') !== 'warn') {
     $failures[] = 'warn mode debe marcar gate_decision=warn';
 }
 if ((string) ($warnTelemetry['route_path'] ?? '') === '') {
     $failures[] = 'warn mode debe reportar route_path';
+}
+if (stripos($warnResult->reply(), 'evidencia minima') === false) {
+    $failures[] = 'warn mode debe explicar falta de evidencia para no invocar LLM.';
 }
 
 putenv('ENFORCEMENT_MODE=strict');

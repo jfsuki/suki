@@ -47,6 +47,7 @@ use App\Core\ApiSecurityGuard;
 use App\Core\SecurityStateRepository;
 use App\Core\OperationalQueueStore;
 use App\Core\LogSanitizer;
+use App\Core\WebhookSecurityPolicy;
 use App\Core\Agents\ConversationQualityDashboard;
 
 $route = trim($_GET['route'] ?? '');
@@ -98,9 +99,16 @@ if ($manifestError) {
     }
 }
 
-function setTenantContext(array $payload = []): void
+function setTenantContext(array $payload = [], bool $preferAuthenticatedTenant = false): void
 {
-    $tenant = $payload['tenant_id'] ?? ($_SERVER['HTTP_X_TENANT_ID'] ?? '');
+    $sessionUser = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    $sessionTenant = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $tenant = '';
+    if ($preferAuthenticatedTenant && $sessionTenant !== '') {
+        $tenant = $sessionTenant;
+    } else {
+        $tenant = $payload['tenant_id'] ?? ($_SERVER['HTTP_X_TENANT_ID'] ?? '');
+    }
     if ($tenant === '' || $tenant === null) {
         return;
     }
@@ -414,6 +422,122 @@ function auditRecordsReadAccess(
     @file_put_contents($dir . '/records_read_access.log.jsonl', $line . PHP_EOL, FILE_APPEND | LOCK_EX);
 }
 
+/**
+ * @return array<string, mixed>
+ */
+function resolveAuthenticatedSessionUser(): array
+{
+    return is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+}
+
+function resolveRequestedTenantIdForRecordsMutation(array $payload): string
+{
+    $payloadTenant = trim((string) ($payload['tenant_id'] ?? ''));
+    if ($payloadTenant !== '') {
+        return $payloadTenant;
+    }
+
+    $headerTenant = trim((string) ($_SERVER['HTTP_X_TENANT_ID'] ?? ''));
+    if ($headerTenant !== '') {
+        return $headerTenant;
+    }
+
+    return trim((string) ($_GET['tenant_id'] ?? ''));
+}
+
+function auditRecordsMutationAccess(
+    string $route,
+    string $method,
+    string $decision,
+    string $authMode,
+    string $tenantId = '',
+    string $reason = ''
+): void {
+    $dir = PROJECT_ROOT . '/storage/security';
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0775, true);
+    }
+    if (!is_dir($dir)) {
+        return;
+    }
+
+    $requestId = trim((string) ($_SERVER['HTTP_X_REQUEST_ID'] ?? ''));
+    if ($requestId === '') {
+        $requestId = substr(hash('sha256', microtime(true) . ':' . random_int(1000, 9999)), 0, 24);
+    }
+
+    $payload = [
+        'ts' => date('c'),
+        'request_id' => $requestId,
+        'endpoint' => $route,
+        'method' => strtoupper($method),
+        'decision' => $decision,
+        'auth_mode' => $authMode,
+        'tenant_id' => $tenantId !== '' ? sanitizeKey($tenantId) : '',
+        'reason' => $reason,
+    ];
+    $payload = LogSanitizer::sanitizeArray($payload);
+
+    $line = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if ($line === false) {
+        return;
+    }
+    @file_put_contents($dir . '/records_mutation_access.log.jsonl', $line . PHP_EOL, FILE_APPEND | LOCK_EX);
+}
+
+/**
+ * @return array{ok:bool,code:int,tenant_id:string,reason:string,auth_mode:string,payload:array<string,mixed>}
+ */
+function requireAuthenticatedRecordsMutation(string $route, string $method, array $payload): array
+{
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        return [
+            'ok' => false,
+            'code' => 401,
+            'tenant_id' => '',
+            'reason' => 'missing_auth',
+            'auth_mode' => 'none',
+            'payload' => [],
+        ];
+    }
+
+    $sessionTenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    if ($sessionTenantId === '') {
+        return [
+            'ok' => false,
+            'code' => 403,
+            'tenant_id' => '',
+            'reason' => 'missing_session_tenant',
+            'auth_mode' => 'session',
+            'payload' => [],
+        ];
+    }
+
+    $requestedTenantId = resolveRequestedTenantIdForRecordsMutation($payload);
+    if ($requestedTenantId !== '' && $requestedTenantId !== $sessionTenantId) {
+        return [
+            'ok' => false,
+            'code' => 403,
+            'tenant_id' => '',
+            'reason' => 'tenant_mismatch',
+            'auth_mode' => 'session',
+            'payload' => [],
+        ];
+    }
+
+    $payload['tenant_id'] = $sessionTenantId;
+
+    return [
+        'ok' => true,
+        'code' => 200,
+        'tenant_id' => $sessionTenantId,
+        'reason' => 'ok',
+        'auth_mode' => 'session',
+        'payload' => $payload,
+    ];
+}
+
 function auditChannelQueueMetric(
     string $channel,
     string $route,
@@ -509,11 +633,10 @@ function securityStateRepository(): SecurityStateRepository
     return $repo;
 }
 
-function verifyWhatsAppSignature(string $rawBody): bool
+function verifyWhatsAppSignature(string $rawBody, string $appSecret): bool
 {
-    $appSecret = trim((string) (getenv('WHATSAPP_APP_SECRET') ?: ''));
     if ($appSecret === '') {
-        return true;
+        return false;
     }
     $header = trim((string) ($_SERVER['HTTP_X_HUB_SIGNATURE_256'] ?? ''));
     if ($header === '' || !str_starts_with($header, 'sha256=')) {
@@ -523,11 +646,10 @@ function verifyWhatsAppSignature(string $rawBody): bool
     return hash_equals($expected, $header);
 }
 
-function verifyAlanubeWebhookRequest(string $rawBody): bool
+function verifyAlanubeWebhookRequest(string $rawBody, string $secret): bool
 {
-    $secret = trim((string) (getenv('ALANUBE_WEBHOOK_SECRET') ?: ''));
     if ($secret === '') {
-        return true;
+        return false;
     }
 
     $rawToken = trim((string) ($_SERVER['HTTP_X_ALANUBE_WEBHOOK_SECRET'] ?? $_SERVER['HTTP_X_WEBHOOK_SECRET'] ?? ''));
@@ -910,6 +1032,8 @@ if (!(bool) ($guard['ok'] ?? false)) {
     return;
 }
 
+$webhookSecurityPolicy = new WebhookSecurityPolicy();
+
 if (str_starts_with($route, 'contracts/')) {
     $parts = explode('/', $route);
     $type = $parts[1] ?? '';
@@ -999,8 +1123,9 @@ if (str_starts_with($route, 'dashboards')) {
 
 if ($route === 'chat/message') {
     $payload = requestData();
-    if (isset($_SESSION['auth_user']) && is_array($_SESSION['auth_user'])) {
-        $auth = $_SESSION['auth_user'];
+    $auth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    $isAuthenticated = !empty($auth);
+    if ($isAuthenticated) {
         $authUserId = (string) ($auth['id'] ?? '');
         $authTenantId = (string) ($auth['tenant_id'] ?? '');
         $authProjectId = (string) ($auth['project_id'] ?? '');
@@ -1033,8 +1158,18 @@ if ($route === 'chat/message') {
         if (empty($payload['project_id'])) {
             $payload['project_id'] = $auth['project_id'] ?? '';
         }
+    } else {
+        // Unauthenticated chat requests can still be informative, but never trusted for execution.
+        $payload['role'] = 'guest';
     }
-    setTenantContext($payload);
+
+    $payload['is_authenticated'] = $isAuthenticated;
+    $payload['auth_user_id'] = $isAuthenticated ? (string) ($auth['id'] ?? '') : '';
+    $payload['auth_tenant_id'] = $isAuthenticated ? (string) ($auth['tenant_id'] ?? '') : '';
+    $payload['auth_project_id'] = $isAuthenticated ? (string) ($auth['project_id'] ?? '') : '';
+    $payload['chat_exec_auth_required'] = true;
+
+    setTenantContext($payload, $isAuthenticated);
     try {
         $agent = new \App\Core\ChatAgent();
         $result = $agent->handle($payload);
@@ -1042,6 +1177,11 @@ if ($route === 'chat/message') {
         $message = (string) ($result['message'] ?? 'OK');
         $data = (array) ($result['data'] ?? []);
         $code = $status === 'error' ? 400 : 200;
+        $customCode = (int) ($result['code'] ?? ($data['http_code'] ?? 0));
+        if ($customCode >= 100 && $customCode <= 599) {
+            $code = $customCode;
+        }
+        unset($data['http_code']);
         respondJson($response, $status, $message, $data, $code);
         return;
     } catch (\Throwable $e) {
@@ -1051,9 +1191,19 @@ if ($route === 'chat/message') {
 }
 
 if ($route === 'channels/telegram/webhook') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $expectedSecret = trim((string) (getenv('TELEGRAM_WEBHOOK_SECRET') ?: ''));
+    if ($expectedSecret === '' && $webhookSecurityPolicy->shouldRequireSecret()) {
+        respondJson($response, 'error', 'Telegram webhook secret requerido por politica de seguridad', [], 403);
+        return;
+    }
+
     $payload = requestData();
     $rawBody = requestRawBody();
-    $expectedSecret = (string) (getenv('TELEGRAM_WEBHOOK_SECRET') ?: '');
     $receivedSecret = (string) ($_SERVER['HTTP_X_TELEGRAM_BOT_API_SECRET_TOKEN'] ?? '');
     if ($expectedSecret !== '' && !hash_equals($expectedSecret, $receivedSecret)) {
         respondJson($response, 'error', 'Telegram webhook secret invalido', [], 401);
@@ -1178,9 +1328,20 @@ if ($route === 'channels/whatsapp/webhook') {
         return;
     }
 
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $whatsAppAppSecret = trim((string) (getenv('WHATSAPP_APP_SECRET') ?: ''));
+    if ($whatsAppAppSecret === '' && $webhookSecurityPolicy->shouldRequireSecret()) {
+        respondJson($response, 'error', 'WhatsApp webhook secret requerido por politica de seguridad', [], 403);
+        return;
+    }
+
     $enqueueStart = microtime(true);
     $rawBody = requestRawBody();
-    if (!verifyWhatsAppSignature($rawBody)) {
+    if ($whatsAppAppSecret !== '' && !verifyWhatsAppSignature($rawBody, $whatsAppAppSecret)) {
         respondJson($response, 'error', 'WhatsApp signature invalida', [], 401);
         return;
     }
@@ -2524,8 +2685,14 @@ if ($route === 'integrations/alanube/webhook') {
         return;
     }
 
+    $alanubeSecret = trim((string) (getenv('ALANUBE_WEBHOOK_SECRET') ?: ''));
+    if ($alanubeSecret === '' && $webhookSecurityPolicy->shouldRequireSecret()) {
+        respondJson($response, 'error', 'Alanube webhook secret requerido por politica de seguridad', [], 403);
+        return;
+    }
+
     $rawBody = requestRawBody();
-    if (!verifyAlanubeWebhookRequest($rawBody)) {
+    if ($alanubeSecret !== '' && !verifyAlanubeWebhookRequest($rawBody, $alanubeSecret)) {
         respondJson($response, 'error', 'Alanube webhook signature invalida', [], 401);
         return;
     }
@@ -2580,6 +2747,7 @@ if (str_starts_with($route, 'records/')) {
     $parts = explode('/', $route);
     $entity = $parts[1] ?? '';
     $id = $parts[2] ?? null;
+    $mutationContext = null;
 
     if ($entity === '') {
         respondJson($response, 'error', 'Entidad requerida', [], 400);
@@ -2661,22 +2829,39 @@ if (str_starts_with($route, 'records/')) {
             return;
         }
 
+        if (in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+            $mutationPayload = in_array($method, ['POST', 'PUT', 'PATCH'], true) ? requestData() : [];
+            $mutationContext = requireAuthenticatedRecordsMutation($route, $method, $mutationPayload);
+            if (!(bool) ($mutationContext['ok'] ?? false)) {
+                $reason = (string) ($mutationContext['reason'] ?? 'unauthorized');
+                $authMode = (string) ($mutationContext['auth_mode'] ?? 'none');
+                $code = (int) ($mutationContext['code'] ?? 403);
+                auditRecordsMutationAccess($route, $method, 'denied', $authMode, '', $reason);
+                respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], $code);
+                return;
+            }
+
+            $boundTenantId = trim((string) ($mutationContext['tenant_id'] ?? ''));
+            if ($boundTenantId !== '') {
+                setTenantContext(['tenant_id' => $boundTenantId], true);
+            }
+            auditRecordsMutationAccess($route, $method, 'allowed', 'session', $boundTenantId, 'ok');
+        }
+
         if ($method === 'POST') {
-            $payload = requestData();
-            setTenantContext($payload);
+            $payload = is_array($mutationContext['payload'] ?? null) ? (array) $mutationContext['payload'] : requestData();
             $command = new CommandLayer();
             $data = $command->createRecord($entity, $payload);
             respondJson($response, 'success', 'Registro creado', $data);
             return;
         }
 
-        if ($method === 'PUT') {
+        if ($method === 'PUT' || $method === 'PATCH') {
             if ($id === null || $id === '') {
                 respondJson($response, 'error', 'ID requerido', [], 400);
                 return;
             }
-            $payload = requestData();
-            setTenantContext($payload);
+            $payload = is_array($mutationContext['payload'] ?? null) ? (array) $mutationContext['payload'] : requestData();
             $command = new CommandLayer();
             $data = $command->updateRecord($entity, $id, $payload);
             respondJson($response, 'success', 'Registro actualizado', $data);
@@ -2688,7 +2873,6 @@ if (str_starts_with($route, 'records/')) {
                 respondJson($response, 'error', 'ID requerido', [], 400);
                 return;
             }
-            setTenantContext($_GET);
             $command = new CommandLayer();
             $data = $command->deleteRecord($entity, $id);
             respondJson($response, 'success', 'Registro eliminado', $data);

@@ -153,6 +153,7 @@ $telegramReplayA = runApiRouteE2E($helper, [
     'method' => 'POST',
     'env' => [
         'APP_ENV' => 'local',
+        'ALLOW_INSECURE_WEBHOOKS' => '1',
         'ALLOW_RUNTIME_SCHEMA' => '1',
     ],
     'payload' => [
@@ -168,6 +169,7 @@ $telegramReplayB = runApiRouteE2E($helper, [
     'method' => 'POST',
     'env' => [
         'APP_ENV' => 'local',
+        'ALLOW_INSECURE_WEBHOOKS' => '1',
         'ALLOW_RUNTIME_SCHEMA' => '1',
     ],
     'payload' => [

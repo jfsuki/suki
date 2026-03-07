@@ -108,6 +108,173 @@
       ]
     },
     {
+      "name": "builder.create_entity",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "high",
+      "gates_required": [
+        "builder_mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "builder.create_form",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "medium",
+      "gates_required": [
+        "builder_mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "builder.create_relation",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "high",
+      "gates_required": [
+        "builder_mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "builder.create_index",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "high",
+      "gates_required": [
+        "builder_mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "builder.install_playbook",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "critical",
+      "gates_required": [
+        "builder_mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "confirmation_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "builder.compile_workflow",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "high",
+      "gates_required": [
+        "builder_mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "confirmation_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "builder.import_integration_openapi",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "IntegrationActionOrchestrator"
+      ],
+      "rag_required": true,
+      "json_schema_required": true,
+      "risk_level": "critical",
+      "gates_required": [
+        "builder_mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "confirmation_guard",
+        "policy_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "auth.login",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "medium",
+      "gates_required": [
+        "mode_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "auth.create_user",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "high",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "confirmation_guard",
+        "audit_guard"
+      ]
+    },
+    {
       "name": "support.*",
       "type": "INFORMATIVE",
       "required_role": "support",

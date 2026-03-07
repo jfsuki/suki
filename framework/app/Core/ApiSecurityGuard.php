@@ -142,6 +142,7 @@ final class ApiSecurityGuard
             'integrations/',
             'workflow/',
             'registry/',
+            'records/',
             'command',
             'auth/users',
         ];

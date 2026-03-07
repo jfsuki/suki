@@ -8585,8 +8585,25 @@ private function parseEntityFromCrudText(string $text): string
         ];
     }
 
-        private function result(string $action, string $reply, ?array $command, ?array $llmRequest, array $state, array $telemetry): array
+    private function result(string $action, string $reply, ?array $command, ?array $llmRequest, array $state, array $telemetry): array
     {
+        $command = is_array($command) ? $command : [];
+        $llmRequest = is_array($llmRequest) ? $llmRequest : [];
+        $action = $this->normalizeGatewayAction($action, $command, $llmRequest);
+
+        if (!isset($telemetry['routing_hint_steps']) || !is_array($telemetry['routing_hint_steps'])) {
+            $telemetry['routing_hint_steps'] = $this->defaultRoutingHintSteps($action);
+        }
+        if (!array_key_exists('cache_hit', $telemetry)) {
+            $telemetry['cache_hit'] = false;
+        }
+        if (!array_key_exists('rules_hit', $telemetry)) {
+            $telemetry['rules_hit'] = $action !== 'send_to_llm';
+        }
+        if (!array_key_exists('rag_hit', $telemetry)) {
+            $telemetry['rag_hit'] = false;
+        }
+
         if (isset($telemetry['llm_telemetry']) || isset($llmRequest['llm_telemetry'])) {
             $llmRes = $telemetry['llm_telemetry'] ?? $llmRequest['llm_telemetry'];
             $usage = $state['llm_usage'] ?? ['count' => 0, 'last' => null, 'history' => []];
@@ -8609,6 +8626,46 @@ private function parseEntityFromCrudText(string $text): string
             'state' => $state,
             'telemetry' => $telemetry,
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $command
+     * @param array<string,mixed> $llmRequest
+     */
+    private function normalizeGatewayAction(string $action, array $command, array $llmRequest): string
+    {
+        $action = strtolower(trim($action));
+        $allowed = ['respond_local', 'ask_user', 'execute_command', 'send_to_llm', 'error'];
+        if (!in_array($action, $allowed, true)) {
+            if (!empty($command)) {
+                return 'execute_command';
+            }
+            if (!empty($llmRequest)) {
+                return 'send_to_llm';
+            }
+            return 'respond_local';
+        }
+
+        if ($action === 'execute_command' && empty($command)) {
+            return 'respond_local';
+        }
+        if ($action === 'send_to_llm' && empty($llmRequest)) {
+            return 'respond_local';
+        }
+
+        return $action;
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    private function defaultRoutingHintSteps(string $action): array
+    {
+        return match ($action) {
+            'send_to_llm' => ['cache', 'rules', 'rag', 'llm'],
+            'execute_command' => ['cache', 'rules', 'action_contract'],
+            default => ['cache', 'rules'],
+        };
     }
 
     private function updateState(array $state, string $userText, string $reply, ?string $intent, ?string $entity, array $collected, ?string $activeTask, ?array $missing = null): array

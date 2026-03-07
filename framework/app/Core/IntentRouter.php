@@ -8,18 +8,31 @@ final class IntentRouter
     private ContractRegistry $contracts;
     private RouterPolicyEvaluator $policyEvaluator;
     private string $enforcementMode;
+    private string $enforcementModeSource;
+    private string $effectiveAppEnv;
+    private ?SemanticMemoryService $semanticMemory;
+    private bool $semanticMemoryResolved;
 
     public function __construct(
         ?ContractRegistry $contracts = null,
         ?string $enforcementMode = null,
-        ?RouterPolicyEvaluator $policyEvaluator = null
+        ?RouterPolicyEvaluator $policyEvaluator = null,
+        ?SemanticMemoryService $semanticMemory = null
     )
     {
         $this->contracts = $contracts ?? new ContractRegistry();
         $this->policyEvaluator = $policyEvaluator ?? new RouterPolicyEvaluator();
-        $this->enforcementMode = $this->normalizeEnforcementMode(
-            $enforcementMode ?? (string) (getenv('ENFORCEMENT_MODE') ?: 'off')
+        $this->semanticMemory = $semanticMemory;
+        $this->semanticMemoryResolved = $semanticMemory !== null;
+        $rawAppEnv = (string) (getenv('APP_ENV') ?: getenv('SUKI_ENV') ?: 'dev');
+        $rawMode = getenv('ENFORCEMENT_MODE');
+        $resolved = EnforcementModePolicy::resolve(
+            $rawAppEnv,
+            $enforcementMode !== null ? $enforcementMode : ($rawMode === false ? null : (string) $rawMode)
         );
+        $this->enforcementMode = (string) ($resolved['mode'] ?? 'warn');
+        $this->enforcementModeSource = (string) ($resolved['source'] ?? 'app_env_default');
+        $this->effectiveAppEnv = (string) ($resolved['app_env'] ?? 'dev');
     }
 
     public function route(array $gatewayResult, array $context = []): IntentRouteResult
@@ -30,6 +43,7 @@ final class IntentRouter
         $llmRequest = is_array($gatewayResult['llm_request'] ?? null) ? (array) $gatewayResult['llm_request'] : [];
         $state = is_array($gatewayResult['state'] ?? null) ? (array) $gatewayResult['state'] : [];
         $telemetry = is_array($gatewayResult['telemetry'] ?? null) ? (array) $gatewayResult['telemetry'] : [];
+        $routingHintSteps = $this->extractRoutingHintSteps($gatewayResult, $telemetry);
 
         $routeOrder = ['cache', 'rules', 'rag', 'llm'];
         $violations = [];
@@ -60,7 +74,7 @@ final class IntentRouter
             }
         }
 
-        $routePathSteps = $this->resolveRoutePathSteps($action, $routeOrder);
+        $routePathSteps = $this->resolveRoutePathSteps($action, $routeOrder, $routingHintSteps);
         if ($action === 'send_to_llm' && !in_array('llm', $routePathSteps, true)) {
             $violations[] = 'router_policy_missing_llm_stage_for_send_to_llm';
         }
@@ -81,6 +95,44 @@ final class IntentRouter
             }
         }
 
+        $retrieval = $this->maybeRetrieveEvidence(
+            $action,
+            is_array($actionCatalogEntry) ? (array) $actionCatalogEntry : null,
+            $gatewayResult,
+            $context
+        );
+        if (!empty($retrieval)) {
+            if (array_key_exists('rag_hit', $retrieval)) {
+                $telemetry['rag_hit'] = (bool) $retrieval['rag_hit'];
+                $gatewayResult['rag_hit'] = (bool) $retrieval['rag_hit'];
+            }
+            foreach (['source_ids', 'evidence_ids'] as $key) {
+                $list = is_array($retrieval[$key] ?? null) ? (array) $retrieval[$key] : [];
+                if (!empty($list)) {
+                    $normalized = array_values(array_unique(array_filter(array_map(
+                        static fn($value): string => trim((string) $value),
+                        $list
+                    ), static fn(string $value): bool => $value !== '')));
+                    if (!empty($normalized)) {
+                        $telemetry[$key] = $normalized;
+                        $gatewayResult[$key] = $normalized;
+                    }
+                }
+            }
+            if (is_array($retrieval['telemetry'] ?? null)) {
+                $telemetry['retrieval'] = (array) $retrieval['telemetry'];
+            }
+            if (!empty($telemetry['source_ids'] ?? []) || !empty($telemetry['evidence_ids'] ?? [])) {
+                $evidence = is_array($gatewayResult['evidence'] ?? null) ? (array) $gatewayResult['evidence'] : [];
+                $evidence[] = 'at_least_one_source_reference';
+                $gatewayResult['evidence'] = array_values(array_unique(array_filter(array_map(
+                    static fn($value): string => trim((string) $value),
+                    $evidence
+                ), static fn(string $value): bool => $value !== '')));
+            }
+        }
+
+        $evaluationContext = $this->mergeRoutingEvidenceContext($context, $gatewayResult, $telemetry, $routePathSteps, $action);
         $evaluation = $this->policyEvaluator->evaluate(
             [
                 'action' => $action,
@@ -95,7 +147,7 @@ final class IntentRouter
             ],
             $routerPolicy,
             is_array($actionCatalogEntry) ? (array) $actionCatalogEntry : null,
-            $context,
+            $evaluationContext,
             $this->enforcementMode
         );
         $violations = is_array($evaluation['violations'] ?? null) ? (array) $evaluation['violations'] : [];
@@ -103,6 +155,9 @@ final class IntentRouter
         $routePathSteps = is_array($evaluation['route_path_steps'] ?? null)
             ? (array) $evaluation['route_path_steps']
             : $routePathSteps;
+        if ($action === 'execute_command') {
+            $routePathSteps = $this->appendActionContractStage($routePathSteps);
+        }
         $versions = [
             'prompt_version' => (string) (getenv('PROMPT_VERSION') ?: 'unknown'),
             'router_policy_version' => $contractVersions['router_policy'],
@@ -120,10 +175,18 @@ final class IntentRouter
             'contract_versions' => $contractVersions,
             'versions' => $versions,
             'enforcement_mode' => $this->enforcementMode,
+            'enforcement_mode_source' => $this->enforcementModeSource,
+            'enforcement_app_env' => $this->effectiveAppEnv,
             'gate_results' => is_array($evaluation['gate_results'] ?? null) ? (array) $evaluation['gate_results'] : [],
             'evidence_status' => is_array($evaluation['evidence_status'] ?? null) ? (array) $evaluation['evidence_status'] : [],
             'evidence_used' => is_array($evaluation['evidence_used'] ?? null) ? (array) $evaluation['evidence_used'] : [],
+            'routing_hint_steps' => $routingHintSteps,
+            'is_authenticated' => (bool) ($context['is_authenticated'] ?? false),
+            'effective_role' => strtolower(trim((string) ($context['role'] ?? 'guest'))) ?: 'guest',
         ];
+        if (is_array($telemetry['retrieval'] ?? null)) {
+            $agentOps['retrieval'] = (array) $telemetry['retrieval'];
+        }
         if (!empty($violations)) {
             $agentOps['contract_violations'] = $violations;
         }
@@ -148,29 +211,38 @@ final class IntentRouter
         }
 
         if ($gateDecision === 'warn') {
-            $overrideAction = trim((string) ($evaluation['action_override'] ?? ''));
-            $replyOverride = trim((string) ($evaluation['reply_override'] ?? ''));
-            if ($overrideAction === 'ask_user') {
-                return new IntentRouteResult(
-                    'ask_user',
-                    $replyOverride !== '' ? $replyOverride : 'Falta evidencia minima para continuar.',
-                    [],
-                    [],
-                    $state,
-                    $telemetry,
-                    $agentOps
-                );
+            if ($action === 'send_to_llm') {
+                $replyOverride = trim((string) ($evaluation['reply_override'] ?? ''));
+                $warnReply = $replyOverride !== ''
+                    ? $replyOverride
+                    : 'Falta evidencia minima para continuar. Comparte un dato verificable para seguir.';
+                return new IntentRouteResult('ask_user', $warnReply, [], [], $state, $telemetry, $agentOps);
             }
-            if ($overrideAction === 'respond_local') {
-                return new IntentRouteResult(
-                    'respond_local',
-                    $replyOverride !== '' ? $replyOverride : 'No hay evidencia minima suficiente para ejecutar.',
-                    [],
-                    [],
-                    $state,
-                    $telemetry,
-                    $agentOps
-                );
+            if (!in_array($action, ['respond_local', 'ask_user'], true)) {
+                $overrideAction = trim((string) ($evaluation['action_override'] ?? ''));
+                $replyOverride = trim((string) ($evaluation['reply_override'] ?? ''));
+                if ($overrideAction === 'ask_user') {
+                    return new IntentRouteResult(
+                        'ask_user',
+                        $replyOverride !== '' ? $replyOverride : 'Falta evidencia minima para continuar.',
+                        [],
+                        [],
+                        $state,
+                        $telemetry,
+                        $agentOps
+                    );
+                }
+                if ($overrideAction === 'respond_local') {
+                    return new IntentRouteResult(
+                        'respond_local',
+                        $replyOverride !== '' ? $replyOverride : 'No hay evidencia minima suficiente para ejecutar.',
+                        [],
+                        [],
+                        $state,
+                        $telemetry,
+                        $agentOps
+                    );
+                }
             }
         }
 
@@ -186,13 +258,6 @@ final class IntentRouter
 
         return new IntentRouteResult('error', $reply, [], [], $state, $telemetry, $agentOps);
     }
-
-    private function normalizeEnforcementMode(string $mode): string
-    {
-        $mode = strtolower(trim($mode));
-        return in_array($mode, ['off', 'warn', 'strict'], true) ? $mode : 'off';
-    }
-
     /**
      * @param mixed $value
      * @return array<int, string>
@@ -220,10 +285,28 @@ final class IntentRouter
 
     /**
      * @param array<int, string> $routeOrder
+     * @param array<int, string> $routingHintSteps
      * @return array<int, string>
      */
-    private function resolveRoutePathSteps(string $action, array $routeOrder): array
+    private function resolveRoutePathSteps(string $action, array $routeOrder, array $routingHintSteps = []): array
     {
+        if (!empty($routingHintSteps)) {
+            $hintPath = [];
+            $allowed = ['cache', 'rules', 'rag', 'llm', 'action_contract'];
+            foreach ($routingHintSteps as $step) {
+                $step = strtolower(trim((string) $step));
+                if ($step === '' || !in_array($step, $allowed, true)) {
+                    continue;
+                }
+                if (!in_array($step, $hintPath, true)) {
+                    $hintPath[] = $step;
+                }
+            }
+            if (!empty($hintPath)) {
+                return $hintPath;
+            }
+        }
+
         if ($action === 'send_to_llm') {
             return $routeOrder;
         }
@@ -242,6 +325,246 @@ final class IntentRouter
         return $path;
     }
 
+    /**
+     * @param array<int, string> $routePathSteps
+     * @return array<int, string>
+     */
+    private function appendActionContractStage(array $routePathSteps): array
+    {
+        if (in_array('action_contract', $routePathSteps, true)) {
+            return $routePathSteps;
+        }
+        if (empty($routePathSteps)) {
+            return ['cache', 'rules', 'action_contract'];
+        }
+
+        $result = [];
+        foreach ($routePathSteps as $step) {
+            $step = strtolower(trim((string) $step));
+            if ($step === '') {
+                continue;
+            }
+            $result[] = $step;
+            if ($step === 'rules') {
+                $result[] = 'action_contract';
+            }
+        }
+        if (!in_array('action_contract', $result, true)) {
+            $result[] = 'action_contract';
+        }
+        return array_values(array_unique($result));
+    }
+
+    /**
+     * @param array<string,mixed> $context
+     * @param array<string,mixed> $gatewayResult
+     * @param array<string,mixed> $telemetry
+     * @param array<int,string> $routePathSteps
+     * @param string $action
+     * @return array<string,mixed>
+     */
+    private function mergeRoutingEvidenceContext(
+        array $context,
+        array $gatewayResult,
+        array $telemetry,
+        array $routePathSteps,
+        string $action
+    ): array
+    {
+        $merged = $context;
+        foreach (['cache_hit', 'rules_hit', 'rag_hit'] as $flag) {
+            if (array_key_exists($flag, $merged)) {
+                continue;
+            }
+            if (array_key_exists($flag, $telemetry)) {
+                $merged[$flag] = (bool) $telemetry[$flag];
+                continue;
+            }
+            if (array_key_exists($flag, $gatewayResult)) {
+                $merged[$flag] = (bool) $gatewayResult[$flag];
+            }
+        }
+        if (!array_key_exists('rules_hit', $merged) && $action !== 'send_to_llm' && in_array('rules', $routePathSteps, true)) {
+            $merged['rules_hit'] = true;
+        }
+        foreach (['source_ids', 'evidence_ids'] as $listKey) {
+            if (array_key_exists($listKey, $merged)) {
+                continue;
+            }
+            $source = $telemetry[$listKey] ?? $gatewayResult[$listKey] ?? null;
+            if (is_array($source)) {
+                $merged[$listKey] = array_values(array_filter(array_map(
+                    static fn($value): string => trim((string) $value),
+                    $source
+                ), static fn(string $value): bool => $value !== ''));
+            }
+        }
+        return $merged;
+    }
+
+    /**
+     * @param array<string,mixed> $gatewayResult
+     * @param array<string,mixed> $telemetry
+     * @return array<int,string>
+     */
+    private function extractRoutingHintSteps(array $gatewayResult, array $telemetry): array
+    {
+        $source = $telemetry['routing_hint_steps'] ?? $gatewayResult['routing_hint_steps'] ?? null;
+        if (!is_array($source)) {
+            return [];
+        }
+        $steps = [];
+        foreach ($source as $step) {
+            $step = strtolower(trim((string) $step));
+            if ($step === '') {
+                continue;
+            }
+            if (!in_array($step, $steps, true)) {
+                $steps[] = $step;
+            }
+        }
+        return $steps;
+    }
+
+    /**
+     * @param array<string,mixed>|null $actionCatalogEntry
+     * @param array<string,mixed> $gatewayResult
+     * @param array<string,mixed> $context
+     * @return array<string,mixed>
+     */
+    private function maybeRetrieveEvidence(
+        string $action,
+        ?array $actionCatalogEntry,
+        array $gatewayResult,
+        array $context
+    ): array {
+        if (!$this->shouldAttemptRetrieval($action, $actionCatalogEntry)) {
+            return [];
+        }
+
+        $semanticMemory = $this->semanticMemory();
+        if (!$semanticMemory) {
+            return [];
+        }
+
+        $tenantId = trim((string) ($context['tenant_id'] ?? ''));
+        if ($tenantId === '') {
+            return [];
+        }
+        $appId = trim((string) ($context['app_id'] ?? $context['project_id'] ?? ''));
+        $query = $this->extractRetrievalQuery($gatewayResult, $context);
+        if ($query === '') {
+            return [];
+        }
+
+        try {
+            $topK = max(1, (int) (getenv('SEMANTIC_MEMORY_TOP_K') ?: 5));
+            return $semanticMemory->retrieve($query, [
+                'tenant_id' => $tenantId,
+                'app_id' => $appId !== '' ? $appId : null,
+            ], $topK);
+        } catch (\Throwable $e) {
+            return [
+                'rag_hit' => false,
+                'source_ids' => [],
+                'evidence_ids' => [],
+                'telemetry' => [
+                    'retrieval_attempted' => true,
+                    'retrieval_result_count' => 0,
+                    'retrieval_error' => trim((string) $e->getMessage()),
+                ],
+            ];
+        }
+    }
+
+    /**
+     * @param array<string,mixed>|null $actionCatalogEntry
+     */
+    private function shouldAttemptRetrieval(string $action, ?array $actionCatalogEntry): bool
+    {
+        if ($action === 'send_to_llm') {
+            return true;
+        }
+        if (!is_array($actionCatalogEntry)) {
+            return false;
+        }
+        return (bool) ($actionCatalogEntry['rag_required'] ?? false);
+    }
+
+    private function semanticMemory(): ?SemanticMemoryService
+    {
+        if ($this->semanticMemoryResolved) {
+            return $this->semanticMemory;
+        }
+        $this->semanticMemoryResolved = true;
+
+        if (!SemanticMemoryService::isEnabledFromEnv()) {
+            $this->semanticMemory = null;
+            return null;
+        }
+
+        try {
+            $this->semanticMemory = new SemanticMemoryService();
+            return $this->semanticMemory;
+        } catch (\Throwable $e) {
+            $this->semanticMemory = null;
+            return null;
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $gatewayResult
+     * @param array<string,mixed> $context
+     */
+    private function extractRetrievalQuery(array $gatewayResult, array $context): string
+    {
+        $candidates = [];
+        $contextText = trim((string) ($context['message_text'] ?? $context['message'] ?? $context['text'] ?? ''));
+        if ($contextText !== '') {
+            $candidates[] = $contextText;
+        }
+
+        $userText = trim((string) ($gatewayResult['user_text'] ?? ''));
+        if ($userText !== '') {
+            $candidates[] = $userText;
+        }
+
+        $llmRequest = is_array($gatewayResult['llm_request'] ?? null) ? (array) $gatewayResult['llm_request'] : [];
+        $messages = is_array($llmRequest['messages'] ?? null) ? (array) $llmRequest['messages'] : [];
+        foreach (array_reverse($messages) as $message) {
+            if (!is_array($message)) {
+                continue;
+            }
+            $role = strtolower(trim((string) ($message['role'] ?? '')));
+            if ($role !== 'user' && $role !== '') {
+                continue;
+            }
+            $content = $message['content'] ?? '';
+            if (is_array($content)) {
+                foreach ($content as $part) {
+                    if (is_string($part) && trim($part) !== '') {
+                        $candidates[] = trim($part);
+                    } elseif (is_array($part) && trim((string) ($part['text'] ?? '')) !== '') {
+                        $candidates[] = trim((string) $part['text']);
+                    }
+                }
+            } elseif (is_string($content) && trim($content) !== '') {
+                $candidates[] = trim($content);
+            }
+            if (!empty($candidates)) {
+                break;
+            }
+        }
+
+        foreach ($candidates as $candidate) {
+            $candidate = trim((string) $candidate);
+            if ($candidate !== '') {
+                return $candidate;
+            }
+        }
+        return '';
+    }
+
     private function mapCommandToCatalogAction(string $commandName): string
     {
         $commandName = trim($commandName);
@@ -258,6 +581,15 @@ final class IntentRouter
             'CreateInvoice' => 'invoice.create',
             'GenerateReport' => 'report.generate',
             'ConfigureFEProvider' => 'settings.configure_fe_provider',
+            'CreateEntity' => 'builder.create_entity',
+            'CreateForm' => 'builder.create_form',
+            'CreateRelation' => 'builder.create_relation',
+            'CreateIndex' => 'builder.create_index',
+            'InstallPlaybook' => 'builder.install_playbook',
+            'CompileWorkflow' => 'builder.compile_workflow',
+            'ImportIntegrationOpenApi' => 'builder.import_integration_openapi',
+            'AuthLogin' => 'auth.login',
+            'AuthCreateUser' => 'auth.create_user',
         ];
 
         if (isset($map[$commandName])) {

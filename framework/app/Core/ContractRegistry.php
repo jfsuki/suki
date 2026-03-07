@@ -29,7 +29,15 @@ final class ContractRegistry
         }
 
         $workspaceRoot = dirname(__DIR__, 3);
-        $this->contractsDir = $workspaceRoot . '/docs/contracts';
+        $runtimeContractsDir = (defined('PROJECT_ROOT') ? PROJECT_ROOT : ($workspaceRoot . '/project')) . '/contracts';
+        $docsContractsDir = $workspaceRoot . '/docs/contracts';
+
+        if ($this->isContractsDirComplete($runtimeContractsDir)) {
+            $this->contractsDir = $runtimeContractsDir;
+            return;
+        }
+
+        $this->contractsDir = $docsContractsDir;
     }
 
     public function getContractsDir(): string
@@ -236,5 +244,25 @@ final class ContractRegistry
         }
         $dt = \DateTimeImmutable::createFromFormat('Y-m-d', $value);
         return $dt instanceof \DateTimeImmutable && $dt->format('Y-m-d') === $value;
+    }
+
+    private function isContractsDirComplete(string $dir): bool
+    {
+        $dir = rtrim($dir, '/\\');
+        if ($dir === '' || !is_dir($dir)) {
+            return false;
+        }
+
+        $required = [
+            'router_policy.json',
+            'action_catalog.json',
+            'agentops_metrics_contract.json',
+        ];
+        foreach ($required as $file) {
+            if (!is_file($dir . '/' . $file)) {
+                return false;
+            }
+        }
+        return true;
     }
 }

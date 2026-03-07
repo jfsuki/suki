@@ -17,6 +17,14 @@ $strictRouter = new IntentRouter();
 $allowed = $strictRouter->route([
     'action' => 'execute_command',
     'command' => ['command' => 'CreateRecord', 'entity' => 'clientes', 'data' => ['nombre' => 'Ana']],
+], [
+    'tenant_id' => 'default',
+    'project_id' => 'default',
+    'session_id' => 'allowlist_allowed',
+    'mode' => 'app',
+    'role' => 'admin',
+    'is_authenticated' => true,
+    'auth_tenant_id' => 'default',
 ]);
 $allowedTelemetry = $allowed->telemetry();
 if (!$allowed->isCommand()) {
@@ -29,6 +37,14 @@ if ((string) ($allowedTelemetry['gate_decision'] ?? '') !== 'allow') {
 $blocked = $strictRouter->route([
     'action' => 'execute_command',
     'command' => ['command' => 'DeleteRecord', 'entity' => 'clientes', 'id' => 1],
+], [
+    'tenant_id' => 'default',
+    'project_id' => 'default',
+    'session_id' => 'allowlist_blocked',
+    'mode' => 'app',
+    'role' => 'admin',
+    'is_authenticated' => true,
+    'auth_tenant_id' => 'default',
 ]);
 $blockedTelemetry = $blocked->telemetry();
 if (!$blocked->isLocalResponse()) {
@@ -43,13 +59,21 @@ $warnRouter = new IntentRouter();
 $warn = $warnRouter->route([
     'action' => 'execute_command',
     'command' => ['command' => 'DeleteRecord', 'entity' => 'clientes', 'id' => 1],
+], [
+    'tenant_id' => 'default',
+    'project_id' => 'default',
+    'session_id' => 'allowlist_warn',
+    'mode' => 'app',
+    'role' => 'admin',
+    'is_authenticated' => true,
+    'auth_tenant_id' => 'default',
 ]);
 $warnTelemetry = $warn->telemetry();
-if (!$warn->isCommand()) {
-    $failures[] = 'warn: DeleteRecord no debe bloquearse';
+if (!$warn->isLocalResponse()) {
+    $failures[] = 'warn: DeleteRecord no allowlisted debe bloquearse por hard gate.';
 }
-if ((string) ($warnTelemetry['gate_decision'] ?? '') !== 'warn') {
-    $failures[] = 'warn: gate_decision esperado warn para DeleteRecord';
+if ((string) ($warnTelemetry['gate_decision'] ?? '') !== 'blocked') {
+    $failures[] = 'warn: gate_decision esperado blocked para DeleteRecord en hard gate.';
 }
 if (!is_array($warnTelemetry['contract_versions'] ?? null)) {
     $failures[] = 'warn: contract_versions obligatorio en telemetry';

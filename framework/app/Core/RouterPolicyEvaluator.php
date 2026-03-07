@@ -90,12 +90,32 @@ final class RouterPolicyEvaluator
             $violations[] = 'gate_mode_failed:' . $modeReason;
         }
 
-        // Track declarative gates listed in contract, even if runtime execution is delegated.
+        $builderModeGateRequired = $action === 'execute_command' && in_array('builder_mode_guard', $gatesRequired, true);
+        [$builderModePassed, $builderModeReason] = $this->validateBuilderMode($context);
+        $builderModeGate = $this->gateResult(
+            'builder_mode_gate',
+            $builderModeGateRequired,
+            !$builderModeGateRequired || $builderModePassed,
+            $builderModeReason
+        );
+        $gateResults[] = $builderModeGate;
+        if ($builderModeGateRequired && !$builderModeGate['passed']) {
+            $violations[] = 'gate_builder_mode_failed:' . $builderModeReason;
+        }
+
+        // Track declarative gates listed in contract.
+        // P0 hard gates are never deferred; missing implementation is treated as violation.
         foreach ($gatesRequired as $gateName) {
             if ($this->hasGateResult($gateResults, $gateName)) {
                 continue;
             }
-            $gateResults[] = $this->gateResult($gateName, true, true, 'deferred_to_execution_engine');
+            $canonicalGate = $this->canonicalGateName($gateName);
+            if (in_array($canonicalGate, $this->hardGateNames(), true)) {
+                $gateResults[] = $this->gateResult($canonicalGate, true, false, 'hard_gate_not_implemented');
+                $violations[] = 'hard_gate_not_implemented:' . $canonicalGate;
+                continue;
+            }
+            $gateResults[] = $this->gateResult($canonicalGate, true, true, 'deferred_to_execution_engine');
         }
 
         $evidence = $this->evaluateEvidence(
@@ -122,13 +142,28 @@ final class RouterPolicyEvaluator
         $missingEvidenceAction = $this->resolveMissingEvidenceAction($routerPolicy);
         $onlyMissingEvidence = $this->containsOnlyMissingEvidenceViolations($violations);
         $hasViolations = !empty($violations);
+        $hardGateFailures = $this->collectHardGateFailures($gateResults, $action);
+        if (!empty($hardGateFailures)) {
+            foreach ($hardGateFailures as $hardFailure) {
+                $tag = 'hard_gate_failed:' . $hardFailure;
+                if (!in_array($tag, $violations, true)) {
+                    $violations[] = $tag;
+                }
+            }
+            $hasViolations = true;
+        }
 
         $gateDecision = 'off';
         $finalDecision = 'allow';
         $actionOverride = '';
         $replyOverride = '';
 
-        if ($mode === 'off') {
+        if (!empty($hardGateFailures)) {
+            $gateDecision = 'blocked';
+            $finalDecision = 'blocked';
+            $actionOverride = 'respond_local';
+            $replyOverride = 'Acceso no autorizado para este recurso.';
+        } elseif ($mode === 'off') {
             $gateDecision = 'off';
             $finalDecision = 'allow';
         } elseif (!$hasViolations) {
@@ -332,6 +367,79 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'CreateEntity':
+                if ($entity === '') {
+                    return [false, 'missing_entity'];
+                }
+                if (!is_array($command['fields'] ?? null) || empty((array) $command['fields'])) {
+                    return [false, 'missing_or_invalid_fields'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'CreateForm':
+                if ($entity === '') {
+                    return [false, 'missing_entity'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'CreateRelation':
+                $source = trim((string) ($command['source_entity'] ?? ''));
+                $target = trim((string) ($command['target_entity'] ?? ''));
+                if ($source === '' || $target === '') {
+                    return [false, 'missing_relation_entities'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'CreateIndex':
+                $field = trim((string) ($command['field'] ?? ''));
+                if ($entity === '' || $field === '') {
+                    return [false, 'missing_entity_or_field'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'InstallPlaybook':
+                $sectorKey = trim((string) ($command['sector_key'] ?? ''));
+                if ($sectorKey === '') {
+                    return [false, 'missing_sector_key'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'CompileWorkflow':
+                $text = trim((string) ($command['text'] ?? ''));
+                if ($text === '') {
+                    return [false, 'missing_workflow_text'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ImportIntegrationOpenApi':
+                $apiName = trim((string) ($command['api_name'] ?? $command['integration_id'] ?? ''));
+                $docUrl = trim((string) ($command['doc_url'] ?? ''));
+                $openapiJson = trim((string) ($command['openapi_json'] ?? ''));
+                if ($apiName === '') {
+                    return [false, 'missing_api_name'];
+                }
+                if ($docUrl === '' && $openapiJson === '') {
+                    return [false, 'missing_openapi_source'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'AuthLogin':
+                $userId = trim((string) ($command['user_id'] ?? $command['usuario'] ?? $command['user'] ?? ''));
+                $password = trim((string) ($command['password'] ?? $command['clave'] ?? ''));
+                if ($userId === '' || $password === '') {
+                    return [false, 'missing_credentials'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'AuthCreateUser':
+                $newUser = trim((string) ($command['user_id'] ?? $command['usuario'] ?? $command['user'] ?? ''));
+                $newRole = trim((string) ($command['role'] ?? $command['rol'] ?? ''));
+                $newPassword = trim((string) ($command['password'] ?? $command['clave'] ?? ''));
+                if ($newUser === '' || $newRole === '' || $newPassword === '') {
+                    return [false, 'missing_user_create_fields'];
+                }
+                return [true, 'schema_valid'];
+
             default:
                 // Backward-compatible fallback for commands not yet fully modeled.
                 if ($entity === '' && empty($data) && $id === null) {
@@ -355,14 +463,14 @@ final class RouterPolicyEvaluator
 
         $isAuthenticated = array_key_exists('is_authenticated', $context)
             ? (bool) $context['is_authenticated']
-            : true;
+            : false;
         if (!$isAuthenticated) {
             return [false, 'not_authenticated'];
         }
 
-        $role = strtolower(trim((string) ($context['role'] ?? getenv('DEFAULT_ROLE') ?: 'admin')));
+        $role = strtolower(trim((string) ($context['role'] ?? getenv('DEFAULT_ROLE') ?: 'guest')));
         if ($role === '') {
-            $role = 'admin';
+            $role = 'guest';
         }
         if ($role === 'admin' || $role === $requiredRole) {
             return [true, 'role_allowed'];
@@ -381,14 +489,24 @@ final class RouterPolicyEvaluator
         $contextTenant = trim((string) ($context['tenant_id'] ?? ''));
         $commandTenant = trim((string) ($command['tenant_id'] ?? ''));
         $envTenant = trim((string) (getenv('TENANT_KEY') ?: getenv('TENANT_ID') ?: ''));
+        $authTenant = trim((string) ($context['auth_tenant_id'] ?? ''));
+        $chatExecAuthRequired = (bool) ($context['chat_exec_auth_required'] ?? false);
 
         $resolved = $contextTenant !== '' ? $contextTenant : ($commandTenant !== '' ? $commandTenant : $envTenant);
         if ($resolved === '') {
             $resolved = 'default';
         }
 
+        if ($chatExecAuthRequired && $contextTenant === '') {
+            return [false, 'missing_context_tenant', $resolved];
+        }
+
         if ($contextTenant !== '' && $commandTenant !== '' && $contextTenant !== $commandTenant) {
             return [false, 'tenant_mismatch', $resolved];
+        }
+
+        if ($authTenant !== '' && $resolved !== $authTenant) {
+            return [false, 'tenant_mismatch_auth_context', $resolved];
         }
 
         return [true, 'tenant_scope_ok', $resolved];
@@ -408,6 +526,22 @@ final class RouterPolicyEvaluator
             return [false, 'mode_builder_disallows_runtime_execution'];
         }
         return [true, 'mode_ok'];
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     * @return array{0: bool, 1: string}
+     */
+    private function validateBuilderMode(array $context): array
+    {
+        $mode = strtolower(trim((string) ($context['mode'] ?? 'app')));
+        if ($mode === '') {
+            $mode = 'app';
+        }
+        if ($mode !== 'builder') {
+            return [false, 'mode_builder_required'];
+        }
+        return [true, 'mode_builder_ok'];
     }
 
     /**
@@ -456,6 +590,12 @@ final class RouterPolicyEvaluator
             if ((bool) ($context[$flag] ?? false)) {
                 $sourcesUsed[] = $name;
             }
+        }
+        // Deterministic routes resolved before LLM fallback are evidence-backed by rules even when
+        // upstream payloads do not yet annotate explicit source flags.
+        $action = strtolower(trim((string) ($input['action'] ?? '')));
+        if (empty($sourcesUsed) && $action !== 'send_to_llm' && in_array('rules', $routePathSteps, true)) {
+            $sourcesUsed[] = 'rules';
         }
 
         $present = [];
@@ -560,21 +700,64 @@ final class RouterPolicyEvaluator
      */
     private function hasGateResult(array $gateResults, string $gateName): bool
     {
-        $aliases = [
-            'schema_guard' => 'schema_gate',
-            'role_guard' => 'auth_rbac_gate',
-            'auth_guard' => 'auth_rbac_gate',
-            'tenant_scope_guard' => 'tenant_scope_gate',
-            'mode_guard' => 'mode_guard_gate',
-            'allowlist_guard' => 'allowlist_gate',
-        ];
-        $matchName = $aliases[$gateName] ?? $gateName;
+        $matchName = $this->canonicalGateName($gateName);
         foreach ($gateResults as $row) {
             if ((string) ($row['name'] ?? '') === $matchName) {
                 return true;
             }
         }
         return false;
+    }
+
+    private function canonicalGateName(string $gateName): string
+    {
+        $aliases = [
+            'schema_guard' => 'schema_gate',
+            'role_guard' => 'auth_rbac_gate',
+            'auth_guard' => 'auth_rbac_gate',
+            'tenant_scope_guard' => 'tenant_scope_gate',
+            'mode_guard' => 'mode_guard_gate',
+            'builder_mode_guard' => 'builder_mode_gate',
+            'allowlist_guard' => 'allowlist_gate',
+        ];
+        $normalized = strtolower(trim($gateName));
+        return $aliases[$normalized] ?? $normalized;
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function hardGateNames(): array
+    {
+        return ['allowlist_gate', 'schema_gate', 'auth_rbac_gate', 'tenant_scope_gate'];
+    }
+
+    /**
+     * @param array<int, array{name:string,required:bool,passed:bool,reason:string}> $gateResults
+     * @return array<int, string>
+     */
+    private function collectHardGateFailures(array $gateResults, string $action): array
+    {
+        if ($action !== 'execute_command') {
+            return [];
+        }
+
+        $hard = $this->hardGateNames();
+        $failures = [];
+        foreach ($gateResults as $gate) {
+            $name = strtolower(trim((string) ($gate['name'] ?? '')));
+            if (!in_array($name, $hard, true)) {
+                continue;
+            }
+            $required = (bool) ($gate['required'] ?? false);
+            $passed = (bool) ($gate['passed'] ?? true);
+            if ($required && !$passed) {
+                $reason = trim((string) ($gate['reason'] ?? 'gate_failed'));
+                $failures[] = $name . ':' . ($reason !== '' ? $reason : 'gate_failed');
+            }
+        }
+
+        return array_values(array_unique($failures));
     }
 
     /**

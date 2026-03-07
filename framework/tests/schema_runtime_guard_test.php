@@ -13,7 +13,7 @@ use App\Core\SecurityStateRepository;
 use App\Core\SqlMemoryRepository;
 use App\Core\SqlMetricsRepository;
 
-$tmpDir = __DIR__ . '/tmp/schema_runtime_guard_' . time();
+$tmpDir = __DIR__ . '/tmp/schema_runtime_guard_' . time() . random_int(1000, 9999);
 if (!is_dir($tmpDir)) {
     mkdir($tmpDir, 0775, true);
 }
