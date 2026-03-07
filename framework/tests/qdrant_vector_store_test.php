@@ -136,6 +136,40 @@ if (!$queryCall) {
     $failures[] = 'No se detecto llamada query.';
 }
 
+putenv('AGENT_TRAINING_COLLECTION=agent_training');
+putenv('SECTOR_KNOWLEDGE_COLLECTION=sector_knowledge');
+putenv('USER_MEMORY_COLLECTION=user_memory');
+if (QdrantVectorStore::resolveCollection('agent_training', 'fallback_collection') !== 'agent_training') {
+    $failures[] = 'resolveCollection debe mapear agent_training -> agent_training.';
+}
+if (QdrantVectorStore::resolveCollection('sector_knowledge', 'fallback_collection') !== 'sector_knowledge') {
+    $failures[] = 'resolveCollection debe mapear sector_knowledge -> sector_knowledge.';
+}
+if (QdrantVectorStore::resolveCollection('user_memory', 'fallback_collection') !== 'user_memory') {
+    $failures[] = 'resolveCollection debe mapear user_memory -> user_memory.';
+}
+if (QdrantVectorStore::resolveCollection('unknown_type', 'fallback_collection') !== 'fallback_collection') {
+    $failures[] = 'resolveCollection debe usar fallback para memory_type desconocido.';
+}
+
+try {
+    $mappedStore = new QdrantVectorStore(
+        'http://localhost:6333',
+        'qdrant_key',
+        null,
+        768,
+        'Cosine',
+        5,
+        $transport,
+        'sector_knowledge'
+    );
+    if ($mappedStore->collectionName() !== 'sector_knowledge') {
+        $failures[] = 'Constructor con memory_type debe resolver colección sector_knowledge.';
+    }
+} catch (\Throwable $e) {
+    $failures[] = 'Constructor con memory_type no debe fallar: ' . $e->getMessage();
+}
+
 try {
     new QdrantVectorStore(
         'http://localhost:6333',
@@ -157,4 +191,3 @@ echo json_encode([
     'failures' => $failures,
 ], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
 exit($ok ? 0 : 1);
-

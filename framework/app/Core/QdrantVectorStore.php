@@ -11,10 +11,12 @@ final class QdrantVectorStore
 {
     private const CANONICAL_DISTANCE = 'Cosine';
     private const CANONICAL_DIMENSION = 768;
+    private const DEFAULT_COLLECTION = 'suki_akp_default';
 
     private string $baseUrl;
     private string $apiKey;
     private string $collection;
+    private string $memoryType;
     private int $vectorSize;
     private string $distance;
     private int $timeoutSec;
@@ -32,7 +34,8 @@ final class QdrantVectorStore
         ?int $vectorSize = null,
         ?string $distance = null,
         ?int $timeoutSec = null,
-        ?callable $transport = null
+        ?callable $transport = null,
+        ?string $memoryType = null
     ) {
         $this->baseUrl = rtrim((string) ($baseUrl ?? getenv('QDRANT_URL') ?? ''), '/');
         if ($this->baseUrl === '') {
@@ -40,10 +43,21 @@ final class QdrantVectorStore
         }
 
         $this->apiKey = trim((string) ($apiKey ?? getenv('QDRANT_API_KEY') ?? ''));
-        $this->collection = trim((string) ($collection ?? getenv('QDRANT_COLLECTION') ?? 'suki_akp_default'));
+        $requestedMemoryType = self::normalizeMemoryType((string) ($memoryType ?? getenv('SEMANTIC_MEMORY_TYPE') ?? ''));
+        $fallbackCollection = trim((string) (getenv('QDRANT_COLLECTION') ?? self::DEFAULT_COLLECTION));
+        if ($fallbackCollection === '') {
+            $fallbackCollection = self::DEFAULT_COLLECTION;
+        }
+        $explicitCollection = trim((string) ($collection ?? ''));
+        if ($explicitCollection !== '') {
+            $this->collection = $explicitCollection;
+        } else {
+            $this->collection = self::resolveCollection($requestedMemoryType, $fallbackCollection);
+        }
         if ($this->collection === '') {
             throw new RuntimeException('QDRANT_COLLECTION requerido para memoria semantica.');
         }
+        $this->memoryType = self::normalizeMemoryType($requestedMemoryType);
 
         $resolvedSize = (int) ($vectorSize ?? getenv('EMBEDDING_OUTPUT_DIMENSIONALITY') ?: self::CANONICAL_DIMENSION);
         if ($resolvedSize !== self::CANONICAL_DIMENSION) {
@@ -67,16 +81,38 @@ final class QdrantVectorStore
     }
 
     /**
-     * @return array{base_url:string,collection:string,size:int,distance:string}
+     * @return array{base_url:string,collection:string,memory_type:string,size:int,distance:string}
      */
     public function profile(): array
     {
         return [
             'base_url' => $this->baseUrl,
             'collection' => $this->collection,
+            'memory_type' => $this->memoryType !== '' ? $this->memoryType : 'unspecified',
             'size' => $this->vectorSize,
             'distance' => $this->distance,
         ];
+    }
+
+    public static function resolveCollection(string $memoryType, ?string $fallbackCollection = null): string
+    {
+        $memoryType = self::normalizeMemoryType($memoryType);
+        if ($memoryType === 'agent_training') {
+            return self::resolveCollectionEnv('AGENT_TRAINING_COLLECTION', 'agent_training');
+        }
+        if ($memoryType === 'sector_knowledge') {
+            return self::resolveCollectionEnv('SECTOR_KNOWLEDGE_COLLECTION', 'sector_knowledge');
+        }
+        if ($memoryType === 'user_memory') {
+            return self::resolveCollectionEnv('USER_MEMORY_COLLECTION', 'user_memory');
+        }
+
+        $fallbackCollection = trim((string) ($fallbackCollection ?? getenv('QDRANT_COLLECTION') ?? self::DEFAULT_COLLECTION));
+        if ($fallbackCollection !== '') {
+            return $fallbackCollection;
+        }
+
+        return self::DEFAULT_COLLECTION;
     }
 
     /**
@@ -95,6 +131,14 @@ final class QdrantVectorStore
         $status = (int) ($response['status'] ?? 0);
         if ($status < 200 || $status >= 300) {
             $data = is_array($response['data'] ?? null) ? (array) $response['data'] : [];
+            $rawMessage = strtolower(trim((string) ($data['status']['error'] ?? $data['error'] ?? $data['message'] ?? '')));
+            if ($rawMessage !== '' && str_contains($rawMessage, 'already exists')) {
+                return [
+                    'ok' => true,
+                    'status' => $status,
+                    'collection' => $this->collection,
+                ];
+            }
             throw new RuntimeException($this->extractErrorMessage($data, $status, 'Qdrant ensureCollection'));
         }
 
@@ -321,5 +365,21 @@ final class QdrantVectorStore
         }
         return $prefix . ' error HTTP ' . $status . '.';
     }
-}
 
+    private static function normalizeMemoryType(string $memoryType): string
+    {
+        $memoryType = strtolower(trim($memoryType));
+        return in_array($memoryType, ['agent_training', 'sector_knowledge', 'user_memory'], true)
+            ? $memoryType
+            : '';
+    }
+
+    private static function resolveCollectionEnv(string $envKey, string $default): string
+    {
+        $value = trim((string) (getenv($envKey) ?: $default));
+        if ($value === '') {
+            return $default;
+        }
+        return $value;
+    }
+}

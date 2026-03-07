@@ -13,6 +13,7 @@ final class SemanticChunkContract
      * @var array<int,string>
      */
     public const REQUIRED_PAYLOAD_FIELDS = [
+        'memory_type',
         'tenant_id',
         'app_id',
         'source_type',
@@ -44,6 +45,14 @@ final class SemanticChunkContract
         $sourceType = trim((string) ($chunk['source_type'] ?? ''));
         if ($sourceType === '') {
             throw new RuntimeException('Chunk invalido: source_type requerido.');
+        }
+
+        $memoryType = self::normalizeMemoryType(
+            trim((string) ($chunk['memory_type'] ?? '')),
+            $sourceType
+        );
+        if ($memoryType === '') {
+            throw new RuntimeException('Chunk invalido: memory_type requerido o no reconocido.');
         }
 
         $sourceId = trim((string) ($chunk['source_id'] ?? ''));
@@ -100,6 +109,7 @@ final class SemanticChunkContract
         }
 
         return [
+            'memory_type' => $memoryType,
             'tenant_id' => $tenantId,
             'app_id' => $appId,
             'source_type' => $sourceType,
@@ -122,6 +132,7 @@ final class SemanticChunkContract
     {
         $normalized = self::normalizeChunk($chunk);
         $payload = [
+            'memory_type' => $normalized['memory_type'],
             'tenant_id' => $normalized['tenant_id'],
             'app_id' => $normalized['app_id'],
             'source_type' => $normalized['source_type'],
@@ -156,6 +167,11 @@ final class SemanticChunkContract
             throw new RuntimeException('Payload semantico invalido: tenant_id vacio.');
         }
 
+        $memoryType = trim((string) ($payload['memory_type'] ?? ''));
+        if (!in_array($memoryType, ['agent_training', 'sector_knowledge', 'user_memory'], true)) {
+            throw new RuntimeException('Payload semantico invalido: memory_type no permitido.');
+        }
+
         if (($payload['app_id'] ?? null) !== null && trim((string) $payload['app_id']) === '') {
             throw new RuntimeException('Payload semantico invalido: app_id vacio.');
         }
@@ -182,6 +198,7 @@ final class SemanticChunkContract
     {
         $normalized = self::normalizeChunk($chunk);
         $parts = [
+            (string) $normalized['memory_type'],
             (string) $normalized['tenant_id'],
             (string) ($normalized['app_id'] ?? ''),
             (string) $normalized['source_id'],
@@ -190,5 +207,21 @@ final class SemanticChunkContract
         ];
         return substr(hash('sha256', implode('|', $parts)), 0, 32);
     }
-}
 
+    private static function normalizeMemoryType(string $memoryType, string $sourceType): string
+    {
+        $memoryType = strtolower(trim($memoryType));
+        if (in_array($memoryType, ['agent_training', 'sector_knowledge', 'user_memory'], true)) {
+            return $memoryType;
+        }
+
+        $sourceType = strtolower(trim($sourceType));
+        if (in_array($sourceType, ['conversation', 'chat_log', 'session_state', 'user_memory'], true)) {
+            return 'user_memory';
+        }
+        if (in_array($sourceType, ['agent_training', 'framework_docs', 'policy_pack', 'contracts'], true)) {
+            return 'agent_training';
+        }
+        return 'sector_knowledge';
+    }
+}

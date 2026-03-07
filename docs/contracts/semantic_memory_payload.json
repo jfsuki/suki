@@ -1,8 +1,8 @@
 {
   "contract_id": "semantic_memory_payload",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "effective_date": "2026-03-07",
-  "addenda_of": null,
+  "addenda_of": "1.0.0",
   "status": "canonical_draft",
   "scope": "Minimum payload and flow contract for semantic memory indexing and retrieval.",
   "embedding_profile": {
@@ -12,6 +12,7 @@
     "distance": "Cosine"
   },
   "required_fields": [
+    "memory_type",
     "tenant_id",
     "app_id",
     "source_type",
@@ -23,6 +24,20 @@
     "quality_score",
     "created_at"
   ],
+  "memory_type_contract": {
+    "required": true,
+    "allowed_values": [
+      "agent_training",
+      "sector_knowledge",
+      "user_memory"
+    ],
+    "collection_mapping": {
+      "agent_training": "agent_training",
+      "sector_knowledge": "sector_knowledge",
+      "user_memory": "user_memory"
+    },
+    "fallback_collection_env": "QDRANT_COLLECTION"
+  },
   "flow": [
     "ingest",
     "hygiene",
@@ -36,4 +51,3 @@
     "tenant_filter_required_on_retrieval": true
   }
 }
-
