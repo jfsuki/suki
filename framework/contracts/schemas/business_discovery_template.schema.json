@@ -1,0 +1,836 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Business Discovery Template",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "discovery_id",
+    "language",
+    "version",
+    "sector_key",
+    "sector_label",
+    "country_or_regulation",
+    "business_type",
+    "dataset_target",
+    "business_processes",
+    "business_documents",
+    "operational_flows",
+    "accounting_rules",
+    "sector_terminology",
+    "frequent_business_questions",
+    "skill_mappings",
+    "architecture_guards",
+    "data_quality_rules"
+  ],
+  "properties": {
+    "discovery_id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2
+    },
+    "version": {
+      "type": "string",
+      "minLength": 3
+    },
+    "sector_key": {
+      "type": "string",
+      "minLength": 3
+    },
+    "sector_label": {
+      "type": "string",
+      "minLength": 3
+    },
+    "country_or_regulation": {
+      "type": "string",
+      "minLength": 3
+    },
+    "business_type": {
+      "type": "string",
+      "minLength": 3
+    },
+    "dataset_target": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "batch_id",
+        "dataset_version",
+        "country",
+        "currency",
+        "tax_regime",
+        "channels",
+        "volume_profile",
+        "tenant_scope_note"
+      ],
+      "properties": {
+        "batch_id": {
+          "type": "string",
+          "minLength": 3
+        },
+        "dataset_version": {
+          "type": "string",
+          "minLength": 3
+        },
+        "country": {
+          "type": "string",
+          "minLength": 2
+        },
+        "currency": {
+          "type": "string",
+          "minLength": 3
+        },
+        "tax_regime": {
+          "type": "string",
+          "minLength": 2
+        },
+        "channels": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 2
+          }
+        },
+        "volume_profile": {
+          "type": "string",
+          "minLength": 4
+        },
+        "tenant_scope_note": {
+          "type": "string",
+          "minLength": 8
+        }
+      }
+    },
+    "business_processes": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "sales",
+        "purchases",
+        "inventory",
+        "accounting",
+        "billing",
+        "reporting"
+      ],
+      "properties": {
+        "sales": {
+          "$ref": "#/definitions/process"
+        },
+        "purchases": {
+          "$ref": "#/definitions/process"
+        },
+        "inventory": {
+          "$ref": "#/definitions/process"
+        },
+        "accounting": {
+          "$ref": "#/definitions/process"
+        },
+        "billing": {
+          "$ref": "#/definitions/process"
+        },
+        "reporting": {
+          "$ref": "#/definitions/process"
+        }
+      }
+    },
+    "business_documents": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "invoice",
+        "purchase_order",
+        "delivery_note",
+        "credit_note",
+        "debit_note",
+        "accounting_entry",
+        "bank_statement"
+      ],
+      "properties": {
+        "invoice": {
+          "$ref": "#/definitions/document"
+        },
+        "purchase_order": {
+          "$ref": "#/definitions/document"
+        },
+        "delivery_note": {
+          "$ref": "#/definitions/document"
+        },
+        "credit_note": {
+          "$ref": "#/definitions/document"
+        },
+        "debit_note": {
+          "$ref": "#/definitions/document"
+        },
+        "accounting_entry": {
+          "$ref": "#/definitions/document"
+        },
+        "bank_statement": {
+          "$ref": "#/definitions/document"
+        }
+      }
+    },
+    "operational_flows": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/flow"
+      }
+    },
+    "accounting_rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "tax",
+        "vat",
+        "withholding",
+        "payment_types",
+        "credit_sales",
+        "inventory_cost",
+        "cost_of_goods_sold",
+        "chart_of_accounts_min",
+        "posting_rules"
+      ],
+      "properties": {
+        "tax": {
+          "$ref": "#/definitions/rule_block"
+        },
+        "vat": {
+          "$ref": "#/definitions/rule_block"
+        },
+        "withholding": {
+          "$ref": "#/definitions/rule_block"
+        },
+        "payment_types": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 2
+          }
+        },
+        "credit_sales": {
+          "$ref": "#/definitions/rule_block"
+        },
+        "inventory_cost": {
+          "$ref": "#/definitions/rule_block"
+        },
+        "cost_of_goods_sold": {
+          "$ref": "#/definitions/rule_block"
+        },
+        "chart_of_accounts_min": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/account"
+          }
+        },
+        "posting_rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/posting_rule"
+          }
+        }
+      }
+    },
+    "sector_terminology": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/terminology"
+      }
+    },
+    "frequent_business_questions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/business_question"
+      }
+    },
+    "skill_mappings": {
+      "type": "array",
+      "minItems": 13,
+      "items": {
+        "$ref": "#/definitions/skill_mapping"
+      }
+    },
+    "architecture_guards": {
+      "type": "array",
+      "minItems": 5,
+      "items": {
+        "$ref": "#/definitions/architecture_guard"
+      }
+    },
+    "data_quality_rules": {
+      "type": "array",
+      "minItems": 4,
+      "items": {
+        "$ref": "#/definitions/data_quality_rule"
+      }
+    }
+  },
+  "definitions": {
+    "skill_name": {
+      "type": "string",
+      "enum": [
+        "create_invoice",
+        "send_invoice",
+        "register_expense",
+        "accounting_post",
+        "product_lookup",
+        "inventory_check",
+        "customer_lookup",
+        "read_document",
+        "extract_invoice_data",
+        "generate_report",
+        "business_explain",
+        "dataset_lookup",
+        "tax_accountant_advisor"
+      ]
+    },
+    "process": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "label",
+        "events",
+        "documents_involved",
+        "erp_actions",
+        "skills_used"
+      ],
+      "properties": {
+        "label": {
+          "type": "string",
+          "minLength": 3
+        },
+        "events": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "documents_involved": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "invoice",
+              "purchase_order",
+              "delivery_note",
+              "credit_note",
+              "debit_note",
+              "accounting_entry",
+              "bank_statement"
+            ]
+          }
+        },
+        "erp_actions": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "skills_used": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/skill_name"
+          }
+        }
+      }
+    },
+    "document": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "origin_event",
+        "key_fields",
+        "related_skill"
+      ],
+      "properties": {
+        "origin_event": {
+          "type": "string",
+          "minLength": 3
+        },
+        "key_fields": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 2
+          }
+        },
+        "related_skill": {
+          "$ref": "#/definitions/skill_name"
+        }
+      }
+    },
+    "flow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "flow_key",
+        "label",
+        "user_request_example",
+        "documents",
+        "sequence"
+      ],
+      "properties": {
+        "flow_key": {
+          "type": "string",
+          "minLength": 3
+        },
+        "label": {
+          "type": "string",
+          "minLength": 3
+        },
+        "user_request_example": {
+          "type": "string",
+          "minLength": 5
+        },
+        "documents": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "invoice",
+              "purchase_order",
+              "delivery_note",
+              "credit_note",
+              "debit_note",
+              "accounting_entry",
+              "bank_statement"
+            ]
+          }
+        },
+        "sequence": {
+          "type": "array",
+          "minItems": 2,
+          "items": {
+            "$ref": "#/definitions/flow_step"
+          }
+        }
+      }
+    },
+    "flow_step": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "kind",
+        "value"
+      ],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "event",
+            "skill",
+            "document"
+          ]
+        },
+        "value": {
+          "type": "string",
+          "minLength": 3
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "skill"
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "value": {
+                "$ref": "#/definitions/skill_name"
+              }
+            }
+          }
+        }
+      ]
+    },
+    "rule_block": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "summary",
+        "rules"
+      ],
+      "properties": {
+        "summary": {
+          "type": "string",
+          "minLength": 5
+        },
+        "rules": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 5
+          }
+        }
+      }
+    },
+    "account": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "code",
+        "name"
+      ],
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 2
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2
+        }
+      }
+    },
+    "posting_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "trigger",
+        "debit_account",
+        "credit_account"
+      ],
+      "properties": {
+        "trigger": {
+          "type": "string",
+          "minLength": 2
+        },
+        "debit_account": {
+          "type": "string",
+          "minLength": 2
+        },
+        "credit_account": {
+          "type": "string",
+          "minLength": 2
+        }
+      }
+    },
+    "terminology": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "term",
+        "type",
+        "related_skill",
+        "synonyms",
+        "common_phrases",
+        "how_users_ask"
+      ],
+      "properties": {
+        "term": {
+          "type": "string",
+          "minLength": 2
+        },
+        "type": {
+          "type": "string",
+          "minLength": 2
+        },
+        "related_skill": {
+          "$ref": "#/definitions/skill_name"
+        },
+        "synonyms": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 2
+          }
+        },
+        "common_phrases": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "how_users_ask": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        }
+      }
+    },
+    "business_question": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "question",
+        "answer",
+        "related_skill",
+        "related_process",
+        "tags"
+      ],
+      "properties": {
+        "question": {
+          "type": "string",
+          "minLength": 5
+        },
+        "answer": {
+          "type": "string",
+          "minLength": 8
+        },
+        "related_skill": {
+          "$ref": "#/definitions/skill_name"
+        },
+        "related_process": {
+          "type": "string",
+          "enum": [
+            "sales",
+            "purchases",
+            "inventory",
+            "accounting",
+            "billing",
+            "reporting"
+          ]
+        },
+        "tags": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 2
+          }
+        }
+      }
+    },
+    "slot": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "name",
+        "required"
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2
+        },
+        "required": {
+          "type": "boolean"
+        }
+      }
+    },
+    "one_question_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "missing_slot",
+        "question"
+      ],
+      "properties": {
+        "missing_slot": {
+          "type": "string",
+          "minLength": 2
+        },
+        "question": {
+          "type": "string",
+          "minLength": 5
+        }
+      }
+    },
+    "skill_mapping": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "skill",
+        "intent",
+        "label",
+        "related_processes",
+        "related_documents",
+        "related_flows",
+        "utterances_explicit",
+        "utterances_implicit",
+        "hard_negatives",
+        "required_slots",
+        "one_question_policy",
+        "confirm_required",
+        "success_reply_template",
+        "error_reply_template"
+      ],
+      "properties": {
+        "skill": {
+          "$ref": "#/definitions/skill_name"
+        },
+        "intent": {
+          "type": "string",
+          "minLength": 3
+        },
+        "label": {
+          "type": "string",
+          "minLength": 3
+        },
+        "related_processes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "sales",
+              "purchases",
+              "inventory",
+              "accounting",
+              "billing",
+              "reporting"
+            ]
+          }
+        },
+        "related_documents": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "enum": [
+              "invoice",
+              "purchase_order",
+              "delivery_note",
+              "credit_note",
+              "debit_note",
+              "accounting_entry",
+              "bank_statement"
+            ]
+          }
+        },
+        "related_flows": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "utterances_explicit": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "utterances_implicit": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "hard_negatives": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        },
+        "required_slots": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/slot"
+          }
+        },
+        "one_question_policy": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/definitions/one_question_rule"
+          }
+        },
+        "confirm_required": {
+          "type": "boolean"
+        },
+        "success_reply_template": {
+          "type": "string",
+          "minLength": 5
+        },
+        "error_reply_template": {
+          "type": "string",
+          "minLength": 5
+        }
+      }
+    },
+    "architecture_guard": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "scope",
+        "rule",
+        "severity",
+        "action_if_violate"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 3
+        },
+        "scope": {
+          "type": "string",
+          "minLength": 3
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 8
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "action_if_violate": {
+          "type": "string",
+          "minLength": 4
+        }
+      }
+    },
+    "data_quality_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "id",
+        "rule",
+        "reason"
+      ],
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 3
+        },
+        "rule": {
+          "type": "string",
+          "minLength": 8
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 8
+        }
+      }
+    }
+  }
+}

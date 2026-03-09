@@ -1,0 +1,275 @@
+{
+  "discovery_id": "business_discovery_ferreteria_minorista_v1",
+  "language": "es-CO",
+  "version": "1.0.0",
+  "sector_key": "FERRETERIA_MINORISTA",
+  "sector_label": "Ferreteria minorista",
+  "country_or_regulation": "CO - IVA, retenciones y PUC comercial",
+  "business_type": "comercio minorista de materiales y herramientas",
+  "dataset_target": {
+    "batch_id": "business_discovery_ferreteria_minorista_v1",
+    "dataset_version": "1.0.0",
+    "country": "CO",
+    "currency": "COP",
+    "tax_regime": "iva_responsable",
+    "channels": ["web_chat", "whatsapp", "telegram"],
+    "volume_profile": "ventas diarias, reposicion semanal y cierre mensual",
+    "tenant_scope_note": "Todo acceso debe respetar tenant, proyecto, modo y usuario."
+  },
+  "business_processes": {
+    "sales": {
+      "label": "Ventas",
+      "events": ["venta mostrador", "cotizacion aprobada"],
+      "documents_involved": ["invoice", "delivery_note", "credit_note"],
+      "erp_actions": ["validar cliente", "consultar producto", "verificar inventario", "crear factura"],
+      "skills_used": ["customer_lookup", "product_lookup", "inventory_check", "create_invoice", "send_invoice", "accounting_post"]
+    },
+    "purchases": {
+      "label": "Compras",
+      "events": ["reposicion aprobada", "factura proveedor recibida"],
+      "documents_involved": ["purchase_order", "delivery_note", "accounting_entry"],
+      "erp_actions": ["leer soporte", "extraer datos", "registrar compra", "contabilizar documento"],
+      "skills_used": ["read_document", "extract_invoice_data", "register_expense", "accounting_post", "tax_accountant_advisor"]
+    },
+    "inventory": {
+      "label": "Inventario",
+      "events": ["ingreso mercancia", "ajuste por rotura"],
+      "documents_involved": ["delivery_note", "accounting_entry", "debit_note"],
+      "erp_actions": ["buscar producto", "consultar stock", "explicar movimiento"],
+      "skills_used": ["product_lookup", "inventory_check", "business_explain"]
+    },
+    "accounting": {
+      "label": "Contabilidad",
+      "events": ["asiento de venta", "conciliacion bancaria"],
+      "documents_involved": ["accounting_entry", "bank_statement", "debit_note"],
+      "erp_actions": ["leer extracto", "registrar asiento", "revisar impuesto"],
+      "skills_used": ["read_document", "accounting_post", "tax_accountant_advisor"]
+    },
+    "billing": {
+      "label": "Facturacion",
+      "events": ["venta lista", "envio de factura"],
+      "documents_involved": ["invoice", "credit_note", "debit_note"],
+      "erp_actions": ["crear factura", "enviar factura", "explicar documento"],
+      "skills_used": ["create_invoice", "send_invoice", "business_explain"]
+    },
+    "reporting": {
+      "label": "Reportes",
+      "events": ["cierre diario", "revision del mes"],
+      "documents_involved": ["invoice", "accounting_entry", "bank_statement"],
+      "erp_actions": ["generar reporte", "consultar dataset", "explicar resultado"],
+      "skills_used": ["generate_report", "dataset_lookup", "business_explain"]
+    }
+  },
+  "business_documents": {
+    "invoice": {
+      "origin_event": "venta confirmada",
+      "key_fields": ["numero", "fecha", "cliente", "items", "total"],
+      "related_skill": "create_invoice"
+    },
+    "purchase_order": {
+      "origin_event": "reposicion aprobada",
+      "key_fields": ["numero", "proveedor", "fecha", "items"],
+      "related_skill": "register_expense"
+    },
+    "delivery_note": {
+      "origin_event": "entrega o recepcion de mercancia",
+      "key_fields": ["numero", "tercero", "items", "cantidades"],
+      "related_skill": "inventory_check"
+    },
+    "credit_note": {
+      "origin_event": "devolucion o descuento",
+      "key_fields": ["numero", "factura_referencia", "motivo", "valor"],
+      "related_skill": "business_explain"
+    },
+    "debit_note": {
+      "origin_event": "ajuste documentado",
+      "key_fields": ["numero", "documento_referencia", "motivo", "valor"],
+      "related_skill": "accounting_post"
+    },
+    "accounting_entry": {
+      "origin_event": "hecho economico listo para contabilizar",
+      "key_fields": ["fecha", "detalle", "cuenta_debito", "cuenta_credito", "valor"],
+      "related_skill": "accounting_post"
+    },
+    "bank_statement": {
+      "origin_event": "extracto disponible",
+      "key_fields": ["banco", "periodo", "movimientos", "saldo_final"],
+      "related_skill": "read_document"
+    }
+  },
+  "operational_flows": [
+    {
+      "flow_key": "sale_cash",
+      "label": "Venta contado",
+      "user_request_example": "Necesito facturar una venta de contado.",
+      "documents": ["invoice", "accounting_entry"],
+      "sequence": [
+        { "kind": "event", "value": "venta confirmada" },
+        { "kind": "skill", "value": "customer_lookup" },
+        { "kind": "skill", "value": "product_lookup" },
+        { "kind": "skill", "value": "inventory_check" },
+        { "kind": "skill", "value": "create_invoice" },
+        { "kind": "skill", "value": "accounting_post" }
+      ]
+    },
+    {
+      "flow_key": "sale_credit",
+      "label": "Venta credito",
+      "user_request_example": "Haz la factura a credito y enviala.",
+      "documents": ["invoice", "delivery_note", "accounting_entry"],
+      "sequence": [
+        { "kind": "event", "value": "pedido aprobado" },
+        { "kind": "skill", "value": "customer_lookup" },
+        { "kind": "skill", "value": "inventory_check" },
+        { "kind": "skill", "value": "create_invoice" },
+        { "kind": "skill", "value": "send_invoice" },
+        { "kind": "skill", "value": "accounting_post" }
+      ]
+    },
+    {
+      "flow_key": "supplier_invoice_capture",
+      "label": "Compra proveedor",
+      "user_request_example": "Lee esta factura del proveedor y registrala.",
+      "documents": ["purchase_order", "delivery_note", "accounting_entry"],
+      "sequence": [
+        { "kind": "event", "value": "factura proveedor recibida" },
+        { "kind": "skill", "value": "read_document" },
+        { "kind": "skill", "value": "extract_invoice_data" },
+        { "kind": "skill", "value": "register_expense" },
+        { "kind": "skill", "value": "accounting_post" }
+      ]
+    },
+    {
+      "flow_key": "monthly_reporting",
+      "label": "Cierre mensual",
+      "user_request_example": "Genera el reporte del mes y explicalo.",
+      "documents": ["invoice", "accounting_entry", "bank_statement"],
+      "sequence": [
+        { "kind": "event", "value": "periodo definido" },
+        { "kind": "skill", "value": "generate_report" },
+        { "kind": "skill", "value": "business_explain" },
+        { "kind": "skill", "value": "tax_accountant_advisor" }
+      ]
+    }
+  ],
+  "accounting_rules": {
+    "tax": {
+      "summary": "Toda venta y compra debe separar base e impuesto.",
+      "rules": ["Guardar base e impuesto en cada documento."]
+    },
+    "vat": {
+      "summary": "El IVA generado y descontable se controla por separado.",
+      "rules": ["La venta registra IVA generado.", "La compra valida IVA descontable."]
+    },
+    "withholding": {
+      "summary": "Las retenciones dependen del tercero y el concepto.",
+      "rules": ["Revisar retencion antes del pago."]
+    },
+    "payment_types": ["efectivo", "transferencia", "tarjeta", "credito"],
+    "credit_sales": {
+      "summary": "La venta a credito exige fecha de vencimiento.",
+      "rules": ["Toda venta a credito debe crear cartera."]
+    },
+    "inventory_cost": {
+      "summary": "No se factura sin validar existencias.",
+      "rules": ["Toda salida debe dejar trazabilidad documental."]
+    },
+    "cost_of_goods_sold": {
+      "summary": "El costo de ventas se reconoce al entregar mercancia.",
+      "rules": ["Separar ingreso y costo en el asiento."]
+    },
+    "chart_of_accounts_min": [
+      { "code": "110505", "name": "Caja general" },
+      { "code": "111005", "name": "Bancos" },
+      { "code": "130505", "name": "Clientes nacionales" },
+      { "code": "143505", "name": "Inventario mercancias" },
+      { "code": "220505", "name": "Proveedores nacionales" },
+      { "code": "240805", "name": "IVA generado" },
+      { "code": "413595", "name": "Ingresos por ventas" },
+      { "code": "613595", "name": "Costo de ventas" }
+    ],
+    "posting_rules": [
+      { "trigger": "factura_contado", "debit_account": "110505", "credit_account": "413595" },
+      { "trigger": "factura_credito", "debit_account": "130505", "credit_account": "413595" },
+      { "trigger": "compra_inventario", "debit_account": "143505", "credit_account": "220505" },
+      { "trigger": "pago_proveedor", "debit_account": "220505", "credit_account": "111005" }
+    ]
+  },
+  "sector_terminology": [
+    {
+      "term": "factura",
+      "type": "document",
+      "related_skill": "create_invoice",
+      "synonyms": ["factura de venta", "documento de cobro"],
+      "common_phrases": ["crear factura"],
+      "how_users_ask": ["me falta facturar esa venta"]
+    },
+    {
+      "term": "inventario",
+      "type": "resource",
+      "related_skill": "inventory_check",
+      "synonyms": ["existencias", "stock"],
+      "common_phrases": ["revisar inventario"],
+      "how_users_ask": ["hay material disponible"]
+    },
+    {
+      "term": "cliente",
+      "type": "party",
+      "related_skill": "customer_lookup",
+      "synonyms": ["comprador", "tercero"],
+      "common_phrases": ["buscar cliente"],
+      "how_users_ask": ["ese cliente ya existe"]
+    },
+    {
+      "term": "reporte",
+      "type": "analysis",
+      "related_skill": "generate_report",
+      "synonyms": ["informe", "resumen"],
+      "common_phrases": ["generar reporte"],
+      "how_users_ask": ["quiero el resumen del mes"]
+    }
+  ],
+  "frequent_business_questions": [
+    { "question": "Como creo una factura de venta?", "answer": "Valida cliente, items y total antes de emitir la factura.", "related_skill": "create_invoice", "related_process": "billing", "tags": ["facturacion"] },
+    { "question": "Como envio una factura al cliente?", "answer": "Confirma el documento y el canal antes de enviarlo.", "related_skill": "send_invoice", "related_process": "billing", "tags": ["envio"] },
+    { "question": "Como registro una compra del proveedor?", "answer": "Lee el soporte y registra tercero, fecha, base e impuestos.", "related_skill": "register_expense", "related_process": "purchases", "tags": ["compras"] },
+    { "question": "Como contabilizo una venta o compra?", "answer": "Aplica el asiento segun si es contado, credito o compra.", "related_skill": "accounting_post", "related_process": "accounting", "tags": ["contabilidad"] },
+    { "question": "Como busco un producto por referencia?", "answer": "Consulta nombre, codigo o referencia antes de vender.", "related_skill": "product_lookup", "related_process": "inventory", "tags": ["productos"] },
+    { "question": "Como reviso si tengo existencias?", "answer": "Consulta stock disponible antes de crear la factura.", "related_skill": "inventory_check", "related_process": "inventory", "tags": ["inventario"] },
+    { "question": "Como verifico si el cliente ya existe?", "answer": "Busca por nit, cedula o nombre comercial.", "related_skill": "customer_lookup", "related_process": "sales", "tags": ["clientes"] },
+    { "question": "Como leo un extracto o PDF del proveedor?", "answer": "Carga el documento y revisa movimientos, fechas y terceros.", "related_skill": "read_document", "related_process": "accounting", "tags": ["documentos"] },
+    { "question": "Como extraigo datos clave de una factura?", "answer": "Identifica tercero, fecha, numero, impuestos y totales.", "related_skill": "extract_invoice_data", "related_process": "purchases", "tags": ["extraccion"] },
+    { "question": "Como genero un reporte del mes?", "answer": "Define periodo y tipo de reporte antes de generarlo.", "related_skill": "generate_report", "related_process": "reporting", "tags": ["reportes"] },
+    { "question": "Como me explicas el flujo de una devolucion?", "answer": "Primero ubica el documento origen y luego valida nota o ajuste.", "related_skill": "business_explain", "related_process": "billing", "tags": ["flujo"] },
+    { "question": "Que dataset sectorial tienes para ferreteria?", "answer": "Puedes consultar flujos, documentos y reglas del sector.", "related_skill": "dataset_lookup", "related_process": "reporting", "tags": ["dataset"] },
+    { "question": "Que debo revisar de IVA o retenciones?", "answer": "Revisa bases gravadas, soportes y coherencia del asiento.", "related_skill": "tax_accountant_advisor", "related_process": "accounting", "tags": ["impuestos"] }
+  ],
+  "skill_mappings": [
+    { "skill": "create_invoice", "intent": "SKILL_CREATE_INVOICE", "label": "Crear factura", "related_processes": ["sales", "billing"], "related_documents": ["invoice"], "related_flows": ["sale_cash", "sale_credit"], "utterances_explicit": ["emitir factura de venta"], "utterances_implicit": ["esa venta sigue sin factura"], "hard_negatives": ["anular factura existente"], "required_slots": [{ "name": "cliente", "required": true }], "one_question_policy": [{ "missing_slot": "cliente", "question": "A que cliente debo facturar?" }], "confirm_required": false, "success_reply_template": "Factura creada para {cliente}.", "error_reply_template": "No pude crear la factura porque falta {missing_slot}." },
+    { "skill": "send_invoice", "intent": "SKILL_SEND_INVOICE", "label": "Enviar factura", "related_processes": ["billing"], "related_documents": ["invoice"], "related_flows": ["sale_credit"], "utterances_explicit": ["manda la factura al cliente"], "utterances_implicit": ["el cliente espera el soporte"], "hard_negatives": ["imprimir factura en caja"], "required_slots": [{ "name": "factura", "required": true }], "one_question_policy": [{ "missing_slot": "factura", "question": "Que factura debo enviar?" }], "confirm_required": true, "success_reply_template": "Factura {factura} enviada.", "error_reply_template": "No pude enviar la factura porque falta {missing_slot}." },
+    { "skill": "register_expense", "intent": "SKILL_REGISTER_EXPENSE", "label": "Registrar compra", "related_processes": ["purchases"], "related_documents": ["purchase_order", "accounting_entry"], "related_flows": ["supplier_invoice_capture"], "utterances_explicit": ["registrar compra de proveedor"], "utterances_implicit": ["falta subir esa factura de compra"], "hard_negatives": ["pagar factura de proveedor"], "required_slots": [{ "name": "proveedor", "required": true }], "one_question_policy": [{ "missing_slot": "proveedor", "question": "De que proveedor es el documento?" }], "confirm_required": true, "success_reply_template": "Compra registrada para {proveedor}.", "error_reply_template": "No pude registrar la compra porque falta {missing_slot}." },
+    { "skill": "accounting_post", "intent": "SKILL_ACCOUNTING_POST", "label": "Contabilizar", "related_processes": ["sales", "purchases", "accounting"], "related_documents": ["accounting_entry", "debit_note"], "related_flows": ["sale_cash", "sale_credit", "supplier_invoice_capture"], "utterances_explicit": ["registrar asiento contable"], "utterances_implicit": ["eso falta pasarlo a contabilidad"], "hard_negatives": ["ver balance general"], "required_slots": [{ "name": "detalle", "required": true }], "one_question_policy": [{ "missing_slot": "detalle", "question": "Cual es el concepto del asiento?" }], "confirm_required": true, "success_reply_template": "Asiento {detalle} contabilizado.", "error_reply_template": "No pude contabilizar porque falta {missing_slot}." },
+    { "skill": "product_lookup", "intent": "SKILL_PRODUCT_LOOKUP", "label": "Consultar producto", "related_processes": ["sales", "inventory"], "related_documents": ["invoice", "delivery_note"], "related_flows": ["sale_cash"], "utterances_explicit": ["consultar precio de un producto"], "utterances_implicit": ["no recuerdo el codigo del articulo"], "hard_negatives": ["crear producto nuevo"], "required_slots": [{ "name": "referencia", "required": true }], "one_question_policy": [{ "missing_slot": "referencia", "question": "Que referencia debo buscar?" }], "confirm_required": false, "success_reply_template": "Referencia {referencia} encontrada.", "error_reply_template": "No pude buscar el producto porque falta {missing_slot}." },
+    { "skill": "inventory_check", "intent": "SKILL_INVENTORY_CHECK", "label": "Revisar inventario", "related_processes": ["sales", "inventory"], "related_documents": ["delivery_note"], "related_flows": ["sale_cash", "sale_credit"], "utterances_explicit": ["consulta stock disponible"], "utterances_implicit": ["revisa si aun queda material"], "hard_negatives": ["cerrar inventario del mes"], "required_slots": [{ "name": "producto", "required": true }], "one_question_policy": [{ "missing_slot": "producto", "question": "Que producto debo revisar?" }], "confirm_required": false, "success_reply_template": "Existencias revisadas para {producto}.", "error_reply_template": "No pude revisar inventario porque falta {missing_slot}." },
+    { "skill": "customer_lookup", "intent": "SKILL_CUSTOMER_LOOKUP", "label": "Consultar cliente", "related_processes": ["sales"], "related_documents": ["invoice"], "related_flows": ["sale_cash", "sale_credit"], "utterances_explicit": ["busca el cliente por nit"], "utterances_implicit": ["no se si ese cliente ya esta creado"], "hard_negatives": ["crear cliente nuevo"], "required_slots": [{ "name": "cliente", "required": true }], "one_question_policy": [{ "missing_slot": "cliente", "question": "Que nombre o nit debo buscar?" }], "confirm_required": false, "success_reply_template": "Cliente {cliente} encontrado.", "error_reply_template": "No pude buscar el cliente porque falta {missing_slot}." },
+    { "skill": "read_document", "intent": "SKILL_READ_DOCUMENT", "label": "Leer documento", "related_processes": ["purchases", "accounting"], "related_documents": ["bank_statement", "purchase_order"], "related_flows": ["supplier_invoice_capture"], "utterances_explicit": ["lee este documento"], "utterances_implicit": ["te deje el soporte para que lo mires"], "hard_negatives": ["borrar archivo adjunto"], "required_slots": [{ "name": "documento", "required": true }], "one_question_policy": [{ "missing_slot": "documento", "question": "Que documento debo leer?" }], "confirm_required": false, "success_reply_template": "Documento {documento} revisado.", "error_reply_template": "No pude leer el documento porque falta {missing_slot}." },
+    { "skill": "extract_invoice_data", "intent": "SKILL_EXTRACT_INVOICE_DATA", "label": "Extraer datos factura", "related_processes": ["purchases"], "related_documents": ["purchase_order", "invoice"], "related_flows": ["supplier_invoice_capture"], "utterances_explicit": ["extrae los datos de esa factura"], "utterances_implicit": ["no quiero digitar el PDF a mano"], "hard_negatives": ["leer factura solamente"], "required_slots": [{ "name": "factura", "required": true }], "one_question_policy": [{ "missing_slot": "factura", "question": "Que factura debo procesar?" }], "confirm_required": false, "success_reply_template": "Datos extraidos de {factura}.", "error_reply_template": "No pude extraer los datos porque falta {missing_slot}." },
+    { "skill": "generate_report", "intent": "SKILL_GENERATE_REPORT", "label": "Generar reporte", "related_processes": ["reporting"], "related_documents": ["accounting_entry", "invoice"], "related_flows": ["monthly_reporting"], "utterances_explicit": ["quiero un reporte de ventas"], "utterances_implicit": ["necesito ver como vamos en el mes"], "hard_negatives": ["explicame el reporte existente"], "required_slots": [{ "name": "periodo", "required": true }], "one_question_policy": [{ "missing_slot": "periodo", "question": "Que periodo debo analizar?" }], "confirm_required": false, "success_reply_template": "Reporte generado para {periodo}.", "error_reply_template": "No pude generar el reporte porque falta {missing_slot}." },
+    { "skill": "business_explain", "intent": "SKILL_BUSINESS_EXPLAIN", "label": "Explicar flujo", "related_processes": ["inventory", "billing", "reporting"], "related_documents": ["credit_note", "delivery_note"], "related_flows": ["monthly_reporting"], "utterances_explicit": ["explicame el flujo correcto"], "utterances_implicit": ["no me queda claro que sigue"], "hard_negatives": ["ejecuta la accion directamente"], "required_slots": [{ "name": "tema", "required": true }], "one_question_policy": [{ "missing_slot": "tema", "question": "Que flujo necesitas que te explique?" }], "confirm_required": false, "success_reply_template": "Flujo {tema} explicado.", "error_reply_template": "No pude explicar el flujo porque falta {missing_slot}." },
+    { "skill": "dataset_lookup", "intent": "SKILL_DATASET_LOOKUP", "label": "Consultar dataset", "related_processes": ["reporting"], "related_documents": ["accounting_entry"], "related_flows": ["monthly_reporting"], "utterances_explicit": ["consulta el dataset de ferreteria"], "utterances_implicit": ["que sabes de este negocio"], "hard_negatives": ["genera reporte del mes"], "required_slots": [{ "name": "tema_dataset", "required": true }], "one_question_policy": [{ "missing_slot": "tema_dataset", "question": "Que tema del dataset quieres consultar?" }], "confirm_required": false, "success_reply_template": "Dataset consultado para {tema_dataset}.", "error_reply_template": "No pude consultar el dataset porque falta {missing_slot}." },
+    { "skill": "tax_accountant_advisor", "intent": "SKILL_TAX_ACCOUNTANT_ADVISOR", "label": "Asesoria tributaria", "related_processes": ["purchases", "accounting", "reporting"], "related_documents": ["accounting_entry", "bank_statement"], "related_flows": ["monthly_reporting"], "utterances_explicit": ["asesorame con IVA y retenciones"], "utterances_implicit": ["tengo dudas del impuesto antes de contabilizar"], "hard_negatives": ["presenta la declaracion automaticamente"], "required_slots": [{ "name": "tema_tributario", "required": true }], "one_question_policy": [{ "missing_slot": "tema_tributario", "question": "Que tema tributario quieres revisar?" }], "confirm_required": false, "success_reply_template": "Criterio tributario listo para {tema_tributario}.", "error_reply_template": "No pude asesorarte porque falta {missing_slot}." }
+  ],
+  "architecture_guards": [
+    { "id": "arch_guard_llm_no_exec", "scope": "runtime.execute", "rule": "El LLM nunca ejecuta acciones ERP directamente; solo propone y las skills autorizadas ejecutan.", "severity": "critical", "action_if_violate": "block" },
+    { "id": "arch_guard_skill_only_execution", "scope": "runtime.skills", "rule": "Toda accion ERP debe pasar por una skill registrada y auditable.", "severity": "critical", "action_if_violate": "block" },
+    { "id": "arch_guard_rag_retrieval_only", "scope": "rag", "rule": "RAG se usa solo para retrieval de conocimiento y evidencia, nunca para ejecutar operaciones.", "severity": "high", "action_if_violate": "block" },
+    { "id": "arch_guard_tenant_isolation", "scope": "tenant", "rule": "Los datos deben respetar aislamiento por tenant, proyecto, modo y usuario.", "severity": "critical", "action_if_violate": "block" },
+    { "id": "arch_guard_agentops_active", "scope": "telemetry", "rule": "AgentOps y la telemetria deben permanecer activos para trazabilidad.", "severity": "high", "action_if_violate": "alert_and_block" }
+  ],
+  "data_quality_rules": [
+    { "id": "dq_no_duplicates", "rule": "No duplicar utterances ni FAQ entre skills o capas.", "reason": "Evita ruido y ambiguedad." },
+    { "id": "dq_no_channel_duplication", "rule": "No repetir la misma utterance por canal; el canal va como metadata.", "reason": "Previene sesgo por canal." },
+    { "id": "dq_no_generic_noise", "rule": "Excluir placeholders, marketing y preguntas irrelevantes.", "reason": "Protege calidad de retrieval y clasificacion." },
+    { "id": "dq_no_cross_sector_contamination", "rule": "No mezclar lenguaje de sectores ajenos a ferreteria minorista.", "reason": "Mantiene precision sectorial." }
+  ]
+}
