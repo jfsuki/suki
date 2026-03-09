@@ -138,7 +138,12 @@ final class SkillResolver
         $matches = 0;
         foreach ($keywords as $keyword) {
             $keyword = $this->normalizeText($keyword);
-            if ($keyword !== '' && str_contains($query, $keyword)) {
+            if ($keyword === '') {
+                continue;
+            }
+
+            $pattern = '/(?:^|\\b)' . preg_quote($keyword, '/') . '(?:$|\\b)/u';
+            if (preg_match($pattern, $query) === 1) {
                 $matches++;
             }
         }

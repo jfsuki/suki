@@ -350,7 +350,168 @@ if ((bool) ($toolSkillTelemetry['rag_attempted'] ?? true)) {
     $failures[] = 'Skill tool bloqueado no debe intentar RAG.';
 }
 
-// 7) Retrieval errors are explicit and degrade in a controlled way.
+// 7) ERP operational skills must be detected without LLM and use controlled fallback.
+$erpOperationalCases = [
+    ['query' => 'crear factura para el cliente ACME', 'skill' => 'create_invoice'],
+    ['query' => 'enviar factura al cliente por correo', 'skill' => 'send_invoice'],
+    ['query' => 'registrar gasto de transporte', 'skill' => 'register_expense'],
+    ['query' => 'contabilizar el asiento de la factura', 'skill' => 'accounting_post'],
+    ['query' => 'buscar producto SKU-001', 'skill' => 'product_lookup'],
+    ['query' => 'revisar inventario disponible del producto', 'skill' => 'inventory_check'],
+    ['query' => 'buscar cliente por documento', 'skill' => 'customer_lookup'],
+];
+foreach ($erpOperationalCases as $index => $erpCase) {
+    $erpRoute = $ragRouter->route([
+        'action' => 'send_to_llm',
+        'llm_request' => [
+            'messages' => [
+                ['role' => 'user', 'content' => (string) $erpCase['query']],
+            ],
+            'user_message' => (string) $erpCase['query'],
+        ],
+    ], [
+        'tenant_id' => 'tenant_demo',
+        'app_id' => 'app_demo',
+        'session_id' => 'intent_router_erp_skill_' . $index,
+        'mode' => 'app',
+        'role' => 'admin',
+    ]);
+    $erpTelemetry = $erpRoute->telemetry();
+    if (!$erpRoute->isLocalResponse()) {
+        $failures[] = 'Skill ERP operativo debe degradar a fallback local seguro cuando no existe tool real: ' . $erpCase['skill'];
+    }
+    if ((string) ($erpTelemetry['skill_selected'] ?? '') !== (string) $erpCase['skill']) {
+        $failures[] = 'Skill ERP detectado incorrecto para query: ' . $erpCase['query'];
+    }
+    if ((string) ($erpTelemetry['skill_result_status'] ?? '') !== 'safe_fallback') {
+        $failures[] = 'Skill ERP sin tool real debe dejar skill_result_status=safe_fallback: ' . $erpCase['skill'];
+    }
+    if ((string) ($erpTelemetry['skill_fallback_reason'] ?? '') !== 'tool_runtime_unavailable') {
+        $failures[] = 'Skill ERP sin tool real debe dejar tool_runtime_unavailable: ' . $erpCase['skill'];
+    }
+    if ((bool) ($erpTelemetry['rag_attempted'] ?? true)) {
+        $failures[] = 'Skill ERP operativo sin tool real no debe intentar RAG: ' . $erpCase['skill'];
+    }
+}
+
+// 8) Operational skills must win over informative skills on ambiguous requests.
+$priorityRoute = $ragRouter->route([
+    'action' => 'send_to_llm',
+    'llm_request' => [
+        'messages' => [
+            ['role' => 'user', 'content' => 'Explica el proceso para crear factura.'],
+        ],
+        'user_message' => 'Explica el proceso para crear factura.',
+    ],
+], [
+    'tenant_id' => 'tenant_demo',
+    'app_id' => 'app_demo',
+    'session_id' => 'intent_router_skill_priority',
+    'mode' => 'app',
+    'role' => 'admin',
+]);
+$priorityTelemetry = $priorityRoute->telemetry();
+if ((string) ($priorityTelemetry['skill_selected'] ?? '') !== 'create_invoice') {
+    $failures[] = 'Skill operativo debe tener prioridad sobre skill informativo en conflicto.';
+}
+
+// 9) ERP documentary/reporting skills must keep controlled execution semantics.
+$readDocumentRoute = $ragRouter->route([
+    'action' => 'send_to_llm',
+    'llm_request' => [
+        'messages' => [
+            ['role' => 'user', 'content' => 'Lee este documento adjunto.'],
+        ],
+        'user_message' => 'Lee este documento adjunto.',
+    ],
+], [
+    'tenant_id' => 'tenant_demo',
+    'app_id' => 'app_demo',
+    'session_id' => 'intent_router_read_document',
+    'mode' => 'app',
+    'role' => 'admin',
+    'attachments_count' => 0,
+]);
+$readDocumentTelemetry = $readDocumentRoute->telemetry();
+if ((string) ($readDocumentTelemetry['skill_selected'] ?? '') !== 'read_document') {
+    $failures[] = 'read_document debe detectarse como skill ERP.';
+}
+if ((string) ($readDocumentTelemetry['skill_fallback_reason'] ?? '') !== 'attachment_required') {
+    $failures[] = 'read_document sin adjunto debe dejar attachment_required.';
+}
+
+$extractInvoiceRoute = $ragRouter->route([
+    'action' => 'send_to_llm',
+    'llm_request' => [
+        'messages' => [
+            ['role' => 'user', 'content' => 'Extrae los datos de esta factura PDF.'],
+        ],
+        'user_message' => 'Extrae los datos de esta factura PDF.',
+    ],
+], [
+    'tenant_id' => 'tenant_demo',
+    'app_id' => 'app_demo',
+    'session_id' => 'intent_router_extract_invoice',
+    'mode' => 'app',
+    'role' => 'admin',
+    'attachments_count' => 0,
+]);
+$extractInvoiceTelemetry = $extractInvoiceRoute->telemetry();
+if ((string) ($extractInvoiceTelemetry['skill_selected'] ?? '') !== 'extract_invoice_data') {
+    $failures[] = 'extract_invoice_data debe detectarse como skill ERP.';
+}
+if ((string) ($extractInvoiceTelemetry['skill_fallback_reason'] ?? '') !== 'attachment_required') {
+    $failures[] = 'extract_invoice_data sin adjunto debe dejar attachment_required.';
+}
+
+$reportRoute = $ragRouter->route([
+    'action' => 'send_to_llm',
+    'llm_request' => [
+        'messages' => [
+            ['role' => 'user', 'content' => 'Genera un reporte de ventas.'],
+        ],
+        'user_message' => 'Genera un reporte de ventas.',
+    ],
+], [
+    'tenant_id' => 'tenant_demo',
+    'app_id' => 'app_demo',
+    'session_id' => 'intent_router_generate_report',
+    'mode' => 'app',
+    'role' => 'admin',
+]);
+$reportTelemetry = $reportRoute->telemetry();
+if ((string) ($reportTelemetry['skill_selected'] ?? '') !== 'generate_report') {
+    $failures[] = 'generate_report debe detectarse como skill ERP.';
+}
+if ((string) ($reportTelemetry['skill_result_status'] ?? '') !== 'needs_input') {
+    $failures[] = 'generate_report sin periodo debe pedir dato faltante.';
+}
+
+$businessExplainRoute = $ragRouter->route([
+    'action' => 'send_to_llm',
+    'llm_request' => [
+        'messages' => [
+            ['role' => 'user', 'content' => 'Explica el proceso de facturacion del negocio.'],
+        ],
+        'user_message' => 'Explica el proceso de facturacion del negocio.',
+    ],
+], [
+    'tenant_id' => 'tenant_demo',
+    'app_id' => 'app_demo',
+    'sector' => 'retail',
+    'session_id' => 'intent_router_business_explain',
+    'mode' => 'app',
+    'role' => 'admin',
+]);
+$businessExplainTelemetry = $businessExplainRoute->telemetry();
+if ((string) ($businessExplainTelemetry['skill_selected'] ?? '') !== 'business_explain') {
+    $failures[] = 'business_explain debe detectarse como skill ERP informativo.';
+}
+if (!$businessExplainRoute->isLlmRequest() || !(bool) ($businessExplainTelemetry['rag_attempted'] ?? false)) {
+    $failures[] = 'business_explain debe continuar a RAG/LLM como skill hybrid.';
+}
+
+// 10) Retrieval errors are explicit and degrade in a controlled way.
 $errorSemantic = buildSemanticService($ragChunks, true);
 $errorRouter = new IntentRouter(null, 'warn', null, $errorSemantic);
 $errorRoute = $errorRouter->route([
@@ -385,7 +546,7 @@ if ((int) (($errorTelemetry['metrics_delta']['rag_errors'] ?? 0)) !== 1) {
     $failures[] = 'RAG error debe reflejarse en metrics_delta.';
 }
 
-// 8) Research mode must allow a wider budget than operation.
+// 11) Research mode must allow a wider budget than operation.
 $operationRoute = $ragRouter->route([
     'action' => 'send_to_llm',
     'llm_request' => [
@@ -444,7 +605,7 @@ if (count($researchChunks) !== 4) {
     $failures[] = 'research debe permitir un semantic_context mas amplio.';
 }
 
-// 9) Budget overflow must stop execution in a controlled way.
+// 12) Budget overflow must stop execution in a controlled way.
 $budgetRouter = new IntentRouter(null, 'warn', null, $trivialSemantic);
 $budgetBlocked = $budgetRouter->route([
     'action' => 'execute_command',
@@ -471,7 +632,7 @@ if ((string) ($budgetTelemetry['loop_guard_reason'] ?? '') !== 'tool_calls_budge
     $failures[] = 'Exceso de tool_calls debe dejar razon explicita.';
 }
 
-// 10) Repeating the same route without progress must trigger anti-loop.
+// 13) Repeating the same route without progress must trigger anti-loop.
 $loopRouter = new IntentRouter(null, 'warn', null, $ragSemantic);
 $loopQuery = 'Como configuro Qdrant para tenant y app?';
 $loopHash = queryHash($loopQuery);

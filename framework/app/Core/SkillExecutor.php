@@ -39,7 +39,7 @@ final class SkillExecutor
 
         switch ($executionMode) {
             case 'tool':
-                [$action, $reply, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps] = $this->executeAttachmentSkill($skill, $context);
+                [$action, $reply, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps] = $this->executeToolSkill($skill, $context);
                 break;
 
             case 'rag':
@@ -75,6 +75,30 @@ final class SkillExecutor
                 'skill_result_status' => $skillResultStatus,
                 'skill_fallback_reason' => $skillFallbackReason,
             ],
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $skill
+     * @param array<string,mixed> $context
+     * @return array{0:string,1:string,2:string,3:string,4:bool,5:array<int,string>}
+     */
+    private function executeToolSkill(array $skill, array $context): array
+    {
+        $name = trim((string) ($skill['name'] ?? ''));
+        if (in_array($name, ['read_document', 'extract_invoice_data', 'image_analysis'], true)) {
+            return $this->executeAttachmentSkill($skill, $context);
+        }
+
+        $toolName = $this->resolvePrimaryToolName($skill);
+
+        return [
+            'respond_local',
+            'La capacidad ' . $name . ' fue clasificada, pero el runtime actual aun no expone el tool ' . $toolName . '. No ejecute ninguna operacion.',
+            'safe_fallback',
+            'tool_runtime_unavailable',
+            true,
+            ['cache', 'rules', 'skills'],
         ];
     }
 
@@ -120,7 +144,7 @@ final class SkillExecutor
     private function executeDeterministicSkill(array $skill, array $context): array
     {
         $name = trim((string) ($skill['name'] ?? ''));
-        if ($name === 'report_generation') {
+        if ($name === 'generate_report' || $name === 'report_generation') {
             $query = strtolower(trim((string) ($context['message_text'] ?? '')));
             if (preg_match('/\b(hoy|ayer|semana|mes|ano|año|desde|hasta|202[0-9])\b/u', $query) !== 1) {
                 return [
@@ -167,6 +191,22 @@ final class SkillExecutor
         }
 
         return $overrides;
+    }
+
+    /**
+     * @param array<string,mixed> $skill
+     */
+    private function resolvePrimaryToolName(array $skill): string
+    {
+        $allowedTools = is_array($skill['allowed_tools'] ?? null) ? (array) $skill['allowed_tools'] : [];
+        foreach ($allowedTools as $allowedTool) {
+            $allowedTool = trim((string) $allowedTool);
+            if ($allowedTool !== '') {
+                return $allowedTool;
+            }
+        }
+
+        return 'unregistered_tool';
     }
 
     private function latencyMs(float $startedAt): int
