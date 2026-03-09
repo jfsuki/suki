@@ -122,6 +122,77 @@ if (!is_array($dataset)) {
     ], 2);
 }
 
+try {
+    $datasetSourceType = trim((string) ($dataset['source_type'] ?? ''));
+    if ($datasetSourceType !== '') {
+        $sourceType = $datasetSourceType;
+    }
+
+    $datasetMemoryType = trim((string) ($dataset['memory_type'] ?? ''));
+    if ($datasetMemoryType !== '') {
+        $memoryType = QdrantVectorStore::assertMemoryType($datasetMemoryType);
+    }
+} catch (Throwable $e) {
+    writeAndExit([
+        'ok' => false,
+        'action' => 'blocked',
+        'input' => realpath($inputPath) ?: $inputPath,
+        'error' => 'Metadata discovery/training invalida: ' . $e->getMessage(),
+    ], 2);
+}
+
+$datasetSourceMetadata = is_array($dataset['source_metadata'] ?? null) ? $dataset['source_metadata'] : [];
+$datasetSectorKey = trim((string) ($dataset['sector_key'] ?? $datasetSourceMetadata['sector_key'] ?? $dataset['sector'] ?? ''));
+$datasetSectorLabel = trim((string) ($dataset['sector_label'] ?? $datasetSourceMetadata['sector_label'] ?? $datasetSectorKey));
+$datasetCountryOrRegulation = trim((string) ($dataset['country_or_regulation'] ?? $datasetSourceMetadata['country_or_regulation'] ?? ''));
+$datasetChannels = stringList($datasetSourceMetadata['channels'] ?? ($dataset['context_pack']['channels'] ?? []));
+$datasetSkillsReferenced = stringList($datasetSourceMetadata['skills_referenced'] ?? []);
+$commonChunkMetadata = array_filter([
+    'batch_id' => (string) ($dataset['batch_id'] ?? ''),
+    'source_type' => $sourceType,
+    'sector_key' => $datasetSectorKey,
+    'sector_label' => $datasetSectorLabel,
+    'country_or_regulation' => $datasetCountryOrRegulation,
+    'channels' => $datasetChannels !== [] ? $datasetChannels : null,
+    'skills_referenced' => $datasetSkillsReferenced !== [] ? $datasetSkillsReferenced : null,
+], static fn($value): bool => $value !== null && $value !== '' && $value !== []);
+
+if ($sourceType === 'business_discovery') {
+    $normalizedSector = safeTag((string) ($dataset['sector'] ?? ''));
+    $normalizedSectorKey = safeTag($datasetSectorKey);
+    if ($memoryType !== 'sector_knowledge') {
+        writeAndExit([
+            'ok' => false,
+            'action' => 'blocked',
+            'input' => realpath($inputPath) ?: $inputPath,
+            'error' => 'Business discovery debe vectorizarse solo en sector_knowledge.',
+            'blocking_reasons' => ['business_discovery_memory_type_invalid'],
+            'dataset' => [
+                'source_type' => $sourceType,
+                'memory_type' => $memoryType,
+            ],
+        ], 1);
+    }
+    if ($datasetSectorKey === '' || $datasetSectorLabel === '' || $datasetCountryOrRegulation === '') {
+        writeAndExit([
+            'ok' => false,
+            'action' => 'blocked',
+            'input' => realpath($inputPath) ?: $inputPath,
+            'error' => 'Business discovery requiere sector_key, sector_label y country_or_regulation.',
+            'blocking_reasons' => ['business_discovery_metadata_incomplete'],
+        ], 1);
+    }
+    if ($normalizedSector !== '' && $normalizedSectorKey !== '' && $normalizedSector !== $normalizedSectorKey) {
+        writeAndExit([
+            'ok' => false,
+            'action' => 'blocked',
+            'input' => realpath($inputPath) ?: $inputPath,
+            'error' => 'Business discovery con sector inconsistente entre sector y sector_key.',
+            'blocking_reasons' => ['business_discovery_sector_mismatch'],
+        ], 1);
+    }
+}
+
 $batchId = safeId((string) ($dataset['batch_id'] ?? 'batch_unknown'));
 $datasetVersion = trim((string) ($dataset['dataset_version'] ?? '1.0.0'));
 if ($datasetVersion === '') {
@@ -213,10 +284,16 @@ foreach ($knowledgeStable as $index => $record) {
     }
 
     $tags = mergeTags(
-        ['layer:knowledge_stable', 'batch:' . $batchId, 'sector:' . safeTag((string) ($record['sector'] ?? 'unknown'))],
+        [
+            'layer:knowledge_stable',
+            'batch:' . $batchId,
+            'sector:' . safeTag((string) ($record['sector'] ?? $datasetSectorKey ?? 'unknown')),
+            'source_type:' . safeTag($sourceType),
+            'sector_key:' . safeTag($datasetSectorKey !== '' ? $datasetSectorKey : (string) ($record['sector'] ?? 'unknown')),
+        ],
         $record['tags'] ?? []
     );
-    $sector = normalizeNullableField($record['sector'] ?? null);
+    $sector = normalizeNullableField($record['sector'] ?? $datasetSectorKey);
     $version = trim((string) ($record['version'] ?? $datasetVersion));
     if ($version === '') {
         $version = $datasetVersion;
@@ -245,10 +322,9 @@ foreach ($knowledgeStable as $index => $record) {
                 'quality_score' => $quality,
                 'created_at' => $publishedAt,
                 'updated_at' => $publishedAt,
-                'metadata' => [
-                    'batch_id' => $batchId,
+                'metadata' => array_merge($commonChunkMetadata, [
                     'layer' => 'knowledge_stable',
-                ],
+                ]),
                 'content' => $part,
             ];
             if ($appendChunk($chunk)) {
@@ -286,10 +362,15 @@ foreach ($supportFaq as $index => $record) {
     }
 
     $tags = mergeTags(
-        ['layer:support_faq', 'batch:' . $batchId],
+        [
+            'layer:support_faq',
+            'batch:' . $batchId,
+            'source_type:' . safeTag($sourceType),
+            'sector_key:' . safeTag($datasetSectorKey !== '' ? $datasetSectorKey : 'unknown'),
+        ],
         $record['tags'] ?? []
     );
-    $sector = normalizeNullableField($record['sector'] ?? null);
+    $sector = normalizeNullableField($record['sector'] ?? $datasetSectorKey);
     $version = trim((string) ($record['version'] ?? $datasetVersion));
     if ($version === '') {
         $version = $datasetVersion;
@@ -315,10 +396,9 @@ foreach ($supportFaq as $index => $record) {
             'quality_score' => $quality,
             'created_at' => $publishedAt,
             'updated_at' => $publishedAt,
-            'metadata' => [
-                'batch_id' => $batchId,
+            'metadata' => array_merge($commonChunkMetadata, [
                 'layer' => 'support_faq',
-            ],
+            ]),
             'content' => $part,
         ];
         if ($appendChunk($chunk)) {
@@ -368,7 +448,7 @@ if ($includeIntentsExpansion) {
                         'tenant_id' => $tenantId,
                         'app_id' => $appId,
                         'agent_role' => null,
-                        'sector' => normalizeNullableField($intent['sector'] ?? null),
+                        'sector' => normalizeNullableField($intent['sector'] ?? $datasetSectorKey),
                         'source_type' => $sourceType,
                         'source_id' => $sourceId,
                         'source' => $sourceId,
@@ -381,6 +461,8 @@ if ($includeIntentsExpansion) {
                                 'intent:' . $intentName,
                                 'action:' . $actionName,
                                 'group:' . $group,
+                                'source_type:' . safeTag($sourceType),
+                                'sector_key:' . safeTag($datasetSectorKey !== '' ? $datasetSectorKey : 'unknown'),
                             ],
                             []
                         ),
@@ -388,13 +470,12 @@ if ($includeIntentsExpansion) {
                         'quality_score' => $globalQuality,
                         'created_at' => $publishedAt,
                         'updated_at' => $publishedAt,
-                        'metadata' => [
-                            'batch_id' => $batchId,
+                        'metadata' => array_merge($commonChunkMetadata, [
                             'layer' => 'intents_expansion',
                             'intent' => $intentName,
                             'action' => $actionName,
                             'group' => $group,
-                        ],
+                        ]),
                         'content' => $part,
                     ];
                     if ($appendChunk($chunk)) {
@@ -446,6 +527,11 @@ $baseReport = [
     'dataset' => [
         'batch_id' => (string) ($dataset['batch_id'] ?? ''),
         'dataset_version' => $datasetVersion,
+        'source_type' => $sourceType,
+        'memory_type' => $memoryType,
+        'sector_key' => $datasetSectorKey,
+        'sector_label' => $datasetSectorLabel,
+        'country_or_regulation' => $datasetCountryOrRegulation,
         'publication_status' => (string) ($dataset['publication']['status'] ?? ''),
         'published_at' => $publishedAt,
     ],

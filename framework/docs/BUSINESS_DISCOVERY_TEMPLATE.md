@@ -9,6 +9,12 @@ Flujo canonico:
 3. `training_dataset_publication_gate.php`
 4. `training_dataset_vectorize.php`
 
+Clasificacion obligatoria del dataset compilado:
+- `source_type=business_discovery`
+- `memory_type=sector_knowledge`
+- `sector_key`, `sector_label`, `country_or_regulation` preservados
+- canales solo como metadata
+
 ## Archivos base
 - Template editable: `project/contracts/knowledge/business_discovery_template.json`
 - Schema discovery: `framework/contracts/schemas/business_discovery_template.schema.json`
@@ -34,6 +40,7 @@ Flujo canonico:
 - El aislamiento tenant/proyecto/modo/usuario se preserva.
 - AgentOps/telemetria permanecen activos.
 - No duplicar utterances ni repetirlas por canal.
+- `BusinessDiscovery` nunca puede rutearse a `agent_training` ni `user_memory`.
 
 ## Compilacion
 ```bash

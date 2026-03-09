@@ -69,6 +69,40 @@ if (empty($failures)) {
 
         if (is_array($compiled)) {
             $dataset = is_array($compiled['dataset'] ?? null) ? $compiled['dataset'] : [];
+            if (($dataset['source_type'] ?? '') !== 'business_discovery') {
+                $failures[] = 'El dataset compilado debe marcar source_type=business_discovery.';
+            }
+            if (($dataset['memory_type'] ?? '') !== 'sector_knowledge') {
+                $failures[] = 'El dataset compilado debe marcar memory_type=sector_knowledge.';
+            }
+            if (($dataset['sector_key'] ?? '') !== 'FERRETERIA_MINORISTA') {
+                $failures[] = 'El dataset compilado debe preservar sector_key.';
+            }
+            if (($dataset['sector_label'] ?? '') !== 'Ferreteria minorista') {
+                $failures[] = 'El dataset compilado debe preservar sector_label.';
+            }
+            if (($dataset['country_or_regulation'] ?? '') === '') {
+                $failures[] = 'El dataset compilado debe preservar country_or_regulation.';
+            }
+            if (($dataset['publication']['status'] ?? '') !== 'draft') {
+                $failures[] = 'El compilador no debe publicar el dataset; debe quedar draft.';
+            }
+
+            $sourceMetadata = is_array($dataset['source_metadata'] ?? null) ? $dataset['source_metadata'] : [];
+            if (($sourceMetadata['sector_key'] ?? '') !== 'FERRETERIA_MINORISTA') {
+                $failures[] = 'source_metadata debe preservar sector_key.';
+            }
+            if (($sourceMetadata['sector_label'] ?? '') !== 'Ferreteria minorista') {
+                $failures[] = 'source_metadata debe preservar sector_label.';
+            }
+            $skillsReferenced = is_array($sourceMetadata['skills_referenced'] ?? null)
+                ? array_values((array) $sourceMetadata['skills_referenced'])
+                : [];
+            $missingReferencedSkills = array_values(array_diff($requiredSkills, $skillsReferenced));
+            if ($missingReferencedSkills !== []) {
+                $failures[] = 'source_metadata.skills_referenced debe incluir todas las skills requeridas.';
+            }
+
             $report = TrainingDatasetValidator::validate($dataset, [
                 'min_explicit' => 1,
                 'min_implicit' => 1,
@@ -164,6 +198,69 @@ if (empty($failures)) {
                     }
                     if ((int) ($json['trace']['chunks_prepared'] ?? 0) < 1) {
                         $failures[] = 'La vectorizacion del dataset compilado debe preparar chunks.';
+                    }
+                    if (($json['memory_type'] ?? '') !== 'sector_knowledge') {
+                        $failures[] = 'La vectorizacion debe resolverse a sector_knowledge.';
+                    }
+                    if (($json['dataset']['source_type'] ?? '') !== 'business_discovery') {
+                        $failures[] = 'La vectorizacion debe preservar source_type=business_discovery.';
+                    }
+                    if (($json['dataset']['sector_key'] ?? '') !== 'FERRETERIA_MINORISTA') {
+                        $failures[] = 'La vectorizacion debe preservar sector_key.';
+                    }
+                    if (($json['dataset']['sector_label'] ?? '') !== 'Ferreteria minorista') {
+                        $failures[] = 'La vectorizacion debe preservar sector_label.';
+                    }
+                    $contractSample = is_array($json['contract_sample'] ?? null) ? (array) $json['contract_sample'] : [];
+                    $sampleMetadata = is_array($contractSample['metadata'] ?? null) ? (array) $contractSample['metadata'] : [];
+                    if (($contractSample['source_type'] ?? '') !== 'business_discovery') {
+                        $failures[] = 'contract_sample debe preservar source_type.';
+                    }
+                    if (($contractSample['memory_type'] ?? '') !== 'sector_knowledge') {
+                        $failures[] = 'contract_sample debe quedar en sector_knowledge.';
+                    }
+                    if (($sampleMetadata['sector_key'] ?? '') !== 'FERRETERIA_MINORISTA') {
+                        $failures[] = 'metadata del chunk debe preservar sector_key.';
+                    }
+                    if (($sampleMetadata['sector_label'] ?? '') !== 'Ferreteria minorista') {
+                        $failures[] = 'metadata del chunk debe preservar sector_label.';
+                    }
+                    if (($sampleMetadata['country_or_regulation'] ?? '') === '') {
+                        $failures[] = 'metadata del chunk debe preservar country_or_regulation.';
+                    }
+                }
+
+                $agentTrainingDataset = $tmpDir . '/compiled_dataset_agent_training.json';
+                $agentPayload = readJson($compiledPath);
+                if (is_array($agentPayload)) {
+                    $agentPayload['memory_type'] = 'agent_training';
+                    writeJson($agentTrainingDataset, $agentPayload);
+                    $agentRun = runScript($php, $vectorizeScript, [
+                        '--in=' . $agentTrainingDataset,
+                        '--tenant-id=tenant_test',
+                        '--app-id=app_test',
+                        '--max-chars=220',
+                        '--dry-run',
+                    ]);
+                    if ($agentRun['code'] === 0) {
+                        $failures[] = 'Business discovery no debe poder vectorizarse a agent_training.';
+                    }
+                }
+
+                $userMemoryDataset = $tmpDir . '/compiled_dataset_user_memory.json';
+                $userPayload = readJson($compiledPath);
+                if (is_array($userPayload)) {
+                    $userPayload['memory_type'] = 'user_memory';
+                    writeJson($userMemoryDataset, $userPayload);
+                    $userRun = runScript($php, $vectorizeScript, [
+                        '--in=' . $userMemoryDataset,
+                        '--tenant-id=tenant_test',
+                        '--app-id=app_test',
+                        '--max-chars=220',
+                        '--dry-run',
+                    ]);
+                    if ($userRun['code'] === 0) {
+                        $failures[] = 'Business discovery no debe poder vectorizarse a user_memory.';
                     }
                 }
             }
@@ -269,4 +366,16 @@ function rrmdir(string $dir): void
         @unlink($path);
     }
     @rmdir($dir);
+}
+
+/**
+ * @param array<string,mixed> $payload
+ */
+function writeJson(string $path, array $payload): void
+{
+    $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    if (!is_string($encoded)) {
+        throw new RuntimeException('No se pudo serializar JSON temporal.');
+    }
+    file_put_contents($path, $encoded . PHP_EOL);
 }

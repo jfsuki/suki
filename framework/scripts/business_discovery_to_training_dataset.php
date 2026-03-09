@@ -125,7 +125,12 @@ writeReportAndExit([
     'output' => realpath($outputPath) ?: $outputPath,
     'dataset' => [
         'batch_id' => (string) ($dataset['batch_id'] ?? ''),
+        'source_type' => (string) ($dataset['source_type'] ?? ''),
+        'memory_type' => (string) ($dataset['memory_type'] ?? ''),
         'sector' => (string) ($dataset['sector'] ?? ''),
+        'sector_key' => (string) ($dataset['sector_key'] ?? ''),
+        'sector_label' => (string) ($dataset['sector_label'] ?? ''),
+        'country_or_regulation' => (string) ($dataset['country_or_regulation'] ?? ''),
         'publication_status' => (string) ($dataset['publication']['status'] ?? ''),
     ],
     'stats' => $stats,
