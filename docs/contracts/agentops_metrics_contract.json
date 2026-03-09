@@ -1,7 +1,7 @@
 {
   "contract_id": "agentops_metrics_contract",
-  "version": "1.0.0",
-  "effective_date": "2026-03-02",
+  "version": "1.1.0",
+  "effective_date": "2026-03-09",
   "addenda_of": null,
   "status": "canonical_draft",
   "contract_location": "docs/contracts",
@@ -27,6 +27,34 @@
     "gate_decision",
     "versions",
     "latency_ms"
+  ],
+  "runtime_trace_minimum_fields": [
+    "route_reason",
+    "semantic_enabled",
+    "rag_attempted",
+    "rag_used",
+    "rag_result_count",
+    "evidence_gate_status",
+    "fallback_reason",
+    "llm_used",
+    "tool_calls_count",
+    "retry_count",
+    "loop_guard_triggered",
+    "request_mode",
+    "metrics_delta"
+  ],
+  "metrics_delta_fields": [
+    "requests_total",
+    "routed_by_rules",
+    "routed_by_rag",
+    "routed_by_llm",
+    "evidence_gate_failures",
+    "rag_errors",
+    "loop_guard_hits",
+    "semantic_disabled_requests",
+    "llm_fallback_requests",
+    "tenant_scope_violations_detected",
+    "rag_result_count_total"
   ],
   "versions_contract": {
     "required": true,

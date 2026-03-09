@@ -75,12 +75,25 @@ if (!is_array($matchedEvent)) {
 if (is_array($matchedEvent)) {
     $requiredFields = [
         'route_path',
+        'route_reason',
         'gate_decision',
         'action_contract',
         'rag_hit',
         'source_ids',
         'evidence_ids',
         'llm_called',
+        'llm_used',
+        'semantic_enabled',
+        'rag_attempted',
+        'rag_used',
+        'rag_result_count',
+        'evidence_gate_status',
+        'fallback_reason',
+        'tool_calls_count',
+        'retry_count',
+        'loop_guard_triggered',
+        'request_mode',
+        'metrics_delta',
         'latency_ms',
         'error_flag',
         'error_type',
@@ -94,6 +107,9 @@ if (is_array($matchedEvent)) {
 
     if (!is_string($matchedEvent['route_path'] ?? null) || trim((string) $matchedEvent['route_path']) === '') {
         $failures[] = 'route_path debe ser string no vacio.';
+    }
+    if (!is_string($matchedEvent['route_reason'] ?? null) || trim((string) ($matchedEvent['route_reason'] ?? '')) === '') {
+        $failures[] = 'route_reason debe ser string no vacio.';
     }
     if (!is_string($matchedEvent['gate_decision'] ?? null) || trim((string) $matchedEvent['gate_decision']) === '') {
         $failures[] = 'gate_decision debe ser string no vacio.';
@@ -113,6 +129,42 @@ if (is_array($matchedEvent)) {
     if (!is_bool($matchedEvent['llm_called'] ?? null)) {
         $failures[] = 'llm_called debe ser booleano.';
     }
+    if (!is_bool($matchedEvent['llm_used'] ?? null)) {
+        $failures[] = 'llm_used debe ser booleano.';
+    }
+    if (!is_bool($matchedEvent['semantic_enabled'] ?? null)) {
+        $failures[] = 'semantic_enabled debe ser booleano.';
+    }
+    if (!is_bool($matchedEvent['rag_attempted'] ?? null)) {
+        $failures[] = 'rag_attempted debe ser booleano.';
+    }
+    if (!is_bool($matchedEvent['rag_used'] ?? null)) {
+        $failures[] = 'rag_used debe ser booleano.';
+    }
+    if (!is_numeric($matchedEvent['rag_result_count'] ?? null) || (int) $matchedEvent['rag_result_count'] < 0) {
+        $failures[] = 'rag_result_count debe ser numerico >= 0.';
+    }
+    if (!is_string($matchedEvent['evidence_gate_status'] ?? null) || trim((string) ($matchedEvent['evidence_gate_status'] ?? '')) === '') {
+        $failures[] = 'evidence_gate_status debe ser string no vacio.';
+    }
+    if (!is_string($matchedEvent['fallback_reason'] ?? null) || trim((string) ($matchedEvent['fallback_reason'] ?? '')) === '') {
+        $failures[] = 'fallback_reason debe ser string no vacio.';
+    }
+    if (!is_numeric($matchedEvent['tool_calls_count'] ?? null) || (int) $matchedEvent['tool_calls_count'] < 0) {
+        $failures[] = 'tool_calls_count debe ser numerico >= 0.';
+    }
+    if (!is_numeric($matchedEvent['retry_count'] ?? null) || (int) $matchedEvent['retry_count'] < 0) {
+        $failures[] = 'retry_count debe ser numerico >= 0.';
+    }
+    if (!is_bool($matchedEvent['loop_guard_triggered'] ?? null)) {
+        $failures[] = 'loop_guard_triggered debe ser booleano.';
+    }
+    if (!is_string($matchedEvent['request_mode'] ?? null) || !in_array((string) ($matchedEvent['request_mode'] ?? ''), ['operation', 'research'], true)) {
+        $failures[] = 'request_mode debe ser operation o research.';
+    }
+    if (!is_array($matchedEvent['metrics_delta'] ?? null)) {
+        $failures[] = 'metrics_delta debe ser arreglo.';
+    }
     if (!is_numeric($matchedEvent['latency_ms'] ?? null) || (int) $matchedEvent['latency_ms'] < 0) {
         $failures[] = 'latency_ms debe ser numerico >= 0.';
     }
@@ -129,12 +181,25 @@ if (is_array($matchedEvent)) {
     } else {
         foreach ([
             'route_path',
+            'route_reason',
             'gate_decision',
             'action_contract',
             'rag_hit',
             'source_ids',
             'evidence_ids',
             'llm_called',
+            'llm_used',
+            'semantic_enabled',
+            'rag_attempted',
+            'rag_used',
+            'rag_result_count',
+            'evidence_gate_status',
+            'fallback_reason',
+            'tool_calls_count',
+            'retry_count',
+            'loop_guard_triggered',
+            'request_mode',
+            'metrics_delta',
             'latency_ms',
             'error_flag',
             'error_type',

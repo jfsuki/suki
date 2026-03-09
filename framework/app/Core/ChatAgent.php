@@ -219,6 +219,13 @@ final class ChatAgent
             $userId
         );
         if (is_array($securityBlock)) {
+            $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+                'llm_called' => false,
+                'error_flag' => true,
+                'error_type' => 'security_block',
+                'tool_calls_count' => 0,
+                'retry_count' => 0,
+            ]);
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
                 'message' => $text,
                 'resolved_locally' => true,
@@ -265,6 +272,13 @@ final class ChatAgent
 
         if ($route->isLocalResponse()) {
             $reply = $this->reply($route->reply(), $channel, $sessionId, $userId);
+            $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+                'llm_called' => false,
+                'error_flag' => false,
+                'error_type' => 'none',
+                'tool_calls_count' => 0,
+                'retry_count' => 0,
+            ]);
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
                 'message' => $text,
                 'resolved_locally' => true,
@@ -386,6 +400,13 @@ final class ChatAgent
             } catch (\Throwable $e) {
                 // observability must not block chat response
             }
+            $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+                'llm_called' => false,
+                'error_flag' => $commandErrorFlag,
+                'error_type' => $commandErrorType,
+                'tool_calls_count' => 1,
+                'retry_count' => 0,
+            ]);
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
                 'message' => $text,
                 'resolved_locally' => true,
@@ -439,6 +460,13 @@ final class ChatAgent
                     'user_id' => $userId,
                 ]);
             } catch (\Throwable $e) {
+                $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+                    'llm_called' => true,
+                    'error_flag' => true,
+                    'error_type' => 'llm_unavailable',
+                    'tool_calls_count' => 0,
+                    'retry_count' => 0,
+                ]);
                 $this->telemetry()->record($tenantId, array_merge($telemetry, [
                     'message' => $text,
                     'provider_used' => 'llm',
@@ -486,6 +514,15 @@ final class ChatAgent
             }
             $provider = $llmResult['provider'] ?? 'llm';
             $usage = $this->normalizeUsage((array) ($llmResult['usage'] ?? []));
+            $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+                'llm_called' => true,
+                'error_flag' => false,
+                'error_type' => 'none',
+                'tool_calls_count' => 0,
+                'retry_count' => 0,
+                'usage' => $usage,
+                'cost_estimate' => $llmResult['cost_estimate'] ?? null,
+            ]);
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
                 'message' => $text,
                 'provider_used' => $provider,
@@ -549,6 +586,13 @@ final class ChatAgent
             return $this->reply($textReply !== '' ? $textReply : 'Listo.', $channel, $sessionId, $userId);
         }
 
+        $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+            'llm_called' => false,
+            'error_flag' => true,
+            'error_type' => 'route_error',
+            'tool_calls_count' => 0,
+            'retry_count' => 0,
+        ]);
         $this->telemetry()->record($tenantId, array_merge($telemetry, [
             'message' => $text,
             'resolved_locally' => true,
@@ -1521,22 +1565,6 @@ final class ChatAgent
         string $eventName,
         array $runtimeContext = []
     ): array {
-        $routePath = (string) ($routeTelemetry['route_path'] ?? '');
-        $gateDecision = (string) ($routeTelemetry['gate_decision'] ?? 'unknown');
-        $actionContract = trim((string) ($routeTelemetry['action_contract'] ?? ''));
-        $ragHit = (bool) ($routeTelemetry['rag_hit'] ?? false);
-        $sourceIds = $this->normalizeStringList($routeTelemetry['source_ids'] ?? []);
-        $evidenceIds = $this->normalizeStringList($routeTelemetry['evidence_ids'] ?? []);
-        $llmCalled = array_key_exists('llm_called', $runtimeContext)
-            ? (bool) $runtimeContext['llm_called']
-            : (bool) ($routeTelemetry['llm_called'] ?? false);
-        $errorType = trim((string) ($runtimeContext['error_type'] ?? $routeTelemetry['error_type'] ?? ''));
-        $errorFlag = array_key_exists('error_flag', $runtimeContext)
-            ? (bool) $runtimeContext['error_flag']
-            : ($errorType !== '');
-        if ($errorType === '') {
-            $errorType = $errorFlag ? 'runtime_error' : 'none';
-        }
         $contractVersions = is_array($routeTelemetry['contract_versions'] ?? null)
             ? (array) $routeTelemetry['contract_versions']
             : [];
@@ -1554,18 +1582,7 @@ final class ChatAgent
             ];
         }
 
-        $runtimeObservability = [
-            'route_path' => $routePath !== '' ? $routePath : 'unknown',
-            'gate_decision' => $gateDecision !== '' ? $gateDecision : 'unknown',
-            'action_contract' => $actionContract !== '' ? $actionContract : 'none',
-            'rag_hit' => $ragHit,
-            'source_ids' => $sourceIds,
-            'evidence_ids' => $evidenceIds,
-            'llm_called' => $llmCalled,
-            'latency_ms' => $latencyMs,
-            'error_flag' => $errorFlag,
-            'error_type' => $errorType,
-        ];
+        $runtimeObservability = $this->buildAgentOpsRuntimeObservability($routeTelemetry, $latencyMs, $runtimeContext);
 
         return [
             'event_name' => $eventName,
@@ -1581,6 +1598,24 @@ final class ChatAgent
             'source_ids' => $runtimeObservability['source_ids'],
             'evidence_ids' => $runtimeObservability['evidence_ids'],
             'llm_called' => $runtimeObservability['llm_called'],
+            'llm_used' => $runtimeObservability['llm_used'],
+            'route_reason' => $runtimeObservability['route_reason'],
+            'semantic_enabled' => $runtimeObservability['semantic_enabled'],
+            'rag_attempted' => $runtimeObservability['rag_attempted'],
+            'rag_used' => $runtimeObservability['rag_used'],
+            'rag_result_count' => $runtimeObservability['rag_result_count'],
+            'evidence_gate_status' => $runtimeObservability['evidence_gate_status'],
+            'fallback_reason' => $runtimeObservability['fallback_reason'],
+            'tool_calls_count' => $runtimeObservability['tool_calls_count'],
+            'retry_count' => $runtimeObservability['retry_count'],
+            'loop_guard_triggered' => $runtimeObservability['loop_guard_triggered'],
+            'request_mode' => $runtimeObservability['request_mode'],
+            'app_id' => $runtimeObservability['app_id'],
+            'user_id' => $runtimeObservability['user_id'],
+            'memory_type' => $runtimeObservability['memory_type'],
+            'token_usage' => $runtimeObservability['token_usage'],
+            'cost_estimate' => $runtimeObservability['cost_estimate'],
+            'metrics_delta' => $runtimeObservability['metrics_delta'],
             'error_flag' => $runtimeObservability['error_flag'],
             'error_type' => $runtimeObservability['error_type'],
             'contract_versions' => $contractVersions,
@@ -1591,6 +1626,102 @@ final class ChatAgent
             'enforcement_app_env' => $enforcementAppEnv !== '' ? $enforcementAppEnv : 'unknown',
             'agentops_runtime' => $runtimeObservability,
         ];
+    }
+
+    private function buildAgentOpsRuntimeObservability(array $routeTelemetry, int $latencyMs, array $runtimeContext = []): array
+    {
+        $routePath = (string) ($routeTelemetry['route_path'] ?? '');
+        $gateDecision = (string) ($routeTelemetry['gate_decision'] ?? 'unknown');
+        $actionContract = trim((string) ($routeTelemetry['action_contract'] ?? ''));
+        $ragHit = (bool) ($routeTelemetry['rag_hit'] ?? false);
+        $sourceIds = $this->normalizeStringList($routeTelemetry['source_ids'] ?? []);
+        $evidenceIds = $this->normalizeStringList($routeTelemetry['evidence_ids'] ?? []);
+        $llmCalled = array_key_exists('llm_called', $runtimeContext)
+            ? (bool) $runtimeContext['llm_called']
+            : (bool) ($routeTelemetry['llm_called'] ?? false);
+        $errorType = trim((string) ($runtimeContext['error_type'] ?? $routeTelemetry['error_type'] ?? ''));
+        $errorFlag = array_key_exists('error_flag', $runtimeContext)
+            ? (bool) $runtimeContext['error_flag']
+            : ($errorType !== '');
+        if ($errorType === '') {
+            $errorType = $errorFlag ? 'runtime_error' : 'none';
+        }
+
+        $tokenUsage = is_array($runtimeContext['usage'] ?? null)
+            ? (array) $runtimeContext['usage']
+            : (is_array($routeTelemetry['token_usage'] ?? null) ? (array) $routeTelemetry['token_usage'] : null);
+        $costEstimate = $runtimeContext['cost_estimate'] ?? ($routeTelemetry['cost_estimate'] ?? null);
+        if (!is_numeric($costEstimate)) {
+            $costEstimate = null;
+        }
+
+        $stageLatency = [
+            'router_ms' => max(0, (int) ($routeTelemetry['router_latency_ms'] ?? 0)),
+            'rag_ms' => max(0, (int) (($routeTelemetry['retrieval']['retrieval_latency_ms'] ?? $routeTelemetry['retrieval_latency_ms'] ?? 0))),
+        ];
+
+        return [
+            'route_path' => $routePath !== '' ? $routePath : 'unknown',
+            'gate_decision' => $gateDecision !== '' ? $gateDecision : 'unknown',
+            'action_contract' => $actionContract !== '' ? $actionContract : 'none',
+            'route_reason' => trim((string) ($routeTelemetry['route_reason'] ?? '')) ?: 'unknown',
+            'rag_hit' => $ragHit,
+            'source_ids' => $sourceIds,
+            'evidence_ids' => $evidenceIds,
+            'semantic_enabled' => (bool) ($routeTelemetry['semantic_enabled'] ?? false),
+            'semantic_memory_status' => trim((string) ($routeTelemetry['semantic_memory_status'] ?? '')) ?: 'unknown',
+            'rag_attempted' => (bool) ($routeTelemetry['rag_attempted'] ?? false),
+            'rag_used' => (bool) ($routeTelemetry['rag_used'] ?? false),
+            'rag_result_count' => max(0, (int) ($routeTelemetry['rag_result_count'] ?? 0)),
+            'evidence_gate_status' => trim((string) ($routeTelemetry['evidence_gate_status'] ?? '')) ?: 'unknown',
+            'fallback_reason' => trim((string) ($routeTelemetry['fallback_reason'] ?? '')) ?: 'none',
+            'llm_called' => $llmCalled,
+            'llm_used' => $llmCalled,
+            'tool_calls_count' => max(0, (int) ($runtimeContext['tool_calls_count'] ?? $routeTelemetry['tool_calls_count'] ?? 0)),
+            'retry_count' => max(0, (int) ($runtimeContext['retry_count'] ?? $routeTelemetry['retry_count'] ?? 0)),
+            'loop_guard_triggered' => (bool) ($routeTelemetry['loop_guard_triggered'] ?? false),
+            'loop_guard_reason' => trim((string) ($routeTelemetry['loop_guard_reason'] ?? '')) ?: 'none',
+            'loop_guard_stage' => trim((string) ($routeTelemetry['loop_guard_stage'] ?? '')) ?: 'none',
+            'request_mode' => trim((string) ($routeTelemetry['request_mode'] ?? 'operation')) ?: 'operation',
+            'memory_type' => trim((string) ($routeTelemetry['memory_type'] ?? '')) ?: 'none',
+            'tenant_id' => trim((string) ($routeTelemetry['tenant_id'] ?? '')) ?: 'default',
+            'app_id' => ($routeTelemetry['app_id'] ?? null),
+            'user_id' => trim((string) ($routeTelemetry['user_id'] ?? '')) ?: 'anon',
+            'query_hash' => trim((string) ($routeTelemetry['query_hash'] ?? '')),
+            'runtime_budget' => is_array($routeTelemetry['runtime_budget'] ?? null) ? (array) $routeTelemetry['runtime_budget'] : [],
+            'stage_latency_ms' => $stageLatency,
+            'latency_ms' => $latencyMs,
+            'token_usage' => $tokenUsage,
+            'cost_estimate' => $costEstimate,
+            'metrics_delta' => is_array($routeTelemetry['metrics_delta'] ?? null) ? (array) $routeTelemetry['metrics_delta'] : [],
+            'tenant_scope_violation_detected' => (bool) ($routeTelemetry['tenant_scope_violation_detected'] ?? false),
+            'route_path_coherent' => (bool) ($routeTelemetry['route_path_coherent'] ?? true),
+            'rag_error' => trim((string) ($routeTelemetry['rag_error'] ?? '')),
+            'error_flag' => $errorFlag,
+            'error_type' => $errorType,
+        ];
+    }
+
+    private function rememberAgentOpsTrace(
+        string $tenantId,
+        string $userId,
+        string $projectId,
+        string $mode,
+        array $routeTelemetry,
+        int $latencyMs,
+        array $runtimeContext = []
+    ): void {
+        try {
+            $this->gateway()->rememberAgentOpsTrace(
+                $tenantId,
+                $userId,
+                $projectId,
+                $mode,
+                $this->buildAgentOpsRuntimeObservability($routeTelemetry, $latencyMs, $runtimeContext)
+            );
+        } catch (\Throwable $ignored) {
+            // agentops trace persistence must not block chat response
+        }
     }
 
     /**

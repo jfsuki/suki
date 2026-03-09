@@ -5,6 +5,37 @@ namespace App\Core;
 
 final class IntentRouter
 {
+    private const REQUEST_MODE_OPERATION = 'operation';
+    private const REQUEST_MODE_RESEARCH = 'research';
+    private const TRACE_HISTORY_LIMIT = 8;
+    private const REQUEST_MODE_BUDGETS = [
+        'operation' => [
+            'max_router_steps' => 4,
+            'max_tool_calls' => 1,
+            'max_retries' => 0,
+            'max_llm_fallbacks' => 1,
+            'max_semantic_queries' => 1,
+            'max_context_chunks' => 2,
+            'max_execution_ms' => 1500,
+            'max_same_route_repeats' => 2,
+        ],
+        'research' => [
+            'max_router_steps' => 5,
+            'max_tool_calls' => 2,
+            'max_retries' => 1,
+            'max_llm_fallbacks' => 1,
+            'max_semantic_queries' => 2,
+            'max_context_chunks' => 4,
+            'max_execution_ms' => 3000,
+            'max_same_route_repeats' => 3,
+        ],
+    ];
+    /** @var array<int,string> */
+    private const RESEARCH_ACTIVE_TASKS = [
+        'unknown_business_discovery',
+        'business_research_confirmation',
+    ];
+
     private ContractRegistry $contracts;
     private RouterPolicyEvaluator $policyEvaluator;
     private string $enforcementMode;
@@ -42,6 +73,7 @@ final class IntentRouter
 
     public function route(array $gatewayResult, array $context = []): IntentRouteResult
     {
+        $routeStartedAt = microtime(true);
         $action = (string) ($gatewayResult['action'] ?? 'respond_local');
         $reply = (string) ($gatewayResult['reply'] ?? '');
         $command = is_array($gatewayResult['command'] ?? null) ? (array) $gatewayResult['command'] : [];
@@ -49,6 +81,21 @@ final class IntentRouter
         $state = is_array($gatewayResult['state'] ?? null) ? (array) $gatewayResult['state'] : [];
         $telemetry = is_array($gatewayResult['telemetry'] ?? null) ? (array) $gatewayResult['telemetry'] : [];
         $routingHintSteps = $this->extractRoutingHintSteps($gatewayResult, $telemetry);
+        $rawRequestMode = $context['request_mode'] ?? $gatewayResult['request_mode'] ?? $telemetry['request_mode'] ?? null;
+        $normalizedExplicitRequestMode = $this->normalizeRequestMode((string) $rawRequestMode);
+        $requestModeInvalid = $rawRequestMode !== null
+            && trim((string) $rawRequestMode) !== ''
+            && $normalizedExplicitRequestMode === '';
+        $requestMode = $normalizedExplicitRequestMode !== ''
+            ? $normalizedExplicitRequestMode
+            : $this->resolveRequestMode($gatewayResult, $context, $state, $telemetry);
+        $runtimeBudget = $this->runtimeBudgetConfig($requestMode);
+        $queryHash = $this->hashQueryForTrace($this->extractRetrievalQuery($gatewayResult, $context));
+
+        $telemetry['request_mode'] = $requestMode;
+        $telemetry['request_mode_invalid'] = $requestModeInvalid;
+        $telemetry['runtime_budget'] = $runtimeBudget;
+        $telemetry['query_hash'] = $queryHash;
 
         $routeOrder = ['cache', 'rules', 'rag', 'llm'];
         $violations = [];
@@ -104,7 +151,9 @@ final class IntentRouter
             $action,
             is_array($actionCatalogEntry) ? (array) $actionCatalogEntry : null,
             $gatewayResult,
-            $context
+            $context,
+            $requestMode,
+            $runtimeBudget
         );
         $llmContext = [];
         if (!empty($retrieval)) {
@@ -198,6 +247,7 @@ final class IntentRouter
         ];
         $routePath = implode('>', $routePathSteps);
         $routeStageReasons = $this->buildRouteStageReasons($action, $gatewayResult, $telemetry, $routePathSteps);
+        $routeLatencyMs = $this->latencyMs($routeStartedAt);
         $agentOps = [
             'route_path' => $routePath,
             'route_path_steps' => $routePathSteps,
@@ -217,6 +267,10 @@ final class IntentRouter
             'is_authenticated' => (bool) ($context['is_authenticated'] ?? false),
             'effective_role' => strtolower(trim((string) ($context['role'] ?? 'guest'))) ?: 'guest',
             'route_reason' => $this->resolveRouteReason($action, $gateDecision, $telemetry),
+            'request_mode' => $requestMode,
+            'runtime_budget' => $runtimeBudget,
+            'query_hash' => $queryHash,
+            'router_latency_ms' => $routeLatencyMs,
         ];
         if (is_array($telemetry['retrieval'] ?? null)) {
             $agentOps['retrieval'] = (array) $telemetry['retrieval'];
@@ -232,6 +286,38 @@ final class IntentRouter
             $agentOps['action_type'] = (string) ($actionCatalogEntry['type'] ?? '');
         }
         $telemetry = array_merge($telemetry, $agentOps);
+
+        $runtimeGuard = $this->evaluateRuntimeGuard(
+            $action,
+            $gateDecision,
+            $routePathSteps,
+            $telemetry,
+            $context,
+            $state,
+            $runtimeBudget
+        );
+        $telemetry = array_merge($telemetry, is_array($runtimeGuard['telemetry'] ?? null) ? (array) $runtimeGuard['telemetry'] : []);
+        $agentOps = array_merge($agentOps, is_array($runtimeGuard['telemetry'] ?? null) ? (array) $runtimeGuard['telemetry'] : []);
+
+        $finalAction = (bool) ($runtimeGuard['triggered'] ?? false)
+            ? 'respond_local'
+            : (($action === 'send_to_llm' && $gateDecision !== 'allow') ? 'respond_local' : $action);
+        $telemetry['llm_used'] = $finalAction === 'send_to_llm';
+        $telemetry['metrics_delta'] = $this->buildMetricsDelta($finalAction, $telemetry);
+        $agentOps['metrics_delta'] = $telemetry['metrics_delta'];
+
+        if ((bool) ($runtimeGuard['triggered'] ?? false)) {
+            $guardReply = trim((string) ($runtimeGuard['reply'] ?? ''));
+            return new IntentRouteResult(
+                'respond_local',
+                $guardReply !== '' ? $guardReply : 'Detuve esta ruta para evitar repeticion o exceso de presupuesto.',
+                [],
+                [],
+                $state,
+                $telemetry,
+                $agentOps
+            );
+        }
 
         if ($action === 'send_to_llm' && !empty($llmRequest) && !empty($llmContext)) {
             $llmRequest = $this->injectSemanticContext($llmRequest, $llmContext, $telemetry);
@@ -394,6 +480,253 @@ final class IntentRouter
     }
 
     /**
+     * @param array<string,mixed> $gatewayResult
+     * @param array<string,mixed> $context
+     * @param array<string,mixed> $state
+     * @param array<string,mixed> $telemetry
+     */
+    private function resolveRequestMode(array $gatewayResult, array $context, array $state, array $telemetry): string
+    {
+        foreach ([
+            $context['request_mode'] ?? null,
+            $gatewayResult['request_mode'] ?? null,
+            $telemetry['request_mode'] ?? null,
+        ] as $candidate) {
+            $normalized = $this->normalizeRequestMode((string) $candidate);
+            if ($normalized !== '') {
+                return $normalized;
+            }
+        }
+
+        $activeTask = strtolower(trim((string) ($state['active_task'] ?? $gatewayResult['active_task'] ?? '')));
+        if ((bool) ($state['unknown_business_force_research'] ?? false) || in_array($activeTask, self::RESEARCH_ACTIVE_TASKS, true)) {
+            return self::REQUEST_MODE_RESEARCH;
+        }
+
+        return self::REQUEST_MODE_OPERATION;
+    }
+
+    private function normalizeRequestMode(string $mode): string
+    {
+        $mode = strtolower(trim($mode));
+        if ($mode === self::REQUEST_MODE_OPERATION || $mode === self::REQUEST_MODE_RESEARCH) {
+            return $mode;
+        }
+
+        return '';
+    }
+
+    /**
+     * @return array<string,int>
+     */
+    private function runtimeBudgetConfig(string $requestMode): array
+    {
+        $normalizedMode = $this->normalizeRequestMode($requestMode);
+        if ($normalizedMode === '') {
+            $normalizedMode = self::REQUEST_MODE_OPERATION;
+        }
+
+        return self::REQUEST_MODE_BUDGETS[$normalizedMode];
+    }
+
+    private function hashQueryForTrace(string $query): string
+    {
+        $normalized = $this->normalizeFreeText($query);
+        if ($normalized === '') {
+            return '';
+        }
+
+        return substr(sha1($normalized), 0, 16);
+    }
+
+    private function latencyMs(float $startedAt): int
+    {
+        return (int) max(0, round((microtime(true) - $startedAt) * 1000));
+    }
+
+    /**
+     * @param array<string,mixed> $telemetry
+     * @param array<string,mixed> $context
+     * @param array<string,mixed> $state
+     * @param array<string,int> $runtimeBudget
+     * @return array{triggered:bool,reply:string,telemetry:array<string,mixed>}
+     */
+    private function evaluateRuntimeGuard(
+        string $action,
+        string $gateDecision,
+        array $routePathSteps,
+        array $telemetry,
+        array $context,
+        array $state,
+        array $runtimeBudget
+    ): array {
+        $routePath = implode('>', $routePathSteps);
+        $routeStepCount = count($routePathSteps);
+        $toolCallsCount = $this->resolveCount($context['tool_calls_count'] ?? $telemetry['tool_calls_count'] ?? ($action === 'execute_command' ? 1 : 0));
+        $retryCount = $this->resolveCount($context['retry_count'] ?? $telemetry['retry_count'] ?? 0);
+        $semanticQueriesCount = (bool) ($telemetry['rag_attempted'] ?? false) ? 1 : 0;
+        $llmFallbackCount = ($action === 'send_to_llm' && $gateDecision === 'allow') ? 1 : 0;
+        $routerLatencyMs = $this->resolveCount($telemetry['router_latency_ms'] ?? 0);
+        $loopCheck = $this->detectRepeatedRouteLoop($state, $telemetry, $routePath, $runtimeBudget);
+        $tenantScopeViolation = trim((string) ($telemetry['tenant_id'] ?? $context['tenant_id'] ?? '')) === '';
+        $guardTriggered = false;
+        $guardReason = 'none';
+        $guardStage = 'none';
+        $guardReply = '';
+
+        if ((bool) ($telemetry['request_mode_invalid'] ?? false)) {
+            $guardTriggered = true;
+            $guardReason = 'invalid_request_mode';
+            $guardStage = 'router';
+            $guardReply = 'El request_mode recibido no es valido para esta ruta.';
+        } elseif ($routeStepCount > (int) ($runtimeBudget['max_router_steps'] ?? 4)) {
+            $guardTriggered = true;
+            $guardReason = 'router_steps_budget_exceeded';
+            $guardStage = 'router';
+            $guardReply = 'Detuve esta ruta porque excede el presupuesto operativo permitido.';
+        } elseif ($toolCallsCount > (int) ($runtimeBudget['max_tool_calls'] ?? 1)) {
+            $guardTriggered = true;
+            $guardReason = 'tool_calls_budget_exceeded';
+            $guardStage = 'execution';
+            $guardReply = 'Detuve esta ruta porque excede el numero permitido de acciones en este turno.';
+        } elseif ($retryCount > (int) ($runtimeBudget['max_retries'] ?? 0)) {
+            $guardTriggered = true;
+            $guardReason = 'retry_budget_exceeded';
+            $guardStage = 'retry';
+            $guardReply = 'Detuve esta ruta para evitar reintentos repetitivos sin control.';
+        } elseif ($semanticQueriesCount > (int) ($runtimeBudget['max_semantic_queries'] ?? 1)) {
+            $guardTriggered = true;
+            $guardReason = 'semantic_query_budget_exceeded';
+            $guardStage = 'rag';
+            $guardReply = 'Detuve esta ruta porque excede el presupuesto de consultas semanticas.';
+        } elseif ($llmFallbackCount > (int) ($runtimeBudget['max_llm_fallbacks'] ?? 1)) {
+            $guardTriggered = true;
+            $guardReason = 'llm_fallback_budget_exceeded';
+            $guardStage = 'llm';
+            $guardReply = 'Detuve esta ruta porque excede el presupuesto de fallback a LLM.';
+        } elseif ($routerLatencyMs > (int) ($runtimeBudget['max_execution_ms'] ?? 1500)) {
+            $guardTriggered = true;
+            $guardReason = 'execution_time_budget_exceeded';
+            $guardStage = 'router';
+            $guardReply = 'Detuve esta ruta porque excede el tiempo maximo permitido para este modo.';
+        } elseif ((bool) ($loopCheck['triggered'] ?? false)) {
+            $guardTriggered = true;
+            $guardReason = 'repeated_route_without_progress';
+            $guardStage = 'router';
+            $guardReply = 'Detuve esta ruta para evitar repetir el mismo fallback sin progreso. Cambia el dato clave o concreta el siguiente paso.';
+        }
+
+        $telemetryPatch = [
+            'tool_calls_count' => $toolCallsCount,
+            'retry_count' => $retryCount,
+            'semantic_queries_count' => $semanticQueriesCount,
+            'llm_fallback_count' => $llmFallbackCount,
+            'loop_guard_triggered' => $guardTriggered,
+            'loop_guard_reason' => $guardReason,
+            'loop_guard_stage' => $guardStage,
+            'same_route_repeat_count' => (int) ($loopCheck['repeat_count'] ?? 0),
+            'tenant_scope_violation_detected' => $tenantScopeViolation,
+            'route_path_coherent' => $routePath !== '',
+        ];
+
+        if ($guardTriggered) {
+            $telemetryPatch['fallback_reason'] = $guardReason;
+            $telemetryPatch['route_reason'] = $action === 'send_to_llm'
+                ? 'loop_guard_blocked_before_llm'
+                : 'loop_guard_blocked_before_action';
+        }
+
+        return [
+            'triggered' => $guardTriggered,
+            'reply' => $guardReply,
+            'telemetry' => $telemetryPatch,
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $state
+     * @param array<string,mixed> $telemetry
+     * @param array<string,int> $runtimeBudget
+     * @return array{triggered:bool,repeat_count:int}
+     */
+    private function detectRepeatedRouteLoop(array $state, array $telemetry, string $routePath, array $runtimeBudget): array
+    {
+        $history = is_array($state['agentops_trace_history'] ?? null) ? (array) $state['agentops_trace_history'] : [];
+        if ($history === [] || $routePath === '') {
+            return ['triggered' => false, 'repeat_count' => 0];
+        }
+
+        $requestMode = trim((string) ($telemetry['request_mode'] ?? self::REQUEST_MODE_OPERATION));
+        $routeReason = trim((string) ($telemetry['route_reason'] ?? ''));
+        $queryHash = trim((string) ($telemetry['query_hash'] ?? ''));
+        if ($queryHash === '') {
+            return ['triggered' => false, 'repeat_count' => 0];
+        }
+
+        $repeatCount = 0;
+        foreach (array_reverse(array_slice($history, -self::TRACE_HISTORY_LIMIT)) as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            if (trim((string) ($entry['query_hash'] ?? '')) !== $queryHash) {
+                break;
+            }
+            if (trim((string) ($entry['route_path'] ?? '')) !== $routePath) {
+                break;
+            }
+            if (trim((string) ($entry['route_reason'] ?? '')) !== $routeReason) {
+                break;
+            }
+            if (trim((string) ($entry['request_mode'] ?? self::REQUEST_MODE_OPERATION)) !== $requestMode) {
+                break;
+            }
+            $repeatCount++;
+        }
+
+        return [
+            'triggered' => $repeatCount >= (int) ($runtimeBudget['max_same_route_repeats'] ?? 2),
+            'repeat_count' => $repeatCount,
+        ];
+    }
+
+    /**
+     * @param mixed $value
+     */
+    private function resolveCount(mixed $value): int
+    {
+        if (is_numeric($value)) {
+            return max(0, (int) $value);
+        }
+
+        return 0;
+    }
+
+    /**
+     * @param array<string,mixed> $telemetry
+     * @return array<string,int>
+     */
+    private function buildMetricsDelta(string $finalAction, array $telemetry): array
+    {
+        $evidenceGateStatus = trim((string) ($telemetry['evidence_gate_status'] ?? ''));
+        $fallbackReason = trim((string) ($telemetry['fallback_reason'] ?? ''));
+        $tenantViolation = (bool) ($telemetry['tenant_scope_violation_detected'] ?? false);
+
+        return [
+            'requests_total' => 1,
+            'routed_by_rules' => ($finalAction !== 'send_to_llm' && !(bool) ($telemetry['rag_used'] ?? false)) ? 1 : 0,
+            'routed_by_rag' => (bool) ($telemetry['rag_used'] ?? false) ? 1 : 0,
+            'routed_by_llm' => $finalAction === 'send_to_llm' ? 1 : 0,
+            'evidence_gate_failures' => $evidenceGateStatus === 'insufficient_evidence' ? 1 : 0,
+            'rag_errors' => ($fallbackReason === 'rag_error' || trim((string) ($telemetry['rag_error'] ?? '')) !== '') ? 1 : 0,
+            'loop_guard_hits' => (bool) ($telemetry['loop_guard_triggered'] ?? false) ? 1 : 0,
+            'semantic_disabled_requests' => trim((string) ($telemetry['semantic_memory_status'] ?? '')) === 'disabled' ? 1 : 0,
+            'llm_fallback_requests' => $finalAction === 'send_to_llm' ? 1 : 0,
+            'tenant_scope_violations_detected' => $tenantViolation ? 1 : 0,
+            'rag_result_count_total' => $this->resolveCount($telemetry['rag_result_count'] ?? 0),
+        ];
+    }
+
+    /**
      * @param array<string,mixed> $context
      * @param array<string,mixed> $gatewayResult
      * @param array<string,mixed> $telemetry
@@ -451,6 +784,12 @@ final class IntentRouter
             'agent_role',
             'user_id',
             'skip_evidence_gate',
+            'request_mode',
+            'runtime_budget',
+            'query_hash',
+            'tool_calls_count',
+            'retry_count',
+            'loop_guard_triggered',
         ] as $key) {
             if (!array_key_exists($key, $merged) && array_key_exists($key, $telemetry)) {
                 $merged[$key] = $telemetry[$key];
@@ -493,7 +832,9 @@ final class IntentRouter
         string $action,
         ?array $actionCatalogEntry,
         array $gatewayResult,
-        array $context
+        array $context,
+        string $requestMode,
+        array $runtimeBudget
     ): array {
         $query = $this->extractRetrievalQuery($gatewayResult, $context);
         $memoryType = $this->resolveRetrievalMemoryType($context, $actionCatalogEntry);
@@ -526,8 +867,11 @@ final class IntentRouter
             'top_k' => $runtimeConfig['top_k'],
             'min_score' => $runtimeConfig['min_score'],
             'min_evidence_chunks' => $runtimeConfig['min_evidence_chunks'],
-            'max_context_chunks' => $runtimeConfig['max_context_chunks'],
+            'max_context_chunks' => min(max(1, (int) ($runtimeBudget['max_context_chunks'] ?? $runtimeConfig['max_context_chunks'])), max(1, (int) $runtimeConfig['top_k'])),
             'reason' => (string) ($policy['reason'] ?? 'rag_not_applicable'),
+            'request_mode' => $requestMode,
+            'runtime_budget' => $runtimeBudget,
+            'retrieval_latency_ms' => 0,
         ];
 
         if (!(bool) ($policy['should_attempt'] ?? false)) {
@@ -567,12 +911,17 @@ final class IntentRouter
         }
 
         try {
+            $retrievalStartedAt = microtime(true);
             $retrieval = $semanticMemory->retrieve($query, array_merge($scope, [
                 'memory_type' => $memoryType,
             ]), $runtimeConfig['top_k']);
-            $preparedContext = SemanticMemoryService::prepareContext($retrieval);
+            $preparedContext = SemanticMemoryService::prepareContext(
+                $retrieval,
+                (int) ($runtimeBudget['max_context_chunks'] ?? $runtimeConfig['max_context_chunks'])
+            );
             $rawHitCount = count((array) ($retrieval['hits'] ?? []));
             $passed = $preparedContext['used_count'] >= $runtimeConfig['min_evidence_chunks'];
+            $retrievalLatencyMs = $this->latencyMs($retrievalStartedAt);
 
             return [
                 'ok' => true,
@@ -595,6 +944,7 @@ final class IntentRouter
                         'fallback_reason' => $passed ? 'llm_last_resort_after_rag' : 'insufficient_evidence',
                         'route_reason' => $passed ? 'rag_backed_llm_fallback' : 'rag_attempted_but_insufficient',
                         'skip_evidence_gate' => false,
+                        'retrieval_latency_ms' => $retrievalLatencyMs,
                     ]
                 ),
             ];
@@ -618,6 +968,7 @@ final class IntentRouter
                     'skip_evidence_gate' => false,
                     'rag_error' => trim((string) $e->getMessage()),
                     'reason' => 'rag_error',
+                    'retrieval_latency_ms' => 0,
                 ]),
             ];
         }

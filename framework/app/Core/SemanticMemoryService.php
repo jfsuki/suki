@@ -329,9 +329,12 @@ final class SemanticMemoryService
      * @param array<string,mixed> $retrieval
      * @return array{chunks:array<int,array<string,mixed>>,used_count:int,source_ids:array<int,string>,evidence_ids:array<int,string>,max_context_chunks:int,min_evidence_chunks:int}
      */
-    public static function prepareContext(array $retrieval): array
+    public static function prepareContext(array $retrieval, ?int $maxContextChunks = null): array
     {
         $config = self::retrievalRuntimeConfig();
+        if ($maxContextChunks !== null) {
+            $config['max_context_chunks'] = max(1, min((int) $maxContextChunks, max(1, (int) $config['top_k'])));
+        }
         $hits = is_array($retrieval['hits'] ?? null) ? (array) $retrieval['hits'] : [];
         $chunks = [];
         $sourceIds = [];

@@ -72,6 +72,9 @@ $disabledTelemetry = $disabled->telemetry();
 if ((string) ($disabledTelemetry['semantic_memory_status'] ?? '') !== 'disabled') {
     $failures[] = 'Cuando semantic memory esta deshabilitada debe quedar trazado en telemetry.';
 }
+if ((string) ($disabledTelemetry['request_mode'] ?? '') !== 'operation') {
+    $failures[] = 'Sin request_mode explicito debe usar operation por defecto.';
+}
 if ((string) ($disabledTelemetry['evidence_gate_status'] ?? '') !== 'disabled_by_config') {
     $failures[] = 'Evidence gate debe reportar disabled_by_config cuando semantic memory esta apagada.';
 }
@@ -80,6 +83,9 @@ if ((string) ($disabledTelemetry['fallback_reason'] ?? '') !== 'semantic_memory_
 }
 if ((string) ($disabledTelemetry['memory_type'] ?? '') !== 'sector_knowledge') {
     $failures[] = 'IntentRouter debe fijar memory_type explicito para retrieval.';
+}
+if ((int) (($disabledTelemetry['metrics_delta']['semantic_disabled_requests'] ?? 0)) !== 1) {
+    $failures[] = 'Semantic disabled debe quedar contado en metrics_delta.';
 }
 
 // 3) Trivial query skips RAG by rule and can continue to LLM.
@@ -230,6 +236,9 @@ $ragTelemetry = $rag->telemetry();
 if (!(bool) ($ragTelemetry['rag_attempted'] ?? false) || !(bool) ($ragTelemetry['rag_used'] ?? false)) {
     $failures[] = 'Consulta tecnica debe dejar rag_attempted=true y rag_used=true.';
 }
+if ((string) ($ragTelemetry['request_mode'] ?? '') !== 'operation') {
+    $failures[] = 'Consulta tecnica normal debe quedar en request_mode=operation.';
+}
 if ((string) ($ragTelemetry['evidence_gate_status'] ?? '') !== 'passed') {
     $failures[] = 'Consulta tecnica con retrieval util debe marcar evidence_gate_status=passed.';
 }
@@ -241,8 +250,8 @@ if ((string) ($ragTelemetry['route_path'] ?? '') !== 'cache>rules>rag>llm') {
 }
 $semanticContext = is_array($rag->llmRequest()['semantic_context'] ?? null) ? (array) $rag->llmRequest()['semantic_context'] : [];
 $semanticChunks = is_array($semanticContext['chunks'] ?? null) ? (array) $semanticContext['chunks'] : [];
-if (count($semanticChunks) !== 3) {
-    $failures[] = 'Contexto semantico debe deduplicarse y limitarse a 3 chunks.';
+if (count($semanticChunks) !== 2) {
+    $failures[] = 'Contexto semantico debe deduplicarse y limitarse al budget de operation.';
 }
 $chunkIds = [];
 foreach ($semanticChunks as $chunk) {
@@ -250,11 +259,14 @@ foreach ($semanticChunks as $chunk) {
         $chunkIds[] = (string) ($chunk['chunk_id'] ?? '');
     }
 }
-if (count(array_unique(array_filter($chunkIds))) !== 3) {
+if (count(array_unique(array_filter($chunkIds))) !== 2) {
     $failures[] = 'Contexto semantico no debe repetir chunks duplicados.';
 }
 if ((string) ($ragTelemetry['tenant_id'] ?? '') !== 'tenant_demo' || (string) ($ragTelemetry['app_id'] ?? '') !== 'app_demo') {
     $failures[] = 'Telemetry debe conservar el scope tenant/app aplicado.';
+}
+if ((int) (($ragTelemetry['metrics_delta']['routed_by_rag'] ?? 0)) !== 1) {
+    $failures[] = 'Consulta tecnica con contexto util debe contar routed_by_rag=1.';
 }
 
 // 5) Retrieval errors are explicit and degrade in a controlled way.
@@ -287,6 +299,146 @@ if ((string) ($errorTelemetry['evidence_gate_status'] ?? '') !== 'insufficient_e
 }
 if ((string) ($errorTelemetry['reason'] ?? '') !== 'rag_error') {
     $failures[] = 'Telemetry debe exponer causa rag_error.';
+}
+if ((int) (($errorTelemetry['metrics_delta']['rag_errors'] ?? 0)) !== 1) {
+    $failures[] = 'RAG error debe reflejarse en metrics_delta.';
+}
+
+// 6) Research mode must allow a wider budget than operation.
+$operationRoute = $ragRouter->route([
+    'action' => 'send_to_llm',
+    'llm_request' => [
+        'messages' => [
+            ['role' => 'user', 'content' => 'Como configuro Qdrant para tenant y app?'],
+        ],
+        'user_message' => 'Como configuro Qdrant para tenant y app?',
+    ],
+], [
+    'tenant_id' => 'tenant_demo',
+    'app_id' => 'app_demo',
+    'sector' => 'retail',
+    'session_id' => 'intent_router_operation_budget',
+    'mode' => 'app',
+    'role' => 'admin',
+    'request_mode' => 'operation',
+]);
+$researchRoute = $ragRouter->route([
+    'action' => 'send_to_llm',
+    'llm_request' => [
+        'messages' => [
+            ['role' => 'user', 'content' => 'Como configuro Qdrant para tenant y app?'],
+        ],
+        'user_message' => 'Como configuro Qdrant para tenant y app?',
+    ],
+], [
+    'tenant_id' => 'tenant_demo',
+    'app_id' => 'app_demo',
+    'sector' => 'retail',
+    'session_id' => 'intent_router_research_budget',
+    'mode' => 'app',
+    'role' => 'admin',
+    'request_mode' => 'research',
+]);
+$operationTelemetry = $operationRoute->telemetry();
+$researchTelemetry = $researchRoute->telemetry();
+$operationChunks = is_array($operationRoute->llmRequest()['semantic_context']['chunks'] ?? null)
+    ? (array) $operationRoute->llmRequest()['semantic_context']['chunks']
+    : [];
+$researchChunks = is_array($researchRoute->llmRequest()['semantic_context']['chunks'] ?? null)
+    ? (array) $researchRoute->llmRequest()['semantic_context']['chunks']
+    : [];
+if ((string) ($operationTelemetry['request_mode'] ?? '') !== 'operation') {
+    $failures[] = 'operation debe persistir request_mode=operation.';
+}
+if ((string) ($researchTelemetry['request_mode'] ?? '') !== 'research') {
+    $failures[] = 'research debe persistir request_mode=research.';
+}
+if ((int) (($operationTelemetry['runtime_budget']['max_context_chunks'] ?? 0)) >= (int) (($researchTelemetry['runtime_budget']['max_context_chunks'] ?? 0))) {
+    $failures[] = 'research debe tener budget de contexto mayor que operation.';
+}
+if (count($operationChunks) !== 2) {
+    $failures[] = 'operation debe recortar semantic_context al budget conservador.';
+}
+if (count($researchChunks) !== 4) {
+    $failures[] = 'research debe permitir un semantic_context mas amplio.';
+}
+
+// 7) Budget overflow must stop execution in a controlled way.
+$budgetRouter = new IntentRouter(null, 'warn', null, $trivialSemantic);
+$budgetBlocked = $budgetRouter->route([
+    'action' => 'execute_command',
+    'command' => ['command' => 'CreateForm', 'entity' => 'clientes'],
+], [
+    'tenant_id' => 'default',
+    'project_id' => 'default',
+    'session_id' => 'intent_router_budget_guard',
+    'mode' => 'builder',
+    'role' => 'admin',
+    'is_authenticated' => true,
+    'auth_tenant_id' => 'default',
+    'tool_calls_count' => 3,
+    'request_mode' => 'operation',
+]);
+$budgetTelemetry = $budgetBlocked->telemetry();
+if (!$budgetBlocked->isLocalResponse()) {
+    $failures[] = 'Exceso de tool_calls debe cortar la ruta con respuesta local segura.';
+}
+if (!(bool) ($budgetTelemetry['loop_guard_triggered'] ?? false)) {
+    $failures[] = 'Budget overflow debe activar loop_guard_triggered.';
+}
+if ((string) ($budgetTelemetry['loop_guard_reason'] ?? '') !== 'tool_calls_budget_exceeded') {
+    $failures[] = 'Exceso de tool_calls debe dejar razon explicita.';
+}
+
+// 8) Repeating the same route without progress must trigger anti-loop.
+$loopRouter = new IntentRouter(null, 'warn', null, $ragSemantic);
+$loopQuery = 'Como configuro Qdrant para tenant y app?';
+$loopHash = queryHash($loopQuery);
+$loopRoute = $loopRouter->route([
+    'action' => 'send_to_llm',
+    'llm_request' => [
+        'messages' => [
+            ['role' => 'user', 'content' => $loopQuery],
+        ],
+        'user_message' => $loopQuery,
+    ],
+    'state' => [
+        'agentops_trace_history' => [
+            [
+                'route_path' => 'cache>rules>rag>llm',
+                'route_reason' => 'llm_after_verified_rag',
+                'request_mode' => 'operation',
+                'query_hash' => $loopHash,
+            ],
+            [
+                'route_path' => 'cache>rules>rag>llm',
+                'route_reason' => 'llm_after_verified_rag',
+                'request_mode' => 'operation',
+                'query_hash' => $loopHash,
+            ],
+        ],
+    ],
+], [
+    'tenant_id' => 'tenant_demo',
+    'app_id' => 'app_demo',
+    'sector' => 'retail',
+    'session_id' => 'intent_router_loop_guard',
+    'mode' => 'app',
+    'role' => 'admin',
+    'request_mode' => 'operation',
+]);
+$loopTelemetry = $loopRoute->telemetry();
+if (!$loopRoute->isLocalResponse()) {
+    $failures[] = 'Anti-loop debe cortar la repeticion sin progreso con respuesta local.';
+}
+if ((string) ($loopTelemetry['loop_guard_reason'] ?? '') !== 'repeated_route_without_progress') {
+    $failures[] = 'Anti-loop debe dejar razon repeated_route_without_progress.';
+}
+if ((int) ($loopTelemetry['same_route_repeat_count'] ?? 0) < 2) {
+    $failures[] = 'Anti-loop debe contar las repeticiones previas de la misma ruta.';
+}
+if ((int) (($loopTelemetry['metrics_delta']['loop_guard_hits'] ?? 0)) !== 1) {
+    $failures[] = 'Anti-loop debe reflejarse en metrics_delta.';
 }
 
 if ($previousMode === false) {
@@ -446,4 +598,10 @@ function matchesFilter(array $payload, array $filter): bool
         }
     }
     return true;
+}
+
+function queryHash(string $query): string
+{
+    $query = strtolower(trim(preg_replace('/\s+/', ' ', $query) ?? $query));
+    return substr(sha1($query), 0, 16);
 }

@@ -120,6 +120,44 @@ final class ConversationGateway
         $this->saveState($tenantId, $userId, $state);
     }
 
+    public function rememberAgentOpsTrace(
+        string $tenantId,
+        string $userId,
+        string $projectId,
+        string $mode,
+        array $trace
+    ): void {
+        $tenantId = $tenantId !== '' ? $tenantId : 'default';
+        $userId = $userId !== '' ? $userId : 'anon';
+        $projectId = $projectId !== '' ? $projectId : 'default';
+        $mode = strtolower(trim($mode)) === 'builder' ? 'builder' : 'app';
+
+        $this->contextProjectId = $projectId;
+        $this->contextMode = $mode;
+        $this->contextProfileUser = $this->profileUserKey($userId);
+
+        $state = $this->loadState($tenantId, $userId, $projectId, $mode);
+        $history = is_array($state['agentops_trace_history'] ?? null) ? (array) $state['agentops_trace_history'] : [];
+        $history[] = [
+            'at' => date('c'),
+            'route_path' => trim((string) ($trace['route_path'] ?? '')),
+            'route_reason' => trim((string) ($trace['route_reason'] ?? '')),
+            'request_mode' => trim((string) ($trace['request_mode'] ?? 'operation')) ?: 'operation',
+            'query_hash' => trim((string) ($trace['query_hash'] ?? '')),
+            'llm_used' => (bool) ($trace['llm_used'] ?? false),
+            'rag_attempted' => (bool) ($trace['rag_attempted'] ?? false),
+            'rag_used' => (bool) ($trace['rag_used'] ?? false),
+            'evidence_gate_status' => trim((string) ($trace['evidence_gate_status'] ?? '')),
+            'fallback_reason' => trim((string) ($trace['fallback_reason'] ?? '')),
+            'loop_guard_triggered' => (bool) ($trace['loop_guard_triggered'] ?? false),
+            'tool_calls_count' => max(0, (int) ($trace['tool_calls_count'] ?? 0)),
+            'retry_count' => max(0, (int) ($trace['retry_count'] ?? 0)),
+        ];
+        $state['agentops_trace_history'] = array_values(array_slice($history, -8));
+        $state['agentops_last_trace'] = end($state['agentops_trace_history']) ?: null;
+        $this->saveState($tenantId, $userId, $state);
+    }
+
     public function postExecutionFollowup(
         string $tenantId,
         string $userId,
@@ -8736,6 +8774,8 @@ private function parseEntityFromCrudText(string $text): string
             'feedback_log' => [],
             'last_messages' => [],
             'llm_usage' => ['count' => 0, 'last' => null, 'history' => []],
+            'agentops_trace_history' => [],
+            'agentops_last_trace' => null,
             'summary' => null,
         ];
 
@@ -8821,6 +8861,16 @@ private function parseEntityFromCrudText(string $text): string
         }
         if (isset($merged['unknown_business_discovery']) && !is_array($merged['unknown_business_discovery']) && $merged['unknown_business_discovery'] !== null) {
             $merged['unknown_business_discovery'] = null;
+        }
+        if (!is_array($merged['agentops_trace_history'] ?? null)) {
+            $merged['agentops_trace_history'] = [];
+        }
+        $merged['agentops_trace_history'] = array_values(array_slice(array_filter(
+            $merged['agentops_trace_history'],
+            static fn($entry): bool => is_array($entry)
+        ), -8));
+        if (isset($merged['agentops_last_trace']) && !is_array($merged['agentops_last_trace']) && $merged['agentops_last_trace'] !== null) {
+            $merged['agentops_last_trace'] = null;
         }
         $merged['unknown_business_force_research'] = (bool) ($merged['unknown_business_force_research'] ?? false);
         $merged['resolution_attempts'] = (int) ($merged['resolution_attempts'] ?? 0);
