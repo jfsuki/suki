@@ -192,6 +192,9 @@ final class ChatAgent
             'session_id' => $sessionId,
             'user_id' => $userId,
             'message_text' => $text,
+            'channel' => $channel,
+            'has_attachment' => !empty($payload['meta']) || !empty($payload['attachments']),
+            'attachments_count' => $this->resolveAttachmentCount($payload),
             'role' => $role,
             'mode' => $mode,
             'message_id' => (string) ($payload['message_id'] ?? ''),
@@ -1577,6 +1580,7 @@ final class ChatAgent
                 'prompt_version' => (string) (getenv('PROMPT_VERSION') ?: 'unknown'),
                 'router_policy_version' => (string) ($contractVersions['router_policy'] ?? 'unknown'),
                 'action_catalog_version' => (string) ($contractVersions['action_catalog'] ?? 'unknown'),
+                'skills_catalog_version' => (string) ($contractVersions['skills_catalog'] ?? 'unknown'),
                 'akp_version' => (string) (getenv('AKP_VERSION') ?: 'unknown'),
                 'policy_pack_version' => (string) (getenv('POLICY_PACK_VERSION') ?: 'unknown'),
             ];
@@ -1606,6 +1610,13 @@ final class ChatAgent
             'rag_result_count' => $runtimeObservability['rag_result_count'],
             'evidence_gate_status' => $runtimeObservability['evidence_gate_status'],
             'fallback_reason' => $runtimeObservability['fallback_reason'],
+            'skill_detected' => $runtimeObservability['skill_detected'],
+            'skill_selected' => $runtimeObservability['skill_selected'],
+            'skill_executed' => $runtimeObservability['skill_executed'],
+            'skill_failed' => $runtimeObservability['skill_failed'],
+            'skill_execution_ms' => $runtimeObservability['skill_execution_ms'],
+            'skill_result_status' => $runtimeObservability['skill_result_status'],
+            'skill_fallback_reason' => $runtimeObservability['skill_fallback_reason'],
             'tool_calls_count' => $runtimeObservability['tool_calls_count'],
             'retry_count' => $runtimeObservability['retry_count'],
             'loop_guard_triggered' => $runtimeObservability['loop_guard_triggered'],
@@ -1657,6 +1668,7 @@ final class ChatAgent
 
         $stageLatency = [
             'router_ms' => max(0, (int) ($routeTelemetry['router_latency_ms'] ?? 0)),
+            'skill_ms' => max(0, (int) ($routeTelemetry['skill_execution_ms'] ?? 0)),
             'rag_ms' => max(0, (int) (($routeTelemetry['retrieval']['retrieval_latency_ms'] ?? $routeTelemetry['retrieval_latency_ms'] ?? 0))),
         ];
 
@@ -1675,6 +1687,13 @@ final class ChatAgent
             'rag_result_count' => max(0, (int) ($routeTelemetry['rag_result_count'] ?? 0)),
             'evidence_gate_status' => trim((string) ($routeTelemetry['evidence_gate_status'] ?? '')) ?: 'unknown',
             'fallback_reason' => trim((string) ($routeTelemetry['fallback_reason'] ?? '')) ?: 'none',
+            'skill_detected' => (bool) ($routeTelemetry['skill_detected'] ?? false),
+            'skill_selected' => trim((string) ($routeTelemetry['skill_selected'] ?? '')) ?: 'none',
+            'skill_executed' => (bool) ($routeTelemetry['skill_executed'] ?? false),
+            'skill_failed' => (bool) ($routeTelemetry['skill_failed'] ?? false),
+            'skill_execution_ms' => max(0, (int) ($routeTelemetry['skill_execution_ms'] ?? 0)),
+            'skill_result_status' => trim((string) ($routeTelemetry['skill_result_status'] ?? '')) ?: 'unknown',
+            'skill_fallback_reason' => trim((string) ($routeTelemetry['skill_fallback_reason'] ?? '')) ?: 'none',
             'llm_called' => $llmCalled,
             'llm_used' => $llmCalled,
             'tool_calls_count' => max(0, (int) ($runtimeContext['tool_calls_count'] ?? $routeTelemetry['tool_calls_count'] ?? 0)),
@@ -1748,6 +1767,19 @@ final class ChatAgent
         }
 
         return array_values(array_unique($normalized));
+    }
+
+    private function resolveAttachmentCount(array $payload): int
+    {
+        $count = 0;
+        if (is_array($payload['attachments'] ?? null)) {
+            $count += count((array) $payload['attachments']);
+        }
+        if (is_array($payload['meta'] ?? null) && !empty($payload['meta'])) {
+            $count++;
+        }
+
+        return $count;
     }
 
     private function commandBus(): CommandBus

@@ -1,0 +1,205 @@
+{
+  "contract_id": "skills_catalog",
+  "version": "1.0.0",
+  "effective_date": "2026-03-09",
+  "addenda_of": null,
+  "status": "canonical_draft",
+  "contract_location": "docs/contracts",
+  "scope": "Deterministic skill registry for controlled pre-LLM capabilities.",
+  "required_fields": [
+    "name",
+    "description",
+    "intent_patterns",
+    "execution_mode",
+    "allowed_tools",
+    "priority"
+  ],
+  "supported_execution_modes": [
+    "deterministic",
+    "tool",
+    "rag",
+    "hybrid"
+  ],
+  "catalog": [
+    {
+      "name": "document_read",
+      "description": "Handle document reading or document-summary requests before free-form fallback.",
+      "intent_patterns": [
+        "re:(lee|leer|revisa|analiza|resume).*(documento|archivo|pdf|contrato|manual)",
+        "re:(documento|archivo|pdf|contrato|manual).*(lee|revisa|analiza|resume|explica)"
+      ],
+      "keywords": [
+        "documento",
+        "archivo",
+        "pdf",
+        "contrato",
+        "manual",
+        "adjunto"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "document_reader"
+      ],
+      "priority": 90,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "attachments"
+        ]
+      },
+      "channel_capabilities": [
+        "chat",
+        "file_input"
+      ],
+      "context_hints": {
+        "requires_attachment": true,
+        "media_type": "document"
+      }
+    },
+    {
+      "name": "image_analysis",
+      "description": "Handle image or screenshot analysis requests before free-form fallback.",
+      "intent_patterns": [
+        "re:(analiza|analizar|revisa|describe|explica).*(imagen|foto|captura|screenshot)",
+        "re:(imagen|foto|captura|screenshot).*(analiza|describe|explica|revisa)"
+      ],
+      "keywords": [
+        "imagen",
+        "foto",
+        "captura",
+        "screenshot",
+        "adjunta"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "image_analyzer"
+      ],
+      "priority": 90,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "attachments"
+        ]
+      },
+      "channel_capabilities": [
+        "chat",
+        "image_input"
+      ],
+      "context_hints": {
+        "requires_attachment": true,
+        "media_type": "image"
+      }
+    },
+    {
+      "name": "dataset_lookup",
+      "description": "Route explicit dataset or knowledge-base lookups to semantic retrieval before LLM fallback.",
+      "intent_patterns": [
+        "re:(busca|buscar|consulta|lookup|encuentra|localiza).*(dataset|corpus|knowledge base|base de conocimiento|catalogo|entrenamiento)",
+        "re:(dataset|corpus|knowledge base|base de conocimiento|catalogo|entrenamiento).*(busca|consulta|lookup|encuentra|localiza)"
+      ],
+      "keywords": [
+        "dataset",
+        "lookup",
+        "corpus",
+        "catalogo",
+        "base de conocimiento",
+        "knowledge base",
+        "entrenamiento"
+      ],
+      "execution_mode": "rag",
+      "allowed_tools": [],
+      "priority": 80,
+      "memory_type": "sector_knowledge",
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": []
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {
+        "informative_query": true
+      }
+    },
+    {
+      "name": "business_explanation",
+      "description": "Support business or process explanations with retrieval-first context before LLM fallback.",
+      "intent_patterns": [
+        "re:(explica|explicar|expliqueme|como funciona|como opera).*(negocio|proceso|operacion|politica|policy)",
+        "re:(negocio|proceso|operacion|politica|policy).*(explica|explicar|como funciona|como opera)"
+      ],
+      "keywords": [
+        "negocio",
+        "proceso",
+        "operacion",
+        "politica",
+        "policy",
+        "business"
+      ],
+      "execution_mode": "hybrid",
+      "allowed_tools": [
+        "semantic_retrieval"
+      ],
+      "priority": 70,
+      "memory_type": "sector_knowledge",
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "sector"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {
+        "informative_query": true
+      }
+    },
+    {
+      "name": "report_generation",
+      "description": "Handle report generation requests with deterministic clarification before any fallback.",
+      "intent_patterns": [
+        "re:(reporte|informe|report|dashboard|resumen ejecutivo).*(genera|generar|crear|arma|prepara)",
+        "re:(genera|generar|crear|arma|prepara).*(reporte|informe|report|dashboard|resumen ejecutivo)"
+      ],
+      "keywords": [
+        "reporte",
+        "informe",
+        "report",
+        "dashboard",
+        "resumen ejecutivo"
+      ],
+      "execution_mode": "deterministic",
+      "allowed_tools": [
+        "report_builder"
+      ],
+      "priority": 75,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "report_scope",
+          "period"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {
+        "needs_scope": true
+      }
+    }
+  ]
+}

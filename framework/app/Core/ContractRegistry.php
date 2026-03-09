@@ -60,16 +60,23 @@ final class ContractRegistry
         return $this->loadContract('agentops_metrics_contract.json', 'agentops_metrics_contract');
     }
 
+    public function getSkillsCatalog(): array
+    {
+        return $this->loadContract('skills_catalog.json', 'skills_catalog');
+    }
+
     public function versions(): array
     {
         $router = $this->getRouterPolicy();
         $actions = $this->getActionCatalog();
         $agentOps = $this->getAgentOpsMetricsContract();
+        $skills = $this->getSkillsCatalog();
 
         return [
             'router_policy' => (string) ($router['version'] ?? 'unknown'),
             'action_catalog' => (string) ($actions['version'] ?? 'unknown'),
             'agentops_metrics_contract' => (string) ($agentOps['version'] ?? 'unknown'),
+            'skills_catalog' => (string) ($skills['version'] ?? 'unknown'),
         ];
     }
 
@@ -139,6 +146,10 @@ final class ContractRegistry
         }
         if ($contractId === 'agentops_metrics_contract') {
             $this->validateAgentOpsContract($contract, $path);
+            return;
+        }
+        if ($contractId === 'skills_catalog') {
+            $this->validateSkillsCatalog($contract, $path);
             return;
         }
 
@@ -237,6 +248,71 @@ final class ContractRegistry
         }
     }
 
+    private function validateSkillsCatalog(array $contract, string $path): void
+    {
+        if (!is_array($contract['required_fields'] ?? null) || empty($contract['required_fields'])) {
+            throw new RuntimeException("ContractRegistry: required_fields must be non-empty array in {$path}");
+        }
+        if (!is_array($contract['supported_execution_modes'] ?? null) || empty($contract['supported_execution_modes'])) {
+            throw new RuntimeException("ContractRegistry: supported_execution_modes must be non-empty array in {$path}");
+        }
+        if (!is_array($contract['catalog'] ?? null) || empty($contract['catalog'])) {
+            throw new RuntimeException("ContractRegistry: catalog must be non-empty array in {$path}");
+        }
+
+        $requiredFields = array_values(array_filter(array_map(
+            static fn($value): string => trim((string) $value),
+            $contract['required_fields']
+        ), static fn(string $value): bool => $value !== ''));
+        if ($requiredFields === []) {
+            throw new RuntimeException("ContractRegistry: required_fields has no valid values in {$path}");
+        }
+
+        $supportedModes = array_values(array_filter(array_map(
+            static fn($value): string => strtolower(trim((string) $value)),
+            $contract['supported_execution_modes']
+        ), static fn(string $value): bool => $value !== ''));
+        if ($supportedModes === []) {
+            throw new RuntimeException("ContractRegistry: supported_execution_modes has no valid values in {$path}");
+        }
+
+        foreach ($contract['catalog'] as $index => $entry) {
+            if (!is_array($entry)) {
+                throw new RuntimeException("ContractRegistry: catalog[{$index}] must be object in {$path}");
+            }
+            foreach ($requiredFields as $field) {
+                if (!array_key_exists($field, $entry)) {
+                    throw new RuntimeException("ContractRegistry: catalog[{$index}] missing '{$field}' in {$path}");
+                }
+            }
+            if (!is_string($entry['name']) || trim((string) $entry['name']) === '') {
+                throw new RuntimeException("ContractRegistry: catalog[{$index}].name must be non-empty string in {$path}");
+            }
+            if (!is_string($entry['description']) || trim((string) $entry['description']) === '') {
+                throw new RuntimeException("ContractRegistry: catalog[{$index}].description must be non-empty string in {$path}");
+            }
+            if (!is_array($entry['intent_patterns'] ?? null) || empty($entry['intent_patterns'])) {
+                throw new RuntimeException("ContractRegistry: catalog[{$index}].intent_patterns must be non-empty array in {$path}");
+            }
+            if (!is_array($entry['allowed_tools'] ?? null)) {
+                throw new RuntimeException("ContractRegistry: catalog[{$index}].allowed_tools must be array in {$path}");
+            }
+            $executionMode = strtolower(trim((string) ($entry['execution_mode'] ?? '')));
+            if (!in_array($executionMode, $supportedModes, true)) {
+                throw new RuntimeException("ContractRegistry: catalog[{$index}].execution_mode must be supported in {$path}");
+            }
+            if (!is_numeric($entry['priority'] ?? null)) {
+                throw new RuntimeException("ContractRegistry: catalog[{$index}].priority must be numeric in {$path}");
+            }
+            if (!is_array($entry['input_schema'] ?? null)) {
+                throw new RuntimeException("ContractRegistry: catalog[{$index}].input_schema must be object in {$path}");
+            }
+            if (!is_array($entry['channel_capabilities'] ?? null)) {
+                throw new RuntimeException("ContractRegistry: catalog[{$index}].channel_capabilities must be array in {$path}");
+            }
+        }
+    }
+
     private function isValidDate(string $value): bool
     {
         if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $value)) {
@@ -257,6 +333,7 @@ final class ContractRegistry
             'router_policy.json',
             'action_catalog.json',
             'agentops_metrics_contract.json',
+            'skills_catalog.json',
         ];
         foreach ($required as $file) {
             if (!is_file($dir . '/' . $file)) {

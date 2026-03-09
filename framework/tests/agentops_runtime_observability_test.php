@@ -89,6 +89,13 @@ if (is_array($matchedEvent)) {
         'rag_result_count',
         'evidence_gate_status',
         'fallback_reason',
+        'skill_detected',
+        'skill_selected',
+        'skill_executed',
+        'skill_failed',
+        'skill_execution_ms',
+        'skill_result_status',
+        'skill_fallback_reason',
         'tool_calls_count',
         'retry_count',
         'loop_guard_triggered',
@@ -150,6 +157,27 @@ if (is_array($matchedEvent)) {
     if (!is_string($matchedEvent['fallback_reason'] ?? null) || trim((string) ($matchedEvent['fallback_reason'] ?? '')) === '') {
         $failures[] = 'fallback_reason debe ser string no vacio.';
     }
+    if (!is_bool($matchedEvent['skill_detected'] ?? null)) {
+        $failures[] = 'skill_detected debe ser booleano.';
+    }
+    if (!is_string($matchedEvent['skill_selected'] ?? null) || trim((string) ($matchedEvent['skill_selected'] ?? '')) === '') {
+        $failures[] = 'skill_selected debe ser string no vacio.';
+    }
+    if (!is_bool($matchedEvent['skill_executed'] ?? null)) {
+        $failures[] = 'skill_executed debe ser booleano.';
+    }
+    if (!is_bool($matchedEvent['skill_failed'] ?? null)) {
+        $failures[] = 'skill_failed debe ser booleano.';
+    }
+    if (!is_numeric($matchedEvent['skill_execution_ms'] ?? null) || (int) $matchedEvent['skill_execution_ms'] < 0) {
+        $failures[] = 'skill_execution_ms debe ser numerico >= 0.';
+    }
+    if (!is_string($matchedEvent['skill_result_status'] ?? null) || trim((string) ($matchedEvent['skill_result_status'] ?? '')) === '') {
+        $failures[] = 'skill_result_status debe ser string no vacio.';
+    }
+    if (!is_string($matchedEvent['skill_fallback_reason'] ?? null) || trim((string) ($matchedEvent['skill_fallback_reason'] ?? '')) === '') {
+        $failures[] = 'skill_fallback_reason debe ser string no vacio.';
+    }
     if (!is_numeric($matchedEvent['tool_calls_count'] ?? null) || (int) $matchedEvent['tool_calls_count'] < 0) {
         $failures[] = 'tool_calls_count debe ser numerico >= 0.';
     }
@@ -195,6 +223,13 @@ if (is_array($matchedEvent)) {
             'rag_result_count',
             'evidence_gate_status',
             'fallback_reason',
+            'skill_detected',
+            'skill_selected',
+            'skill_executed',
+            'skill_failed',
+            'skill_execution_ms',
+            'skill_result_status',
+            'skill_fallback_reason',
             'tool_calls_count',
             'retry_count',
             'loop_guard_triggered',

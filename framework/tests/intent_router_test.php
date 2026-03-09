@@ -117,8 +117,11 @@ if ((bool) ($trivialTelemetry['rag_attempted'] ?? true)) {
 if ((string) ($trivialTelemetry['evidence_gate_status'] ?? '') !== 'skipped_by_rule') {
     $failures[] = 'Consulta trivial debe marcar evidence_gate_status=skipped_by_rule.';
 }
+if ((string) ($trivialTelemetry['skill_result_status'] ?? '') !== 'no_skill_match') {
+    $failures[] = 'Consulta trivial sin skill debe dejar skill_result_status=no_skill_match.';
+}
 
-// 4) Technical query uses RAG, dedupes/limits context, then falls back to LLM as last resort.
+// 4) Technical query without matching skill still uses RAG, dedupes context, then falls back to LLM.
 $ragChunks = [
     [
         'memory_type' => 'sector_knowledge',
@@ -245,8 +248,11 @@ if ((string) ($ragTelemetry['evidence_gate_status'] ?? '') !== 'passed') {
 if ((string) ($ragTelemetry['route_reason'] ?? '') !== 'llm_after_verified_rag') {
     $failures[] = 'Con retrieval exitoso route_reason debe indicar llm_after_verified_rag.';
 }
-if ((string) ($ragTelemetry['route_path'] ?? '') !== 'cache>rules>rag>llm') {
-    $failures[] = 'Ruta tecnica debe dejar route_path completo cache>rules>rag>llm.';
+if ((string) ($ragTelemetry['route_path'] ?? '') !== 'cache>rules>skills>rag>llm') {
+    $failures[] = 'Ruta tecnica debe dejar route_path completo cache>rules>skills>rag>llm.';
+}
+if ((bool) ($ragTelemetry['skill_detected'] ?? true)) {
+    $failures[] = 'Consulta tecnica generica no debe detectar skill si no hay match explicito.';
 }
 $semanticContext = is_array($rag->llmRequest()['semantic_context'] ?? null) ? (array) $rag->llmRequest()['semantic_context'] : [];
 $semanticChunks = is_array($semanticContext['chunks'] ?? null) ? (array) $semanticContext['chunks'] : [];
@@ -269,7 +275,82 @@ if ((int) (($ragTelemetry['metrics_delta']['routed_by_rag'] ?? 0)) !== 1) {
     $failures[] = 'Consulta tecnica con contexto util debe contar routed_by_rag=1.';
 }
 
-// 5) Retrieval errors are explicit and degrade in a controlled way.
+// 5) Explicit dataset lookup should resolve through skills before RAG/LLM.
+$skillRag = $ragRouter->route([
+    'action' => 'send_to_llm',
+    'llm_request' => [
+        'messages' => [
+            ['role' => 'user', 'content' => 'Busca en el dataset la politica de tenant_id y app_id.'],
+        ],
+        'user_message' => 'Busca en el dataset la politica de tenant_id y app_id.',
+    ],
+], [
+    'tenant_id' => 'tenant_demo',
+    'app_id' => 'app_demo',
+    'sector' => 'retail',
+    'session_id' => 'intent_router_skill_rag',
+    'mode' => 'app',
+    'role' => 'admin',
+]);
+if (!$skillRag->isLlmRequest()) {
+    $failures[] = 'dataset_lookup debe continuar a RAG/LLM como ruta skill controlada.';
+}
+$skillRagTelemetry = $skillRag->telemetry();
+if (!(bool) ($skillRagTelemetry['skill_detected'] ?? false) || (string) ($skillRagTelemetry['skill_selected'] ?? '') !== 'dataset_lookup') {
+    $failures[] = 'dataset_lookup debe detectarse sin LLM.';
+}
+if (!(bool) ($skillRagTelemetry['skill_executed'] ?? false) || (string) ($skillRagTelemetry['skill_result_status'] ?? '') !== 'continued_to_rag') {
+    $failures[] = 'dataset_lookup debe ejecutarse y continuar hacia RAG.';
+}
+if ((string) ($skillRagTelemetry['route_path'] ?? '') !== 'cache>rules>skills>rag>llm') {
+    $failures[] = 'Skill RAG debe dejar route_path=cache>rules>skills>rag>llm.';
+}
+if ((string) ($skillRagTelemetry['route_reason'] ?? '') !== 'llm_after_skill_and_verified_rag') {
+    $failures[] = 'Skill RAG con evidencia valida debe dejar route_reason=llm_after_skill_and_verified_rag.';
+}
+$skillContext = is_array($skillRag->llmRequest()['skill_context'] ?? null) ? (array) $skillRag->llmRequest()['skill_context'] : [];
+if ((string) ($skillContext['name'] ?? '') !== 'dataset_lookup') {
+    $failures[] = 'Skill context debe propagarse al llm_request.';
+}
+
+// 6) Tool skill without attachment must stop before RAG/LLM with controlled fallback.
+$toolSkillRoute = $ragRouter->route([
+    'action' => 'send_to_llm',
+    'llm_request' => [
+        'messages' => [
+            ['role' => 'user', 'content' => 'Analiza esta imagen del producto.'],
+        ],
+        'user_message' => 'Analiza esta imagen del producto.',
+    ],
+], [
+    'tenant_id' => 'tenant_demo',
+    'app_id' => 'app_demo',
+    'session_id' => 'intent_router_skill_tool',
+    'mode' => 'app',
+    'role' => 'admin',
+    'attachments_count' => 0,
+]);
+if (!$toolSkillRoute->isLocalResponse()) {
+    $failures[] = 'image_analysis sin adjunto debe responder local antes de RAG/LLM.';
+}
+$toolSkillTelemetry = $toolSkillRoute->telemetry();
+if ((string) ($toolSkillTelemetry['skill_selected'] ?? '') !== 'image_analysis') {
+    $failures[] = 'image_analysis debe detectarse como skill.';
+}
+if ((string) ($toolSkillTelemetry['route_path'] ?? '') !== 'cache>rules>skills') {
+    $failures[] = 'Skill tool bloqueado por falta de adjunto debe dejar route_path=cache>rules>skills.';
+}
+if ((string) ($toolSkillTelemetry['skill_result_status'] ?? '') !== 'needs_input') {
+    $failures[] = 'Skill tool sin adjunto debe pedir input faltante.';
+}
+if ((string) ($toolSkillTelemetry['skill_fallback_reason'] ?? '') !== 'attachment_required') {
+    $failures[] = 'Skill tool sin adjunto debe dejar attachment_required.';
+}
+if ((bool) ($toolSkillTelemetry['rag_attempted'] ?? true)) {
+    $failures[] = 'Skill tool bloqueado no debe intentar RAG.';
+}
+
+// 7) Retrieval errors are explicit and degrade in a controlled way.
 $errorSemantic = buildSemanticService($ragChunks, true);
 $errorRouter = new IntentRouter(null, 'warn', null, $errorSemantic);
 $errorRoute = $errorRouter->route([
@@ -304,7 +385,7 @@ if ((int) (($errorTelemetry['metrics_delta']['rag_errors'] ?? 0)) !== 1) {
     $failures[] = 'RAG error debe reflejarse en metrics_delta.';
 }
 
-// 6) Research mode must allow a wider budget than operation.
+// 8) Research mode must allow a wider budget than operation.
 $operationRoute = $ragRouter->route([
     'action' => 'send_to_llm',
     'llm_request' => [
@@ -363,7 +444,7 @@ if (count($researchChunks) !== 4) {
     $failures[] = 'research debe permitir un semantic_context mas amplio.';
 }
 
-// 7) Budget overflow must stop execution in a controlled way.
+// 9) Budget overflow must stop execution in a controlled way.
 $budgetRouter = new IntentRouter(null, 'warn', null, $trivialSemantic);
 $budgetBlocked = $budgetRouter->route([
     'action' => 'execute_command',
@@ -390,7 +471,7 @@ if ((string) ($budgetTelemetry['loop_guard_reason'] ?? '') !== 'tool_calls_budge
     $failures[] = 'Exceso de tool_calls debe dejar razon explicita.';
 }
 
-// 8) Repeating the same route without progress must trigger anti-loop.
+// 10) Repeating the same route without progress must trigger anti-loop.
 $loopRouter = new IntentRouter(null, 'warn', null, $ragSemantic);
 $loopQuery = 'Como configuro Qdrant para tenant y app?';
 $loopHash = queryHash($loopQuery);
@@ -405,13 +486,13 @@ $loopRoute = $loopRouter->route([
     'state' => [
         'agentops_trace_history' => [
             [
-                'route_path' => 'cache>rules>rag>llm',
+                'route_path' => 'cache>rules>skills>rag>llm',
                 'route_reason' => 'llm_after_verified_rag',
                 'request_mode' => 'operation',
                 'query_hash' => $loopHash,
             ],
             [
-                'route_path' => 'cache>rules>rag>llm',
+                'route_path' => 'cache>rules>skills>rag>llm',
                 'route_reason' => 'llm_after_verified_rag',
                 'request_mode' => 'operation',
                 'query_hash' => $loopHash,

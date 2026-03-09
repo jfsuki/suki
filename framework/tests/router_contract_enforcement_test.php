@@ -27,12 +27,13 @@ foreach ((array) ($routerPolicy['route_order'] ?? []) as $step) {
     }
 }
 if (empty($routeOrder)) {
-    $routeOrder = ['cache', 'rules', 'rag'];
+    $routeOrder = ['cache', 'rules', 'skills', 'rag'];
 }
 $routerPolicy['route_order'] = $routeOrder;
 writeJson($tmpDir . '/router_policy.json', $routerPolicy);
 copy($sourceDir . '/action_catalog.json', $tmpDir . '/action_catalog.json');
 copy($sourceDir . '/agentops_metrics_contract.json', $tmpDir . '/agentops_metrics_contract.json');
+copy($sourceDir . '/skills_catalog.json', $tmpDir . '/skills_catalog.json');
 
 $registry = new ContractRegistry($tmpDir);
 $payload = [

@@ -8700,7 +8700,7 @@ private function parseEntityFromCrudText(string $text): string
     private function defaultRoutingHintSteps(string $action): array
     {
         return match ($action) {
-            'send_to_llm' => ['cache', 'rules', 'rag', 'llm'],
+            'send_to_llm' => ['cache', 'rules', 'skills', 'rag', 'llm'],
             'execute_command' => ['cache', 'rules', 'action_contract'],
             default => ['cache', 'rules'],
         };

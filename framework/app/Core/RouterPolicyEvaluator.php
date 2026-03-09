@@ -25,7 +25,10 @@ final class RouterPolicyEvaluator
         $action = trim((string) ($input['action'] ?? 'respond_local'));
         $command = is_array($input['command'] ?? null) ? (array) $input['command'] : [];
         $routeOrder = $this->normalizeRouteOrder($input['route_order'] ?? []);
-        $routePathSteps = $this->resolveRoutePathSteps($action, $routeOrder);
+        $routePathSteps = $this->normalizeProvidedRoutePathSteps($input['route_path_steps'] ?? null);
+        if ($routePathSteps === []) {
+            $routePathSteps = $this->resolveRoutePathSteps($action, $routeOrder);
+        }
         $routePath = implode('>', $routePathSteps);
 
         $intentType = $this->resolveIntentType($action, $actionCatalogEntry);
@@ -235,7 +238,7 @@ final class RouterPolicyEvaluator
     private function normalizeRouteOrder(mixed $value): array
     {
         if (!is_array($value) || empty($value)) {
-            return ['cache', 'rules', 'rag', 'llm'];
+            return ['cache', 'rules', 'skills', 'rag', 'llm'];
         }
         $result = [];
         foreach ($value as $stage) {
@@ -247,7 +250,30 @@ final class RouterPolicyEvaluator
                 $result[] = $stage;
             }
         }
-        return empty($result) ? ['cache', 'rules', 'rag', 'llm'] : $result;
+        return empty($result) ? ['cache', 'rules', 'skills', 'rag', 'llm'] : $result;
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<int,string>
+     */
+    private function normalizeProvidedRoutePathSteps(mixed $value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $allowed = ['cache', 'rules', 'skills', 'rag', 'llm', 'action_contract'];
+        $result = [];
+        foreach ($value as $stage) {
+            $stage = strtolower(trim((string) $stage));
+            if ($stage === '' || !in_array($stage, $allowed, true) || in_array($stage, $result, true)) {
+                continue;
+            }
+            $result[] = $stage;
+        }
+
+        return $result;
     }
 
     /**

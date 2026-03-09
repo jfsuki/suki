@@ -10,7 +10,7 @@ final class IntentRouter
     private const TRACE_HISTORY_LIMIT = 8;
     private const REQUEST_MODE_BUDGETS = [
         'operation' => [
-            'max_router_steps' => 4,
+            'max_router_steps' => 5,
             'max_tool_calls' => 1,
             'max_retries' => 0,
             'max_llm_fallbacks' => 1,
@@ -20,7 +20,7 @@ final class IntentRouter
             'max_same_route_repeats' => 2,
         ],
         'research' => [
-            'max_router_steps' => 5,
+            'max_router_steps' => 6,
             'max_tool_calls' => 2,
             'max_retries' => 1,
             'max_llm_fallbacks' => 1,
@@ -42,6 +42,8 @@ final class IntentRouter
     private string $enforcementModeSource;
     private string $effectiveAppEnv;
     private ?SemanticMemoryService $semanticMemory;
+    private SkillResolver $skillResolver;
+    private SkillExecutor $skillExecutor;
     private bool $semanticMemoryResolved;
     /** @var array<string,mixed> */
     private array $semanticMemoryAvailability;
@@ -50,12 +52,16 @@ final class IntentRouter
         ?ContractRegistry $contracts = null,
         ?string $enforcementMode = null,
         ?RouterPolicyEvaluator $policyEvaluator = null,
-        ?SemanticMemoryService $semanticMemory = null
+        ?SemanticMemoryService $semanticMemory = null,
+        ?SkillResolver $skillResolver = null,
+        ?SkillExecutor $skillExecutor = null
     )
     {
         $this->contracts = $contracts ?? new ContractRegistry();
         $this->policyEvaluator = $policyEvaluator ?? new RouterPolicyEvaluator();
         $this->semanticMemory = $semanticMemory;
+        $this->skillResolver = $skillResolver ?? new SkillResolver();
+        $this->skillExecutor = $skillExecutor ?? new SkillExecutor();
         $this->semanticMemoryResolved = $semanticMemory !== null;
         $this->semanticMemoryAvailability = $semanticMemory !== null
             ? ['enabled' => true, 'status' => 'enabled', 'reason' => 'semantic_memory_injected']
@@ -79,7 +85,10 @@ final class IntentRouter
         $command = is_array($gatewayResult['command'] ?? null) ? (array) $gatewayResult['command'] : [];
         $llmRequest = is_array($gatewayResult['llm_request'] ?? null) ? (array) $gatewayResult['llm_request'] : [];
         $state = is_array($gatewayResult['state'] ?? null) ? (array) $gatewayResult['state'] : [];
-        $telemetry = is_array($gatewayResult['telemetry'] ?? null) ? (array) $gatewayResult['telemetry'] : [];
+        $telemetry = array_merge(
+            $this->defaultSkillTelemetry(),
+            is_array($gatewayResult['telemetry'] ?? null) ? (array) $gatewayResult['telemetry'] : []
+        );
         $routingHintSteps = $this->extractRoutingHintSteps($gatewayResult, $telemetry);
         $rawRequestMode = $context['request_mode'] ?? $gatewayResult['request_mode'] ?? $telemetry['request_mode'] ?? null;
         $normalizedExplicitRequestMode = $this->normalizeRequestMode((string) $rawRequestMode);
@@ -97,14 +106,16 @@ final class IntentRouter
         $telemetry['runtime_budget'] = $runtimeBudget;
         $telemetry['query_hash'] = $queryHash;
 
-        $routeOrder = ['cache', 'rules', 'rag', 'llm'];
+        $routeOrder = ['cache', 'rules', 'skills', 'rag', 'llm'];
         $violations = [];
         $contractVersions = [
             'router_policy' => 'unknown',
             'action_catalog' => 'unknown',
             'agentops_metrics_contract' => 'unknown',
+            'skills_catalog' => 'unknown',
         ];
         $catalog = [];
+        $skillsRegistry = null;
         $routerPolicy = [
             'route_order' => $routeOrder,
             'rules' => ['llm_is_last_resort' => true],
@@ -123,6 +134,36 @@ final class IntentRouter
         } catch (\Throwable $e) {
             if ($this->enforcementMode !== 'off') {
                 $violations[] = 'contract_registry_unavailable:' . $e->getMessage();
+            }
+        }
+
+        try {
+            $skillsCatalog = $this->contracts->getSkillsCatalog();
+            $skillsRegistry = new SkillRegistry($skillsCatalog);
+            $contractVersions['skills_catalog'] = (string) ($skillsCatalog['version'] ?? 'unknown');
+        } catch (\Throwable $e) {
+            $telemetry['skill_result_status'] = 'registry_unavailable';
+            $telemetry['skill_fallback_reason'] = 'skills_catalog_unavailable';
+            $telemetry['skill_failure_detail'] = trim((string) $e->getMessage());
+        }
+
+        $skillOutcome = $this->maybeExecuteSkill(
+            $action,
+            $gatewayResult,
+            $context,
+            $runtimeBudget,
+            $skillsRegistry
+        );
+        if ($skillOutcome !== []) {
+            $action = (string) ($skillOutcome['action'] ?? $action);
+            $reply = array_key_exists('reply', $skillOutcome) ? (string) ($skillOutcome['reply'] ?? '') : $reply;
+            $command = is_array($skillOutcome['command'] ?? null) ? (array) $skillOutcome['command'] : $command;
+            $llmRequest = is_array($skillOutcome['llm_request'] ?? null) ? (array) $skillOutcome['llm_request'] : $llmRequest;
+            $context = array_merge($context, is_array($skillOutcome['context_overrides'] ?? null) ? (array) $skillOutcome['context_overrides'] : []);
+            $telemetry = array_merge($telemetry, is_array($skillOutcome['telemetry'] ?? null) ? (array) $skillOutcome['telemetry'] : []);
+            $skillRoutingHintSteps = $skillOutcome['routing_hint_steps'] ?? null;
+            if (is_array($skillRoutingHintSteps) && $skillRoutingHintSteps !== []) {
+                $routingHintSteps = $skillRoutingHintSteps;
             }
         }
 
@@ -242,6 +283,7 @@ final class IntentRouter
             'prompt_version' => (string) (getenv('PROMPT_VERSION') ?: 'unknown'),
             'router_policy_version' => $contractVersions['router_policy'],
             'action_catalog_version' => $contractVersions['action_catalog'],
+            'skills_catalog_version' => $contractVersions['skills_catalog'],
             'akp_version' => (string) (getenv('AKP_VERSION') ?: 'unknown'),
             'policy_pack_version' => (string) (getenv('POLICY_PACK_VERSION') ?: 'unknown'),
         ];
@@ -389,7 +431,7 @@ final class IntentRouter
     private function normalizeRouteOrder(mixed $value): array
     {
         if (!is_array($value) || empty($value)) {
-            return ['cache', 'rules', 'rag', 'llm'];
+            return ['cache', 'rules', 'skills', 'rag', 'llm'];
         }
         $result = [];
         foreach ($value as $step) {
@@ -402,7 +444,7 @@ final class IntentRouter
             }
         }
         if (empty($result)) {
-            return ['cache', 'rules', 'rag', 'llm'];
+            return ['cache', 'rules', 'skills', 'rag', 'llm'];
         }
         return $result;
     }
@@ -416,7 +458,7 @@ final class IntentRouter
     {
         if (!empty($routingHintSteps)) {
             $hintPath = [];
-            $allowed = ['cache', 'rules', 'rag', 'llm', 'action_contract'];
+            $allowed = ['cache', 'rules', 'skills', 'rag', 'llm', 'action_contract'];
             foreach ($routingHintSteps as $step) {
                 $step = strtolower(trim((string) $step));
                 if ($step === '' || !in_array($step, $allowed, true)) {
@@ -790,6 +832,13 @@ final class IntentRouter
             'tool_calls_count',
             'retry_count',
             'loop_guard_triggered',
+            'skill_detected',
+            'skill_selected',
+            'skill_executed',
+            'skill_failed',
+            'skill_execution_ms',
+            'skill_result_status',
+            'skill_fallback_reason',
         ] as $key) {
             if (!array_key_exists($key, $merged) && array_key_exists($key, $telemetry)) {
                 $merged[$key] = $telemetry[$key];
@@ -820,6 +869,83 @@ final class IntentRouter
             }
         }
         return $steps;
+    }
+
+    /**
+     * @return array<string,mixed>
+     */
+    private function defaultSkillTelemetry(): array
+    {
+        return [
+            'skill_detected' => false,
+            'skill_selected' => 'none',
+            'skill_executed' => false,
+            'skill_failed' => false,
+            'skill_execution_mode' => 'none',
+            'skill_execution_ms' => 0,
+            'skill_result_status' => 'not_detected',
+            'skill_fallback_reason' => 'none',
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $gatewayResult
+     * @param array<string,mixed> $context
+     * @return array<string,mixed>
+     */
+    private function maybeExecuteSkill(
+        string $action,
+        array $gatewayResult,
+        array $context,
+        array $runtimeBudget,
+        ?SkillRegistry $skillsRegistry
+    ): array {
+        if ($action !== 'send_to_llm' || !$skillsRegistry) {
+            return [];
+        }
+
+        $query = $this->extractRetrievalQuery($gatewayResult, $context);
+        $resolved = $this->skillResolver->resolve($query, $skillsRegistry, $context);
+        if (!(bool) ($resolved['detected'] ?? false)) {
+            return [
+                'telemetry' => [
+                    'skill_detected' => false,
+                    'skill_selected' => 'none',
+                    'skill_executed' => false,
+                    'skill_failed' => false,
+                    'skill_execution_mode' => 'none',
+                    'skill_execution_ms' => 0,
+                    'skill_result_status' => (string) ($resolved['reason'] ?? 'not_detected'),
+                    'skill_fallback_reason' => 'no_skill_match',
+                ],
+            ];
+        }
+
+        $skill = is_array($resolved['selected'] ?? null) ? (array) $resolved['selected'] : [];
+        if ($skill === []) {
+            return [
+                'telemetry' => [
+                    'skill_detected' => false,
+                    'skill_selected' => 'none',
+                    'skill_executed' => false,
+                    'skill_failed' => false,
+                    'skill_execution_mode' => 'none',
+                    'skill_execution_ms' => 0,
+                    'skill_result_status' => 'selection_failed',
+                    'skill_fallback_reason' => 'no_selected_skill',
+                ],
+            ];
+        }
+
+        $execution = $this->skillExecutor->execute($skill, $gatewayResult, $context, $runtimeBudget);
+        $telemetry = is_array($execution['telemetry'] ?? null) ? (array) $execution['telemetry'] : [];
+        $telemetry['skill_detected'] = true;
+        $telemetry['skill_match_reason'] = (string) ($resolved['reason'] ?? 'skill_match');
+        $telemetry['matched_skills'] = is_array($resolved['matched_skills'] ?? null) ? (array) $resolved['matched_skills'] : [];
+
+        return array_merge($execution, [
+            'telemetry' => $telemetry,
+        ]);
     }
 
     /**
@@ -1259,6 +1385,21 @@ final class IntentRouter
                 $reasons[$normalizedStep] = $rulesHit ? 'resolved_by_rules_or_dsl' : 'rules_unresolved';
                 continue;
             }
+            if ($normalizedStep === 'skills') {
+                if (!(bool) ($telemetry['skill_detected'] ?? false)) {
+                    $reasons[$normalizedStep] = 'skill_not_detected';
+                    continue;
+                }
+                $skillName = trim((string) ($telemetry['skill_selected'] ?? ''));
+                $skillStatus = trim((string) ($telemetry['skill_result_status'] ?? 'selected'));
+                $skillFallback = trim((string) ($telemetry['skill_fallback_reason'] ?? 'none'));
+                if ((bool) ($telemetry['skill_failed'] ?? false)) {
+                    $reasons[$normalizedStep] = 'skill_failed:' . ($skillFallback !== '' ? $skillFallback : 'runtime_failure');
+                    continue;
+                }
+                $reasons[$normalizedStep] = 'skill_selected:' . ($skillName !== '' ? $skillName : 'unknown') . ':' . $skillStatus;
+                continue;
+            }
             if ($normalizedStep === 'rag') {
                 $status = trim((string) ($telemetry['evidence_gate_status'] ?? ''));
                 $reason = trim((string) ($telemetry['reason'] ?? $telemetry['fallback_reason'] ?? 'rag_not_evaluated'));
@@ -1289,6 +1430,9 @@ final class IntentRouter
      */
     private function resolveRouteReason(string $action, string $gateDecision, array $telemetry): string
     {
+        if ((bool) ($telemetry['skill_executed'] ?? false) && $action !== 'send_to_llm') {
+            return 'skill_resolved_before_llm';
+        }
         if ($action !== 'send_to_llm') {
             return 'deterministic_route_resolved';
         }
@@ -1297,6 +1441,9 @@ final class IntentRouter
         }
         if ($gateDecision === 'warn') {
             return 'fallback_blocked_by_evidence_gate';
+        }
+        if ((bool) ($telemetry['rag_used'] ?? false) && (bool) ($telemetry['skill_executed'] ?? false)) {
+            return 'llm_after_skill_and_verified_rag';
         }
         if ((bool) ($telemetry['rag_used'] ?? false)) {
             return 'llm_after_verified_rag';
