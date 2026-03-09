@@ -127,7 +127,9 @@ final class RouterPolicyEvaluator
             $input,
             $schemaGate['passed'],
             $authGate['passed'],
-            $modeGate['passed']
+            $modeGate['passed'],
+            (bool) ($input['skip_evidence_gate'] ?? false),
+            trim((string) ($input['evidence_gate_status'] ?? ''))
         );
         $missingEvidence = is_array($evidence['missing'] ?? null) ? (array) $evidence['missing'] : [];
         foreach ($missingEvidence as $missing) {
@@ -561,7 +563,9 @@ final class RouterPolicyEvaluator
         array $input,
         bool $schemaPass,
         bool $authPass,
-        bool $modePass
+        bool $modePass,
+        bool $skipEvidenceGate,
+        string $evidenceGateStatus
     ): array {
         $required = [];
         $policyMinimum = is_array($routerPolicy['minimum_evidence'] ?? null) ? (array) $routerPolicy['minimum_evidence'] : [];
@@ -622,6 +626,10 @@ final class RouterPolicyEvaluator
 
         if ($intentType === 'FORBIDDEN') {
             $present[] = 'policy_or_guard_reference';
+        }
+        if ($skipEvidenceGate || $evidenceGateStatus === 'skipped_by_rule') {
+            $required = [];
+            $present[] = 'evidence_gate_skipped_by_rule';
         }
 
         $present = array_values(array_unique($present));

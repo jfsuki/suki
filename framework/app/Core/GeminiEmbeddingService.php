@@ -11,6 +11,13 @@ final class GeminiEmbeddingService
 {
     private const CANONICAL_MODEL = 'gemini-embedding-001';
     private const CANONICAL_DIMENSION = 768;
+    /**
+     * @var array<int,string>
+     */
+    private const ALLOWED_TASK_TYPES = [
+        'RETRIEVAL_DOCUMENT',
+        'RETRIEVAL_QUERY',
+    ];
 
     private string $apiKey;
     private string $model;
@@ -228,6 +235,9 @@ final class GeminiEmbeddingService
     private function normalizeTaskType(string $taskType): string
     {
         $taskType = strtoupper(trim($taskType));
+        if (!in_array($taskType, self::ALLOWED_TASK_TYPES, true)) {
+            throw new RuntimeException('task_type invalido para embeddings. Usa RETRIEVAL_DOCUMENT o RETRIEVAL_QUERY.');
+        }
         return $taskType;
     }
 

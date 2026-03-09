@@ -1,6 +1,77 @@
 {
   "batch_id": "esco_comercio_operaciones_v2",
   "language": "es-CO",
+  "dataset_version": "1.0.0",
+  "sector": "COMERCIO_PYME",
+  "knowledge_stable": [
+    {
+      "id": "ks_comercio_001",
+      "sector": "COMERCIO_PYME",
+      "title": "Regla base de facturacion y recaudo",
+      "facts": [
+        "Toda factura debe tener cliente, items y total antes de registrar accion ejecutable.",
+        "Si forma de pago es credito, debe solicitarse fecha de vencimiento."
+      ],
+      "source_refs": [
+        "playbook:COMERCIO_PYME",
+        "rule:ERP_FACTURA_VENTA"
+      ],
+      "tags": [
+        "facturacion",
+        "recaudo",
+        "slots"
+      ],
+      "version": "1.0.0",
+      "vectorize": true
+    }
+  ],
+  "support_faq": [
+    {
+      "id": "faq_comercio_001",
+      "question": "Como recupero una factura registrada?",
+      "answer": "Usa consulta por numero de factura o cliente. Si no aparece, valida tenant y periodo de fecha.",
+      "tags": [
+        "facturas",
+        "consulta"
+      ],
+      "version": "1.0.0",
+      "vectorize": true
+    }
+  ],
+  "policy_constraints": [
+    {
+      "id": "pc_exec_auth_001",
+      "scope": "runtime.execute",
+      "rule": "Ninguna accion ejecutable se permite sin auth y tenant bound.",
+      "severity": "critical",
+      "action_if_violate": "block",
+      "version": "1.0.0",
+      "vectorize": false
+    }
+  ],
+  "ontology": {
+    "canonical_terms": [
+      {
+        "term": "factura",
+        "type": "document",
+        "synonyms": [
+          "factura de venta",
+          "comprobante de venta"
+        ]
+      },
+      {
+        "term": "recaudo",
+        "type": "cashflow",
+        "synonyms": [
+          "abono cliente",
+          "pago recibido"
+        ]
+      }
+    ]
+  },
+  "publication": {
+    "status": "draft"
+  },
   "context_pack": {
     "business_type": "comercio_pyme",
     "country": "CO",

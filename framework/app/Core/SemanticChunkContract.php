@@ -16,14 +16,20 @@ final class SemanticChunkContract
         'memory_type',
         'tenant_id',
         'app_id',
+        'agent_role',
+        'sector',
         'source_type',
         'source_id',
+        'source',
+        'content',
+        'tags',
+        'created_at',
+        'updated_at',
+        'metadata',
         'chunk_id',
         'type',
-        'tags',
         'version',
         'quality_score',
-        'created_at',
     ];
 
     /**
@@ -60,6 +66,11 @@ final class SemanticChunkContract
             throw new RuntimeException('Chunk invalido: source_id requerido.');
         }
 
+        $source = trim((string) ($chunk['source'] ?? $sourceId));
+        if ($source === '') {
+            $source = $sourceId;
+        }
+
         $chunkId = trim((string) ($chunk['chunk_id'] ?? ''));
         if ($chunkId === '') {
             throw new RuntimeException('Chunk invalido: chunk_id requerido.');
@@ -70,57 +81,58 @@ final class SemanticChunkContract
             $type = 'knowledge';
         }
 
-        $appIdRaw = trim((string) ($chunk['app_id'] ?? ''));
-        $appId = $appIdRaw !== '' ? $appIdRaw : null;
+        $appId = self::normalizeNullableString($chunk['app_id'] ?? null);
+        $tags = self::normalizeTags($chunk['tags'] ?? []);
+        $agentRole = self::normalizeNullableString(
+            $chunk['agent_role'] ?? self::extractTaggedValue($tags, 'agent_role')
+        );
+        $sector = self::normalizeNullableString(
+            $chunk['sector'] ?? self::extractTaggedValue($tags, 'sector')
+        );
 
         $version = trim((string) ($chunk['version'] ?? getenv('AKP_VERSION') ?: '1.0.0'));
         if ($version === '') {
             $version = '1.0.0';
         }
 
-        $tagsInput = $chunk['tags'] ?? [];
-        if (is_string($tagsInput)) {
-            $tagsInput = preg_split('/\s*,\s*/', $tagsInput) ?: [];
-        }
-        $tags = [];
-        if (is_array($tagsInput)) {
-            foreach ($tagsInput as $tag) {
-                $tag = trim((string) $tag);
-                if ($tag !== '' && !in_array($tag, $tags, true)) {
-                    $tags[] = $tag;
-                }
-            }
-        }
-
         $qualityScore = $chunk['quality_score'] ?? 1.0;
         if (!is_numeric($qualityScore)) {
             throw new RuntimeException('Chunk invalido: quality_score debe ser numerico.');
         }
-        $quality = (float) $qualityScore;
-        if ($quality < 0.0) {
-            $quality = 0.0;
-        } elseif ($quality > 1.0) {
-            $quality = 1.0;
-        }
+        $quality = max(0.0, min(1.0, (float) $qualityScore));
 
         $createdAt = trim((string) ($chunk['created_at'] ?? $chunk['timestamp'] ?? date('c')));
         if ($createdAt === '') {
             $createdAt = date('c');
         }
 
+        $updatedAt = trim((string) ($chunk['updated_at'] ?? $createdAt));
+        if ($updatedAt === '') {
+            $updatedAt = $createdAt;
+        }
+
+        $metadata = is_array($chunk['metadata'] ?? null) ? (array) $chunk['metadata'] : [];
+        $userId = self::normalizeNullableString($chunk['user_id'] ?? ($metadata['user_id'] ?? null));
+
         return [
             'memory_type' => $memoryType,
             'tenant_id' => $tenantId,
             'app_id' => $appId,
+            'agent_role' => $agentRole,
+            'sector' => $sector,
             'source_type' => $sourceType,
             'source_id' => $sourceId,
+            'source' => $source,
             'chunk_id' => $chunkId,
             'type' => $type,
             'tags' => $tags,
             'version' => $version,
             'quality_score' => $quality,
             'created_at' => $createdAt,
+            'updated_at' => $updatedAt,
+            'metadata' => $metadata,
             'content' => $content,
+            'user_id' => $userId,
         ];
     }
 
@@ -135,17 +147,26 @@ final class SemanticChunkContract
             'memory_type' => $normalized['memory_type'],
             'tenant_id' => $normalized['tenant_id'],
             'app_id' => $normalized['app_id'],
+            'agent_role' => $normalized['agent_role'],
+            'sector' => $normalized['sector'],
             'source_type' => $normalized['source_type'],
             'source_id' => $normalized['source_id'],
+            'source' => $normalized['source'],
             'chunk_id' => $normalized['chunk_id'],
             'type' => $normalized['type'],
             'tags' => $normalized['tags'],
             'version' => $normalized['version'],
             'quality_score' => $normalized['quality_score'],
             'created_at' => $normalized['created_at'],
+            'updated_at' => $normalized['updated_at'],
+            'metadata' => $normalized['metadata'],
             'content' => $normalized['content'],
             'content_hash' => sha1((string) $normalized['content']),
         ];
+
+        if ($normalized['user_id'] !== null) {
+            $payload['user_id'] = $normalized['user_id'];
+        }
 
         self::validatePayload($payload);
         return $payload;
@@ -172,20 +193,31 @@ final class SemanticChunkContract
             throw new RuntimeException('Payload semantico invalido: memory_type no permitido.');
         }
 
-        if (($payload['app_id'] ?? null) !== null && trim((string) $payload['app_id']) === '') {
-            throw new RuntimeException('Payload semantico invalido: app_id vacio.');
-        }
-
-        foreach (['source_type', 'source_id', 'chunk_id', 'type', 'version', 'created_at'] as $required) {
+        foreach (['source_type', 'source_id', 'source', 'chunk_id', 'type', 'version', 'created_at', 'updated_at', 'content'] as $required) {
             if (trim((string) ($payload[$required] ?? '')) === '') {
                 throw new RuntimeException('Payload semantico invalido: ' . $required . ' vacio.');
             }
         }
 
+        if (($payload['app_id'] ?? null) !== null && trim((string) $payload['app_id']) === '') {
+            throw new RuntimeException('Payload semantico invalido: app_id vacio.');
+        }
+        if (($payload['agent_role'] ?? null) !== null && trim((string) $payload['agent_role']) === '') {
+            throw new RuntimeException('Payload semantico invalido: agent_role vacio.');
+        }
+        if (($payload['sector'] ?? null) !== null && trim((string) $payload['sector']) === '') {
+            throw new RuntimeException('Payload semantico invalido: sector vacio.');
+        }
+        if (($payload['user_id'] ?? null) !== null && trim((string) $payload['user_id']) === '') {
+            throw new RuntimeException('Payload semantico invalido: user_id vacio.');
+        }
+
         if (!is_array($payload['tags'] ?? null)) {
             throw new RuntimeException('Payload semantico invalido: tags debe ser arreglo.');
         }
-
+        if (!is_array($payload['metadata'] ?? null)) {
+            throw new RuntimeException('Payload semantico invalido: metadata debe ser arreglo.');
+        }
         if (!is_numeric($payload['quality_score'] ?? null)) {
             throw new RuntimeException('Payload semantico invalido: quality_score no numerico.');
         }
@@ -223,5 +255,58 @@ final class SemanticChunkContract
             return 'agent_training';
         }
         return 'sector_knowledge';
+    }
+
+    /**
+     * @param mixed $value
+     */
+    private static function normalizeNullableString($value): ?string
+    {
+        $value = trim((string) $value);
+        return $value !== '' ? $value : null;
+    }
+
+    /**
+     * @param mixed $tagsInput
+     * @return array<int,string>
+     */
+    private static function normalizeTags($tagsInput): array
+    {
+        if (is_string($tagsInput)) {
+            $tagsInput = preg_split('/\s*,\s*/', $tagsInput) ?: [];
+        }
+
+        $tags = [];
+        if (is_array($tagsInput)) {
+            foreach ($tagsInput as $tag) {
+                $tag = trim((string) $tag);
+                if ($tag !== '' && !in_array($tag, $tags, true)) {
+                    $tags[] = $tag;
+                }
+            }
+        }
+
+        return $tags;
+    }
+
+    /**
+     * @param array<int,string> $tags
+     */
+    private static function extractTaggedValue(array $tags, string $prefix): ?string
+    {
+        $needle = strtolower(trim($prefix)) . ':';
+        foreach ($tags as $tag) {
+            $value = trim((string) $tag);
+            if ($value === '') {
+                continue;
+            }
+            if (str_starts_with(strtolower($value), $needle)) {
+                $normalized = trim(substr($value, strlen($needle)));
+                if ($normalized !== '') {
+                    return $normalized;
+                }
+            }
+        }
+        return null;
     }
 }

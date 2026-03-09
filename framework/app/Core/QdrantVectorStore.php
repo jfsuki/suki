@@ -13,6 +13,15 @@ final class QdrantVectorStore
     private const CANONICAL_DIMENSION = 768;
     private const DEFAULT_COLLECTION = 'suki_akp_default';
 
+    /**
+     * @var array<int,string>
+     */
+    private const ALLOWED_MEMORY_TYPES = [
+        'agent_training',
+        'sector_knowledge',
+        'user_memory',
+    ];
+
     private string $baseUrl;
     private string $apiKey;
     private string $collection;
@@ -48,16 +57,20 @@ final class QdrantVectorStore
         if ($fallbackCollection === '') {
             $fallbackCollection = self::DEFAULT_COLLECTION;
         }
+
         $explicitCollection = trim((string) ($collection ?? ''));
         if ($explicitCollection !== '') {
             $this->collection = $explicitCollection;
+        } elseif ($requestedMemoryType !== '') {
+            $this->collection = self::resolveCollectionOrFail($requestedMemoryType);
         } else {
-            $this->collection = self::resolveCollection($requestedMemoryType, $fallbackCollection);
+            $this->collection = self::resolveCollection('', $fallbackCollection);
         }
+
         if ($this->collection === '') {
             throw new RuntimeException('QDRANT_COLLECTION requerido para memoria semantica.');
         }
-        $this->memoryType = self::normalizeMemoryType($requestedMemoryType);
+        $this->memoryType = $requestedMemoryType;
 
         $resolvedSize = (int) ($vectorSize ?? getenv('EMBEDDING_OUTPUT_DIMENSIONALITY') ?: self::CANONICAL_DIMENSION);
         if ($resolvedSize !== self::CANONICAL_DIMENSION) {
@@ -80,6 +93,11 @@ final class QdrantVectorStore
         return $this->collection;
     }
 
+    public function memoryType(): string
+    {
+        return $this->memoryType;
+    }
+
     /**
      * @return array{base_url:string,collection:string,memory_type:string,size:int,distance:string}
      */
@@ -92,6 +110,35 @@ final class QdrantVectorStore
             'size' => $this->vectorSize,
             'distance' => $this->distance,
         ];
+    }
+
+    public function forMemoryType(string $memoryType): self
+    {
+        $memoryType = self::assertMemoryType($memoryType);
+
+        if ($this->memoryType === $memoryType && $this->collection === self::resolveCollectionOrFail($memoryType)) {
+            return $this;
+        }
+
+        return new self(
+            $this->baseUrl,
+            $this->apiKey,
+            null,
+            $this->vectorSize,
+            $this->distance,
+            $this->timeoutSec,
+            $this->transport,
+            $memoryType
+        );
+    }
+
+    public static function assertMemoryType(string $memoryType): string
+    {
+        $memoryType = self::normalizeMemoryType($memoryType);
+        if ($memoryType === '') {
+            throw new RuntimeException('memory_type invalido. Permitidos: agent_training, sector_knowledge, user_memory.');
+        }
+        return $memoryType;
     }
 
     public static function resolveCollection(string $memoryType, ?string $fallbackCollection = null): string
@@ -115,11 +162,27 @@ final class QdrantVectorStore
         return self::DEFAULT_COLLECTION;
     }
 
+    public static function resolveCollectionOrFail(string $memoryType): string
+    {
+        return self::resolveCollection(self::assertMemoryType($memoryType), null);
+    }
+
     /**
-     * @return array{ok:bool,status:int,collection:string}
+     * @return array{ok:bool,status:int,collection:string,created:bool}
      */
     public function ensureCollection(): array
     {
+        $existing = $this->describeCollection(true);
+        if ($existing !== null) {
+            $this->assertCollectionConfig($existing);
+            return [
+                'ok' => true,
+                'status' => 200,
+                'collection' => $this->collection,
+                'created' => false,
+            ];
+        }
+
         $payload = [
             'vectors' => [
                 'size' => $this->vectorSize,
@@ -137,6 +200,7 @@ final class QdrantVectorStore
                     'ok' => true,
                     'status' => $status,
                     'collection' => $this->collection,
+                    'created' => false,
                 ];
             }
             throw new RuntimeException($this->extractErrorMessage($data, $status, 'Qdrant ensureCollection'));
@@ -146,6 +210,48 @@ final class QdrantVectorStore
             'ok' => true,
             'status' => $status,
             'collection' => $this->collection,
+            'created' => true,
+        ];
+    }
+
+    /**
+     * @return array{ok:bool,collection:string,created:array<int,string>,existing:array<int,string>}
+     */
+    public function ensurePayloadIndexes(bool $wait = true): array
+    {
+        $collectionInfo = $this->describeCollection(false);
+        $created = [];
+        $existing = [];
+
+        foreach ($this->payloadIndexSpecs() as $spec) {
+            $fieldName = (string) $spec['field_name'];
+            $isTenant = (bool) ($spec['is_tenant'] ?? false);
+            if ($this->hasPayloadIndex($collectionInfo, $fieldName, $isTenant)) {
+                $existing[] = $fieldName;
+                continue;
+            }
+
+            $path = '/collections/' . rawurlencode($this->collection) . '/index?wait=' . ($wait ? 'true' : 'false');
+            $response = $this->request('PUT', $path, $spec, true);
+            $status = (int) ($response['status'] ?? 0);
+            $data = is_array($response['data'] ?? null) ? (array) $response['data'] : [];
+            if ($status < 200 || $status >= 300) {
+                $rawMessage = strtolower(trim((string) ($data['status']['error'] ?? $data['error'] ?? $data['message'] ?? '')));
+                if ($rawMessage !== '' && (str_contains($rawMessage, 'already exists') || str_contains($rawMessage, 'exists'))) {
+                    $existing[] = $fieldName;
+                    continue;
+                }
+                throw new RuntimeException($this->extractErrorMessage($data, $status, 'Qdrant ensurePayloadIndexes'));
+            }
+
+            $created[] = $fieldName;
+        }
+
+        return [
+            'ok' => true,
+            'collection' => $this->collection,
+            'created' => $created,
+            'existing' => $existing,
         ];
     }
 
@@ -173,7 +279,7 @@ final class QdrantVectorStore
             ];
         }
 
-        if (empty($normalized)) {
+        if ($normalized === []) {
             return ['ok' => true, 'upserted' => 0, 'status' => 200];
         }
 
@@ -203,7 +309,7 @@ final class QdrantVectorStore
             'with_payload' => $withPayload,
             'with_vector' => false,
         ];
-        if (!empty($filter)) {
+        if ($filter !== []) {
             $payload['filter'] = $filter;
         }
 
@@ -213,14 +319,13 @@ final class QdrantVectorStore
         $data = is_array($response['data'] ?? null) ? (array) $response['data'] : [];
 
         if ($status < 200 || $status >= 300) {
-            // Qdrant versions before query endpoint support /points/search.
             $fallbackPayload = [
                 'vector' => $vector,
                 'limit' => $limit,
                 'with_payload' => $withPayload,
                 'with_vector' => false,
             ];
-            if (!empty($filter)) {
+            if ($filter !== []) {
                 $fallbackPayload['filter'] = $filter;
             }
             $fallbackPath = '/collections/' . rawurlencode($this->collection) . '/points/search';
@@ -232,12 +337,143 @@ final class QdrantVectorStore
     }
 
     /**
+     * @return array<string,mixed>|null
+     */
+    private function describeCollection(bool $allowMissing): ?array
+    {
+        $response = $this->request('GET', '/collections/' . rawurlencode($this->collection), [], true);
+        $status = (int) ($response['status'] ?? 0);
+        $data = is_array($response['data'] ?? null) ? (array) $response['data'] : [];
+
+        if ($status === 404 && $allowMissing) {
+            return null;
+        }
+        if ($status < 200 || $status >= 300) {
+            throw new RuntimeException($this->extractErrorMessage($data, $status, 'Qdrant describeCollection'));
+        }
+
+        return $data;
+    }
+
+    /**
+     * @param array<string,mixed> $collectionInfo
+     */
+    private function assertCollectionConfig(array $collectionInfo): void
+    {
+        $vectors = $this->extractVectorConfig($collectionInfo);
+        $size = (int) ($vectors['size'] ?? 0);
+        $distance = trim((string) ($vectors['distance'] ?? ''));
+
+        if ($size !== $this->vectorSize) {
+            throw new RuntimeException(
+                'Coleccion Qdrant con size invalido. Esperado '
+                . $this->vectorSize
+                . ', recibido '
+                . $size
+                . '.'
+            );
+        }
+        if (strcasecmp($distance, $this->distance) !== 0) {
+            throw new RuntimeException(
+                'Coleccion Qdrant con distance invalido. Esperado '
+                . $this->distance
+                . ', recibido '
+                . $distance
+                . '.'
+            );
+        }
+    }
+
+    /**
+     * @param array<string,mixed> $collectionInfo
+     * @return array<string,mixed>
+     */
+    private function extractVectorConfig(array $collectionInfo): array
+    {
+        $result = is_array($collectionInfo['result'] ?? null) ? (array) $collectionInfo['result'] : [];
+        $config = is_array($result['config'] ?? null) ? (array) $result['config'] : [];
+        $params = is_array($config['params'] ?? null) ? (array) $config['params'] : [];
+        $vectors = $params['vectors'] ?? $result['vectors'] ?? [];
+
+        if (is_array($vectors) && array_key_exists('size', $vectors)) {
+            return (array) $vectors;
+        }
+        if (is_array($vectors) && isset($vectors['default']) && is_array($vectors['default'])) {
+            return (array) $vectors['default'];
+        }
+
+        return [];
+    }
+
+    /**
+     * @return array<int,array<string,mixed>>
+     */
+    private function payloadIndexSpecs(): array
+    {
+        $specs = [
+            [
+                'field_name' => 'tenant_id',
+                'field_schema' => 'keyword',
+                'is_tenant' => true,
+            ],
+            [
+                'field_name' => 'memory_type',
+                'field_schema' => 'keyword',
+            ],
+            [
+                'field_name' => 'app_id',
+                'field_schema' => 'keyword',
+            ],
+            [
+                'field_name' => 'sector',
+                'field_schema' => 'keyword',
+            ],
+            [
+                'field_name' => 'agent_role',
+                'field_schema' => 'keyword',
+            ],
+        ];
+
+        if ($this->memoryType === 'user_memory') {
+            $specs[] = [
+                'field_name' => 'user_id',
+                'field_schema' => 'keyword',
+            ];
+        }
+
+        return $specs;
+    }
+
+    /**
+     * @param array<string,mixed> $collectionInfo
+     */
+    private function hasPayloadIndex(array $collectionInfo, string $fieldName, bool $requiresTenant): bool
+    {
+        $result = is_array($collectionInfo['result'] ?? null) ? (array) $collectionInfo['result'] : [];
+        $payloadSchema = is_array($result['payload_schema'] ?? null) ? (array) $result['payload_schema'] : [];
+        $schema = is_array($payloadSchema[$fieldName] ?? null) ? (array) $payloadSchema[$fieldName] : [];
+        if ($schema === []) {
+            return false;
+        }
+        if (!$requiresTenant) {
+            return true;
+        }
+
+        $params = is_array($schema['params'] ?? null) ? (array) $schema['params'] : [];
+        $isTenant = $params['is_tenant'] ?? $schema['is_tenant'] ?? false;
+        return $isTenant === true || $isTenant === 1 || $isTenant === 'true';
+    }
+
+    /**
+     * Gemini + cosine in Qdrant already operate on the provider vector output.
+     * To keep write/query symmetry, runtime validates dimensions but does not renormalize.
+     *
      * @param array<int,float|int|string> $vector
      * @return array<int,float>
      */
     private function normalizeVector(array $vector): array
     {
-        if (empty($vector)) {
+        if ($vector === []) {
             throw new RuntimeException('Vector vacio para Qdrant.');
         }
 
@@ -328,7 +564,7 @@ final class QdrantVectorStore
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_TIMEOUT, $this->timeoutSec);
         curl_setopt($ch, CURLOPT_HTTPHEADER, $headers);
-        if (!empty($payload)) {
+        if ($payload !== []) {
             curl_setopt(
                 $ch,
                 CURLOPT_POSTFIELDS,
@@ -369,7 +605,7 @@ final class QdrantVectorStore
     private static function normalizeMemoryType(string $memoryType): string
     {
         $memoryType = strtolower(trim($memoryType));
-        return in_array($memoryType, ['agent_training', 'sector_knowledge', 'user_memory'], true)
+        return in_array($memoryType, self::ALLOWED_MEMORY_TYPES, true)
             ? $memoryType
             : '';
     }
@@ -377,9 +613,6 @@ final class QdrantVectorStore
     private static function resolveCollectionEnv(string $envKey, string $default): string
     {
         $value = trim((string) (getenv($envKey) ?: $default));
-        if ($value === '') {
-            return $default;
-        }
-        return $value;
+        return $value !== '' ? $value : $default;
     }
 }

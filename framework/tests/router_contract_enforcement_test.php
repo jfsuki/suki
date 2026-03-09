@@ -39,8 +39,9 @@ $payload = [
     'action' => 'send_to_llm',
     'llm_request' => [
         'messages' => [
-            ['role' => 'user', 'content' => 'hola'],
+            ['role' => 'user', 'content' => 'Como configuro Qdrant para tenant y app?'],
         ],
+        'user_message' => 'Como configuro Qdrant para tenant y app?',
     ],
 ];
 
@@ -59,6 +60,9 @@ if ((string) ($warnTelemetry['gate_decision'] ?? '') !== 'warn') {
 }
 if ((string) ($warnTelemetry['route_path'] ?? '') === '') {
     $failures[] = 'warn mode debe reportar route_path';
+}
+if ((string) ($warnTelemetry['evidence_gate_status'] ?? '') === '') {
+    $failures[] = 'warn mode debe reportar evidence_gate_status.';
 }
 if (stripos($warnResult->reply(), 'evidencia minima') === false) {
     $failures[] = 'warn mode debe explicar falta de evidencia para no invocar LLM.';

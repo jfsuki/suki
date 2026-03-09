@@ -12,6 +12,8 @@ final class IntentRouter
     private string $effectiveAppEnv;
     private ?SemanticMemoryService $semanticMemory;
     private bool $semanticMemoryResolved;
+    /** @var array<string,mixed> */
+    private array $semanticMemoryAvailability;
 
     public function __construct(
         ?ContractRegistry $contracts = null,
@@ -24,6 +26,9 @@ final class IntentRouter
         $this->policyEvaluator = $policyEvaluator ?? new RouterPolicyEvaluator();
         $this->semanticMemory = $semanticMemory;
         $this->semanticMemoryResolved = $semanticMemory !== null;
+        $this->semanticMemoryAvailability = $semanticMemory !== null
+            ? ['enabled' => true, 'status' => 'enabled', 'reason' => 'semantic_memory_injected']
+            : ['enabled' => false, 'status' => 'unresolved', 'reason' => 'semantic_memory_not_resolved'];
         $rawAppEnv = (string) (getenv('APP_ENV') ?: getenv('SUKI_ENV') ?: 'dev');
         $rawMode = getenv('ENFORCEMENT_MODE');
         $resolved = EnforcementModePolicy::resolve(
@@ -101,6 +106,7 @@ final class IntentRouter
             $gatewayResult,
             $context
         );
+        $llmContext = [];
         if (!empty($retrieval)) {
             if (array_key_exists('rag_hit', $retrieval)) {
                 $telemetry['rag_hit'] = (bool) $retrieval['rag_hit'];
@@ -121,7 +127,30 @@ final class IntentRouter
             }
             if (is_array($retrieval['telemetry'] ?? null)) {
                 $telemetry['retrieval'] = (array) $retrieval['telemetry'];
+                foreach ([
+                    'semantic_memory_status',
+                    'memory_type',
+                    'reason',
+                    'route_reason',
+                    'semantic_enabled',
+                    'rag_attempted',
+                    'rag_used',
+                    'rag_result_count',
+                    'evidence_gate_status',
+                    'fallback_reason',
+                    'skip_evidence_gate',
+                    'tenant_id',
+                    'app_id',
+                    'sector',
+                    'agent_role',
+                    'user_id',
+                ] as $telemetryKey) {
+                    if (array_key_exists($telemetryKey, $telemetry['retrieval'])) {
+                        $telemetry[$telemetryKey] = $telemetry['retrieval'][$telemetryKey];
+                    }
+                }
             }
+            $llmContext = is_array($retrieval['llm_context'] ?? null) ? (array) $retrieval['llm_context'] : [];
             if (!empty($telemetry['source_ids'] ?? []) || !empty($telemetry['evidence_ids'] ?? [])) {
                 $evidence = is_array($gatewayResult['evidence'] ?? null) ? (array) $gatewayResult['evidence'] : [];
                 $evidence[] = 'at_least_one_source_reference';
@@ -144,6 +173,8 @@ final class IntentRouter
                 'allowlisted' => $allowlisted,
                 'pre_violations' => $violations,
                 'evidence' => is_array($gatewayResult['evidence'] ?? null) ? (array) $gatewayResult['evidence'] : [],
+                'skip_evidence_gate' => (bool) ($telemetry['skip_evidence_gate'] ?? false),
+                'evidence_gate_status' => (string) ($telemetry['evidence_gate_status'] ?? ''),
             ],
             $routerPolicy,
             is_array($actionCatalogEntry) ? (array) $actionCatalogEntry : null,
@@ -166,9 +197,11 @@ final class IntentRouter
             'policy_pack_version' => (string) (getenv('POLICY_PACK_VERSION') ?: 'unknown'),
         ];
         $routePath = implode('>', $routePathSteps);
+        $routeStageReasons = $this->buildRouteStageReasons($action, $gatewayResult, $telemetry, $routePathSteps);
         $agentOps = [
             'route_path' => $routePath,
             'route_path_steps' => $routePathSteps,
+            'route_stage_reasons' => $routeStageReasons,
             'gate_decision' => $gateDecision,
             'final_decision' => (string) ($evaluation['final_decision'] ?? 'allow'),
             'resolve_criteria_code' => (string) ($evaluation['resolve_criteria_code'] ?? 'INFORMATIVE_RESPONSE_VALID'),
@@ -183,6 +216,7 @@ final class IntentRouter
             'routing_hint_steps' => $routingHintSteps,
             'is_authenticated' => (bool) ($context['is_authenticated'] ?? false),
             'effective_role' => strtolower(trim((string) ($context['role'] ?? 'guest'))) ?: 'guest',
+            'route_reason' => $this->resolveRouteReason($action, $gateDecision, $telemetry),
         ];
         if (is_array($telemetry['retrieval'] ?? null)) {
             $agentOps['retrieval'] = (array) $telemetry['retrieval'];
@@ -198,6 +232,10 @@ final class IntentRouter
             $agentOps['action_type'] = (string) ($actionCatalogEntry['type'] ?? '');
         }
         $telemetry = array_merge($telemetry, $agentOps);
+
+        if ($action === 'send_to_llm' && !empty($llmRequest) && !empty($llmContext)) {
+            $llmRequest = $this->injectSemanticContext($llmRequest, $llmContext, $telemetry);
+        }
 
         if ($gateDecision === 'blocked') {
             $overrideAction = trim((string) ($evaluation['action_override'] ?? ''));
@@ -399,6 +437,25 @@ final class IntentRouter
                 ), static fn(string $value): bool => $value !== ''));
             }
         }
+        foreach ([
+            'semantic_enabled',
+            'rag_attempted',
+            'rag_used',
+            'rag_result_count',
+            'evidence_gate_status',
+            'fallback_reason',
+            'memory_type',
+            'tenant_id',
+            'app_id',
+            'sector',
+            'agent_role',
+            'user_id',
+            'skip_evidence_gate',
+        ] as $key) {
+            if (!array_key_exists($key, $merged) && array_key_exists($key, $telemetry)) {
+                $merged[$key] = $telemetry[$key];
+            }
+        }
         return $merged;
     }
 
@@ -438,57 +495,132 @@ final class IntentRouter
         array $gatewayResult,
         array $context
     ): array {
-        if (!$this->shouldAttemptRetrieval($action, $actionCatalogEntry)) {
-            return [];
+        $query = $this->extractRetrievalQuery($gatewayResult, $context);
+        $memoryType = $this->resolveRetrievalMemoryType($context, $actionCatalogEntry);
+        $runtimeConfig = SemanticMemoryService::retrievalRuntimeConfig();
+        $availability = SemanticMemoryService::availabilityFromEnv();
+        $scope = [
+            'tenant_id' => trim((string) ($context['tenant_id'] ?? '')),
+            'app_id' => trim((string) ($context['app_id'] ?? $context['project_id'] ?? '')) ?: null,
+            'sector' => trim((string) ($context['sector'] ?? '')) ?: null,
+            'agent_role' => trim((string) ($context['agent_role'] ?? '')) ?: null,
+            'user_id' => trim((string) ($context['user_id'] ?? '')) ?: null,
+        ];
+        $policy = $this->evaluateRetrievalPolicy($action, $actionCatalogEntry, $query, $scope);
+        $baseTelemetry = [
+            'semantic_enabled' => (bool) ($availability['enabled'] ?? false),
+            'semantic_memory_status' => (string) ($availability['status'] ?? ($this->semanticMemoryAvailability['status'] ?? 'unresolved')),
+            'rag_attempted' => false,
+            'rag_used' => false,
+            'rag_result_count' => 0,
+            'route_reason' => (string) ($policy['route_reason'] ?? 'rag_not_applicable'),
+            'evidence_gate_status' => (string) ($policy['evidence_gate_status'] ?? 'skipped_by_rule'),
+            'fallback_reason' => (string) ($policy['fallback_reason'] ?? 'rag_not_required'),
+            'skip_evidence_gate' => (bool) ($policy['skip_evidence_gate'] ?? false),
+            'memory_type' => $memoryType,
+            'tenant_id' => (string) $scope['tenant_id'],
+            'app_id' => $scope['app_id'],
+            'sector' => $scope['sector'],
+            'agent_role' => $scope['agent_role'],
+            'user_id' => $scope['user_id'],
+            'top_k' => $runtimeConfig['top_k'],
+            'min_score' => $runtimeConfig['min_score'],
+            'min_evidence_chunks' => $runtimeConfig['min_evidence_chunks'],
+            'max_context_chunks' => $runtimeConfig['max_context_chunks'],
+            'reason' => (string) ($policy['reason'] ?? 'rag_not_applicable'),
+        ];
+
+        if (!(bool) ($policy['should_attempt'] ?? false)) {
+            return [
+                'ok' => true,
+                'rag_hit' => false,
+                'hits' => [],
+                'source_ids' => [],
+                'evidence_ids' => [],
+                'llm_context' => [],
+                'telemetry' => $baseTelemetry,
+            ];
         }
 
         $semanticMemory = $this->semanticMemory();
         if (!$semanticMemory) {
-            return [];
-        }
-
-        $tenantId = trim((string) ($context['tenant_id'] ?? ''));
-        if ($tenantId === '') {
-            return [];
-        }
-        $appId = trim((string) ($context['app_id'] ?? $context['project_id'] ?? ''));
-        $query = $this->extractRetrievalQuery($gatewayResult, $context);
-        if ($query === '') {
-            return [];
+            $disabled = SemanticMemoryService::disabledResult(
+                (string) ($this->semanticMemoryAvailability['reason'] ?? 'semantic_memory_unavailable'),
+                [
+                    'memory_type' => $memoryType,
+                ]
+            );
+            $disabled['llm_context'] = [];
+            $disabled['telemetry'] = array_merge(
+                $baseTelemetry,
+                is_array($disabled['telemetry'] ?? null) ? (array) $disabled['telemetry'] : [],
+                [
+                    'semantic_enabled' => false,
+                    'semantic_memory_status' => (string) ($this->semanticMemoryAvailability['status'] ?? 'disabled'),
+                    'evidence_gate_status' => 'disabled_by_config',
+                    'fallback_reason' => 'semantic_memory_unavailable',
+                    'route_reason' => 'rag_unavailable_before_llm',
+                    'skip_evidence_gate' => false,
+                ]
+            );
+            return $disabled;
         }
 
         try {
-            $topK = max(1, (int) (getenv('SEMANTIC_MEMORY_TOP_K') ?: 5));
-            return $semanticMemory->retrieve($query, [
-                'tenant_id' => $tenantId,
-                'app_id' => $appId !== '' ? $appId : null,
-            ], $topK);
+            $retrieval = $semanticMemory->retrieve($query, array_merge($scope, [
+                'memory_type' => $memoryType,
+            ]), $runtimeConfig['top_k']);
+            $preparedContext = SemanticMemoryService::prepareContext($retrieval);
+            $rawHitCount = count((array) ($retrieval['hits'] ?? []));
+            $passed = $preparedContext['used_count'] >= $runtimeConfig['min_evidence_chunks'];
+
+            return [
+                'ok' => true,
+                'rag_hit' => $passed,
+                'hits' => $passed ? (array) $preparedContext['chunks'] : [],
+                'source_ids' => $passed ? (array) $preparedContext['source_ids'] : [],
+                'evidence_ids' => $passed ? (array) $preparedContext['evidence_ids'] : [],
+                'llm_context' => $passed ? $preparedContext : [],
+                'telemetry' => array_merge(
+                    $baseTelemetry,
+                    is_array($retrieval['telemetry'] ?? null) ? (array) $retrieval['telemetry'] : [],
+                    [
+                        'semantic_enabled' => true,
+                        'semantic_memory_status' => 'enabled',
+                        'rag_attempted' => true,
+                        'rag_used' => $passed,
+                        'rag_result_count' => $passed ? (int) $preparedContext['used_count'] : 0,
+                        'rag_result_count_raw' => $rawHitCount,
+                        'evidence_gate_status' => $passed ? 'passed' : 'insufficient_evidence',
+                        'fallback_reason' => $passed ? 'llm_last_resort_after_rag' : 'insufficient_evidence',
+                        'route_reason' => $passed ? 'rag_backed_llm_fallback' : 'rag_attempted_but_insufficient',
+                        'skip_evidence_gate' => false,
+                    ]
+                ),
+            ];
         } catch (\Throwable $e) {
             return [
+                'ok' => true,
                 'rag_hit' => false,
+                'hits' => [],
                 'source_ids' => [],
                 'evidence_ids' => [],
-                'telemetry' => [
-                    'retrieval_attempted' => true,
-                    'retrieval_result_count' => 0,
-                    'retrieval_error' => trim((string) $e->getMessage()),
-                ],
+                'llm_context' => [],
+                'telemetry' => array_merge($baseTelemetry, [
+                    'semantic_enabled' => true,
+                    'semantic_memory_status' => 'error',
+                    'rag_attempted' => true,
+                    'rag_used' => false,
+                    'rag_result_count' => 0,
+                    'evidence_gate_status' => 'insufficient_evidence',
+                    'fallback_reason' => 'rag_error',
+                    'route_reason' => 'rag_error_before_llm',
+                    'skip_evidence_gate' => false,
+                    'rag_error' => trim((string) $e->getMessage()),
+                    'reason' => 'rag_error',
+                ]),
             ];
         }
-    }
-
-    /**
-     * @param array<string,mixed>|null $actionCatalogEntry
-     */
-    private function shouldAttemptRetrieval(string $action, ?array $actionCatalogEntry): bool
-    {
-        if ($action === 'send_to_llm') {
-            return true;
-        }
-        if (!is_array($actionCatalogEntry)) {
-            return false;
-        }
-        return (bool) ($actionCatalogEntry['rag_required'] ?? false);
     }
 
     private function semanticMemory(): ?SemanticMemoryService
@@ -498,18 +630,382 @@ final class IntentRouter
         }
         $this->semanticMemoryResolved = true;
 
-        if (!SemanticMemoryService::isEnabledFromEnv()) {
+        $availability = SemanticMemoryService::availabilityFromEnv();
+        $this->semanticMemoryAvailability = $availability;
+        if (!(bool) ($availability['enabled'] ?? false)) {
             $this->semanticMemory = null;
             return null;
         }
 
         try {
             $this->semanticMemory = new SemanticMemoryService();
+            $this->semanticMemoryAvailability = [
+                'enabled' => true,
+                'status' => 'enabled',
+                'reason' => 'semantic_memory_enabled',
+            ];
             return $this->semanticMemory;
         } catch (\Throwable $e) {
             $this->semanticMemory = null;
+            $this->semanticMemoryAvailability = [
+                'enabled' => false,
+                'status' => 'error',
+                'reason' => 'semantic_memory_init_failed:' . trim((string) $e->getMessage()),
+            ];
             return null;
         }
+    }
+
+    /**
+     * @param array<string,mixed> $context
+     * @param array<string,mixed>|null $actionCatalogEntry
+     */
+    private function resolveRetrievalMemoryType(array $context, ?array $actionCatalogEntry): string
+    {
+        $candidate = trim((string) ($context['memory_type'] ?? ''));
+        if (in_array($candidate, ['agent_training', 'sector_knowledge', 'user_memory'], true)) {
+            return $candidate;
+        }
+
+        if (is_array($actionCatalogEntry)) {
+            $catalogMemoryType = trim((string) ($actionCatalogEntry['memory_type'] ?? ''));
+            if (in_array($catalogMemoryType, ['agent_training', 'sector_knowledge', 'user_memory'], true)) {
+                return $catalogMemoryType;
+            }
+        }
+
+        return 'sector_knowledge';
+    }
+
+    /**
+     * @param array<string,mixed>|null $actionCatalogEntry
+     * @param array<string,mixed> $scope
+     * @return array<string,mixed>
+     */
+    private function evaluateRetrievalPolicy(
+        string $action,
+        ?array $actionCatalogEntry,
+        string $query,
+        array $scope
+    ): array {
+        if ($action !== 'send_to_llm') {
+            return [
+                'should_attempt' => false,
+                'skip_evidence_gate' => true,
+                'evidence_gate_status' => 'skipped_by_rule',
+                'route_reason' => 'deterministic_route_resolved_before_rag',
+                'fallback_reason' => 'deterministic_route_resolved',
+                'reason' => 'deterministic_route_resolved',
+            ];
+        }
+
+        if (trim($query) === '') {
+            return [
+                'should_attempt' => false,
+                'skip_evidence_gate' => true,
+                'evidence_gate_status' => 'skipped_by_rule',
+                'route_reason' => 'empty_query_before_rag',
+                'fallback_reason' => 'empty_query',
+                'reason' => 'empty_query',
+            ];
+        }
+
+        if ($this->isTrivialConversationQuery($query)) {
+            return [
+                'should_attempt' => false,
+                'skip_evidence_gate' => true,
+                'evidence_gate_status' => 'skipped_by_rule',
+                'route_reason' => 'rag_skipped_by_rule',
+                'fallback_reason' => 'rag_not_required_for_trivial_query',
+                'reason' => 'trivial_query',
+            ];
+        }
+
+        if ((string) ($scope['tenant_id'] ?? '') === '') {
+            return [
+                'should_attempt' => false,
+                'skip_evidence_gate' => false,
+                'evidence_gate_status' => 'insufficient_evidence',
+                'route_reason' => 'rag_skipped_missing_tenant_scope',
+                'fallback_reason' => 'missing_tenant_scope',
+                'reason' => 'missing_tenant_scope',
+            ];
+        }
+
+        $requiresCorpus = $this->isTechnicalInformativeQuery($query)
+            || (is_array($actionCatalogEntry) && (bool) ($actionCatalogEntry['rag_required'] ?? false));
+        if (!$requiresCorpus) {
+            return [
+                'should_attempt' => false,
+                'skip_evidence_gate' => true,
+                'evidence_gate_status' => 'skipped_by_rule',
+                'route_reason' => 'rag_skipped_by_rule',
+                'fallback_reason' => 'rag_not_required',
+                'reason' => 'non_technical_query',
+            ];
+        }
+
+        return [
+            'should_attempt' => true,
+            'skip_evidence_gate' => false,
+            'evidence_gate_status' => 'insufficient_evidence',
+            'route_reason' => 'rag_attempt_required',
+            'fallback_reason' => 'awaiting_rag_result',
+            'reason' => 'technical_query_requires_corpus',
+        ];
+    }
+
+    private function isTrivialConversationQuery(string $query): bool
+    {
+        $normalized = $this->normalizeFreeText($query);
+        if ($normalized === '') {
+            return true;
+        }
+
+        $trivialExact = [
+            'hola',
+            'hello',
+            'hi',
+            'gracias',
+            'muchas gracias',
+            'ok',
+            'oki',
+            'ok gracias',
+            'dale',
+            'vale',
+            'listo',
+            'si',
+            'no',
+            'adios',
+            'buenos dias',
+            'buenas tardes',
+            'buenas noches',
+        ];
+        if (in_array($normalized, $trivialExact, true)) {
+            return true;
+        }
+
+        $tokens = preg_split('/\s+/', $normalized) ?: [];
+        return count($tokens) <= 2 && preg_match('/^(hola|gracias|ok|si|no|dale|vale|adios)/u', $normalized) === 1;
+    }
+
+    private function isTechnicalInformativeQuery(string $query): bool
+    {
+        $normalized = $this->normalizeFreeText($query);
+        if ($normalized === '') {
+            return false;
+        }
+
+        $technicalTerms = [
+            'arquitectura',
+            'architecture',
+            'configuracion',
+            'config',
+            'policy',
+            'politica',
+            'proceso',
+            'process',
+            'error',
+            'falla',
+            'issue',
+            'bug',
+            'ayuda',
+            'help',
+            'soporte',
+            'support',
+            'faq',
+            'documentacion',
+            'docs',
+            'workflow',
+            'schema',
+            'contrato',
+            'contract',
+            'qdrant',
+            'vector',
+            'embedding',
+            'retrieval',
+            'rag',
+            'tenant',
+            'app_id',
+            'agent_role',
+            'user_memory',
+            'sector_knowledge',
+            'agent_training',
+            'api',
+            'integracion',
+            'integration',
+            'billing',
+            'invoice',
+            'invoices',
+            'factura',
+            'facturas',
+            'facturacion',
+            'cobro',
+            'como configurar',
+            'como funciona',
+            'necesito ayuda',
+            'ayuda con',
+            'problema con',
+            'no funciona',
+            'por que',
+            'why',
+            'how',
+            'troubleshoot',
+            'troubleshooting',
+            'memoria semantica',
+        ];
+        foreach ($technicalTerms as $term) {
+            if (str_contains($normalized, $term)) {
+                return true;
+            }
+        }
+
+        $questionStarters = ['como', 'por que', 'porque', 'que', 'cual', 'where', 'what', 'how', 'why'];
+        $tokens = preg_split('/\s+/', $normalized) ?: [];
+        if (count($tokens) >= 5) {
+            foreach ($questionStarters as $starter) {
+                if (str_starts_with($normalized, $starter . ' ')) {
+                    return true;
+                }
+            }
+        }
+
+        return str_contains($normalized, '?') && count($tokens) >= 5;
+    }
+
+    private function normalizeFreeText(string $text): string
+    {
+        $text = strtolower(trim($text));
+        $text = preg_replace('/\s+/', ' ', $text) ?? $text;
+        return trim($text);
+    }
+
+    /**
+     * @param array<string,mixed> $gatewayResult
+     * @param array<string,mixed> $telemetry
+     * @param array<int,string> $routePathSteps
+     * @return array<string,string>
+     */
+    private function buildRouteStageReasons(
+        string $action,
+        array $gatewayResult,
+        array $telemetry,
+        array $routePathSteps
+    ): array {
+        $reasons = [];
+        foreach ($routePathSteps as $step) {
+            $normalizedStep = strtolower(trim((string) $step));
+            if ($normalizedStep === '') {
+                continue;
+            }
+            if ($normalizedStep === 'cache') {
+                $cacheHit = (bool) ($telemetry['cache_hit'] ?? $gatewayResult['cache_hit'] ?? false);
+                $reasons[$normalizedStep] = $cacheHit ? 'cache_hit' : 'cache_miss_or_unavailable';
+                continue;
+            }
+            if ($normalizedStep === 'rules') {
+                $rulesHit = (bool) ($telemetry['rules_hit'] ?? $gatewayResult['rules_hit'] ?? ($action !== 'send_to_llm'));
+                $reasons[$normalizedStep] = $rulesHit ? 'resolved_by_rules_or_dsl' : 'rules_unresolved';
+                continue;
+            }
+            if ($normalizedStep === 'rag') {
+                $status = trim((string) ($telemetry['evidence_gate_status'] ?? ''));
+                $reason = trim((string) ($telemetry['reason'] ?? $telemetry['fallback_reason'] ?? 'rag_not_evaluated'));
+                $reasons[$normalizedStep] = $status !== '' ? ($status . ':' . $reason) : $reason;
+                continue;
+            }
+            if ($normalizedStep === 'llm') {
+                if ($action !== 'send_to_llm') {
+                    $reasons[$normalizedStep] = 'not_needed';
+                    continue;
+                }
+                if ((bool) ($telemetry['rag_used'] ?? false)) {
+                    $reasons[$normalizedStep] = 'llm_last_resort_after_rag';
+                    continue;
+                }
+                $fallbackReason = trim((string) ($telemetry['fallback_reason'] ?? 'llm_last_resort'));
+                $reasons[$normalizedStep] = $fallbackReason;
+                continue;
+            }
+            $reasons[$normalizedStep] = 'stage_processed';
+        }
+
+        return $reasons;
+    }
+
+    /**
+     * @param array<string,mixed> $telemetry
+     */
+    private function resolveRouteReason(string $action, string $gateDecision, array $telemetry): string
+    {
+        if ($action !== 'send_to_llm') {
+            return 'deterministic_route_resolved';
+        }
+        if ($gateDecision === 'blocked') {
+            return 'blocked_before_llm';
+        }
+        if ($gateDecision === 'warn') {
+            return 'fallback_blocked_by_evidence_gate';
+        }
+        if ((bool) ($telemetry['rag_used'] ?? false)) {
+            return 'llm_after_verified_rag';
+        }
+        if (trim((string) ($telemetry['route_reason'] ?? '')) !== '') {
+            return (string) $telemetry['route_reason'];
+        }
+        return 'llm_last_resort_without_rag';
+    }
+
+    /**
+     * @param array<string,mixed> $llmRequest
+     * @param array<string,mixed> $semanticContext
+     * @param array<string,mixed> $telemetry
+     * @return array<string,mixed>
+     */
+    private function injectSemanticContext(array $llmRequest, array $semanticContext, array $telemetry): array
+    {
+        if ($semanticContext === []) {
+            return $llmRequest;
+        }
+
+        $llmRequest['semantic_context'] = $semanticContext;
+        $llmRequest['semantic_context_meta'] = [
+            'memory_type' => (string) ($telemetry['memory_type'] ?? ''),
+            'tenant_id' => (string) ($telemetry['tenant_id'] ?? ''),
+            'app_id' => $telemetry['app_id'] ?? null,
+            'sector' => $telemetry['sector'] ?? null,
+            'agent_role' => $telemetry['agent_role'] ?? null,
+            'user_id' => $telemetry['user_id'] ?? null,
+        ];
+
+        $contextLines = ["Contexto semantico verificado:"];
+        foreach ((array) ($semanticContext['chunks'] ?? []) as $index => $chunk) {
+            if (!is_array($chunk)) {
+                continue;
+            }
+            $source = trim((string) ($chunk['source'] ?? $chunk['source_id'] ?? 'fuente'));
+            $content = trim((string) ($chunk['content'] ?? ''));
+            if ($content === '') {
+                continue;
+            }
+            $contextLines[] = ($index + 1) . '. [' . $source . '] ' . $content;
+        }
+
+        if ($contextLines !== ["Contexto semantico verificado:"]) {
+            $contextBlock = implode("\n", $contextLines);
+            $llmRequest['user_message'] = trim((string) ($llmRequest['user_message'] ?? ''));
+            $llmRequest['user_message'] = trim($llmRequest['user_message'] . "\n\n" . $contextBlock);
+            if (is_array($llmRequest['prompt_contract'] ?? null)) {
+                $llmRequest['prompt_contract']['SEMANTIC_CONTEXT'] = [
+                    'memory_type' => (string) ($telemetry['memory_type'] ?? ''),
+                    'chunks' => (array) ($semanticContext['chunks'] ?? []),
+                    'source_ids' => (array) ($semanticContext['source_ids'] ?? []),
+                    'evidence_ids' => (array) ($semanticContext['evidence_ids'] ?? []),
+                ];
+            }
+        }
+
+        return $llmRequest;
     }
 
     /**

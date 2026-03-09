@@ -63,6 +63,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('worker_processes_queued_whatsapp_message', fn() => $this->checkWorkerProcessesQueuedWhatsAppMessage());
         $tests[] = $this->wrap('worker_respects_idempotency', fn() => $this->checkWorkerRespectsIdempotency());
         $tests[] = $this->wrap('worker_logs_route_path', fn() => $this->checkWorkerLogsRoutePath());
+        $tests[] = $this->wrap('agentops_runtime_observability', fn() => $this->checkAgentOpsRuntimeObservability());
         $tests[] = $this->wrap('operational_queue_schema_guard', fn() => $this->checkOperationalQueueSchemaGuard());
         $tests[] = $this->wrap('schema_runtime_guard', fn() => $this->checkSchemaRuntimeGuard());
         $tests[] = $this->wrap('framework_hygiene', fn() => $this->checkFrameworkHygiene());
@@ -86,6 +87,9 @@ final class UnitTestRunner
         $tests[] = $this->wrap('canonical_storage_new_project', fn() => $this->checkCanonicalStorageNewProject());
         $tests[] = $this->wrap('llm_router_failover', fn() => $this->checkLlmRouterFailover());
         $tests[] = $this->wrap('training_dataset_validator', fn() => $this->checkTrainingDatasetValidator());
+        $tests[] = $this->wrap('training_dataset_publication_gate', fn() => $this->checkTrainingDatasetPublicationGate());
+        $tests[] = $this->wrap('training_dataset_vectorize_command', fn() => $this->checkTrainingDatasetVectorizeCommand());
+        $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
 
         $summary = [
             'passed' => count(array_filter($tests, fn($t) => $t['status'] === 'pass')),
@@ -972,6 +976,11 @@ final class UnitTestRunner
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/worker_logs_route_path_test.php');
     }
 
+    private function checkAgentOpsRuntimeObservability(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/agentops_runtime_observability_test.php');
+    }
+
     private function checkOperationalQueueSchemaGuard(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/operational_queue_schema_guard_test.php');
@@ -1399,6 +1408,21 @@ final class UnitTestRunner
     private function checkTrainingDatasetValidator(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/training_dataset_validator_test.php');
+    }
+
+    private function checkTrainingDatasetPublicationGate(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/training_dataset_publication_gate_test.php');
+    }
+
+    private function checkTrainingDatasetVectorizeCommand(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/training_dataset_vectorize_command_test.php');
+    }
+
+    private function checkSemanticPipelineE2E(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/semantic_pipeline_e2e_test.php');
     }
 
     private function cleanupLegacyTestArtifacts(): void

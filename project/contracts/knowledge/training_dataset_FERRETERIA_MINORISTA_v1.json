@@ -1,0 +1,774 @@
+{
+    "batch_id": "pilot_ferreteria_minorista_v1",
+    "language": "es-CO",
+    "dataset_version": "1.0.0",
+    "sector": "FERRETERIA_MINORISTA",
+    "knowledge_stable": [
+        {
+            "id": "ks_ferreteria_001",
+            "sector": "FERRETERIA_MINORISTA",
+            "title": "Datos minimos para facturar venta en ferreteria",
+            "facts": [
+                "Una factura de venta requiere cliente identificado, lista de items y total antes de ejecutar la accion.",
+                "Si la venta es a credito se debe registrar condicion de pago para control de cartera."
+            ],
+            "source_refs": [
+                "playbook:FERRETERIA_MINORISTA",
+                "rule:ERP_INVOICE_SALES_MIN_FIELDS"
+            ],
+            "tags": [
+                "facturacion",
+                "slots",
+                "ventas"
+            ],
+            "version": "1.0.0",
+            "vectorize": true
+        },
+        {
+            "id": "ks_ferreteria_002",
+            "sector": "FERRETERIA_MINORISTA",
+            "title": "Control de items y unidades en mostrador",
+            "facts": [
+                "Cada item facturado debe incluir descripcion comercial y valor unitario para evitar ambiguedad en caja.",
+                "Las ventas de ferreteria suelen mezclar unidades, paquetes o metros y deben quedar claras en la factura."
+            ],
+            "source_refs": [
+                "playbook:FERRETERIA_MINORISTA",
+                "rule:ITEM_CLARITY_FOR_SALES"
+            ],
+            "tags": [
+                "items",
+                "mostrador",
+                "calidad_dato"
+            ],
+            "version": "1.0.0",
+            "vectorize": true
+        },
+        {
+            "id": "ks_ferreteria_003",
+            "sector": "FERRETERIA_MINORISTA",
+            "title": "Validacion operativa previa al cierre de venta",
+            "facts": [
+                "Antes de cerrar una venta se valida que el cliente exista y que el total sea numerico y positivo.",
+                "Si falta un dato critico se debe pedir una sola pregunta de seguimiento y no ejecutar con supuestos."
+            ],
+            "source_refs": [
+                "policy:ONE_QUESTION_MINIMAL",
+                "policy:EXECUTION_GATES"
+            ],
+            "tags": [
+                "gates",
+                "validacion",
+                "operacion"
+            ],
+            "version": "1.0.0",
+            "vectorize": true
+        }
+    ],
+    "support_faq": [
+        {
+            "id": "faq_ferreteria_001",
+            "question": "Que hago si no recuerdo el cliente al momento de facturar?",
+            "answer": "Solicita primero el nombre o documento del cliente y no ejecutes la factura hasta completar ese dato.",
+            "tags": [
+                "cliente",
+                "factura"
+            ],
+            "version": "1.0.0",
+            "vectorize": true
+        },
+        {
+            "id": "faq_ferreteria_002",
+            "question": "Como registro una venta con varios productos en una sola factura?",
+            "answer": "Incluye todos los items con su descripcion y valor unitario, luego confirma el total acumulado antes de guardar.",
+            "tags": [
+                "items",
+                "multi_item"
+            ],
+            "version": "1.0.0",
+            "vectorize": true
+        },
+        {
+            "id": "faq_ferreteria_003",
+            "question": "Cuando debo marcar una venta como credito?",
+            "answer": "Marca credito cuando el pago no se realiza completo en caja y registra una condicion de pago clara.",
+            "tags": [
+                "credito",
+                "cartera"
+            ],
+            "version": "1.0.0",
+            "vectorize": true
+        },
+        {
+            "id": "faq_ferreteria_004",
+            "question": "Que pasa si falta el total en la solicitud de factura?",
+            "answer": "El asistente debe preguntar solo por el total faltante y bloquear la ejecucion hasta recibir ese valor.",
+            "tags": [
+                "slots",
+                "one_question_policy"
+            ],
+            "version": "1.0.0",
+            "vectorize": true
+        }
+    ],
+    "policy_constraints": [
+        {
+            "id": "pc_ferreteria_001",
+            "scope": "runtime.execute",
+            "rule": "Ninguna accion ejecutable de facturacion se permite sin auth valida y tenant vinculado.",
+            "severity": "critical",
+            "action_if_violate": "block",
+            "version": "1.0.0",
+            "vectorize": false
+        },
+        {
+            "id": "pc_ferreteria_002",
+            "scope": "runtime.slots",
+            "rule": "Si falta cliente, items o total, el asistente debe pedir un solo dato faltante por turno.",
+            "severity": "high",
+            "action_if_violate": "ask_user",
+            "version": "1.0.0",
+            "vectorize": false
+        },
+        {
+            "id": "pc_ferreteria_003",
+            "scope": "runtime.routing",
+            "rule": "La ruta debe ser cache, rules, rag y llm solo como ultimo recurso con gates en verde.",
+            "severity": "high",
+            "action_if_violate": "block",
+            "version": "1.0.0",
+            "vectorize": false
+        }
+    ],
+    "ontology": {
+        "canonical_terms": [
+            {
+                "term": "factura",
+                "type": "documento_venta",
+                "synonyms": [
+                    "comprobante de venta",
+                    "factura de mostrador",
+                    "documento de cobro"
+                ]
+            },
+            {
+                "term": "cliente",
+                "type": "tercero",
+                "synonyms": [
+                    "comprador",
+                    "razon social",
+                    "titular de compra"
+                ]
+            },
+            {
+                "term": "items",
+                "type": "detalle_venta",
+                "synonyms": [
+                    "productos",
+                    "articulos",
+                    "materiales"
+                ]
+            },
+            {
+                "term": "total",
+                "type": "monto",
+                "synonyms": [
+                    "valor total",
+                    "importe final",
+                    "monto de factura"
+                ]
+            },
+            {
+                "term": "credito",
+                "type": "condicion_pago",
+                "synonyms": [
+                    "pago a plazo",
+                    "pago diferido",
+                    "venta financiada"
+                ]
+            },
+            {
+                "term": "mostrador",
+                "type": "canal_venta",
+                "synonyms": [
+                    "caja",
+                    "punto de venta",
+                    "venta en tienda"
+                ]
+            }
+        ]
+    },
+    "publication": {
+        "status": "published",
+        "published_at": "2026-03-07T16:30:34+00:00"
+    },
+    "context_pack": {
+        "business_type": "ferreteria_minorista",
+        "country": "CO",
+        "currency": "COP",
+        "tax_regime": "iva_regimen_ordinario",
+        "payment_methods": [
+            "efectivo",
+            "transferencia",
+            "tarjeta",
+            "credito"
+        ],
+        "document_flows": [
+            "pedido_mostrador -> factura -> recaudo",
+            "venta_credito -> factura -> cartera -> recaudo"
+        ],
+        "channels": [
+            "whatsapp",
+            "telegram",
+            "web_chat"
+        ],
+        "volume_profile": "60 facturas mensuales y 140 movimientos de inventario mensuales",
+        "chart_of_accounts_min": [
+            {
+                "code": "110505",
+                "name": "Caja general"
+            },
+            {
+                "code": "130505",
+                "name": "Clientes nacionales"
+            },
+            {
+                "code": "413595",
+                "name": "Ingresos por ventas"
+            }
+        ],
+        "posting_rules": [
+            {
+                "trigger": "factura_contado",
+                "debit_account": "110505",
+                "credit_account": "413595"
+            },
+            {
+                "trigger": "factura_credito",
+                "debit_account": "130505",
+                "credit_account": "413595"
+            }
+        ]
+    },
+    "intents_expansion": [
+        {
+            "intent": "ERP_FACTURA_VENTA",
+            "action": "ERP_INVOICE_SALES",
+            "utterances_explicit": [
+                "registrar factura de venta",
+                "crear factura de venta",
+                "generar factura para cliente",
+                "emitir factura por mostrador",
+                "facturar pedido de ferreteria",
+                "crear factura con productos de tornilleria",
+                "facturar venta de pintura",
+                "registrar factura de herramienta electrica",
+                "generar factura por venta de tuberia",
+                "crear factura para constructora",
+                "registrar factura con despacho a obra",
+                "emitir factura con varios items",
+                "facturar venta a credito",
+                "facturar venta de contado",
+                "crear factura con iva incluido",
+                "registrar factura con descuento comercial",
+                "generar factura con referencia de pedido",
+                "crear comprobante de venta ferreteria",
+                "emitir factura para cliente frecuente",
+                "facturar venta de cemento",
+                "registrar factura de accesorios pvc",
+                "generar factura para pago por transferencia",
+                "crear factura para pago en efectivo",
+                "emitir factura para pago con tarjeta",
+                "registrar factura con datos de nit",
+                "crear factura para retiro en tienda",
+                "facturar venta de manguera industrial",
+                "generar factura por caja principal",
+                "crear factura con observacion de entrega",
+                "registrar factura para cliente empresarial",
+                "emitir factura para venta de repuestos",
+                "crear factura por venta de cerraduras",
+                "facturar venta de brocas",
+                "registrar factura con precio mayorista",
+                "generar factura para entrega inmediata",
+                "crear factura para pedido urgente",
+                "emitir factura por venta de tornillos",
+                "registrar factura por venta de lijas",
+                "generar factura de materiales electricos",
+                "crear factura para venta de selladores"
+            ],
+            "utterances_implicit": [
+                "el cliente pide soporte de la compra",
+                "esa venta todavia no tiene comprobante",
+                "necesito dejar legalizada la venta",
+                "falto subir esa venta del mostrador",
+                "me solicitaron el documento fiscal de la compra",
+                "debo registrar la venta que acaba de salir",
+                "esa compra de herramientas quedo sin documento",
+                "falta dejar soporte para la venta a credito",
+                "me pidieron el archivo de la venta de hoy",
+                "esa salida de inventario debe quedar vendida",
+                "necesito formalizar la venta de tuberia",
+                "la venta ya se entrego pero no se documento",
+                "hay una venta pendiente por registrar",
+                "la caja tiene una venta sin soporte",
+                "toca dejar el documento para el cliente",
+                "quiero cerrar la venta con su comprobante",
+                "la obra necesita respaldo de la compra",
+                "necesito el documento de esa transaccion",
+                "el cliente espera su factura para pago",
+                "no aparece el registro de la venta reciente",
+                "falta asociar cliente a la venta realizada",
+                "necesito dejar lista la venta en sistema",
+                "debemos reportar la venta de materiales",
+                "se despacho mercancia y falta el documento",
+                "necesito soporte para cobrar esa venta",
+                "quiero registrar la venta antes del cierre",
+                "la compra ya esta pagada y falta soporte",
+                "debo emitir el documento de esa entrega",
+                "me reclaman el comprobante de la compra",
+                "la venta de cerraduras quedo pendiente",
+                "necesito registrar una venta mayorista",
+                "tengo una salida de bodega sin facturar",
+                "quiero dejar documentada la venta urgente",
+                "falta cerrar la operacion de venta",
+                "esa venta necesita respaldo contable",
+                "debo dejar evidencia de la venta al cliente",
+                "me falta registrar la venta de lijas",
+                "no hemos generado el documento de esa venta",
+                "necesito soportar la venta para cartera",
+                "la venta de mostrador no quedo en sistema"
+            ],
+            "hard_negatives": [
+                "consultar facturas emitidas",
+                "buscar factura por numero",
+                "ver historial de facturas",
+                "anular factura existente",
+                "corregir factura registrada",
+                "descargar pdf de factura",
+                "reenviar factura al correo",
+                "imprimir factura previa",
+                "aplicar nota credito",
+                "aplicar nota debito",
+                "ver cartera vencida",
+                "registrar pago de factura",
+                "conciliar recaudos del dia",
+                "abrir caja del turno",
+                "cerrar caja del turno",
+                "crear cliente nuevo",
+                "actualizar datos del cliente",
+                "eliminar cliente duplicado",
+                "crear producto nuevo",
+                "ajustar inventario de bodega",
+                "trasladar stock entre bodegas",
+                "cargar lista de precios",
+                "generar reporte de ventas mensual",
+                "revisar margen por producto",
+                "crear orden de compra",
+                "registrar entrada de mercancia",
+                "pagar factura de proveedor",
+                "configurar impuestos del sistema",
+                "gestionar usuarios del sistema",
+                "cambiar permisos de operador",
+                "crear cotizacion comercial",
+                "convertir cotizacion a pedido",
+                "registrar devolucion de cliente",
+                "generar certificado de retencion",
+                "consultar balance general",
+                "exportar libro diario",
+                "revisar estado de pedido",
+                "programar entrega a domicilio",
+                "abrir ticket de soporte tecnico",
+                "sincronizar catalogo con ecommerce"
+            ],
+            "slots": [
+                {
+                    "name": "cliente",
+                    "required": true
+                },
+                {
+                    "name": "items",
+                    "required": true
+                },
+                {
+                    "name": "total",
+                    "required": true
+                },
+                {
+                    "name": "forma_pago",
+                    "required": false
+                }
+            ],
+            "one_question_policy": [
+                {
+                    "missing_slot": "cliente",
+                    "question": "A nombre de que cliente debo generar la factura?"
+                },
+                {
+                    "missing_slot": "items",
+                    "question": "Que items debo incluir en la factura?"
+                },
+                {
+                    "missing_slot": "total",
+                    "question": "Cual es el valor total de la venta?"
+                },
+                {
+                    "missing_slot": "forma_pago",
+                    "question": "La venta es de contado o credito?"
+                }
+            ],
+            "confirm_required": false,
+            "success_reply_template": "Listo, facture la venta para {cliente} por {total}.",
+            "error_reply_template": "No pude generar la factura porque falta {missing_slot}."
+        }
+    ],
+    "multi_turn_dialogues": [
+        {
+            "id": "mt_ferr_01",
+            "scenario": "factura_por_comando_directo",
+            "turns": [
+                {
+                    "user": "crea factura para ferreobra total 450000"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                },
+                {
+                    "user": "incluye cemento y tornillos"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        },
+        {
+            "id": "mt_ferr_02",
+            "scenario": "factura_implicita_sin_cliente",
+            "turns": [
+                {
+                    "user": "esa venta quedo sin documento"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                },
+                {
+                    "user": "cliente maderas del norte"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                },
+                {
+                    "user": "tableros y brocas"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:total"
+                },
+                {
+                    "user": "320000"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        },
+        {
+            "id": "mt_ferr_03",
+            "scenario": "factura_credito",
+            "turns": [
+                {
+                    "user": "facturar venta a credito para constructora alfa"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                },
+                {
+                    "user": "pintura y rodillos"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:total"
+                },
+                {
+                    "user": "780000"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        },
+        {
+            "id": "mt_ferr_04",
+            "scenario": "factura_mostrador_con_pago",
+            "turns": [
+                {
+                    "user": "genera la factura de mostrador"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                },
+                {
+                    "user": "cliente contado general"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                },
+                {
+                    "user": "lijas y sellador"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:total"
+                },
+                {
+                    "user": "96000"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        },
+        {
+            "id": "mt_ferr_05",
+            "scenario": "factura_para_entrega_obra",
+            "turns": [
+                {
+                    "user": "necesito factura para despacho a obra"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                },
+                {
+                    "user": "cliente obra santa maria"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                },
+                {
+                    "user": "tuberia pvc y accesorios"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:total"
+                },
+                {
+                    "user": "1250000"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        },
+        {
+            "id": "mt_ferr_06",
+            "scenario": "factura_con_total_faltante",
+            "turns": [
+                {
+                    "user": "crear factura para cliente industrial delta con items herramientas"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:total"
+                },
+                {
+                    "user": "540000"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        },
+        {
+            "id": "mt_ferr_07",
+            "scenario": "factura_mayorista",
+            "turns": [
+                {
+                    "user": "registrar factura mayorista"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                },
+                {
+                    "user": "cliente almacen popular"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                },
+                {
+                    "user": "cajas de tornillos y brocas"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:total"
+                },
+                {
+                    "user": "2100000"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        },
+        {
+            "id": "mt_ferr_08",
+            "scenario": "factura_desde_frase_implicita",
+            "turns": [
+                {
+                    "user": "falta cerrar la operacion de venta de hoy"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                },
+                {
+                    "user": "cliente jose castaño"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                },
+                {
+                    "user": "martillo y puntillas"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:total"
+                },
+                {
+                    "user": "175000"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        },
+        {
+            "id": "mt_ferr_09",
+            "scenario": "factura_urgente",
+            "turns": [
+                {
+                    "user": "crear factura urgente para entrega inmediata"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:cliente"
+                },
+                {
+                    "user": "cliente obra central"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                },
+                {
+                    "user": "selladores y siliconas"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:total"
+                },
+                {
+                    "user": "430000"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        },
+        {
+            "id": "mt_ferr_10",
+            "scenario": "factura_con_forma_pago",
+            "turns": [
+                {
+                    "user": "factura para ferreunion por transferencia"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:items"
+                },
+                {
+                    "user": "pintura anticorrosiva y brochas"
+                },
+                {
+                    "assistant_expected_action": "ask_missing_slot:total"
+                },
+                {
+                    "user": "390000"
+                },
+                {
+                    "assistant_expected_action": "ERP_INVOICE_SALES"
+                }
+            ]
+        }
+    ],
+    "emotion_cases": [
+        {
+            "emotion": "frustracion",
+            "user_samples": [
+                "siempre me falta algo para facturar",
+                "otra vez no me deja cerrar la venta",
+                "esto me retrasa en caja"
+            ],
+            "assistant_style": "calmo y directo",
+            "expected_next_step": "pedir solo el dato faltante mas critico"
+        },
+        {
+            "emotion": "urgencia",
+            "user_samples": [
+                "necesito eso ya",
+                "el cliente esta esperando",
+                "hazlo rapido por favor"
+            ],
+            "assistant_style": "rapido sin rodeos",
+            "expected_next_step": "capturar slots minimos y ejecutar"
+        },
+        {
+            "emotion": "duda",
+            "user_samples": [
+                "no se que dato falta",
+                "guiame paso a paso",
+                "como lo registro bien"
+            ],
+            "assistant_style": "didactico y breve",
+            "expected_next_step": "explicar en una linea y dar una pregunta concreta"
+        }
+    ],
+    "qa_cases": [
+        {
+            "text": "necesito crear factura para un cliente",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "esa venta salio pero no tiene documento",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "factura la venta de mostrador de hoy",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "debo legalizar la venta de tuberia",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "crear factura para cliente empresarial",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "la obra necesita su comprobante de compra",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "emitir factura por venta de herramientas",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "falta dejar soporte de esa venta a credito",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "genera factura para pago por transferencia",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        },
+        {
+            "text": "no hemos generado el documento de la venta",
+            "expect_intent": "ERP_FACTURA_VENTA",
+            "expect_action": "ERP_INVOICE_SALES"
+        }
+    ]
+}

@@ -1,0 +1,106 @@
+{
+  "contract_id": "sector_training_dataset_standard",
+  "version": "1.0.0",
+  "effective_date": "2026-03-07",
+  "addenda_of": null,
+  "status": "canonical_draft",
+  "scope": "Operational standard for sector training datasets used by SUKI routing-adjacent training and semantic memory quality gates.",
+  "embedding_profile": {
+    "provider": "google-gemini",
+    "model": "gemini-embedding-001",
+    "output_dimensionality": 768,
+    "distance": "Cosine"
+  },
+  "layers": {
+    "knowledge_stable": {
+      "purpose": "Stable sector facts for retrieval evidence.",
+      "vectorizable": true,
+      "required_fields": [
+        "id",
+        "sector",
+        "title",
+        "facts",
+        "source_refs",
+        "tags",
+        "version"
+      ]
+    },
+    "intents_operatives": {
+      "purpose": "Operational intent behavior for deterministic routing and slot policy.",
+      "vectorizable": false,
+      "required_fields": [
+        "intent",
+        "action",
+        "slots",
+        "one_question_policy",
+        "hard_negatives",
+        "success_reply_template",
+        "error_reply_template"
+      ]
+    },
+    "support_faq": {
+      "purpose": "Support and FAQ retrieval snippets.",
+      "vectorizable": true,
+      "required_fields": [
+        "id",
+        "question",
+        "answer",
+        "tags",
+        "version"
+      ]
+    },
+    "policy_constraints": {
+      "purpose": "Governance constraints and no-go rules. Structured, not vector-first.",
+      "vectorizable": false,
+      "required_fields": [
+        "id",
+        "scope",
+        "rule",
+        "severity",
+        "action_if_violate",
+        "version"
+      ]
+    },
+    "utterances": {
+      "purpose": "User language coverage by intent (explicit, implicit, hard negatives).",
+      "vectorizable": true,
+      "required_fields": [
+        "utterances_explicit",
+        "utterances_implicit",
+        "hard_negatives"
+      ]
+    }
+  },
+  "quality_rules": {
+    "min_explicit_per_intent": 40,
+    "min_implicit_per_intent": 40,
+    "min_hard_negatives_per_intent": 40,
+    "min_multi_turn_dialogues": 10,
+    "min_qa_cases": 10,
+    "forbidden_overlap": [
+      "utterances_explicit vs hard_negatives",
+      "utterances_implicit vs hard_negatives"
+    ],
+    "required_one_question_policy_for_required_slots": true
+  },
+  "anti_noise_rules": {
+    "forbidden_marketing_copy": true,
+    "forbidden_placeholder_text": true,
+    "forbidden_channel_prefix_in_samples": true,
+    "dedupe_normalization": "lowercase + trim + collapse whitespace + remove common diacritics"
+  },
+  "pipeline": [
+    "ingest",
+    "hygiene",
+    "validation",
+    "quality_score",
+    "publication"
+  ],
+  "publication_states": [
+    "draft",
+    "validated",
+    "published",
+    "deprecated"
+  ]
+}
+

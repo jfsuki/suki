@@ -26,11 +26,13 @@ This project now recognizes `docs/canon/*` and `docs/contracts/*` as official go
 - `docs/canon/ROUTER_CANON.md`: mandatory route order and minimum evidence requirements.
 - `docs/canon/VERSIONING_POLICY.md`: versioning as laws/addenda and rollback discipline.
 - `docs/canon/RUNTIME_ARTIFACTS_POLICY.md`: non-code hygiene policy for runtime/cache artifacts.
+- `docs/canon/TRAINING_DATASET_STANDARD.md`: canonical layered standard for sector training datasets (RAG vs structured boundaries).
 
 ### Contracts docs (official)
 - `docs/contracts/router_policy.json`: machine-readable router law (cache -> rules -> rag -> llm), resolve criteria, minimum evidence, and missing-evidence actions.
 - `docs/contracts/action_catalog.json`: machine-readable intent catalog (`EXECUTABLE|INFORMATIVE|FORBIDDEN`) with roles, tools, risk and gates.
 - `docs/contracts/agentops_metrics_contract.json`: machine-readable AgentOps events, required fields, and mandatory KPIs.
+- `docs/contracts/sector_training_dataset_standard.json`: machine-readable standard for sector dataset layers, quality and anti-noise rules.
 
 ### Canon mandates (effective)
 - Queue and idempotency are co-mandatory for executable side effects.

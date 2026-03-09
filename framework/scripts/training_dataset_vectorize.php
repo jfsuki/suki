@@ -7,6 +7,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/autoload.php';
 
 use App\Core\QdrantVectorStore;
+use App\Core\SemanticChunkContract;
 use App\Core\SemanticMemoryService;
 
 const DEFAULT_CHUNK_MAX_CHARS = 600;
@@ -169,6 +170,7 @@ $appendChunk = static function (array $chunk) use (&$chunks, &$seenChunks, &$tra
     }
     $dedupeKey = sha1(
         implode('|', [
+            (string) ($chunk['memory_type'] ?? ''),
             (string) ($chunk['source_id'] ?? ''),
             (string) ($chunk['type'] ?? ''),
             function_exists('mb_strtolower')
@@ -214,6 +216,7 @@ foreach ($knowledgeStable as $index => $record) {
         ['layer:knowledge_stable', 'batch:' . $batchId, 'sector:' . safeTag((string) ($record['sector'] ?? 'unknown'))],
         $record['tags'] ?? []
     );
+    $sector = normalizeNullableField($record['sector'] ?? null);
     $version = trim((string) ($record['version'] ?? $datasetVersion));
     if ($version === '') {
         $version = $datasetVersion;
@@ -225,18 +228,27 @@ foreach ($knowledgeStable as $index => $record) {
         $baseText = trim($title !== '' ? ($title . '. ' . $fact) : $fact);
         $parts = splitText($baseText, $maxChunkChars);
         foreach ($parts as $partIndex => $part) {
+            $sourceId = $batchId . ':knowledge_stable:' . $recordId;
             $chunk = [
                 'memory_type' => $memoryType,
                 'tenant_id' => $tenantId,
                 'app_id' => $appId,
+                'agent_role' => null,
+                'sector' => $sector,
                 'source_type' => $sourceType,
-                'source_id' => $batchId . ':knowledge_stable:' . $recordId,
+                'source_id' => $sourceId,
+                'source' => $sourceId,
                 'chunk_id' => $recordId . '_fact_' . $factIndex . '_p' . $partIndex,
                 'type' => 'knowledge_stable',
                 'tags' => $tags,
                 'version' => $version,
                 'quality_score' => $quality,
                 'created_at' => $publishedAt,
+                'updated_at' => $publishedAt,
+                'metadata' => [
+                    'batch_id' => $batchId,
+                    'layer' => 'knowledge_stable',
+                ],
                 'content' => $part,
             ];
             if ($appendChunk($chunk)) {
@@ -277,6 +289,7 @@ foreach ($supportFaq as $index => $record) {
         ['layer:support_faq', 'batch:' . $batchId],
         $record['tags'] ?? []
     );
+    $sector = normalizeNullableField($record['sector'] ?? null);
     $version = trim((string) ($record['version'] ?? $datasetVersion));
     if ($version === '') {
         $version = $datasetVersion;
@@ -285,18 +298,27 @@ foreach ($supportFaq as $index => $record) {
     $quality = max(0.0, min(1.0, $quality));
 
     foreach (splitText($text, $maxChunkChars) as $partIndex => $part) {
+        $sourceId = $batchId . ':support_faq:' . $recordId;
         $chunk = [
             'memory_type' => $memoryType,
             'tenant_id' => $tenantId,
             'app_id' => $appId,
+            'agent_role' => null,
+            'sector' => $sector,
             'source_type' => $sourceType,
-            'source_id' => $batchId . ':support_faq:' . $recordId,
+            'source_id' => $sourceId,
+            'source' => $sourceId,
             'chunk_id' => $recordId . '_p' . $partIndex,
             'type' => 'support_faq',
             'tags' => $tags,
             'version' => $version,
             'quality_score' => $quality,
             'created_at' => $publishedAt,
+            'updated_at' => $publishedAt,
+            'metadata' => [
+                'batch_id' => $batchId,
+                'layer' => 'support_faq',
+            ],
             'content' => $part,
         ];
         if ($appendChunk($chunk)) {
@@ -340,12 +362,16 @@ if ($includeIntentsExpansion) {
             }
             foreach ($utterances as $utteranceIndex => $utterance) {
                 foreach (splitText($utterance, $maxChunkChars) as $partIndex => $part) {
+                    $sourceId = $batchId . ':intent:' . $intentName;
                     $chunk = [
                         'memory_type' => $memoryType,
                         'tenant_id' => $tenantId,
                         'app_id' => $appId,
+                        'agent_role' => null,
+                        'sector' => normalizeNullableField($intent['sector'] ?? null),
                         'source_type' => $sourceType,
-                        'source_id' => $batchId . ':intent:' . $intentName,
+                        'source_id' => $sourceId,
+                        'source' => $sourceId,
                         'chunk_id' => $intentName . '_' . $group . '_' . $utteranceIndex . '_p' . $partIndex,
                         'type' => 'intent_utterance_' . $group,
                         'tags' => mergeTags(
@@ -361,6 +387,14 @@ if ($includeIntentsExpansion) {
                         'version' => $version,
                         'quality_score' => $globalQuality,
                         'created_at' => $publishedAt,
+                        'updated_at' => $publishedAt,
+                        'metadata' => [
+                            'batch_id' => $batchId,
+                            'layer' => 'intents_expansion',
+                            'intent' => $intentName,
+                            'action' => $actionName,
+                            'group' => $group,
+                        ],
                         'content' => $part,
                     ];
                     if ($appendChunk($chunk)) {
@@ -417,6 +451,7 @@ $baseReport = [
     ],
     'publication_check' => $publicationCheck,
     'trace' => $trace,
+    'contract_sample' => $chunks !== [] ? SemanticChunkContract::buildPayload($chunks[0]) : null,
 ];
 
 if ($dryRun) {
@@ -581,6 +616,15 @@ function safeTag(string $value): string
         return '';
     }
     return trim($value, '_');
+}
+
+/**
+ * @param mixed $value
+ */
+function normalizeNullableField($value): ?string
+{
+    $value = trim((string) $value);
+    return $value !== '' ? $value : null;
 }
 
 /**

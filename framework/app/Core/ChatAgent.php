@@ -239,7 +239,12 @@ final class ChatAgent
                 $sessionId,
                 $messageId,
                 $this->latencyMs($requestStartedAt),
-                'response.blocked'
+                'response.blocked',
+                [
+                    'llm_called' => false,
+                    'error_flag' => true,
+                    'error_type' => 'security_block',
+                ]
             )));
             try {
                 $this->telemetryService()->recordIntentMetric([
@@ -279,7 +284,12 @@ final class ChatAgent
                 $sessionId,
                 $messageId,
                 $this->latencyMs($requestStartedAt),
-                'response.emitted'
+                'response.emitted',
+                [
+                    'llm_called' => false,
+                    'error_flag' => false,
+                    'error_type' => 'none',
+                ]
             )));
             try {
                 $this->telemetryService()->recordIntentMetric([
@@ -301,6 +311,7 @@ final class ChatAgent
         if ($route->isCommand()) {
             $commandStartedAt = microtime(true);
             $commandPayload = $route->command();
+            $commandExecutionErrorType = '';
             try {
                 $reply = $this->dispatchCommandPayload($commandPayload, $channel, $sessionId, $userId, $mode);
                 if (($reply['status'] ?? '') === 'success') {
@@ -330,6 +341,7 @@ final class ChatAgent
             } catch (\Throwable $e) {
                 $rawError = (string) $e->getMessage();
                 $human = $this->humanizeSqlError($rawError);
+                $commandExecutionErrorType = 'command_exception';
                 $reply = $this->reply('No pude ejecutar ese paso. Revisa permisos o datos.', $channel, $sessionId, $userId, 'error', [
                     'reply' => $human,
                     'error' => $rawError,
@@ -339,6 +351,17 @@ final class ChatAgent
             $commandStatus = (string) ($reply['status'] ?? 'error');
             $commandReply = (string) ($reply['reply'] ?? '');
             $blockedByGuardrail = $commandStatus !== 'success' && $this->looksLikeGuardrailMessage($commandReply);
+            $commandErrorFlag = $commandStatus !== 'success';
+            $commandErrorType = 'none';
+            if ($commandErrorFlag) {
+                if ($blockedByGuardrail) {
+                    $commandErrorType = 'guardrail_blocked';
+                } elseif ($commandExecutionErrorType !== '') {
+                    $commandErrorType = $commandExecutionErrorType;
+                } else {
+                    $commandErrorType = 'command_failed';
+                }
+            }
             try {
                 $this->telemetryService()->recordCommandMetric([
                     'tenant_id' => $tenantId,
@@ -382,7 +405,12 @@ final class ChatAgent
                 $sessionId,
                 $messageId,
                 $this->latencyMs($requestStartedAt),
-                'response.emitted'
+                'response.emitted',
+                [
+                    'llm_called' => false,
+                    'error_flag' => $commandErrorFlag,
+                    'error_type' => $commandErrorType,
+                ]
             )));
             try {
                 $this->telemetryService()->recordIntentMetric([
@@ -411,6 +439,35 @@ final class ChatAgent
                     'user_id' => $userId,
                 ]);
             } catch (\Throwable $e) {
+                $this->telemetry()->record($tenantId, array_merge($telemetry, [
+                    'message' => $text,
+                    'provider_used' => 'llm',
+                    'resolved_locally' => true,
+                    'action' => $action,
+                    'mode' => $mode,
+                    'llm_request_count' => 1,
+                    'session_id' => $sessionId,
+                    'user_id' => $userId,
+                    'project_id' => $projectId,
+                    'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                    'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
+                    'status' => 'error',
+                    'is_authenticated' => $isAuthenticated,
+                    'effective_role' => $role,
+                ], $this->buildAgentOpsTelemetryBase(
+                    $telemetry,
+                    $tenantId,
+                    $projectId,
+                    $sessionId,
+                    $messageId,
+                    $this->latencyMs($requestStartedAt),
+                    'response.emitted',
+                    [
+                        'llm_called' => true,
+                        'error_flag' => true,
+                        'error_type' => 'llm_unavailable',
+                    ]
+                )));
                 try {
                     $this->telemetryService()->recordIntentMetric([
                         'tenant_id' => $tenantId,
@@ -451,7 +508,12 @@ final class ChatAgent
                 $sessionId,
                 $messageId,
                 $this->latencyMs($requestStartedAt),
-                'response.emitted'
+                'response.emitted',
+                [
+                    'llm_called' => true,
+                    'error_flag' => false,
+                    'error_type' => 'none',
+                ]
             )));
             try {
                 $this->telemetryService()->recordIntentMetric([
@@ -506,7 +568,12 @@ final class ChatAgent
             $sessionId,
             $messageId,
             $this->latencyMs($requestStartedAt),
-            'response.emitted'
+            'response.emitted',
+            [
+                'llm_called' => false,
+                'error_flag' => true,
+                'error_type' => 'route_error',
+            ]
         )));
         try {
             $this->telemetryService()->recordIntentMetric([
@@ -1451,10 +1518,25 @@ final class ChatAgent
         string $sessionId,
         string $messageId,
         int $latencyMs,
-        string $eventName
+        string $eventName,
+        array $runtimeContext = []
     ): array {
         $routePath = (string) ($routeTelemetry['route_path'] ?? '');
         $gateDecision = (string) ($routeTelemetry['gate_decision'] ?? 'unknown');
+        $actionContract = trim((string) ($routeTelemetry['action_contract'] ?? ''));
+        $ragHit = (bool) ($routeTelemetry['rag_hit'] ?? false);
+        $sourceIds = $this->normalizeStringList($routeTelemetry['source_ids'] ?? []);
+        $evidenceIds = $this->normalizeStringList($routeTelemetry['evidence_ids'] ?? []);
+        $llmCalled = array_key_exists('llm_called', $runtimeContext)
+            ? (bool) $runtimeContext['llm_called']
+            : (bool) ($routeTelemetry['llm_called'] ?? false);
+        $errorType = trim((string) ($runtimeContext['error_type'] ?? $routeTelemetry['error_type'] ?? ''));
+        $errorFlag = array_key_exists('error_flag', $runtimeContext)
+            ? (bool) $runtimeContext['error_flag']
+            : ($errorType !== '');
+        if ($errorType === '') {
+            $errorType = $errorFlag ? 'runtime_error' : 'none';
+        }
         $contractVersions = is_array($routeTelemetry['contract_versions'] ?? null)
             ? (array) $routeTelemetry['contract_versions']
             : [];
@@ -1472,6 +1554,19 @@ final class ChatAgent
             ];
         }
 
+        $runtimeObservability = [
+            'route_path' => $routePath !== '' ? $routePath : 'unknown',
+            'gate_decision' => $gateDecision !== '' ? $gateDecision : 'unknown',
+            'action_contract' => $actionContract !== '' ? $actionContract : 'none',
+            'rag_hit' => $ragHit,
+            'source_ids' => $sourceIds,
+            'evidence_ids' => $evidenceIds,
+            'llm_called' => $llmCalled,
+            'latency_ms' => $latencyMs,
+            'error_flag' => $errorFlag,
+            'error_type' => $errorType,
+        ];
+
         return [
             'event_name' => $eventName,
             'event_time' => date('c'),
@@ -1479,15 +1574,49 @@ final class ChatAgent
             'project_id' => $projectId,
             'session_id' => $sessionId,
             'message_id' => $messageId,
-            'route_path' => $routePath,
-            'gate_decision' => $gateDecision,
+            'route_path' => $runtimeObservability['route_path'],
+            'gate_decision' => $runtimeObservability['gate_decision'],
+            'action_contract' => $runtimeObservability['action_contract'],
+            'rag_hit' => $runtimeObservability['rag_hit'],
+            'source_ids' => $runtimeObservability['source_ids'],
+            'evidence_ids' => $runtimeObservability['evidence_ids'],
+            'llm_called' => $runtimeObservability['llm_called'],
+            'error_flag' => $runtimeObservability['error_flag'],
+            'error_type' => $runtimeObservability['error_type'],
             'contract_versions' => $contractVersions,
             'versions' => $versions,
             'latency_ms' => $latencyMs,
             'enforcement_mode' => $enforcementMode !== '' ? $enforcementMode : 'unknown',
             'enforcement_mode_source' => $enforcementModeSource !== '' ? $enforcementModeSource : 'unknown',
             'enforcement_app_env' => $enforcementAppEnv !== '' ? $enforcementAppEnv : 'unknown',
+            'agentops_runtime' => $runtimeObservability,
         ];
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<int, string>
+     */
+    private function normalizeStringList($value): array
+    {
+        if (!is_array($value)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($value as $item) {
+            $candidate = trim((string) $item);
+            if ($candidate === '') {
+                continue;
+            }
+            $normalized[] = $candidate;
+        }
+
+        if (empty($normalized)) {
+            return [];
+        }
+
+        return array_values(array_unique($normalized));
     }
 
     private function commandBus(): CommandBus

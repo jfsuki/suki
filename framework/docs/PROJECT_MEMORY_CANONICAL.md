@@ -145,10 +145,12 @@ If a decision conflicts with a higher level, it is invalid.
   - `docs/canon/ROUTER_CANON.md`
   - `docs/canon/VERSIONING_POLICY.md`
   - `docs/canon/RUNTIME_ARTIFACTS_POLICY.md`
+  - `docs/canon/TRAINING_DATASET_STANDARD.md`
 - Official machine-readable governance contracts:
   - `docs/contracts/router_policy.json`
   - `docs/contracts/action_catalog.json`
   - `docs/contracts/agentops_metrics_contract.json`
+  - `docs/contracts/sector_training_dataset_standard.json`
 
 ## 15) Canon mandates (explicit)
 - Queue + idempotency are mandatory for executable actions.
