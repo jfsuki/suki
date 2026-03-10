@@ -28,6 +28,7 @@ final class SkillExecutor
         $skillFailed = false;
         $skillFallbackReason = 'none';
         $skillResultStatus = 'selected';
+        $telemetryOverrides = [];
 
         if ($name !== '') {
             $llmRequest['skill_context'] = [
@@ -39,6 +40,20 @@ final class SkillExecutor
 
         switch ($executionMode) {
             case 'tool':
+                if ($this->isAlertsCenterSkill($name)) {
+                    $toolOutcome = $this->executeAlertsCenterSkill($name, $context);
+                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
+                    $reply = (string) ($toolOutcome['reply'] ?? '');
+                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
+                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
+                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
+                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
+                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
+                        ? (array) $toolOutcome['routing_hint_steps']
+                        : ['cache', 'rules', 'skills'];
+                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    break;
+                }
                 [$action, $reply, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps] = $this->executeToolSkill($skill, $context);
                 break;
 
@@ -74,7 +89,7 @@ final class SkillExecutor
                 'skill_execution_ms' => $this->latencyMs($startedAt),
                 'skill_result_status' => $skillResultStatus,
                 'skill_fallback_reason' => $skillFallbackReason,
-            ],
+            ] + $telemetryOverrides,
         ];
     }
 
@@ -212,5 +227,52 @@ final class SkillExecutor
     private function latencyMs(float $startedAt): int
     {
         return (int) max(0, round((microtime(true) - $startedAt) * 1000));
+    }
+
+    private function isAlertsCenterSkill(string $name): bool
+    {
+        return in_array($name, [
+            'create_task',
+            'list_pending_tasks',
+            'create_reminder',
+            'list_reminders',
+            'create_alert',
+            'list_alerts',
+        ], true);
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
+    private function executeAlertsCenterSkill(string $name, array $context): array
+    {
+        $parser = new AlertsCenterMessageParser();
+        $parsed = $parser->parse($name, $context);
+        $telemetry = is_array($parsed['telemetry'] ?? null) ? (array) $parsed['telemetry'] : [];
+
+        if ((string) ($parsed['kind'] ?? '') === 'command') {
+            return [
+                'action' => 'execute_command',
+                'reply' => '',
+                'command' => is_array($parsed['command'] ?? null) ? (array) $parsed['command'] : [],
+                'skill_result_status' => 'command_ready',
+                'skill_fallback_reason' => 'none',
+                'skill_failed' => false,
+                'routing_hint_steps' => ['cache', 'rules', 'skills'],
+                'telemetry' => $telemetry,
+            ];
+        }
+
+        return [
+            'action' => 'ask_user',
+            'reply' => (string) ($parsed['reply'] ?? 'Necesito un dato adicional para continuar.'),
+            'command' => [],
+            'skill_result_status' => 'needs_input',
+            'skill_fallback_reason' => 'missing_operational_payload',
+            'skill_failed' => false,
+            'routing_hint_steps' => ['cache', 'rules', 'skills'],
+            'telemetry' => $telemetry,
+        ];
     }
 }

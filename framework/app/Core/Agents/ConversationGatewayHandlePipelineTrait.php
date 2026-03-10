@@ -659,6 +659,27 @@ trait ConversationGatewayHandlePipelineTrait
                     $this->saveState($tenantId, $userId, $state);
                     return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('missing_entity', true, $parsed));
                 }
+                if ($this->isAlertsCenterOperationalEntity($entityName)) {
+                    $capsule = $this->buildContextCapsule($normalized, $state, $lexicon, $policy, $classification);
+                    $state = $this->updateState(
+                        $state,
+                        $raw,
+                        '',
+                        $capsule['intent'] ?? null,
+                        $capsule['entity'] ?? null,
+                        $capsule['state']['collected'] ?? [],
+                        $state['active_task'] ?? null
+                    );
+                    $this->saveState($tenantId, $userId, $state);
+                    return $this->result(
+                        'send_to_llm',
+                        '',
+                        null,
+                        $capsule,
+                        $state,
+                        $this->telemetry('missing_entity', true, $parsed + ['deferred_to_alerts_center_skill' => true])
+                    );
+                }
                 $reply = 'Esa tabla no existe en esta app. Debe ser agregada por el creador.';
                 $state = $this->updateState($state, $raw, $reply, null, null, [], null);
                 $this->saveState($tenantId, $userId, $state);

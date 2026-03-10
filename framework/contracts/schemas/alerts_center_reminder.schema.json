@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Alerts Center Reminder",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "reminder_type",
+    "title",
+    "message",
+    "remind_at",
+    "status",
+    "created_at",
+    "metadata"
+  ],
+  "properties": {
+    "id": {
+      "type": ["string", "integer"]
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app_id": {
+      "type": ["string", "null"]
+    },
+    "reminder_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "remind_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["pending", "completed", "cancelled"]
+    },
+    "related_entity_type": {
+      "type": ["string", "null"]
+    },
+    "related_entity_id": {
+      "type": ["string", "null"]
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}

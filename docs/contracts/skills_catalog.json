@@ -1,7 +1,7 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.1.0",
-  "effective_date": "2026-03-09",
+  "version": "1.2.0",
+  "effective_date": "2026-03-10",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
   "contract_location": "docs/contracts",
@@ -242,6 +242,199 @@
         "optional": [
           "customer_id",
           "document_number"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "create_task",
+      "description": "Create operational follow-up tasks through Alerts Center.",
+      "intent_patterns": [
+        "re:(crea|crear|agrega|registrar|programa).*(tarea|task|seguimiento|pendiente)",
+        "re:(tarea|task|seguimiento|pendiente).*(crea|crear|agrega|registrar|programa)"
+      ],
+      "keywords": [
+        "crear tarea",
+        "agregar tarea",
+        "task",
+        "seguimiento"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "alerts_center_tasks"
+      ],
+      "priority": 158,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "title",
+          "priority",
+          "due_at"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "list_pending_tasks",
+      "description": "List pending operational tasks through Alerts Center.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|ver|consulta).*(tareas|task|pendientes|seguimientos)",
+        "re:(tareas|task|pendientes|seguimientos).*(lista|listar|muestra|ver|consulta)"
+      ],
+      "keywords": [
+        "listar tareas pendientes",
+        "tareas pendientes",
+        "pending tasks"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "alerts_center_tasks"
+      ],
+      "priority": 139,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "status",
+          "assigned_to"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "create_reminder",
+      "description": "Create reminders through Alerts Center.",
+      "intent_patterns": [
+        "re:(crea|crear|agrega|programa).*(recordatorio|reminder|recordarme)",
+        "re:(recordatorio|reminder|recordarme).*(crea|crear|agrega|programa)"
+      ],
+      "keywords": [
+        "crear recordatorio",
+        "programar recordatorio",
+        "reminder"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "alerts_center_reminders"
+      ],
+      "priority": 159,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "title",
+          "remind_at"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "list_reminders",
+      "description": "List reminders through Alerts Center.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|ver|consulta).*(recordatorios|reminders)",
+        "re:(recordatorios|reminders).*(lista|listar|muestra|ver|consulta)"
+      ],
+      "keywords": [
+        "listar recordatorios",
+        "recordatorios",
+        "reminders"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "alerts_center_reminders"
+      ],
+      "priority": 137,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "status"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "create_alert",
+      "description": "Create business alerts through Alerts Center.",
+      "intent_patterns": [
+        "re:(crea|crear|genera|agrega|registra).*(alerta|alert)",
+        "re:(alerta|alert).*(crea|crear|genera|agrega|registra)"
+      ],
+      "keywords": [
+        "crear alerta",
+        "generar alerta",
+        "alert"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "alerts_center_alerts"
+      ],
+      "priority": 160,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "title",
+          "severity"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "list_alerts",
+      "description": "List operational alerts through Alerts Center.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|ver|consulta).*(alertas|alerts)",
+        "re:(alertas|alerts).*(lista|listar|muestra|ver|consulta)"
+      ],
+      "keywords": [
+        "listar alertas",
+        "alertas",
+        "alerts"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "alerts_center_alerts"
+      ],
+      "priority": 136,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "status",
+          "severity"
         ]
       },
       "channel_capabilities": [

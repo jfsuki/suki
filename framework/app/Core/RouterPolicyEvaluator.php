@@ -395,6 +395,79 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'CreateTask':
+                $title = trim((string) ($command['title'] ?? ''));
+                if ($title === '') {
+                    return [false, 'missing_title'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListPendingTasks':
+                if (array_key_exists('statuses', $command) && !is_array($command['statuses'])) {
+                    return [false, 'invalid_statuses'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'UpdateTaskStatus':
+                if (($command['id'] ?? null) === null || trim((string) ($command['id'] ?? '')) === '') {
+                    return [false, 'missing_id'];
+                }
+                if (trim((string) ($command['status'] ?? '')) === '') {
+                    return [false, 'missing_status'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'CreateReminder':
+                if (trim((string) ($command['title'] ?? '')) === '') {
+                    return [false, 'missing_title'];
+                }
+                if (trim((string) ($command['remind_at'] ?? '')) === '') {
+                    return [false, 'missing_remind_at'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListReminders':
+                if (array_key_exists('statuses', $command) && !is_array($command['statuses'])) {
+                    return [false, 'invalid_statuses'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'UpdateReminderStatus':
+                if (($command['id'] ?? null) === null || trim((string) ($command['id'] ?? '')) === '') {
+                    return [false, 'missing_id'];
+                }
+                if (trim((string) ($command['status'] ?? '')) === '') {
+                    return [false, 'missing_status'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'CreateAlert':
+                if (trim((string) ($command['title'] ?? '')) === '') {
+                    return [false, 'missing_title'];
+                }
+                if (trim((string) ($command['alert_type'] ?? '')) === '') {
+                    return [false, 'missing_alert_type'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListAlerts':
+                if (array_key_exists('statuses', $command) && !is_array($command['statuses'])) {
+                    return [false, 'invalid_statuses'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'UpdateAlertStatus':
+                if (($command['id'] ?? null) === null || trim((string) ($command['id'] ?? '')) === '') {
+                    return [false, 'missing_id'];
+                }
+                if (trim((string) ($command['status'] ?? '')) === '') {
+                    return [false, 'missing_status'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'FetchPendingOperationalItems':
+                return [true, 'schema_valid'];
+
             case 'CreateEntity':
                 if ($entity === '') {
                     return [false, 'missing_entity'];

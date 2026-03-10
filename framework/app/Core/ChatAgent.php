@@ -223,14 +223,19 @@ final class ChatAgent
             $userId
         );
         if (is_array($securityBlock)) {
-            $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+            $blockedTelemetry = array_merge($telemetry, [
+                'gate_decision' => 'blocked',
+                'fallback_reason' => 'security_block',
+                'error_type' => 'security_block',
+            ]);
+            $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $blockedTelemetry, $this->latencyMs($requestStartedAt), [
                 'llm_called' => false,
                 'error_flag' => true,
                 'error_type' => 'security_block',
                 'tool_calls_count' => 0,
                 'retry_count' => 0,
             ]);
-            $this->telemetry()->record($tenantId, array_merge($telemetry, [
+            $this->telemetry()->record($tenantId, array_merge($blockedTelemetry, [
                 'message' => $text,
                 'resolved_locally' => true,
                 'action' => 'execute_command',
@@ -244,7 +249,7 @@ final class ChatAgent
                 'effective_role' => $role,
                 'status' => 'blocked',
             ], $this->buildAgentOpsTelemetryBase(
-                $telemetry,
+                $blockedTelemetry,
                 $tenantId,
                 $projectId,
                 $sessionId,
@@ -336,6 +341,7 @@ final class ChatAgent
             $commandExecutionErrorType = '';
             try {
                 $reply = $this->dispatchCommandPayload($commandPayload, $channel, $sessionId, $userId, $mode);
+                $commandReply = $this->extractReplyTextFromEnvelope($reply);
                 if (($reply['status'] ?? '') === 'success') {
                     $this->gateway()->rememberExecution(
                         $tenantId,
@@ -345,7 +351,7 @@ final class ChatAgent
                         $commandPayload,
                         (array) ($reply['data'] ?? []),
                         $text,
-                        (string) ($reply['reply'] ?? '')
+                        $commandReply
                     );
                     $followup = $this->gateway()->postExecutionFollowup(
                         $tenantId,
@@ -358,6 +364,7 @@ final class ChatAgent
                     if ($followup !== '') {
                         $current = trim((string) ($reply['data']['reply'] ?? ''));
                         $reply['data']['reply'] = trim($current . "\n" . $followup);
+                        $reply['reply'] = trim($this->extractReplyTextFromEnvelope($reply));
                     }
                 }
             } catch (\Throwable $e) {
@@ -370,8 +377,11 @@ final class ChatAgent
                 ]);
             }
             $commandName = (string) ($commandPayload['command'] ?? 'unknown');
+            $commandData = is_array($reply['data'] ?? null) ? (array) $reply['data'] : [];
+            $commandMarkers = $this->extractOperationalTelemetryMarkers($commandData);
+            $commandTelemetry = array_merge($telemetry, $commandMarkers);
             $commandStatus = (string) ($reply['status'] ?? 'error');
-            $commandReply = (string) ($reply['reply'] ?? '');
+            $commandReply = $this->extractReplyTextFromEnvelope($reply);
             $blockedByGuardrail = $commandStatus !== 'success' && $this->looksLikeGuardrailMessage($commandReply);
             $commandErrorFlag = $commandStatus !== 'success';
             $commandErrorType = 'none';
@@ -414,8 +424,8 @@ final class ChatAgent
                 'error_type' => $commandErrorType,
                 'tool_calls_count' => 1,
                 'retry_count' => 0,
-            ]);
-            $this->telemetry()->record($tenantId, array_merge($telemetry, [
+            ] + $commandMarkers);
+            $this->telemetry()->record($tenantId, array_merge($commandTelemetry, [
                 'message' => $text,
                 'resolved_locally' => true,
                 'action' => $action,
@@ -428,7 +438,7 @@ final class ChatAgent
                 'is_authenticated' => $isAuthenticated,
                 'effective_role' => $role,
             ], $this->buildAgentOpsTelemetryBase(
-                $telemetry,
+                $commandTelemetry,
                 $tenantId,
                 $projectId,
                 $sessionId,
@@ -441,7 +451,7 @@ final class ChatAgent
                     'error_type' => $commandErrorType,
                     'response_kind' => $action,
                     'response_text' => $commandReply,
-                ]
+                ] + $commandMarkers
             )));
             try {
                 $this->telemetryService()->recordIntentMetric([
@@ -1657,6 +1667,11 @@ final class ChatAgent
             'app_id' => $runtimeObservability['app_id'],
             'user_id' => $runtimeObservability['user_id'],
             'memory_type' => $runtimeObservability['memory_type'],
+            'module_used' => $runtimeObservability['module_used'],
+            'alert_action' => $runtimeObservability['alert_action'],
+            'task_action' => $runtimeObservability['task_action'],
+            'reminder_action' => $runtimeObservability['reminder_action'],
+            'pending_items_count' => $runtimeObservability['pending_items_count'],
             'token_usage' => $runtimeObservability['token_usage'],
             'cost_estimate' => $runtimeObservability['cost_estimate'],
             'metrics_delta' => $runtimeObservability['metrics_delta'],
@@ -1745,6 +1760,13 @@ final class ChatAgent
             'same_route_repeat_count' => max(0, (int) ($routeTelemetry['same_route_repeat_count'] ?? 0)),
             'request_mode' => trim((string) ($routeTelemetry['request_mode'] ?? 'operation')) ?: 'operation',
             'memory_type' => trim((string) ($routeTelemetry['memory_type'] ?? '')) ?: 'none',
+            'module_used' => trim((string) ($runtimeContext['module_used'] ?? $routeTelemetry['module_used'] ?? '')) ?: 'none',
+            'alert_action' => trim((string) ($runtimeContext['alert_action'] ?? $routeTelemetry['alert_action'] ?? '')) ?: 'none',
+            'task_action' => trim((string) ($runtimeContext['task_action'] ?? $routeTelemetry['task_action'] ?? '')) ?: 'none',
+            'reminder_action' => trim((string) ($runtimeContext['reminder_action'] ?? $routeTelemetry['reminder_action'] ?? '')) ?: 'none',
+            'pending_items_count' => is_numeric($runtimeContext['pending_items_count'] ?? $routeTelemetry['pending_items_count'] ?? null)
+                ? max(0, (int) ($runtimeContext['pending_items_count'] ?? $routeTelemetry['pending_items_count']))
+                : null,
             'tenant_id' => trim((string) ($routeTelemetry['tenant_id'] ?? '')) ?: 'default',
             'app_id' => ($routeTelemetry['app_id'] ?? null),
             'user_id' => trim((string) ($routeTelemetry['user_id'] ?? '')) ?: 'anon',
@@ -1847,6 +1869,45 @@ final class ChatAgent
         return array_values(array_unique($normalized));
     }
 
+    /**
+     * @param array<string, mixed> $reply
+     */
+    private function extractReplyTextFromEnvelope(array $reply): string
+    {
+        $candidate = trim((string) ($reply['reply'] ?? ''));
+        if ($candidate !== '') {
+            return $candidate;
+        }
+
+        $data = is_array($reply['data'] ?? null) ? (array) $reply['data'] : [];
+        $candidate = trim((string) ($data['reply'] ?? ''));
+        if ($candidate !== '') {
+            return $candidate;
+        }
+
+        return trim((string) ($reply['message'] ?? ''));
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function extractOperationalTelemetryMarkers(array $payload): array
+    {
+        $pendingItemsCount = $payload['pending_items_count'] ?? null;
+        if (!is_numeric($pendingItemsCount)) {
+            $pendingItemsCount = null;
+        }
+
+        return [
+            'module_used' => trim((string) ($payload['module_used'] ?? '')) ?: 'none',
+            'alert_action' => trim((string) ($payload['alert_action'] ?? '')) ?: 'none',
+            'task_action' => trim((string) ($payload['task_action'] ?? '')) ?: 'none',
+            'reminder_action' => trim((string) ($payload['reminder_action'] ?? '')) ?: 'none',
+            'pending_items_count' => $pendingItemsCount !== null ? max(0, (int) $pendingItemsCount) : null,
+        ];
+    }
+
     private function resolveAttachmentCount(array $payload): int
     {
         $count = 0;
@@ -1872,6 +1933,7 @@ final class ChatAgent
             $this->commandBus->register(new ImportIntegrationOpenApiCommandHandler());
             $this->commandBus->register(new CompileWorkflowCommandHandler());
             $this->commandBus->register(new CrudCommandHandler());
+            $this->commandBus->register(new AlertsCenterCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
                 ['AuthLogin', 'AuthCreateUser'],
                 function (array $command, array $context): array {

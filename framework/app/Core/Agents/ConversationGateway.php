@@ -149,6 +149,13 @@ final class ConversationGateway
             'rag_used' => (bool) ($trace['rag_used'] ?? false),
             'evidence_gate_status' => trim((string) ($trace['evidence_gate_status'] ?? '')),
             'fallback_reason' => trim((string) ($trace['fallback_reason'] ?? '')),
+            'module_used' => trim((string) ($trace['module_used'] ?? '')) ?: 'none',
+            'alert_action' => trim((string) ($trace['alert_action'] ?? '')) ?: 'none',
+            'task_action' => trim((string) ($trace['task_action'] ?? '')) ?: 'none',
+            'reminder_action' => trim((string) ($trace['reminder_action'] ?? '')) ?: 'none',
+            'pending_items_count' => is_numeric($trace['pending_items_count'] ?? null)
+                ? max(0, (int) $trace['pending_items_count'])
+                : null,
             'loop_guard_triggered' => (bool) ($trace['loop_guard_triggered'] ?? false),
             'tool_calls_count' => max(0, (int) ($trace['tool_calls_count'] ?? 0)),
             'retry_count' => max(0, (int) ($trace['retry_count'] ?? 0)),
@@ -9681,6 +9688,25 @@ private function parseEntityFromCrudText(string $text): string
     {
         $value = preg_replace('/[^a-zA-Z0-9_\\-]/', '_', $value) ?? 'default';
         return trim($value, '_');
+    }
+
+    private function isAlertsCenterOperationalEntity(string $entity): bool
+    {
+        $entity = mb_strtolower(trim($entity), 'UTF-8');
+        return in_array($entity, [
+            'tarea',
+            'tareas',
+            'task',
+            'tasks',
+            'recordatorio',
+            'recordatorios',
+            'reminder',
+            'reminders',
+            'alerta',
+            'alertas',
+            'alert',
+            'alerts',
+        ], true);
     }
 
 }

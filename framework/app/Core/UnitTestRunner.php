@@ -91,6 +91,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('training_dataset_publication_gate', fn() => $this->checkTrainingDatasetPublicationGate());
         $tests[] = $this->wrap('training_dataset_vectorize_command', fn() => $this->checkTrainingDatasetVectorizeCommand());
         $tests[] = $this->wrap('business_discovery_template', fn() => $this->checkBusinessDiscoveryTemplate());
+        $tests[] = $this->wrap('alerts_center_module', fn() => $this->checkAlertsCenterModule());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
 
         $summary = [
@@ -1430,6 +1431,11 @@ final class UnitTestRunner
     private function checkBusinessDiscoveryTemplate(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/business_discovery_template_test.php');
+    }
+
+    private function checkAlertsCenterModule(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/alerts_center_module_test.php');
     }
 
     private function checkSemanticPipelineE2E(): void
