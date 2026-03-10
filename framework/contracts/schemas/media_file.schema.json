@@ -1,0 +1,68 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Media File",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "entity_type",
+    "entity_id",
+    "file_type",
+    "storage_path",
+    "mime_type",
+    "file_size",
+    "uploaded_by_user_id",
+    "created_at",
+    "metadata"
+  ],
+  "properties": {
+    "id": {
+      "type": ["string", "integer"]
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app_id": {
+      "type": ["string", "null"]
+    },
+    "entity_type": {
+      "type": "string",
+      "enum": ["product", "purchase", "invoice", "sale", "customer", "supplier", "general"]
+    },
+    "entity_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "file_type": {
+      "type": "string",
+      "enum": ["image", "pdf", "xml", "doc", "spreadsheet"]
+    },
+    "storage_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "mime_type": {
+      "type": "string",
+      "minLength": 1
+    },
+    "file_size": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "uploaded_by_user_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    },
+    "updated_at": {
+      "type": ["string", "null"]
+    },
+    "metadata": {
+      "type": "object"
+    }
+  }
+}

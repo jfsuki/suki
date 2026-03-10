@@ -1,6 +1,6 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.2.0",
+  "version": "1.3.0",
   "effective_date": "2026-03-10",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
@@ -435,6 +435,138 @@
         "optional": [
           "status",
           "severity"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "media_upload",
+      "description": "Upload an image or document linked to an operational record.",
+      "intent_patterns": [
+        "re:(sube|subir|adjunta|adjuntar|carga|cargar).*(imagen|foto|archivo|pdf|xml|documento)",
+        "re:(imagen|foto|archivo|pdf|xml|documento).*(sube|subir|adjunta|adjuntar|carga|cargar)"
+      ],
+      "keywords": [
+        "subir imagen",
+        "adjuntar pdf",
+        "cargar archivo"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "media_upload"
+      ],
+      "priority": 170,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "attachments",
+          "entity_type",
+          "entity_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat",
+        "file_input"
+      ],
+      "context_hints": {
+        "requires_attachment": true,
+        "media_type": "file"
+      }
+    },
+    {
+      "name": "media_list",
+      "description": "List images or documents linked to a record.",
+      "intent_patterns": [
+        "re:(listar|lista|mostrar|muestra|ver|consulta).*(archivos|imagenes|documentos|adjuntos)",
+        "re:(archivos|imagenes|documentos|adjuntos).*(listar|lista|mostrar|muestra|ver|consulta)"
+      ],
+      "keywords": [
+        "listar archivos",
+        "ver adjuntos",
+        "mostrar documentos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "media_list"
+      ],
+      "priority": 151,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "entity_type",
+          "entity_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "media_get",
+      "description": "Retrieve a specific file linked to the current tenant.",
+      "intent_patterns": [
+        "re:(abrir|ver|mostrar|consulta).*(archivo|documento|imagen|media)",
+        "re:(archivo|documento|imagen|media).*(abrir|ver|mostrar|consulta)"
+      ],
+      "keywords": [
+        "ver archivo",
+        "abrir documento",
+        "mostrar media"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "media_get"
+      ],
+      "priority": 150,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "media_id",
+          "variant"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "media_delete",
+      "description": "Delete a file linked to a record with explicit confirmation.",
+      "intent_patterns": [
+        "re:(elimina|eliminar|borra|borrar|quitar).*(archivo|documento|imagen|media)",
+        "re:(archivo|documento|imagen|media).*(elimina|eliminar|borra|borrar|quitar)"
+      ],
+      "keywords": [
+        "eliminar archivo",
+        "borrar documento",
+        "quitar imagen"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "media_delete"
+      ],
+      "priority": 149,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "media_id"
         ]
       },
       "channel_capabilities": [

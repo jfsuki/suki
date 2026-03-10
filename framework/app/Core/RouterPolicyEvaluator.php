@@ -468,6 +468,34 @@ final class RouterPolicyEvaluator
             case 'FetchPendingOperationalItems':
                 return [true, 'schema_valid'];
 
+            case 'UploadMedia':
+                if (trim((string) ($command['entity_type'] ?? '')) === '') {
+                    return [false, 'missing_entity_type'];
+                }
+                if (trim((string) ($command['entity_id'] ?? '')) === '') {
+                    return [false, 'missing_entity_id'];
+                }
+                $hasSource = trim((string) ($command['source_path'] ?? '')) !== ''
+                    || is_array($command['file'] ?? null);
+                return $hasSource ? [true, 'schema_valid'] : [false, 'missing_source_file'];
+
+            case 'ListMedia':
+                if (trim((string) ($command['entity_type'] ?? '')) === '') {
+                    return [false, 'missing_entity_type'];
+                }
+                if (trim((string) ($command['entity_id'] ?? '')) === '') {
+                    return [false, 'missing_entity_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetMedia':
+            case 'DeleteMedia':
+            case 'GenerateMediaThumbnail':
+                if (trim((string) ($command['media_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_media_id'];
+                }
+                return [true, 'schema_valid'];
+
             case 'CreateEntity':
                 if ($entity === '') {
                     return [false, 'missing_entity'];

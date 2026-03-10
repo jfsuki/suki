@@ -900,12 +900,18 @@ final class IntentRouter
         array $runtimeBudget,
         ?SkillRegistry $skillsRegistry
     ): array {
-        if ($action !== 'send_to_llm' || !$skillsRegistry) {
+        if ($action === 'execute_command' || !$skillsRegistry) {
             return [];
         }
 
         $query = $this->extractRetrievalQuery($gatewayResult, $context);
         $resolved = $this->skillResolver->resolve($query, $skillsRegistry, $context);
+        if ($action !== 'send_to_llm') {
+            $selectedName = strtolower(trim((string) (($resolved['selected']['name'] ?? '') ?: '')));
+            if (!(bool) ($resolved['detected'] ?? false) || !str_starts_with($selectedName, 'media_')) {
+                return [];
+            }
+        }
         if (!(bool) ($resolved['detected'] ?? false)) {
             return [
                 'telemetry' => [
@@ -1582,6 +1588,11 @@ final class IntentRouter
             'ListAlerts' => 'ops.alert.list',
             'UpdateAlertStatus' => 'ops.alert.update_status',
             'FetchPendingOperationalItems' => 'ops.pending.list',
+            'UploadMedia' => 'media.upload',
+            'ListMedia' => 'media.list',
+            'GetMedia' => 'media.get',
+            'DeleteMedia' => 'media.delete',
+            'GenerateMediaThumbnail' => 'media.generate_thumbnail',
             'CreateInvoice' => 'invoice.create',
             'GenerateReport' => 'report.generate',
             'ConfigureFEProvider' => 'settings.configure_fe_provider',

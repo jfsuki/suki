@@ -196,6 +196,7 @@ final class ChatAgent
             'channel' => $channel,
             'has_attachment' => !empty($payload['meta']) || !empty($payload['attachments']),
             'attachments_count' => $this->resolveAttachmentCount($payload),
+            'attachments' => is_array($payload['attachments'] ?? null) ? (array) $payload['attachments'] : [],
             'role' => $role,
             'mode' => $mode,
             'message_id' => (string) ($payload['message_id'] ?? ''),
@@ -1671,6 +1672,7 @@ final class ChatAgent
             'alert_action' => $runtimeObservability['alert_action'],
             'task_action' => $runtimeObservability['task_action'],
             'reminder_action' => $runtimeObservability['reminder_action'],
+            'media_action' => $runtimeObservability['media_action'],
             'pending_items_count' => $runtimeObservability['pending_items_count'],
             'token_usage' => $runtimeObservability['token_usage'],
             'cost_estimate' => $runtimeObservability['cost_estimate'],
@@ -1764,6 +1766,7 @@ final class ChatAgent
             'alert_action' => trim((string) ($runtimeContext['alert_action'] ?? $routeTelemetry['alert_action'] ?? '')) ?: 'none',
             'task_action' => trim((string) ($runtimeContext['task_action'] ?? $routeTelemetry['task_action'] ?? '')) ?: 'none',
             'reminder_action' => trim((string) ($runtimeContext['reminder_action'] ?? $routeTelemetry['reminder_action'] ?? '')) ?: 'none',
+            'media_action' => trim((string) ($runtimeContext['media_action'] ?? $routeTelemetry['media_action'] ?? '')) ?: 'none',
             'pending_items_count' => is_numeric($runtimeContext['pending_items_count'] ?? $routeTelemetry['pending_items_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['pending_items_count'] ?? $routeTelemetry['pending_items_count']))
                 : null,
@@ -1904,6 +1907,7 @@ final class ChatAgent
             'alert_action' => trim((string) ($payload['alert_action'] ?? '')) ?: 'none',
             'task_action' => trim((string) ($payload['task_action'] ?? '')) ?: 'none',
             'reminder_action' => trim((string) ($payload['reminder_action'] ?? '')) ?: 'none',
+            'media_action' => trim((string) ($payload['media_action'] ?? '')) ?: 'none',
             'pending_items_count' => $pendingItemsCount !== null ? max(0, (int) $pendingItemsCount) : null,
         ];
     }
@@ -1934,6 +1938,7 @@ final class ChatAgent
             $this->commandBus->register(new CompileWorkflowCommandHandler());
             $this->commandBus->register(new CrudCommandHandler());
             $this->commandBus->register(new AlertsCenterCommandHandler());
+            $this->commandBus->register(new MediaCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
                 ['AuthLogin', 'AuthCreateUser'],
                 function (array $command, array $context): array {

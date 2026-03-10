@@ -47,6 +47,9 @@ use App\Core\ApiSecurityGuard;
 use App\Core\SecurityStateRepository;
 use App\Core\OperationalQueueStore;
 use App\Core\LogSanitizer;
+use App\Core\MediaAccessToken;
+use App\Core\MediaService;
+use App\Core\RoleContext;
 use App\Core\WebhookSecurityPolicy;
 use App\Core\Agents\ConversationQualityDashboard;
 
@@ -217,6 +220,21 @@ function resolveRecordsReadToken(): string
         return trim(substr($authorization, 7));
     }
     return '';
+}
+
+function mediaAccessSecret(): string
+{
+    $secret = trim((string) (getenv('MEDIA_ACCESS_SECRET') ?: getenv('RECORDS_READ_SECRET') ?: ''));
+    if ($secret !== '') {
+        return $secret;
+    }
+
+    return hash('sha256', FRAMEWORK_ROOT . '|' . PROJECT_ROOT . '|media_access');
+}
+
+function mediaAccessTtlSec(): int
+{
+    return max(60, (int) (getenv('MEDIA_ACCESS_TTL_SEC') ?: 900));
 }
 
 /**
@@ -2739,6 +2757,304 @@ if ($route === 'integrations/alanube/webhook') {
         return;
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+if ($route === 'media/upload') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    if ($tenantId === '') {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 403);
+        return;
+    }
+
+    $payload = requestData();
+    $requestedTenant = trim((string) ($payload['tenant_id'] ?? ''));
+    if ($requestedTenant !== '' && $requestedTenant !== $tenantId) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 403);
+        return;
+    }
+
+    $payload['tenant_id'] = $tenantId;
+    $payload['project_id'] = (string) ($payload['project_id'] ?? $_GET['project_id'] ?? $sessionUser['project_id'] ?? '');
+    if (isset($_FILES['file']) && is_array($_FILES['file']) && (int) ($_FILES['file']['error'] ?? UPLOAD_ERR_NO_FILE) === UPLOAD_ERR_OK) {
+        $payload['file'] = [
+            'source_path' => (string) ($_FILES['file']['tmp_name'] ?? ''),
+            'tmp_path' => (string) ($_FILES['file']['tmp_name'] ?? ''),
+            'path' => (string) ($_FILES['file']['tmp_name'] ?? ''),
+            'original_name' => (string) ($_FILES['file']['name'] ?? ''),
+            'name' => (string) ($_FILES['file']['name'] ?? ''),
+            'mime_type' => (string) ($_FILES['file']['type'] ?? ''),
+            'type' => (string) ($_FILES['file']['type'] ?? ''),
+            'file_size' => (int) ($_FILES['file']['size'] ?? 0),
+            'size' => (int) ($_FILES['file']['size'] ?? 0),
+        ];
+    }
+
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $media = (new MediaService())->upload($payload + [
+            'app_id' => $payload['project_id'] !== '' ? $payload['project_id'] : null,
+            'uploaded_by_user_id' => (string) ($sessionUser['id'] ?? 'anon'),
+        ]);
+        respondJson($response, 'success', 'Archivo subido', ['media' => $media, 'item' => $media]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'media/list') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = $method === 'GET' ? $_GET : requestData();
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $items = (new MediaService())->list(
+            $tenantId,
+            (string) ($payload['entity_type'] ?? ''),
+            (string) ($payload['entity_id'] ?? ''),
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+            isset($payload['limit']) ? (int) $payload['limit'] : 50,
+            isset($payload['offset']) ? (int) $payload['offset'] : 0
+        );
+        respondJson($response, 'success', 'Archivos cargados', ['items' => $items]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'media/get') {
+    if ($method !== 'GET') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $mediaId = (string) ($_GET['id'] ?? $_GET['media_id'] ?? '');
+        $media = (new MediaService())->get(
+            $tenantId,
+            $mediaId,
+            trim((string) ($_GET['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null
+        );
+        respondJson($response, 'success', 'Archivo cargado', ['media' => $media, 'item' => $media]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 404);
+        return;
+    }
+}
+
+if ($route === 'media/delete') {
+    if (!in_array($method, ['DELETE', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $mediaId = (string) ($payload['id'] ?? $payload['media_id'] ?? '');
+        $result = (new MediaService())->delete(
+            $tenantId,
+            $mediaId,
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+            (string) ($sessionUser['id'] ?? 'anon')
+        );
+        respondJson($response, 'success', 'Archivo eliminado', $result);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 404);
+        return;
+    }
+}
+
+if ($route === 'media/thumbnail') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = requestData();
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $mediaId = (string) ($payload['id'] ?? $payload['media_id'] ?? '');
+        $media = (new MediaService())->generateThumbnail(
+            $tenantId,
+            $mediaId,
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null
+        );
+        respondJson($response, 'success', 'Miniatura generada', ['media' => $media, 'item' => $media]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'media/access') {
+    if ($method !== 'GET') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $mediaId = trim((string) ($_GET['id'] ?? $_GET['media_id'] ?? ''));
+    $variant = trim((string) ($_GET['variant'] ?? 'original'));
+    if ($mediaId === '') {
+        respondJson($response, 'error', 'media_id requerido', [], 400);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    $tenantId = '';
+    $appId = null;
+    $actorId = 'token';
+
+    if (!empty($sessionUser)) {
+        $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+        if ($tenantId === '') {
+            respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 403);
+            return;
+        }
+        $projectId = trim((string) ($_GET['project_id'] ?? $sessionUser['project_id'] ?? ''));
+        $appId = $projectId !== '' ? $projectId : null;
+        $actorId = (string) ($sessionUser['id'] ?? 'anon');
+        setTenantContext(['tenant_id' => $tenantId], true);
+        RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+        RoleContext::setUserId($actorId);
+        RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+    } else {
+        $token = resolveRecordsReadToken();
+        $verified = MediaAccessToken::verify($token, mediaAccessSecret());
+        if (!(bool) ($verified['ok'] ?? false)) {
+            respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+            return;
+        }
+
+        $tokenPayload = is_array($verified['payload'] ?? null) ? (array) $verified['payload'] : [];
+        $scope = trim((string) ($tokenPayload['scope'] ?? ''));
+        $tokenTenantId = trim((string) ($tokenPayload['tenant_id'] ?? ''));
+        $tokenMediaId = trim((string) ($tokenPayload['media_id'] ?? ''));
+        $tokenVariant = trim((string) ($tokenPayload['variant'] ?? ''));
+        $path = trim((string) ($tokenPayload['path'] ?? ''));
+        $exp = (int) ($tokenPayload['exp'] ?? 0);
+        $now = time();
+        if ($scope !== 'media:access' || $tokenTenantId === '' || $tokenMediaId !== $mediaId || $path !== 'media/access') {
+            respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 403);
+            return;
+        }
+        if ($tokenVariant !== '' && $tokenVariant !== $variant) {
+            respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 403);
+            return;
+        }
+        if ($exp <= 0 || $exp < $now || $exp > ($now + mediaAccessTtlSec() + 5)) {
+            respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+            return;
+        }
+
+        $tenantId = $tokenTenantId;
+        $tokenAppId = trim((string) ($tokenPayload['app_id'] ?? ''));
+        $appId = $tokenAppId !== '' ? $tokenAppId : null;
+        setTenantContext(['tenant_id' => $tenantId], true);
+        RoleContext::setRole('guest');
+        RoleContext::setUserId($actorId);
+        RoleContext::setUserLabel('signed_token');
+    }
+
+    try {
+        $access = (new MediaService())->resolveAccess($tenantId, $mediaId, $variant, $appId, $actorId);
+        $absolutePath = (string) ($access['absolute_path'] ?? '');
+        if ($absolutePath === '' || !is_file($absolutePath) || !is_readable($absolutePath)) {
+            respondJson($response, 'error', 'Archivo no disponible', [], 404);
+            return;
+        }
+
+        $fileName = preg_replace('/[^a-zA-Z0-9._-]+/', '_', (string) ($access['file_name'] ?? 'archivo')) ?: 'archivo';
+        while (ob_get_level() > 0) {
+            ob_end_clean();
+        }
+        header('Content-Type: ' . (string) ($access['mime_type'] ?? 'application/octet-stream'));
+        if (is_numeric($access['file_size'] ?? null) && (int) $access['file_size'] > 0) {
+            header('Content-Length: ' . (int) $access['file_size']);
+        }
+        header('Content-Disposition: inline; filename="' . $fileName . '"');
+        header('X-Content-Type-Options: nosniff');
+        $stream = fopen($absolutePath, 'rb');
+        if (!is_resource($stream)) {
+            http_response_code(500);
+            exit;
+        }
+        fpassthru($stream);
+        fclose($stream);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 404);
         return;
     }
 }
