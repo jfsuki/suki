@@ -1631,6 +1631,18 @@ final class ChatAgent
         $runtimeEnvelope = $this->buildAgentOpsRuntimeEnvelope($routeTelemetry, $latencyMs, $runtimeContext);
         $runtimeObservability = $runtimeEnvelope['runtime'];
         $supervisor = $runtimeEnvelope['supervisor'];
+        if (trim((string) ($runtimeObservability['session_id'] ?? '')) === '') {
+            $runtimeObservability['session_id'] = $sessionId;
+        }
+        if (trim((string) ($runtimeObservability['user_id'] ?? '')) === '') {
+            $runtimeObservability['user_id'] = trim((string) ($routeTelemetry['user_id'] ?? '')) ?: 'anon';
+        }
+        if (($runtimeObservability['app_id'] ?? null) === null || trim((string) ($runtimeObservability['app_id'] ?? '')) === '') {
+            $runtimeObservability['app_id'] = $projectId;
+        }
+        if (trim((string) ($runtimeObservability['tenant_id'] ?? '')) === '') {
+            $runtimeObservability['tenant_id'] = $tenantId;
+        }
 
         return [
             'event_name' => $eventName,
@@ -1674,6 +1686,11 @@ final class ChatAgent
             'reminder_action' => $runtimeObservability['reminder_action'],
             'media_action' => $runtimeObservability['media_action'],
             'entity_search_action' => $runtimeObservability['entity_search_action'],
+            'pos_action' => $runtimeObservability['pos_action'],
+            'draft_id' => $runtimeObservability['draft_id'],
+            'session_id' => $runtimeObservability['session_id'],
+            'product_id' => $runtimeObservability['product_id'],
+            'result_status' => $runtimeObservability['result_status'],
             'pending_items_count' => $runtimeObservability['pending_items_count'],
             'token_usage' => $runtimeObservability['token_usage'],
             'cost_estimate' => $runtimeObservability['cost_estimate'],
@@ -1769,6 +1786,11 @@ final class ChatAgent
             'reminder_action' => trim((string) ($runtimeContext['reminder_action'] ?? $routeTelemetry['reminder_action'] ?? '')) ?: 'none',
             'media_action' => trim((string) ($runtimeContext['media_action'] ?? $routeTelemetry['media_action'] ?? '')) ?: 'none',
             'entity_search_action' => trim((string) ($runtimeContext['entity_search_action'] ?? $routeTelemetry['entity_search_action'] ?? '')) ?: 'none',
+            'pos_action' => trim((string) ($runtimeContext['pos_action'] ?? $routeTelemetry['pos_action'] ?? '')) ?: 'none',
+            'draft_id' => trim((string) ($runtimeContext['draft_id'] ?? $routeTelemetry['draft_id'] ?? '')),
+            'session_id' => trim((string) ($runtimeContext['session_id'] ?? $routeTelemetry['session_id'] ?? '')),
+            'product_id' => trim((string) ($runtimeContext['product_id'] ?? $routeTelemetry['product_id'] ?? '')),
+            'result_status' => trim((string) ($runtimeContext['result_status'] ?? $routeTelemetry['result_status'] ?? '')) ?: 'unknown',
             'pending_items_count' => is_numeric($runtimeContext['pending_items_count'] ?? $routeTelemetry['pending_items_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['pending_items_count'] ?? $routeTelemetry['pending_items_count']))
                 : null,
@@ -1911,6 +1933,11 @@ final class ChatAgent
             'reminder_action' => trim((string) ($payload['reminder_action'] ?? '')) ?: 'none',
             'media_action' => trim((string) ($payload['media_action'] ?? '')) ?: 'none',
             'entity_search_action' => trim((string) ($payload['entity_search_action'] ?? '')) ?: 'none',
+            'pos_action' => trim((string) ($payload['pos_action'] ?? '')) ?: 'none',
+            'draft_id' => trim((string) ($payload['draft_id'] ?? '')) ?: '',
+            'session_id' => trim((string) ($payload['session_id'] ?? '')) ?: '',
+            'product_id' => trim((string) ($payload['product_id'] ?? '')) ?: '',
+            'result_status' => trim((string) ($payload['result_status'] ?? '')) ?: '',
             'result_count' => is_numeric($payload['result_count'] ?? null)
                 ? max(0, (int) $payload['result_count'])
                 : null,
@@ -1952,6 +1979,7 @@ final class ChatAgent
             $this->commandBus->register(new AlertsCenterCommandHandler());
             $this->commandBus->register(new MediaCommandHandler());
             $this->commandBus->register(new EntitySearchCommandHandler());
+            $this->commandBus->register(new POSCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
                 ['AuthLogin', 'AuthCreateUser'],
                 function (array $command, array $context): array {

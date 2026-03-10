@@ -520,6 +520,64 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'CreatePOSDraft':
+                $tenantId = trim((string) ($command['tenant_id'] ?? ''));
+                if ($tenantId === '') {
+                    return [false, 'missing_tenant_id'];
+                }
+                if (array_key_exists('metadata', $command) && !is_array($command['metadata'])) {
+                    return [false, 'invalid_metadata'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetPOSDraft':
+                if (trim((string) ($command['draft_id'] ?? $command['sale_draft_id'] ?? '')) === '') {
+                    return [false, 'missing_draft_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'AddPOSDraftLine':
+                if (trim((string) ($command['draft_id'] ?? $command['sale_draft_id'] ?? '')) === '') {
+                    return [false, 'missing_draft_id'];
+                }
+                $productId = trim((string) ($command['product_id'] ?? ''));
+                $query = trim((string) ($command['query'] ?? ''));
+                $sku = trim((string) ($command['sku'] ?? ''));
+                $barcode = trim((string) ($command['barcode'] ?? ''));
+                if ($productId === '' && $query === '' && $sku === '' && $barcode === '') {
+                    return [false, 'missing_product_reference'];
+                }
+                if (array_key_exists('qty', $command) && (!is_numeric($command['qty']) || (float) $command['qty'] <= 0)) {
+                    return [false, 'invalid_qty'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'RemovePOSDraftLine':
+                if (trim((string) ($command['draft_id'] ?? $command['sale_draft_id'] ?? '')) === '') {
+                    return [false, 'missing_draft_id'];
+                }
+                if (trim((string) ($command['line_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_line_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'AttachPOSDraftCustomer':
+                if (trim((string) ($command['draft_id'] ?? $command['sale_draft_id'] ?? '')) === '') {
+                    return [false, 'missing_draft_id'];
+                }
+                $customerId = trim((string) ($command['customer_id'] ?? ''));
+                $query = trim((string) ($command['query'] ?? ''));
+                if ($customerId === '' && $query === '') {
+                    return [false, 'missing_customer_reference'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListPOSOpenDrafts':
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                return [true, 'schema_valid'];
+
             case 'CreateEntity':
                 if ($entity === '') {
                     return [false, 'missing_entity'];

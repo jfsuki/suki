@@ -29,6 +29,11 @@
 - If you add entity search behavior:
   - update repository/service/parser/handler together
   - verify ambiguous results and zero-result paths
+- If you add POS behavior:
+  - update `POSRepository`, `POSService`, `POSCommandHandler`, `POSMessageParser`
+  - keep draft-first design and tenant isolation
+  - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
+  - reuse `EntitySearchService` for product/customer resolution instead of guessing
 - If you add AgentOps metrics:
   - keep `docs/contracts/agentops_metrics_contract.json` aligned
   - extend `TelemetryService`, `SqlMetricsRepository` or `Agents/Telemetry`

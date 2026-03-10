@@ -1,6 +1,6 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "effective_date": "2026-03-10",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
@@ -639,6 +639,200 @@
           "entity_type",
           "date_from",
           "date_to",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_create_draft",
+      "description": "Create a POS sale draft before checkout.",
+      "intent_patterns": [
+        "re:(crea|crear|abre|abrir|nuevo|nueva).*(borrador|draft|carrito).*(pos|venta|sale)?",
+        "re:(borrador|draft|carrito).*(pos|venta|sale).*(crea|crear|abre|abrir|nuevo|nueva)"
+      ],
+      "keywords": [
+        "crear borrador pos",
+        "nuevo draft pos",
+        "abrir carrito pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_create_draft"
+      ],
+      "priority": 172,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "session_id",
+          "customer_id",
+          "currency"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_get_draft",
+      "description": "Load a POS sale draft safely.",
+      "intent_patterns": [
+        "re:(ver|mostrar|muestra|consulta|abrir|abre).*(borrador|draft).*(pos)?",
+        "re:(borrador|draft).*(ver|mostrar|consulta|abrir|abre)"
+      ],
+      "keywords": [
+        "ver borrador pos",
+        "abrir draft pos",
+        "mostrar carrito pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_get_draft"
+      ],
+      "priority": 171,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "draft_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_add_draft_line",
+      "description": "Add a product line into an open POS draft using entity resolution.",
+      "intent_patterns": [
+        "re:(agrega|agregar|anade|añade|suma).*(producto|sku|barcode|item|linea).*(borrador|draft|carrito)",
+        "re:(borrador|draft|carrito).*(agrega|agregar|anade|añade|suma).*(producto|sku|barcode|item|linea)"
+      ],
+      "keywords": [
+        "agregar linea pos",
+        "agregar producto al borrador",
+        "sumar item al draft"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_add_draft_line"
+      ],
+      "priority": 176,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "draft_id",
+          "product_id",
+          "query",
+          "qty"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_remove_draft_line",
+      "description": "Remove a line from an open POS draft.",
+      "intent_patterns": [
+        "re:(quita|quitar|elimina|eliminar|borra|borrar).*(linea|item).*(borrador|draft|carrito)",
+        "re:(borrador|draft|carrito).*(quita|quitar|elimina|eliminar|borra|borrar).*(linea|item)"
+      ],
+      "keywords": [
+        "quitar linea pos",
+        "eliminar item del borrador",
+        "borrar linea draft"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_remove_draft_line"
+      ],
+      "priority": 169,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "draft_id",
+          "line_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_attach_customer",
+      "description": "Attach a customer to an open POS draft using entity resolution.",
+      "intent_patterns": [
+        "re:(asocia|asociar|agrega|adjunta|attach).*(cliente|customer).*(borrador|draft|carrito)",
+        "re:(borrador|draft|carrito).*(cliente|customer).*(asocia|asociar|agrega|adjunta|attach)"
+      ],
+      "keywords": [
+        "asociar cliente al borrador",
+        "agregar cliente pos",
+        "attach customer draft"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_attach_customer"
+      ],
+      "priority": 170,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "draft_id",
+          "customer_id",
+          "query"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_list_open_drafts",
+      "description": "List open POS drafts for the current tenant.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(borradores|drafts|carritos).*(abiertos|open|pos)",
+        "re:(borradores|drafts|carritos).*(abiertos|open).*(lista|listar|muestra|mostrar|ver|consulta)"
+      ],
+      "keywords": [
+        "listar borradores pos",
+        "drafts abiertos pos",
+        "carritos abiertos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_list_open_drafts"
+      ],
+      "priority": 168,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
           "limit"
         ]
       },

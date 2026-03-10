@@ -1595,6 +1595,12 @@ final class IntentRouter
             'GenerateMediaThumbnail' => 'media.generate_thumbnail',
             'SearchEntities' => 'entity.search',
             'ResolveEntityReference' => 'entity.resolve',
+            'CreatePOSDraft' => 'pos.create_draft',
+            'GetPOSDraft' => 'pos.get_draft',
+            'AddPOSDraftLine' => 'pos.add_draft_line',
+            'RemovePOSDraftLine' => 'pos.remove_draft_line',
+            'AttachPOSDraftCustomer' => 'pos.attach_customer',
+            'ListPOSOpenDrafts' => 'pos.list_open_drafts',
             'CreateInvoice' => 'invoice.create',
             'GenerateReport' => 'report.generate',
             'ConfigureFEProvider' => 'settings.configure_fe_provider',
@@ -1623,6 +1629,7 @@ final class IntentRouter
     private function isDeterministicPreLlmSkill(string $selectedName): bool
     {
         return str_starts_with($selectedName, 'media_')
+            || str_starts_with($selectedName, 'pos_')
             || in_array($selectedName, ['entity_search', 'entity_resolve'], true);
     }
 

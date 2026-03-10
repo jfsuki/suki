@@ -155,6 +155,11 @@ final class ConversationGateway
             'reminder_action' => trim((string) ($trace['reminder_action'] ?? '')) ?: 'none',
             'media_action' => trim((string) ($trace['media_action'] ?? '')) ?: 'none',
             'entity_search_action' => trim((string) ($trace['entity_search_action'] ?? '')) ?: 'none',
+            'pos_action' => trim((string) ($trace['pos_action'] ?? '')) ?: 'none',
+            'draft_id' => trim((string) ($trace['draft_id'] ?? '')),
+            'session_id' => trim((string) ($trace['session_id'] ?? '')),
+            'product_id' => trim((string) ($trace['product_id'] ?? '')),
+            'result_status' => trim((string) ($trace['result_status'] ?? '')),
             'pending_items_count' => is_numeric($trace['pending_items_count'] ?? null)
                 ? max(0, (int) $trace['pending_items_count'])
                 : null,
