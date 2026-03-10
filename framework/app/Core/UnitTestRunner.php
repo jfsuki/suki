@@ -95,6 +95,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('media_module', fn() => $this->checkMediaModule());
         $tests[] = $this->wrap('entity_search_module', fn() => $this->checkEntitySearchModule());
         $tests[] = $this->wrap('project_memory_system', fn() => $this->checkProjectMemorySystem());
+        $tests[] = $this->wrap('learning_promotion_pipeline', fn() => $this->checkLearningPromotionPipeline());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
 
         $summary = [
@@ -1454,6 +1455,11 @@ final class UnitTestRunner
     private function checkProjectMemorySystem(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/project_memory_system_test.php');
+    }
+
+    private function checkLearningPromotionPipeline(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/learning_promotion_pipeline_test.php');
     }
 
     private function checkSemanticPipelineE2E(): void

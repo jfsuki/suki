@@ -10,6 +10,7 @@
 - `SkillExecutor.php`: orquestacion de skills y tools.
 - `TelemetryService.php` + `SqlMetricsRepository.php`: metricas SQL.
 - `ImprovementMemoryService.php`: memoria de mejora derivada de AgentOps.
+- `LearningPromotionService.php`: promocion controlada de candidatos aprobados a backlog estructurado.
 - `SemanticMemoryService.php`: retrieval/vector memory.
 - `MediaService.php` y `EntitySearchService.php`: modulos compartidos recientes.
 

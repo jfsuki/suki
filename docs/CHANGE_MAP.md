@@ -33,12 +33,33 @@
   - keep `docs/contracts/agentops_metrics_contract.json` aligned
   - extend `TelemetryService`, `SqlMetricsRepository` or `Agents/Telemetry`
   - add regression tests for minimum required fields
+- If you add learning promotion logic:
+  - update `ImprovementMemoryRepository.php` schema methods and formal migration
+  - update `ImprovementMemoryService.php` only if candidate payload changes
+  - implement proposal generation in `LearningPromotionService.php`
+  - add dedupe coverage and candidate processed-state tests
 - If you add semantic memory capabilities:
   - update `SemanticMemoryService`, `QdrantVectorStore`, `docs/contracts/semantic_memory_payload.json`
   - keep Qdrant optional and fail-safe
 - If you add a contributor-facing map or guide:
   - keep files small
   - prefer new modular docs over rewriting canonical docs
+
+## Learning lifecycle
+- AgentOps metric or telemetry signal
+  - becomes `improvement_memory`
+- Recurrent issue with enough confidence
+  - becomes `learning_candidate` with `review_status=pending`
+- Human or controlled review
+  - moves candidate to `approved` or `rejected`
+- Approved and unprocessed candidate
+  - is promoted by `LearningPromotionService`
+- Promotion output
+  - creates one deduped `improvement_proposal` with `status=open`
+- Existing open/accepted duplicate
+  - blocks proposal spam and only marks the candidate as processed
+- Proposal lifecycle
+  - `open -> accepted|rejected|implemented`
 
 ## Impact hotspots
 - `framework/app/Core/ChatAgent.php`

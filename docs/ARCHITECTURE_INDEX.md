@@ -6,8 +6,8 @@
   - main files: `framework/app/Core/ChatAgent.php`, `framework/app/Core/IntentRouter.php`, `framework/app/Core/CommandBus.php`
   - dependencies: `ProjectRegistry`, `ConversationGateway`, `TelemetryService`, `docs/contracts/*`
 - Shared memory
-  - purpose: conversational state, semantic retrieval, improvement memory, registry-backed context
-  - main files: `framework/app/Core/SqlMemoryRepository.php`, `framework/app/Core/SemanticMemoryService.php`, `framework/app/Core/ImprovementMemoryService.php`
+  - purpose: conversational state, semantic retrieval, improvement memory, learning promotion and registry-backed context
+  - main files: `framework/app/Core/SqlMemoryRepository.php`, `framework/app/Core/SemanticMemoryService.php`, `framework/app/Core/ImprovementMemoryService.php`, `framework/app/Core/LearningPromotionService.php`
   - dependencies: `project/storage/meta/project_registry.sqlite`, `QdrantVectorStore`, `docs/contracts/semantic_memory_payload.json`
 - Observability
   - purpose: AgentOps telemetry, SQL metrics, supervisor evaluation, improvement candidate generation
@@ -106,8 +106,8 @@
   - main files: `framework/app/Core/SqlMetricsRepository.php`, `framework/app/Core/TelemetryService.php`
   - dependencies: `project/storage/meta/project_registry.sqlite`
 - Improvement memory
-  - purpose: convert recurring AgentOps issues into tracked improvements and learning candidates
-  - main files: `framework/app/Core/ImprovementMemoryRepository.php`, `framework/app/Core/ImprovementMemoryService.php`
+  - purpose: convert recurring AgentOps issues into tracked improvements, learning candidates and promoted proposals
+  - main files: `framework/app/Core/ImprovementMemoryRepository.php`, `framework/app/Core/ImprovementMemoryService.php`, `framework/app/Core/LearningPromotionService.php`
   - dependencies: `Agents/Telemetry`, `SqlMetricsRepository`
 
 ## Tests

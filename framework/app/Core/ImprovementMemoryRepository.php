@@ -28,7 +28,7 @@ final class ImprovementMemoryRepository
             $this->requiredTables(),
             $this->requiredIndexes(),
             $this->requiredColumns(),
-            'db/migrations/sqlite/20260310_012_project_memory_system.sql'
+            'db/migrations/sqlite/20260310_013_learning_promotion_pipeline.sql'
         );
     }
 
@@ -111,32 +111,55 @@ final class ImprovementMemoryRepository
         $existing = $this->findLearningCandidate($normalized['tenant_id'], $normalized['candidate_id']);
 
         if (is_array($existing)) {
+            $reviewStatus = $normalized['review_status'];
+            if (
+                (!array_key_exists('review_status', $candidate) || $reviewStatus === 'pending')
+                && in_array((string) ($existing['review_status'] ?? ''), ['approved', 'rejected'], true)
+            ) {
+                $reviewStatus = (string) ($existing['review_status'] ?? 'pending');
+            }
+            $processedAt = array_key_exists('processed_at', $candidate)
+                ? $normalized['processed_at']
+                : ($existing['processed_at'] ?? null);
+            $proposalId = array_key_exists('proposal_id', $candidate)
+                ? $normalized['proposal_id']
+                : ($existing['proposal_id'] ?? null);
             $stmt = $this->db->prepare(
                 'UPDATE learning_candidates
                  SET source_metric = :source_metric,
                      module = :module,
+                     problem_type = :problem_type,
+                     severity = :severity,
+                     evidence = :evidence,
                      description = :description,
                      frequency = :frequency,
                      confidence = :confidence,
-                     review_status = :review_status
+                     review_status = :review_status,
+                     processed_at = :processed_at,
+                     proposal_id = :proposal_id
                  WHERE tenant_id = :tenant_id AND candidate_id = :candidate_id'
             );
             $stmt->execute([
                 ':source_metric' => $normalized['source_metric'],
                 ':module' => $normalized['module'],
+                ':problem_type' => $normalized['problem_type'],
+                ':severity' => $normalized['severity'],
+                ':evidence' => $normalized['evidence'],
                 ':description' => $normalized['description'],
                 ':frequency' => $normalized['frequency'],
                 ':confidence' => $normalized['confidence'],
-                ':review_status' => $normalized['review_status'],
+                ':review_status' => $reviewStatus,
+                ':processed_at' => $processedAt,
+                ':proposal_id' => $proposalId,
                 ':tenant_id' => $normalized['tenant_id'],
                 ':candidate_id' => $normalized['candidate_id'],
             ]);
         } else {
             $stmt = $this->db->prepare(
                 'INSERT INTO learning_candidates (
-                    candidate_id, tenant_id, source_metric, module, description, frequency, confidence, review_status, created_at
+                    candidate_id, tenant_id, source_metric, module, problem_type, severity, evidence, description, frequency, confidence, review_status, processed_at, proposal_id, created_at
                  ) VALUES (
-                    :candidate_id, :tenant_id, :source_metric, :module, :description, :frequency, :confidence, :review_status, :created_at
+                    :candidate_id, :tenant_id, :source_metric, :module, :problem_type, :severity, :evidence, :description, :frequency, :confidence, :review_status, :processed_at, :proposal_id, :created_at
                  )'
             );
             $stmt->execute([
@@ -144,10 +167,15 @@ final class ImprovementMemoryRepository
                 ':tenant_id' => $normalized['tenant_id'],
                 ':source_metric' => $normalized['source_metric'],
                 ':module' => $normalized['module'],
+                ':problem_type' => $normalized['problem_type'],
+                ':severity' => $normalized['severity'],
+                ':evidence' => $normalized['evidence'],
                 ':description' => $normalized['description'],
                 ':frequency' => $normalized['frequency'],
                 ':confidence' => $normalized['confidence'],
                 ':review_status' => $normalized['review_status'],
+                ':processed_at' => $normalized['processed_at'],
+                ':proposal_id' => $normalized['proposal_id'],
                 ':created_at' => $normalized['created_at'],
             ]);
         }
@@ -249,7 +277,7 @@ final class ImprovementMemoryRepository
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function listLearningCandidates(string $tenantId, string $reviewStatus = '', int $limit = 10): array
+    public function listLearningCandidates(string $tenantId, string $reviewStatus = '', int $limit = 10, bool $onlyUnprocessed = false): array
     {
         $limit = max(1, min(100, $limit));
         $where = ['tenant_id = :tenant_id'];
@@ -257,6 +285,9 @@ final class ImprovementMemoryRepository
         if (trim($reviewStatus) !== '') {
             $where[] = 'review_status = :review_status';
             $params[':review_status'] = trim($reviewStatus);
+        }
+        if ($onlyUnprocessed) {
+            $where[] = 'processed_at IS NULL';
         }
 
         $sql = 'SELECT * FROM learning_candidates
@@ -271,6 +302,162 @@ final class ImprovementMemoryRepository
         $stmt->execute();
         $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
         return array_map(fn(array $row): array => $this->normalizeCandidateRow($row), $rows);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listApprovedCandidatesForPromotion(?string $tenantId = null, int $limit = 25): array
+    {
+        $limit = max(1, min(200, $limit));
+        $where = ['review_status = :review_status', 'processed_at IS NULL'];
+        $params = [':review_status' => 'approved'];
+        if ($tenantId !== null && trim($tenantId) !== '') {
+            $where[] = 'tenant_id = :tenant_id';
+            $params[':tenant_id'] = $this->normText($tenantId, 'default');
+        }
+
+        $sql = 'SELECT * FROM learning_candidates
+                WHERE ' . implode(' AND ', $where) . '
+                ORDER BY confidence DESC, frequency DESC, created_at ASC
+                LIMIT :limit';
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map(fn(array $row): array => $this->normalizeCandidateRow($row), $rows);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function markLearningCandidateProcessed(string $tenantId, string $candidateId, ?string $proposalId = null): ?array
+    {
+        if ($candidateId === '') {
+            return null;
+        }
+
+        $stmt = $this->db->prepare(
+            'UPDATE learning_candidates
+             SET processed_at = :processed_at,
+                 proposal_id = :proposal_id
+             WHERE tenant_id = :tenant_id AND candidate_id = :candidate_id'
+        );
+        $stmt->execute([
+            ':processed_at' => date('Y-m-d H:i:s'),
+            ':proposal_id' => $proposalId,
+            ':tenant_id' => $this->normText($tenantId, 'default'),
+            ':candidate_id' => $candidateId,
+        ]);
+
+        return $this->findLearningCandidate($tenantId, $candidateId);
+    }
+
+    /**
+     * @param array<string, mixed> $proposal
+     * @return array<string, mixed>
+     */
+    public function insertImprovementProposal(array $proposal): array
+    {
+        $normalized = $this->normalizeProposalRecord($proposal);
+        $stmt = $this->db->prepare(
+            'INSERT INTO improvement_proposals (
+                id, tenant_id, candidate_id, proposal_type, module, title, description, evidence, frequency, confidence, priority, status, created_at
+             ) VALUES (
+                :id, :tenant_id, :candidate_id, :proposal_type, :module, :title, :description, :evidence, :frequency, :confidence, :priority, :status, :created_at
+             )'
+        );
+        $stmt->execute([
+            ':id' => $normalized['id'],
+            ':tenant_id' => $normalized['tenant_id'],
+            ':candidate_id' => $normalized['candidate_id'],
+            ':proposal_type' => $normalized['proposal_type'],
+            ':module' => $normalized['module'],
+            ':title' => $normalized['title'],
+            ':description' => $normalized['description'],
+            ':evidence' => $normalized['evidence'],
+            ':frequency' => $normalized['frequency'],
+            ':confidence' => $normalized['confidence'],
+            ':priority' => $normalized['priority'],
+            ':status' => $normalized['status'],
+            ':created_at' => $normalized['created_at'],
+        ]);
+
+        $saved = $this->findImprovementProposal($normalized['id']);
+        if (!is_array($saved)) {
+            throw new RuntimeException('IMPROVEMENT_PROPOSAL_INSERT_FETCH_FAILED');
+        }
+
+        return $saved;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findImprovementProposal(string $proposalId): ?array
+    {
+        if ($proposalId === '') {
+            return null;
+        }
+        $stmt = $this->db->prepare('SELECT * FROM improvement_proposals WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $proposalId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return is_array($row) ? $this->normalizeProposalRow($row) : null;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function listImprovementProposals(array $filters = [], int $limit = 25): array
+    {
+        $limit = max(1, min(200, $limit));
+        $where = ['1 = 1'];
+        $params = [];
+
+        if (array_key_exists('tenant_id', $filters)) {
+            $tenantId = $filters['tenant_id'];
+            if ($tenantId === null || trim((string) $tenantId) === '') {
+                $where[] = 'tenant_id IS NULL';
+            } else {
+                $where[] = 'tenant_id = :tenant_id';
+                $params[':tenant_id'] = $this->normText($tenantId, 'default');
+            }
+        }
+        foreach (['module', 'proposal_type', 'candidate_id', 'priority'] as $key) {
+            if (!array_key_exists($key, $filters) || $filters[$key] === null || trim((string) $filters[$key]) === '') {
+                continue;
+            }
+            $where[] = $key . ' = :' . $key;
+            $params[':' . $key] = trim((string) $filters[$key]);
+        }
+        if (is_array($filters['statuses'] ?? null) && $filters['statuses'] !== []) {
+            $placeholders = [];
+            foreach (array_values((array) $filters['statuses']) as $index => $status) {
+                $key = ':status_' . $index;
+                $placeholders[] = $key;
+                $params[$key] = trim((string) $status);
+            }
+            if ($placeholders !== []) {
+                $where[] = 'status IN (' . implode(', ', $placeholders) . ')';
+            }
+        }
+
+        $sql = 'SELECT * FROM improvement_proposals
+                WHERE ' . implode(' AND ', $where) . '
+                ORDER BY created_at DESC, id DESC
+                LIMIT :limit';
+        $stmt = $this->db->prepare($sql);
+        foreach ($params as $key => $value) {
+            $stmt->bindValue($key, $value);
+        }
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        $rows = $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+        return array_map(fn(array $row): array => $this->normalizeProposalRow($row), $rows);
     }
 
     /**
@@ -398,10 +585,15 @@ final class ImprovementMemoryRepository
                 tenant_id TEXT NOT NULL,
                 source_metric TEXT NOT NULL,
                 module TEXT NOT NULL,
+                problem_type TEXT NOT NULL DEFAULT "",
+                severity TEXT NOT NULL DEFAULT "medium",
+                evidence TEXT NULL,
                 description TEXT NOT NULL,
                 frequency INTEGER NOT NULL DEFAULT 0,
                 confidence REAL NOT NULL DEFAULT 0,
                 review_status TEXT NOT NULL DEFAULT "pending",
+                processed_at TEXT NULL,
+                proposal_id TEXT NULL,
                 created_at TEXT NOT NULL
             )'
         );
@@ -413,6 +605,38 @@ final class ImprovementMemoryRepository
             'CREATE INDEX IF NOT EXISTS idx_learning_candidates_source
              ON learning_candidates (tenant_id, source_metric, module)'
         );
+
+        $this->db->exec(
+            'CREATE TABLE IF NOT EXISTS improvement_proposals (
+                id TEXT PRIMARY KEY,
+                tenant_id TEXT NULL,
+                candidate_id TEXT NOT NULL,
+                proposal_type TEXT NOT NULL,
+                module TEXT NOT NULL,
+                title TEXT NOT NULL,
+                description TEXT NOT NULL,
+                evidence TEXT NOT NULL DEFAULT "",
+                frequency INTEGER NOT NULL DEFAULT 0,
+                confidence REAL NOT NULL DEFAULT 0,
+                priority TEXT NOT NULL DEFAULT "medium",
+                status TEXT NOT NULL DEFAULT "open",
+                created_at TEXT NOT NULL
+            )'
+        );
+        $this->db->exec(
+            'CREATE INDEX IF NOT EXISTS idx_improvement_proposals_scope
+             ON improvement_proposals (tenant_id, module, proposal_type, status, created_at)'
+        );
+        $this->db->exec(
+            'CREATE INDEX IF NOT EXISTS idx_improvement_proposals_candidate
+             ON improvement_proposals (candidate_id, status)'
+        );
+
+        $this->ensureColumn('learning_candidates', 'problem_type', 'ALTER TABLE learning_candidates ADD COLUMN problem_type TEXT NOT NULL DEFAULT ""');
+        $this->ensureColumn('learning_candidates', 'severity', 'ALTER TABLE learning_candidates ADD COLUMN severity TEXT NOT NULL DEFAULT "medium"');
+        $this->ensureColumn('learning_candidates', 'evidence', 'ALTER TABLE learning_candidates ADD COLUMN evidence TEXT NULL');
+        $this->ensureColumn('learning_candidates', 'processed_at', 'ALTER TABLE learning_candidates ADD COLUMN processed_at TEXT NULL');
+        $this->ensureColumn('learning_candidates', 'proposal_id', 'ALTER TABLE learning_candidates ADD COLUMN proposal_id TEXT NULL');
     }
 
     private function ensureSchemaMySql(): void
@@ -441,14 +665,39 @@ final class ImprovementMemoryRepository
                 tenant_id VARCHAR(120) NOT NULL,
                 source_metric VARCHAR(64) NOT NULL,
                 module VARCHAR(120) NOT NULL,
+                problem_type VARCHAR(64) NOT NULL DEFAULT '',
+                severity VARCHAR(16) NOT NULL DEFAULT 'medium',
+                evidence TEXT NULL,
                 description TEXT NOT NULL,
                 frequency INT UNSIGNED NOT NULL DEFAULT 0,
                 confidence DECIMAL(6,4) NOT NULL DEFAULT 0,
                 review_status VARCHAR(16) NOT NULL DEFAULT 'pending',
+                processed_at DATETIME NULL,
+                proposal_id VARCHAR(64) NULL,
                 created_at DATETIME NOT NULL,
                 PRIMARY KEY (candidate_id),
                 KEY idx_learning_candidates_scope (tenant_id, review_status, created_at),
                 KEY idx_learning_candidates_source (tenant_id, source_metric, module)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+        $this->db->exec(
+            "CREATE TABLE IF NOT EXISTS improvement_proposals (
+                id VARCHAR(64) NOT NULL,
+                tenant_id VARCHAR(120) NULL,
+                candidate_id VARCHAR(64) NOT NULL,
+                proposal_type VARCHAR(64) NOT NULL,
+                module VARCHAR(120) NOT NULL,
+                title VARCHAR(255) NOT NULL,
+                description TEXT NOT NULL,
+                evidence TEXT NOT NULL,
+                frequency INT UNSIGNED NOT NULL DEFAULT 0,
+                confidence DECIMAL(6,4) NOT NULL DEFAULT 0,
+                priority VARCHAR(16) NOT NULL DEFAULT 'medium',
+                status VARCHAR(16) NOT NULL DEFAULT 'open',
+                created_at DATETIME NOT NULL,
+                PRIMARY KEY (id),
+                KEY idx_improvement_proposals_scope (tenant_id, module, proposal_type, status, created_at),
+                KEY idx_improvement_proposals_candidate (candidate_id, status)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
     }
@@ -482,7 +731,7 @@ final class ImprovementMemoryRepository
      */
     private function requiredTables(): array
     {
-        return ['improvement_memory', 'learning_candidates'];
+        return ['improvement_memory', 'learning_candidates', 'improvement_proposals'];
     }
 
     /**
@@ -499,6 +748,10 @@ final class ImprovementMemoryRepository
                 'idx_learning_candidates_scope',
                 'idx_learning_candidates_source',
             ],
+            'improvement_proposals' => [
+                'idx_improvement_proposals_scope',
+                'idx_improvement_proposals_candidate',
+            ],
         ];
     }
 
@@ -509,7 +762,7 @@ final class ImprovementMemoryRepository
     {
         return [
             'improvement_memory' => ['evidence_hash'],
-            'learning_candidates' => ['tenant_id'],
+            'learning_candidates' => ['tenant_id', 'problem_type', 'severity', 'evidence', 'processed_at', 'proposal_id'],
         ];
     }
 
@@ -560,14 +813,33 @@ final class ImprovementMemoryRepository
         $tenantId = $this->normText($record['tenant_id'] ?? '', 'default');
         $sourceMetric = $this->normText($record['source_metric'] ?? '', 'unknown');
         $module = $this->normText($record['module'] ?? '', 'router');
+        $problemType = $this->normText($record['problem_type'] ?? '', 'tool_failure');
+        $severity = $this->normText($record['severity'] ?? '', 'medium');
+        $evidencePayload = $record['evidence'] ?? [];
+        if (!is_array($evidencePayload)) {
+            $evidencePayload = ['summary' => trim((string) $evidencePayload)];
+        }
+        $evidencePayload = $this->sortRecursive($evidencePayload);
+        $evidenceJson = json_encode($evidencePayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($evidenceJson === false) {
+            $evidenceJson = '{"summary":"serialization_failed"}';
+        }
         $description = trim((string) ($record['description'] ?? ''));
         $frequency = max(0, (int) ($record['frequency'] ?? 0));
         $confidence = round(max(0.0, min(1.0, (float) ($record['confidence'] ?? 0.0))), 4);
         $reviewStatus = $this->normText($record['review_status'] ?? '', 'pending');
+        $processedAt = trim((string) ($record['processed_at'] ?? ''));
+        if ($processedAt === '') {
+            $processedAt = null;
+        }
+        $proposalId = trim((string) ($record['proposal_id'] ?? ''));
+        if ($proposalId === '') {
+            $proposalId = null;
+        }
         $createdAt = $this->createdAt($record['created_at'] ?? null);
         $candidateId = trim((string) ($record['candidate_id'] ?? ''));
         if ($candidateId === '') {
-            $candidateId = 'lc_' . substr(sha1($tenantId . '|' . $sourceMetric . '|' . $module . '|' . $description), 0, 20);
+            $candidateId = 'lc_' . substr(sha1($tenantId . '|' . $problemType . '|' . $sourceMetric . '|' . $module . '|' . $description), 0, 20);
         }
 
         return [
@@ -575,10 +847,64 @@ final class ImprovementMemoryRepository
             'tenant_id' => $tenantId,
             'source_metric' => $sourceMetric,
             'module' => $module,
+            'problem_type' => $problemType,
+            'severity' => $severity,
+            'evidence' => $evidenceJson,
             'description' => $description,
             'frequency' => $frequency,
             'confidence' => $confidence,
             'review_status' => $reviewStatus,
+            'processed_at' => $processedAt,
+            'proposal_id' => $proposalId,
+            'created_at' => $createdAt,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $record
+     * @return array<string, mixed>
+     */
+    private function normalizeProposalRecord(array $record): array
+    {
+        $tenantId = $record['tenant_id'] ?? null;
+        $tenantId = $tenantId === null || trim((string) $tenantId) === '' ? null : trim((string) $tenantId);
+        $candidateId = $this->normText($record['candidate_id'] ?? '', 'unknown_candidate');
+        $proposalType = $this->normText($record['proposal_type'] ?? '', 'dataset_proposal');
+        $module = $this->normText($record['module'] ?? '', 'router');
+        $title = trim((string) ($record['title'] ?? ''));
+        $description = trim((string) ($record['description'] ?? ''));
+        $evidencePayload = $record['evidence'] ?? [];
+        if (!is_array($evidencePayload)) {
+            $evidencePayload = ['summary' => trim((string) $evidencePayload)];
+        }
+        $evidencePayload = $this->sortRecursive($evidencePayload);
+        $evidenceJson = json_encode($evidencePayload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if ($evidenceJson === false) {
+            $evidenceJson = '{"summary":"serialization_failed"}';
+        }
+        $frequency = max(0, (int) ($record['frequency'] ?? 0));
+        $confidence = round(max(0.0, min(1.0, (float) ($record['confidence'] ?? 0.0))), 4);
+        $priority = $this->normText($record['priority'] ?? '', 'medium');
+        $status = $this->normText($record['status'] ?? '', 'open');
+        $createdAt = $this->createdAt($record['created_at'] ?? null);
+        $proposalId = trim((string) ($record['id'] ?? ''));
+        if ($proposalId === '') {
+            $proposalId = 'ip_' . substr(sha1((string) $tenantId . '|' . $proposalType . '|' . $module . '|' . $title), 0, 20);
+        }
+
+        return [
+            'id' => $proposalId,
+            'tenant_id' => $tenantId,
+            'candidate_id' => $candidateId,
+            'proposal_type' => $proposalType,
+            'module' => $module,
+            'title' => $title,
+            'description' => $description,
+            'evidence' => $evidenceJson,
+            'frequency' => $frequency,
+            'confidence' => $confidence,
+            'priority' => $priority,
+            'status' => $status,
             'created_at' => $createdAt,
         ];
     }
@@ -610,15 +936,45 @@ final class ImprovementMemoryRepository
      */
     private function normalizeCandidateRow(array $row): array
     {
+        $decoded = json_decode((string) ($row['evidence'] ?? ''), true);
         return [
             'candidate_id' => (string) ($row['candidate_id'] ?? ''),
             'tenant_id' => (string) ($row['tenant_id'] ?? ''),
             'source_metric' => (string) ($row['source_metric'] ?? ''),
             'module' => (string) ($row['module'] ?? ''),
+            'problem_type' => (string) ($row['problem_type'] ?? ''),
+            'severity' => (string) ($row['severity'] ?? 'medium'),
+            'evidence' => is_array($decoded) ? $decoded : [],
             'description' => (string) ($row['description'] ?? ''),
             'frequency' => (int) ($row['frequency'] ?? 0),
             'confidence' => (float) ($row['confidence'] ?? 0.0),
             'review_status' => (string) ($row['review_status'] ?? 'pending'),
+            'processed_at' => ($row['processed_at'] ?? null) !== null ? (string) $row['processed_at'] : null,
+            'proposal_id' => ($row['proposal_id'] ?? null) !== null ? (string) $row['proposal_id'] : null,
+            'created_at' => (string) ($row['created_at'] ?? ''),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function normalizeProposalRow(array $row): array
+    {
+        $decoded = json_decode((string) ($row['evidence'] ?? ''), true);
+        return [
+            'id' => (string) ($row['id'] ?? ''),
+            'tenant_id' => ($row['tenant_id'] ?? null) !== null ? (string) $row['tenant_id'] : null,
+            'candidate_id' => (string) ($row['candidate_id'] ?? ''),
+            'proposal_type' => (string) ($row['proposal_type'] ?? ''),
+            'module' => (string) ($row['module'] ?? ''),
+            'title' => (string) ($row['title'] ?? ''),
+            'description' => (string) ($row['description'] ?? ''),
+            'evidence' => is_array($decoded) ? $decoded : ['raw' => (string) ($row['evidence'] ?? '')],
+            'frequency' => (int) ($row['frequency'] ?? 0),
+            'confidence' => (float) ($row['confidence'] ?? 0.0),
+            'priority' => (string) ($row['priority'] ?? 'medium'),
+            'status' => (string) ($row['status'] ?? 'open'),
             'created_at' => (string) ($row['created_at'] ?? ''),
         ];
     }
@@ -630,6 +986,14 @@ final class ImprovementMemoryRepository
     {
         $rows = $this->selectRows($sql, $params);
         return is_array($rows[0] ?? null) ? (array) $rows[0] : null;
+    }
+
+    private function ensureColumn(string $table, string $column, string $alterSql): void
+    {
+        if ($this->tableHasColumn($table, $column)) {
+            return;
+        }
+        $this->db->exec($alterSql);
     }
 
     /**
@@ -687,5 +1051,17 @@ final class ImprovementMemoryRepository
             'critical' => 4,
         ];
         return ($weight[$candidate] ?? 2) > ($weight[$current] ?? 2) ? $candidate : $current;
+    }
+
+    private function tableHasColumn(string $table, string $column): bool
+    {
+        $stmt = $this->db->query('PRAGMA table_info(' . $table . ')');
+        $rows = $stmt ? ($stmt->fetchAll(PDO::FETCH_ASSOC) ?: []) : [];
+        foreach ($rows as $row) {
+            if ((string) ($row['name'] ?? '') === $column) {
+                return true;
+            }
+        }
+        return false;
     }
 }

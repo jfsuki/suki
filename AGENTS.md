@@ -219,3 +219,8 @@ Cuando se modifique un archivo de gobierno (AGENTS/docs):
   3) `rag`
   4) `tools`
   5) `llm fallback`
+
+### Learning lifecycle
+- `metrics -> improvement_memory -> learning_candidate(pending) -> review -> approved candidate -> improvement_proposal(open)`
+- La promocion solo puede ocurrir desde `review_status=approved`.
+- Ninguna propuesta implementa cambios de produccion por si sola; solo crea backlog estructurado y trazable.
