@@ -3,11 +3,13 @@
 
 namespace App\Core\Agents;
 
+use App\Core\ImprovementMemoryService;
 use App\Core\LogSanitizer;
 
 final class Telemetry
 {
     private string $projectRoot;
+    private ?ImprovementMemoryService $improvementMemory = null;
 
     public function __construct(?string $projectRoot = null)
     {
@@ -29,11 +31,26 @@ final class Telemetry
         if ($line !== false) {
             file_put_contents($file, $line . PHP_EOL, FILE_APPEND | LOCK_EX);
         }
+
+        try {
+            $this->improvementMemory()->ingestAgentOpsLogEvent($tenantId, $payload);
+        } catch (\Throwable $ignored) {
+            // improvement memory must never block telemetry persistence
+        }
     }
 
     private function safe(string $value): string
     {
         $value = preg_replace('/[^a-zA-Z0-9_\\-]/', '_', $value) ?? 'default';
         return trim($value, '_');
+    }
+
+    private function improvementMemory(): ImprovementMemoryService
+    {
+        if (!$this->improvementMemory) {
+            $this->improvementMemory = new ImprovementMemoryService();
+        }
+
+        return $this->improvementMemory;
     }
 }

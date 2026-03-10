@@ -167,3 +167,55 @@ Cuando se modifique un archivo de gobierno (AGENTS/docs):
 - Todos los artefactos temporales viven solo en `framework/tests/tmp/`.
 - No crear ni mantener artefactos temporales fuera de esa carpeta.
 - La limpieza automatica solo puede tocar `framework/tests/tmp/` y artefactos de prueba declarados por prefijo.
+
+## 14) Agent orientation
+### Project purpose
+- SUKI es un AI-AOS chat-first para crear y operar apps reales con contratos, router, memoria y ejecucion controlada.
+- El objetivo operativo del repo es reducir dependencia del LLM libre usando cache, reglas, RAG, tools y memoria persistente.
+
+### Core architecture
+- Runtime compartido: `framework/app/Core/*`.
+- Contratos canonicos de runtime: `docs/contracts/*`.
+- Contratos del proyecto activo: `project/contracts/*`.
+- Estado, registry y metricas livianas: `project/storage/meta/project_registry.sqlite`.
+- Pipeline mental minimo para agentes:
+  - `cache -> rules -> rag -> tools -> llm fallback`
+- En trazas actuales el stage `tools` puede aparecer como `skills` + `CommandBus`; ambos pertenecen a la misma capa de ejecucion controlada.
+
+### Working rules for contributors
+- Cambios incrementales solamente. No reescribir modulos estables.
+- Todas las acciones nuevas deben ser schema-first.
+- Toda lectura/escritura de negocio debe respetar tenant isolation.
+
+### Core modules and repository map
+- POS:
+  - contratos y formularios en `project/contracts/entities/*`, `project/contracts/invoices/*`, `framework/contracts/forms/ticket_pos.contract.json`
+  - guia local en `framework/app/Modules/POS/AGENTS.md`
+- Purchases:
+  - contratos e invoices en `project/contracts/entities/*` y `project/contracts/invoices/*`
+  - ejecucion compartida via `framework/app/Core/CrudCommandHandler.php`, `EntitySearchService.php`, `MediaService.php`
+- Fiscal Engine:
+  - contratos de invoice en `project/contracts/invoices/*`
+  - runtime en `framework/app/Core/*Invoice*`, `ChatAgent.php`, `IntentRouter.php`
+- Ecommerce Hub:
+  - integraciones en `project/contracts/integrations/*`
+  - clientes/adaptadores en `framework/app/Core/AlanubeClient.php`, `IntegrationHttpClient.php`, `OpenApiIntegrationImporter.php`
+  - guia local en `framework/app/Modules/Ecommerce/AGENTS.md`
+- Media/Documents:
+  - runtime en `framework/app/Core/MediaRepository.php`, `MediaService.php`, `MediaCommandHandler.php`, `MediaMessageParser.php`
+- Entity Search:
+  - runtime en `framework/app/Core/EntitySearchRepository.php`, `EntitySearchService.php`, `EntitySearchCommandHandler.php`, `EntitySearchMessageParser.php`
+- AgentOps:
+  - runtime en `framework/app/Core/ChatAgent.php`, `framework/app/Core/AgentOpsSupervisor.php`, `framework/app/Core/Agents/Telemetry.php`
+  - contrato en `docs/contracts/agentops_metrics_contract.json`
+- Semantic Memory:
+  - runtime en `framework/app/Core/SemanticMemoryService.php`, `QdrantVectorStore.php`
+  - payload/contrato en `docs/contracts/semantic_memory_payload.json`
+
+### Router order reference
+- Orden esperado para exploracion y reasoning operativo:
+  1) `cache`
+  2) `rules`
+  3) `rag`
+  4) `tools`
+  5) `llm fallback`

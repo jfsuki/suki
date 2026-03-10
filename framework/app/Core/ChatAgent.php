@@ -1911,6 +1911,15 @@ final class ChatAgent
             'reminder_action' => trim((string) ($payload['reminder_action'] ?? '')) ?: 'none',
             'media_action' => trim((string) ($payload['media_action'] ?? '')) ?: 'none',
             'entity_search_action' => trim((string) ($payload['entity_search_action'] ?? '')) ?: 'none',
+            'result_count' => is_numeric($payload['result_count'] ?? null)
+                ? max(0, (int) $payload['result_count'])
+                : null,
+            'resolved' => array_key_exists('resolved', $payload)
+                ? (bool) $payload['resolved']
+                : null,
+            'needs_clarification' => array_key_exists('needs_clarification', $payload)
+                ? (bool) $payload['needs_clarification']
+                : null,
             'pending_items_count' => $pendingItemsCount !== null ? max(0, (int) $pendingItemsCount) : null,
         ];
     }

@@ -1,0 +1,53 @@
+# Change Map
+
+## Shared rules
+- If you add a skill:
+  - update `docs/contracts/skills_catalog.json`
+  - update `docs/contracts/action_catalog.json` if the skill introduces a new tool
+  - wire execution in `framework/app/Core/SkillExecutor.php`
+  - add or extend handler tests in `framework/tests/*`
+- If you add a tool:
+  - add schema-first definition in `docs/contracts/action_catalog.json`
+  - register router/skill access through `SkillResolver`, `SkillExecutor` or `CommandBus`
+  - add observability markers (`module_used`, action marker, latency)
+  - add tests for success, safe empty, tenant isolation
+- If you add an entity:
+  - add migration
+  - add repository/service access layer
+  - add telemetry/audit events
+  - add tenant index and health checks
+- If you touch router logic:
+  - verify `IntentRouter.php`, `ChatAgent.php`, `docs/contracts/router_policy.json`
+  - run `chat_acid`, `chat_golden`, `agentops_runtime_observability`
+- If you touch contracts:
+  - preserve existing keys
+  - validate `ContractRegistry`
+  - update tests and documentation references
+- If you add media/document flows:
+  - update `MediaService`, `MediaCommandHandler`, `docs/contracts/action_catalog.json`
+  - verify signed access and tenant isolation
+- If you add entity search behavior:
+  - update repository/service/parser/handler together
+  - verify ambiguous results and zero-result paths
+- If you add AgentOps metrics:
+  - keep `docs/contracts/agentops_metrics_contract.json` aligned
+  - extend `TelemetryService`, `SqlMetricsRepository` or `Agents/Telemetry`
+  - add regression tests for minimum required fields
+- If you add semantic memory capabilities:
+  - update `SemanticMemoryService`, `QdrantVectorStore`, `docs/contracts/semantic_memory_payload.json`
+  - keep Qdrant optional and fail-safe
+- If you add a contributor-facing map or guide:
+  - keep files small
+  - prefer new modular docs over rewriting canonical docs
+
+## Impact hotspots
+- `framework/app/Core/ChatAgent.php`
+  - high impact: routing, observability, security, command dispatch
+- `framework/app/Core/IntentRouter.php`
+  - high impact: deterministic-first policy and fallback behavior
+- `docs/contracts/*`
+  - high impact: schema-first runtime compatibility
+- `project/contracts/*`
+  - project-specific source of truth for entities/forms/integrations
+- `project/storage/meta/project_registry.sqlite`
+  - operational state, memory and metrics store
