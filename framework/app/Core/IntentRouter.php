@@ -908,7 +908,7 @@ final class IntentRouter
         $resolved = $this->skillResolver->resolve($query, $skillsRegistry, $context);
         if ($action !== 'send_to_llm') {
             $selectedName = strtolower(trim((string) (($resolved['selected']['name'] ?? '') ?: '')));
-            if (!(bool) ($resolved['detected'] ?? false) || !str_starts_with($selectedName, 'media_')) {
+            if (!(bool) ($resolved['detected'] ?? false) || !$this->isDeterministicPreLlmSkill($selectedName)) {
                 return [];
             }
         }
@@ -1593,6 +1593,8 @@ final class IntentRouter
             'GetMedia' => 'media.get',
             'DeleteMedia' => 'media.delete',
             'GenerateMediaThumbnail' => 'media.generate_thumbnail',
+            'SearchEntities' => 'entity.search',
+            'ResolveEntityReference' => 'entity.resolve',
             'CreateInvoice' => 'invoice.create',
             'GenerateReport' => 'report.generate',
             'ConfigureFEProvider' => 'settings.configure_fe_provider',
@@ -1616,6 +1618,12 @@ final class IntentRouter
         }
 
         return '';
+    }
+
+    private function isDeterministicPreLlmSkill(string $selectedName): bool
+    {
+        return str_starts_with($selectedName, 'media_')
+            || in_array($selectedName, ['entity_search', 'entity_resolve'], true);
     }
 
     /**

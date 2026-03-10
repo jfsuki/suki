@@ -5,6 +5,23 @@ declare(strict_types=1);
 
 define('PROJECT_ROOT', dirname(__DIR__));
 require_once PROJECT_ROOT . '/config/env_loader.php';
+if (($runtimeEnvOverrides = trim((string) (getenv('SUKI_RUNTIME_ENV_OVERRIDES_JSON') ?: ''))) !== '') {
+    $decodedOverrides = json_decode($runtimeEnvOverrides, true);
+    if (is_array($decodedOverrides)) {
+        foreach ($decodedOverrides as $name => $value) {
+            if (!is_string($name) || $name === '') {
+                continue;
+            }
+            $resolvedValue = is_scalar($value) || $value === null ? (string) $value : json_encode($value, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+            if ($resolvedValue === false) {
+                continue;
+            }
+            putenv($name . '=' . $resolvedValue);
+            $_ENV[$name] = $resolvedValue;
+            $_SERVER[$name] = $resolvedValue;
+        }
+    }
+}
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -49,6 +66,7 @@ use App\Core\OperationalQueueStore;
 use App\Core\LogSanitizer;
 use App\Core\MediaAccessToken;
 use App\Core\MediaService;
+use App\Core\EntitySearchService;
 use App\Core\RoleContext;
 use App\Core\WebhookSecurityPolicy;
 use App\Core\Agents\ConversationQualityDashboard;
@@ -2954,6 +2972,138 @@ if ($route === 'media/thumbnail') {
         return;
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'entity-search/search') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $filters = is_array($payload['filters'] ?? null) ? (array) $payload['filters'] : [];
+        foreach (['entity_type', 'date_from', 'date_to', 'limit', 'only_open', 'only_pending', 'recency_hint'] as $key) {
+            if (array_key_exists($key, $payload) && !array_key_exists($key, $filters)) {
+                $filters[$key] = $payload[$key];
+            }
+        }
+        $projectId = trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? ''));
+        $result = (new EntitySearchService())->search(
+            $tenantId,
+            trim((string) ($payload['query'] ?? $payload['q'] ?? $payload['text'] ?? '')),
+            $filters,
+            $projectId !== '' ? $projectId : null
+        );
+        respondJson($response, 'success', 'Busqueda ejecutada', [
+            'search' => $result,
+            'results' => $result['results'] ?? [],
+            'result_count' => $result['result_count'] ?? 0,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'entity-search/resolve') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $filters = is_array($payload['filters'] ?? null) ? (array) $payload['filters'] : [];
+        foreach (['entity_type', 'date_from', 'date_to', 'limit', 'only_open', 'only_pending', 'recency_hint'] as $key) {
+            if (array_key_exists($key, $payload) && !array_key_exists($key, $filters)) {
+                $filters[$key] = $payload[$key];
+            }
+        }
+        $projectId = trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? ''));
+        $result = (new EntitySearchService())->resolveBestMatch(
+            $tenantId,
+            trim((string) ($payload['query'] ?? $payload['q'] ?? $payload['text'] ?? '')),
+            $filters,
+            $projectId !== '' ? $projectId : null
+        );
+        respondJson($response, 'success', 'Referencia resuelta', [
+            'resolution' => $result,
+            'result' => $result['result'] ?? null,
+            'candidates' => $result['candidates'] ?? [],
+            'resolved' => $result['resolved'] ?? false,
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'entity-search/get') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $filters = is_array($payload['filters'] ?? null) ? (array) $payload['filters'] : [];
+        $projectId = trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? ''));
+        $result = (new EntitySearchService())->getByReference(
+            $tenantId,
+            trim((string) ($payload['entity_type'] ?? '')),
+            trim((string) ($payload['entity_id'] ?? $payload['id'] ?? '')),
+            $filters,
+            $projectId !== '' ? $projectId : null
+        );
+        if (!is_array($result)) {
+            respondJson($response, 'error', 'Referencia no encontrada', [], 404);
+            return;
+        }
+        respondJson($response, 'success', 'Referencia cargada', ['result' => $result, 'item' => $result]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 404);
         return;
     }
 }

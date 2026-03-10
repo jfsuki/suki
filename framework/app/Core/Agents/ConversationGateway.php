@@ -154,6 +154,7 @@ final class ConversationGateway
             'task_action' => trim((string) ($trace['task_action'] ?? '')) ?: 'none',
             'reminder_action' => trim((string) ($trace['reminder_action'] ?? '')) ?: 'none',
             'media_action' => trim((string) ($trace['media_action'] ?? '')) ?: 'none',
+            'entity_search_action' => trim((string) ($trace['entity_search_action'] ?? '')) ?: 'none',
             'pending_items_count' => is_numeric($trace['pending_items_count'] ?? null)
                 ? max(0, (int) $trace['pending_items_count'])
                 : null,

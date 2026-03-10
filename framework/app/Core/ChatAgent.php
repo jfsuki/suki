@@ -1673,6 +1673,7 @@ final class ChatAgent
             'task_action' => $runtimeObservability['task_action'],
             'reminder_action' => $runtimeObservability['reminder_action'],
             'media_action' => $runtimeObservability['media_action'],
+            'entity_search_action' => $runtimeObservability['entity_search_action'],
             'pending_items_count' => $runtimeObservability['pending_items_count'],
             'token_usage' => $runtimeObservability['token_usage'],
             'cost_estimate' => $runtimeObservability['cost_estimate'],
@@ -1767,6 +1768,7 @@ final class ChatAgent
             'task_action' => trim((string) ($runtimeContext['task_action'] ?? $routeTelemetry['task_action'] ?? '')) ?: 'none',
             'reminder_action' => trim((string) ($runtimeContext['reminder_action'] ?? $routeTelemetry['reminder_action'] ?? '')) ?: 'none',
             'media_action' => trim((string) ($runtimeContext['media_action'] ?? $routeTelemetry['media_action'] ?? '')) ?: 'none',
+            'entity_search_action' => trim((string) ($runtimeContext['entity_search_action'] ?? $routeTelemetry['entity_search_action'] ?? '')) ?: 'none',
             'pending_items_count' => is_numeric($runtimeContext['pending_items_count'] ?? $routeTelemetry['pending_items_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['pending_items_count'] ?? $routeTelemetry['pending_items_count']))
                 : null,
@@ -1908,6 +1910,7 @@ final class ChatAgent
             'task_action' => trim((string) ($payload['task_action'] ?? '')) ?: 'none',
             'reminder_action' => trim((string) ($payload['reminder_action'] ?? '')) ?: 'none',
             'media_action' => trim((string) ($payload['media_action'] ?? '')) ?: 'none',
+            'entity_search_action' => trim((string) ($payload['entity_search_action'] ?? '')) ?: 'none',
             'pending_items_count' => $pendingItemsCount !== null ? max(0, (int) $pendingItemsCount) : null,
         ];
     }
@@ -1939,6 +1942,7 @@ final class ChatAgent
             $this->commandBus->register(new CrudCommandHandler());
             $this->commandBus->register(new AlertsCenterCommandHandler());
             $this->commandBus->register(new MediaCommandHandler());
+            $this->commandBus->register(new EntitySearchCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
                 ['AuthLogin', 'AuthCreateUser'],
                 function (array $command, array $context): array {

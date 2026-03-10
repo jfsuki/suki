@@ -496,6 +496,30 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'SearchEntities':
+            case 'ResolveEntityReference':
+                $query = trim((string) ($command['query'] ?? ''));
+                $filters = $command['filters'] ?? null;
+                if ($query === '' && !is_array($filters)) {
+                    return [false, 'missing_query'];
+                }
+                if ($filters !== null && !is_array($filters)) {
+                    return [false, 'invalid_filters'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetEntityByReference':
+                if (trim((string) ($command['entity_type'] ?? '')) === '') {
+                    return [false, 'missing_entity_type'];
+                }
+                if (trim((string) ($command['entity_id'] ?? '')) === '') {
+                    return [false, 'missing_entity_id'];
+                }
+                if (array_key_exists('filters', $command) && !is_array($command['filters'])) {
+                    return [false, 'invalid_filters'];
+                }
+                return [true, 'schema_valid'];
+
             case 'CreateEntity':
                 if ($entity === '') {
                     return [false, 'missing_entity'];

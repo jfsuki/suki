@@ -93,6 +93,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('business_discovery_template', fn() => $this->checkBusinessDiscoveryTemplate());
         $tests[] = $this->wrap('alerts_center_module', fn() => $this->checkAlertsCenterModule());
         $tests[] = $this->wrap('media_module', fn() => $this->checkMediaModule());
+        $tests[] = $this->wrap('entity_search_module', fn() => $this->checkEntitySearchModule());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
 
         $summary = [
@@ -1442,6 +1443,11 @@ final class UnitTestRunner
     private function checkMediaModule(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/media_module_test.php');
+    }
+
+    private function checkEntitySearchModule(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/entity_search_module_test.php');
     }
 
     private function checkSemanticPipelineE2E(): void

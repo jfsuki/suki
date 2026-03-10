@@ -1,6 +1,6 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "effective_date": "2026-03-10",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
@@ -567,6 +567,79 @@
         ],
         "optional": [
           "media_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "entity_search",
+      "description": "Search entities safely across modules inside the current tenant.",
+      "intent_patterns": [
+        "re:(busca|buscar|encuentra|encontrar|localiza|consulta).*(producto|venta|compra|factura|cliente|proveedor|pedido|archivo|documento|imagen|adjunto|sku|barcode|codigo|referencia)",
+        "re:(busca|buscar|encuentra|encontrar|localiza|consulta)\\s+(?!como\\b|que\\b|por\\b|porque\\b|quien\\b|cuando\\b|donde\\b)[a-z0-9][a-z0-9 _-]{2,80}$"
+      ],
+      "keywords": [
+        "buscar sku",
+        "buscar producto",
+        "buscar factura",
+        "buscar cliente"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "entity_search"
+      ],
+      "priority": 148,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "query",
+          "entity_type",
+          "date_from",
+          "date_to",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "entity_resolve",
+      "description": "Resolve ambiguous references deterministically before acting.",
+      "intent_patterns": [
+        "re:(vende|vender|corrige|corregir|abre|abrir|mira|ver|muestra|mostrar|mu[eé]strame).*(ese|esa|este|esta|ultimo|ultima|ayer|hoy|producto|venta|compra|factura|cliente|proveedor|pedido|archivo|documento|imagen)",
+        "re:(ultimo|ultima|ayer|hoy).*(venta|compra|factura|pedido|cliente|proveedor|archivo|documento)",
+        "re:(ese|esa|este|esta).*[a-z0-9][a-z0-9 _-]{2,80}$"
+      ],
+      "keywords": [
+        "ultima venta",
+        "factura de ayer",
+        "ese cliente",
+        "esa coca"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "entity_resolve"
+      ],
+      "priority": 147,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "query",
+          "entity_type",
+          "date_from",
+          "date_to",
+          "limit"
         ]
       },
       "channel_capabilities": [
