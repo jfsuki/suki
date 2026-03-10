@@ -32,6 +32,9 @@
 - If you add POS behavior:
   - update `POSRepository`, `POSService`, `POSCommandHandler`, `POSMessageParser`
   - keep draft-first design and tenant isolation
+  - preserve resolution order `barcode -> sku -> exact_name -> partial -> entity_search fallback`
+  - keep barcode lookups exact-only and return candidates instead of guessing on ambiguous references
+  - keep line pricing fields (`base_price`, `override_price`, `effective_unit_price`, `line_subtotal`, `line_tax`, `line_total`) synchronized
   - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
   - reuse `EntitySearchService` for product/customer resolution instead of guessing
 - If you add AgentOps metrics:

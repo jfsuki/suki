@@ -404,9 +404,13 @@ final class SkillExecutor
             'pos_create_draft',
             'pos_get_draft',
             'pos_add_draft_line',
+            'pos_add_line_by_reference',
             'pos_remove_draft_line',
             'pos_attach_customer',
             'pos_list_open_drafts',
+            'pos_find_product',
+            'pos_get_product_candidates',
+            'pos_reprice_draft',
         ], true);
     }
 

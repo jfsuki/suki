@@ -1,6 +1,6 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "effective_date": "2026-03-10",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
@@ -746,6 +746,41 @@
       "context_hints": {}
     },
     {
+      "name": "pos_add_line_by_reference",
+      "description": "Add a POS draft line only after deterministic barcode, SKU or reference resolution.",
+      "intent_patterns": [
+        "re:(agrega|agregar|anade|aÃ±ade|suma).*(referencia|barcode|sku).*(borrador|draft|carrito)",
+        "re:(borrador|draft|carrito).*(referencia|barcode|sku).*(agrega|agregar|anade|aÃ±ade|suma)"
+      ],
+      "keywords": [
+        "agregar por referencia pos",
+        "agregar por barcode pos",
+        "sumar por sku al borrador"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_add_line_by_reference"
+      ],
+      "priority": 165,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "draft_id",
+          "product_id",
+          "query",
+          "qty",
+          "override_price"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
       "name": "pos_remove_draft_line",
       "description": "Remove a line from an open POS draft.",
       "intent_patterns": [
@@ -834,6 +869,110 @@
         ],
         "optional": [
           "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_find_product",
+      "description": "Resolve a POS product safely by barcode, SKU, exact name or partial reference.",
+      "intent_patterns": [
+        "re:(busca|buscar|encuentra|muestra|mostrar).*(producto|barcode|sku).*(pos)?",
+        "re:(producto|barcode|sku).*(busca|buscar|encuentra|mostrar).*(pos)?"
+      ],
+      "keywords": [
+        "buscar producto pos",
+        "resolver producto pos",
+        "buscar barcode pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_find_product"
+      ],
+      "priority": 173,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "product_id",
+          "query",
+          "sku",
+          "barcode",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_get_product_candidates",
+      "description": "List ranked product candidates for ambiguous POS references.",
+      "intent_patterns": [
+        "re:(candidatos|opciones|posibles).*(producto|barcode|sku).*(pos)?",
+        "re:(producto|barcode|sku).*(candidatos|opciones|posibles).*(pos)?"
+      ],
+      "keywords": [
+        "candidatos producto pos",
+        "opciones producto pos",
+        "productos posibles pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_get_product_candidates"
+      ],
+      "priority": 167,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "query",
+          "sku",
+          "barcode",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_reprice_draft",
+      "description": "Recalculate draft totals and optional line pricing in POS.",
+      "intent_patterns": [
+        "re:(recalcula|recalcular|reprecio|repricing|actualiza).*(borrador|draft|carrito).*(pos)?",
+        "re:(borrador|draft|carrito).*(recalcula|recalcular|reprecio|actualiza).*(pos)?"
+      ],
+      "keywords": [
+        "recalcular borrador pos",
+        "reprecio draft pos",
+        "actualizar totales pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_reprice_draft"
+      ],
+      "priority": 166,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "draft_id",
+          "line_id",
+          "qty",
+          "override_price",
+          "tax_rate"
         ]
       },
       "channel_capabilities": [

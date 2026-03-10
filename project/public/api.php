@@ -3180,6 +3180,96 @@ if ($route === 'pos/get-draft') {
     }
 }
 
+if ($route === 'pos/find-product') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $result = (new POSService())->resolveProductForPOS($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+        ]);
+        $data = [
+            'result' => $result['result'] ?? null,
+            'item' => $result['result'] ?? null,
+            'candidates' => $result['candidates'] ?? [],
+            'items' => (bool) ($result['resolved'] ?? false)
+                ? [($result['result'] ?? null)]
+                : ($result['candidates'] ?? []),
+            'resolved' => (bool) ($result['resolved'] ?? false),
+            'needs_clarification' => (bool) ($result['needs_clarification'] ?? false),
+            'result_status' => (string) ($result['result_status'] ?? 'not_found'),
+            'matched_product_id' => (string) ($result['matched_product_id'] ?? ''),
+            'matched_by' => (string) ($result['matched_by'] ?? ''),
+            'product_query' => (string) ($result['product_query'] ?? ''),
+        ];
+        respondJson($response, 'success', 'Busqueda POS ejecutada', $data);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'pos/get-product-candidates') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $result = (new POSService())->getProductCandidatesForPOS($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+        ]);
+        respondJson($response, 'success', 'Candidatos POS cargados', [
+            'items' => $result['items'] ?? [],
+            'candidates' => $result['candidates'] ?? [],
+            'result' => $result['result'] ?? null,
+            'item' => $result['result'] ?? null,
+            'resolved' => (bool) ($result['resolved'] ?? false),
+            'needs_clarification' => (bool) ($result['needs_clarification'] ?? false),
+            'result_status' => (string) ($result['result_status'] ?? 'not_found'),
+            'matched_product_id' => (string) ($result['matched_product_id'] ?? ''),
+            'matched_by' => (string) ($result['matched_by'] ?? ''),
+            'product_query' => (string) ($result['query'] ?? ''),
+            'result_count' => (int) ($result['result_count'] ?? 0),
+        ]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
 if ($route === 'pos/add-draft-line') {
     if ($method !== 'POST') {
         respondJson($response, 'error', 'Metodo no permitido', [], 405);
@@ -3205,6 +3295,60 @@ if ($route === 'pos/add-draft-line') {
             'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
         ]);
         respondJson($response, 'success', 'Linea POS agregada', ['draft' => $draft, 'item' => $draft]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'pos/add-line-by-reference') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = requestData();
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $service = new POSService();
+        $resolution = $service->resolveProductForPOS($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+        ]);
+        if (!(bool) ($resolution['resolved'] ?? false)) {
+            respondJson($response, 'success', 'Producto no resuelto con seguridad', [
+                'draft_id' => trim((string) ($payload['draft_id'] ?? $payload['sale_draft_id'] ?? '')),
+                'candidates' => $resolution['candidates'] ?? [],
+                'items' => $resolution['candidates'] ?? [],
+                'resolved' => false,
+                'needs_clarification' => (bool) ($resolution['needs_clarification'] ?? false),
+                'result_status' => (string) ($resolution['result_status'] ?? 'not_found'),
+                'matched_product_id' => (string) ($resolution['matched_product_id'] ?? ''),
+                'matched_by' => (string) ($resolution['matched_by'] ?? ''),
+                'product_query' => (string) ($resolution['product_query'] ?? ''),
+            ]);
+            return;
+        }
+
+        $resolvedProduct = is_array($resolution['result'] ?? null) ? (array) $resolution['result'] : [];
+        $draft = $service->addLineByProductReference($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+            'product_id' => (string) ($resolvedProduct['entity_id'] ?? ''),
+        ]);
+        respondJson($response, 'success', 'Linea POS agregada por referencia', ['draft' => $draft, 'item' => $draft]);
         return;
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 422);
@@ -3304,6 +3448,41 @@ if ($route === 'pos/list-open-drafts') {
             isset($payload['limit']) ? (int) $payload['limit'] : 10
         );
         respondJson($response, 'success', 'Borradores POS cargados', ['items' => $items, 'result_count' => count($items)]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'pos/reprice-draft') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = requestData();
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $draftId = trim((string) ($payload['draft_id'] ?? $payload['sale_draft_id'] ?? ''));
+        $draft = (new POSService())->repriceDraft(
+            $tenantId,
+            $draftId,
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+            $payload
+        );
+        respondJson($response, 'success', 'Borrador POS recalculado', ['draft' => $draft, 'item' => $draft]);
         return;
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 422);

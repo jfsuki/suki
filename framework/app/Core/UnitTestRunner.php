@@ -95,6 +95,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('media_module', fn() => $this->checkMediaModule());
         $tests[] = $this->wrap('entity_search_module', fn() => $this->checkEntitySearchModule());
         $tests[] = $this->wrap('pos_core_module', fn() => $this->checkPOSCoreModule());
+        $tests[] = $this->wrap('pos_products_pricing_barcode', fn() => $this->checkPOSProductsPricingBarcode());
         $tests[] = $this->wrap('project_memory_system', fn() => $this->checkProjectMemorySystem());
         $tests[] = $this->wrap('learning_promotion_pipeline', fn() => $this->checkLearningPromotionPipeline());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
@@ -1456,6 +1457,11 @@ final class UnitTestRunner
     private function checkPOSCoreModule(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/pos_core_module_test.php');
+    }
+
+    private function checkPOSProductsPricingBarcode(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/pos_products_pricing_barcode_test.php');
     }
 
     private function checkProjectMemorySystem(): void

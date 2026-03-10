@@ -48,12 +48,32 @@
       "type": "number",
       "exclusiveMinimum": 0
     },
+    "base_price": {
+      "type": "number",
+      "minimum": 0
+    },
+    "override_price": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "effective_unit_price": {
+      "type": "number",
+      "minimum": 0
+    },
     "unit_price": {
+      "type": "number",
+      "minimum": 0
+    },
+    "line_subtotal": {
       "type": "number",
       "minimum": 0
     },
     "tax_rate": {
       "type": ["number", "null"]
+    },
+    "line_tax": {
+      "type": ["number", "null"],
+      "minimum": 0
     },
     "line_total": {
       "type": "number",

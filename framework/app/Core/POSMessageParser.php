@@ -25,9 +25,13 @@ final class POSMessageParser
             'pos_create_draft' => $this->parseCreateDraft($pairs, $baseCommand, $telemetry),
             'pos_get_draft' => $this->parseGetDraft($pairs, $baseCommand, $telemetry),
             'pos_add_draft_line' => $this->parseAddLine($message, $pairs, $baseCommand, $telemetry),
+            'pos_add_line_by_reference' => $this->parseAddLineByReference($message, $pairs, $baseCommand, $telemetry),
             'pos_remove_draft_line' => $this->parseRemoveLine($pairs, $baseCommand, $telemetry),
             'pos_attach_customer' => $this->parseAttachCustomer($message, $pairs, $baseCommand, $telemetry),
             'pos_list_open_drafts' => $this->parseListOpenDrafts($pairs, $baseCommand, $telemetry),
+            'pos_find_product' => $this->parseFindProduct($message, $pairs, $baseCommand, $telemetry),
+            'pos_get_product_candidates' => $this->parseGetProductCandidates($message, $pairs, $baseCommand, $telemetry),
+            'pos_reprice_draft' => $this->parseRepriceDraft($pairs, $baseCommand, $telemetry),
             default => ['kind' => 'ask_user', 'reply' => 'No pude interpretar la operacion POS.', 'telemetry' => $telemetry],
         };
     }
@@ -103,6 +107,37 @@ final class POSMessageParser
      * @param array<string, mixed> $telemetry
      * @return array<string, mixed>
      */
+    private function parseAddLineByReference(string $message, array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $draftId = $this->draftId($pairs);
+        if ($draftId === '') {
+            return $this->askUser('Indica `draft_id` para agregar la linea por referencia.', $telemetry + ['pos_action' => 'add_line_by_reference']);
+        }
+
+        $query = $this->productQuery($message, $pairs);
+        $productId = $this->firstValue($pairs, ['product_id']);
+        if ($productId === '' && $query === '') {
+            return $this->askUser('Indica `product_id`, `sku`, `barcode` o `query` para resolver el producto.', $telemetry + ['pos_action' => 'add_line_by_reference']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'AddPOSLineByReference',
+            'draft_id' => $draftId,
+            'product_id' => $productId !== '' ? $productId : null,
+            'query' => $query !== '' ? $query : null,
+            'sku' => $this->firstValue($pairs, ['sku']),
+            'barcode' => $this->firstValue($pairs, ['barcode']),
+            'qty' => $this->firstValue($pairs, ['qty', 'cantidad']) ?: '1',
+            'override_price' => $this->firstValue($pairs, ['override_price', 'precio_override']),
+        ], $telemetry + ['pos_action' => 'add_line_by_reference']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
     private function parseRemoveLine(array $pairs, array $baseCommand, array $telemetry): array
     {
         $draftId = $this->draftId($pairs);
@@ -157,6 +192,80 @@ final class POSMessageParser
             'command' => 'ListPOSOpenDrafts',
             'limit' => $this->firstValue($pairs, ['limit', 'top', 'max']) ?: '10',
         ], $telemetry + ['pos_action' => 'list_open_drafts']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseFindProduct(string $message, array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $productId = $this->firstValue($pairs, ['product_id']);
+        $query = $this->productQuery($message, $pairs);
+        if ($productId === '' && $query === '') {
+            return $this->askUser('Indica `product_id`, `sku`, `barcode` o `query` para buscar el producto.', $telemetry + ['pos_action' => 'find_product']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'FindPOSProduct',
+            'product_id' => $productId !== '' ? $productId : null,
+            'query' => $query !== '' ? $query : null,
+            'sku' => $this->firstValue($pairs, ['sku']),
+            'barcode' => $this->firstValue($pairs, ['barcode']),
+            'limit' => $this->firstValue($pairs, ['limit', 'top', 'max']) ?: '5',
+        ], $telemetry + ['pos_action' => 'find_product']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseGetProductCandidates(string $message, array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $query = $this->productQuery($message, $pairs);
+        if ($query === '') {
+            return $this->askUser('Indica `sku`, `barcode` o `query` para listar candidatos.', $telemetry + ['pos_action' => 'get_product_candidates']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'GetPOSProductCandidates',
+            'query' => $query,
+            'sku' => $this->firstValue($pairs, ['sku']),
+            'barcode' => $this->firstValue($pairs, ['barcode']),
+            'limit' => $this->firstValue($pairs, ['limit', 'top', 'max']) ?: '5',
+        ], $telemetry + ['pos_action' => 'get_product_candidates']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseRepriceDraft(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $draftId = $this->draftId($pairs);
+        if ($draftId === '') {
+            return $this->askUser('Indica `draft_id` para recalcular el borrador POS.', $telemetry + ['pos_action' => 'reprice_draft']);
+        }
+
+        $lineId = $this->firstValue($pairs, ['line_id']);
+        $qty = $this->firstValue($pairs, ['qty', 'cantidad']);
+        $overridePrice = $this->firstValue($pairs, ['override_price', 'precio_override']);
+        $taxRate = $this->firstValue($pairs, ['tax_rate', 'iva_rate']);
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'RepricePOSDraft',
+            'draft_id' => $draftId,
+            'line_id' => $lineId !== '' ? $lineId : null,
+            'qty' => $qty !== '' ? $qty : null,
+            'override_price' => $overridePrice !== '' ? $overridePrice : null,
+            'tax_rate' => $taxRate !== '' ? $taxRate : null,
+        ], $telemetry + ['pos_action' => 'reprice_draft']);
     }
 
     /**

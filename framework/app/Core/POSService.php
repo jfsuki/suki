@@ -84,25 +84,196 @@ final class POSService
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
+    public function resolveProductForPOS(array $payload): array
+    {
+        $startedAt = microtime(true);
+        $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
+        $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
+        $productQuery = $this->productQuery($payload);
+        $limit = max(1, min(10, (int) ($payload['limit'] ?? 5)));
+        $matchedBy = '';
+        $matchedProductId = '';
+        $resolvedProduct = null;
+        $candidates = [];
+        $resultStatus = 'not_found';
+
+        $productId = $this->nullableString($payload['product_id'] ?? null);
+        if ($productId !== null) {
+            $result = $this->entitySearch->getByReference($tenantId, 'product', $productId, [], $appId);
+            if (is_array($result)) {
+                $resolvedProduct = $this->hydrateProduct($tenantId, $appId, $result);
+                $matchedBy = (string) ($resolvedProduct['matched_by'] ?? 'entity_search');
+                $matchedProductId = (string) ($resolvedProduct['entity_id'] ?? '');
+                $resultStatus = 'success';
+            }
+        } elseif ($productQuery !== '') {
+            [$directCandidates, $lookupMode] = $this->directProductCandidates($tenantId, $appId, $productQuery, $limit, $payload);
+            if ($directCandidates !== []) {
+                $selected = $this->selectResolvedProductCandidate($directCandidates);
+                if (is_array($selected)) {
+                    $resolvedProduct = $this->hydrateResolvedProductCandidate($tenantId, $appId, $selected);
+                    $matchedBy = (string) ($resolvedProduct['matched_by'] ?? '');
+                    $matchedProductId = (string) ($resolvedProduct['entity_id'] ?? '');
+                    $resultStatus = 'success';
+                } else {
+                    $candidates = array_slice($directCandidates, 0, $limit);
+                    $resultStatus = 'clarification_required';
+                }
+            } elseif ($lookupMode !== 'barcode') {
+                $fallback = $this->entitySearch->resolveBestMatch($tenantId, $productQuery, [
+                    'entity_type' => 'product',
+                    'limit' => max(2, $limit),
+                ], $appId);
+                if ((bool) ($fallback['resolved'] ?? false) && is_array($fallback['result'] ?? null)) {
+                    $resolvedProduct = $this->hydrateProduct($tenantId, $appId, (array) $fallback['result']);
+                    $matchedBy = 'entity_search';
+                    $matchedProductId = (string) ($resolvedProduct['entity_id'] ?? '');
+                    $resultStatus = 'success';
+                } else {
+                    $candidates = array_slice((array) ($fallback['candidates'] ?? []), 0, $limit);
+                    if ($candidates !== []) {
+                        $resultStatus = 'clarification_required';
+                    }
+                }
+            }
+        }
+
+        $latencyMs = $this->latencyMs($startedAt);
+        $ambiguityCount = $resolvedProduct === null ? count($candidates) : 0;
+        $this->auditLogger->log('pos_find_product', 'product', $matchedProductId !== '' ? $matchedProductId : null, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'find_product',
+            'draft_id' => $this->nullableString($payload['draft_id'] ?? $payload['sale_draft_id'] ?? null),
+            'product_query' => $productQuery,
+            'matched_product_id' => $matchedProductId,
+            'product_id' => $matchedProductId,
+            'matched_by' => $matchedBy,
+            'ambiguity_count' => $ambiguityCount,
+            'latency_ms' => $latencyMs,
+            'result_status' => $resultStatus,
+        ]);
+        $this->eventLogger->log('find_product', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'find_product',
+            'draft_id' => $this->nullableString($payload['draft_id'] ?? $payload['sale_draft_id'] ?? null),
+            'product_query' => $productQuery,
+            'matched_product_id' => $matchedProductId,
+            'product_id' => $matchedProductId,
+            'matched_by' => $matchedBy,
+            'ambiguity_count' => $ambiguityCount,
+            'latency_ms' => $latencyMs,
+            'result_status' => $resultStatus,
+        ]);
+
+        return [
+            'resolved' => is_array($resolvedProduct),
+            'result' => $resolvedProduct,
+            'candidates' => is_array($resolvedProduct) ? [] : $candidates,
+            'result_count' => is_array($resolvedProduct) ? 1 : count($candidates),
+            'product_query' => $productQuery,
+            'matched_product_id' => $matchedProductId,
+            'matched_by' => $matchedBy,
+            'latency_ms' => $latencyMs,
+            'result_status' => $resultStatus,
+            'needs_clarification' => !is_array($resolvedProduct) && $candidates !== [],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function getProductCandidatesForPOS(array $payload): array
+    {
+        $resolved = $this->resolveProductForPOS($payload);
+        $items = [];
+        if ((bool) ($resolved['resolved'] ?? false) && is_array($resolved['result'] ?? null)) {
+            $items[] = (array) $resolved['result'];
+        } elseif (is_array($resolved['candidates'] ?? null)) {
+            $items = array_values((array) $resolved['candidates']);
+        }
+        $ambiguityCount = (bool) ($resolved['resolved'] ?? false) ? 0 : count($items);
+
+        $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
+        $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
+        $draftId = $this->nullableString($payload['draft_id'] ?? $payload['sale_draft_id'] ?? null);
+        $this->auditLogger->log('pos_get_product_candidates', 'product', (string) ($resolved['matched_product_id'] ?? '') ?: null, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'get_product_candidates',
+            'draft_id' => $draftId,
+            'product_query' => (string) ($resolved['product_query'] ?? ''),
+            'matched_product_id' => (string) ($resolved['matched_product_id'] ?? ''),
+            'product_id' => (string) ($resolved['matched_product_id'] ?? ''),
+            'matched_by' => (string) ($resolved['matched_by'] ?? ''),
+            'ambiguity_count' => $ambiguityCount,
+            'latency_ms' => (int) ($resolved['latency_ms'] ?? 0),
+            'result_status' => (string) ($resolved['result_status'] ?? 'not_found'),
+        ]);
+        $this->eventLogger->log('get_product_candidates', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'get_product_candidates',
+            'draft_id' => $draftId,
+            'product_query' => (string) ($resolved['product_query'] ?? ''),
+            'matched_product_id' => (string) ($resolved['matched_product_id'] ?? ''),
+            'product_id' => (string) ($resolved['matched_product_id'] ?? ''),
+            'matched_by' => (string) ($resolved['matched_by'] ?? ''),
+            'ambiguity_count' => $ambiguityCount,
+            'latency_ms' => (int) ($resolved['latency_ms'] ?? 0),
+            'result_status' => (string) ($resolved['result_status'] ?? 'not_found'),
+        ]);
+
+        return [
+            'query' => (string) ($resolved['product_query'] ?? ''),
+            'items' => $items,
+            'candidates' => $items,
+            'result_count' => count($items),
+            'matched_product_id' => (string) ($resolved['matched_product_id'] ?? ''),
+            'matched_by' => (string) ($resolved['matched_by'] ?? ''),
+            'latency_ms' => (int) ($resolved['latency_ms'] ?? 0),
+            'result_status' => (string) ($resolved['result_status'] ?? 'not_found'),
+            'needs_clarification' => (bool) ($resolved['needs_clarification'] ?? false),
+            'resolved' => (bool) ($resolved['resolved'] ?? false),
+            'result' => is_array($resolved['result'] ?? null) ? (array) $resolved['result'] : null,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
     public function addLineToDraft(array $payload): array
+    {
+        return $this->addLineByProductReference($payload + ['action_name' => 'add_draft_line']);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function addLineByProductReference(array $payload): array
     {
         $startedAt = microtime(true);
         $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
         $draftId = $this->requireString($payload['draft_id'] ?? $payload['sale_draft_id'] ?? null, 'draft_id');
         $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
         $draft = $this->loadEditableDraft($tenantId, $draftId, $appId);
-
         $qty = $this->quantity($payload['qty'] ?? $payload['quantity'] ?? 1);
         $product = $this->resolveProduct($tenantId, $appId, $payload);
-        $unitPrice = $this->explicitOrResolvedPrice($payload['unit_price'] ?? null, $product['unit_price'] ?? null);
-        if ($unitPrice === null) {
-            throw new RuntimeException('POS_PRODUCT_PRICE_UNAVAILABLE');
-        }
-
         $taxRate = $this->nullableDecimal($payload['tax_rate'] ?? null);
         if ($taxRate === null && array_key_exists('tax_rate', $product)) {
             $taxRate = $this->nullableDecimal($product['tax_rate']);
         }
+
+        $pricing = $this->calculateLinePricing(
+            $qty,
+            $payload['base_price'] ?? $product['base_price'] ?? $product['unit_price'] ?? null,
+            $payload['override_price'] ?? null,
+            $taxRate
+        );
 
         $line = $this->repository->insertLine([
             'tenant_id' => $tenantId,
@@ -113,14 +284,24 @@ final class POSService
             'barcode' => $this->nullableString($product['barcode'] ?? null),
             'product_label' => trim((string) ($product['label'] ?? 'producto')) ?: 'producto',
             'qty' => $qty,
-            'unit_price' => $unitPrice,
-            'tax_rate' => $taxRate,
-            'line_total' => $this->money($qty * $unitPrice),
+            'base_price' => $pricing['base_price'],
+            'override_price' => $pricing['override_price'],
+            'effective_unit_price' => $pricing['effective_unit_price'],
+            'unit_price' => $pricing['unit_price'],
+            'line_subtotal' => $pricing['line_subtotal'],
+            'tax_rate' => $pricing['tax_rate'],
+            'line_tax' => $pricing['line_tax'],
+            'line_total' => $pricing['line_total'],
             'metadata' => [
                 'resolved_product' => [
                     'matched_by' => (string) ($product['matched_by'] ?? ''),
-                    'source_module' => (string) ($product['source_module'] ?? 'entity_search'),
+                    'source_module' => (string) ($product['source_module'] ?? 'pos'),
                     'entity_contract' => (string) (($product['metadata_json']['entity_contract'] ?? $product['metadata']['entity_contract'] ?? '')),
+                ],
+                'pricing' => [
+                    'base_price' => $pricing['base_price'],
+                    'override_price' => $pricing['override_price'],
+                    'effective_unit_price' => $pricing['effective_unit_price'],
                 ],
                 'hooks' => [
                     'inventory' => 'pending',
@@ -133,22 +314,31 @@ final class POSService
 
         $draft = $this->recalculateDraftTotals($tenantId, $draftId, $appId);
         $latencyMs = $this->latencyMs($startedAt);
-        $this->auditLogger->log('pos_add_draft_line', 'sale_draft', $draftId, [
+        $actionName = (string) ($payload['action_name'] ?? 'add_line_by_reference');
+        $this->auditLogger->log('pos_' . $actionName, 'sale_draft', $draftId, [
             'tenant_id' => $tenantId,
             'app_id' => $appId,
             'draft_id' => $draftId,
             'session_id' => $draft['session_id'] ?? null,
             'product_id' => (string) ($line['product_id'] ?? ''),
-            'action_name' => 'add_draft_line',
+            'matched_product_id' => (string) ($line['product_id'] ?? ''),
+            'product_query' => $this->productQuery($payload),
+            'matched_by' => (string) ($product['matched_by'] ?? ''),
+            'ambiguity_count' => 0,
+            'action_name' => $actionName,
             'latency_ms' => $latencyMs,
             'result_status' => 'success',
         ]);
-        $this->eventLogger->log('add_draft_line', $tenantId, [
+        $this->eventLogger->log($actionName, $tenantId, [
             'app_id' => $appId,
-            'action_name' => 'add_draft_line',
+            'action_name' => $actionName,
             'draft_id' => $draftId,
             'session_id' => $draft['session_id'] ?? null,
             'product_id' => (string) ($line['product_id'] ?? ''),
+            'matched_product_id' => (string) ($line['product_id'] ?? ''),
+            'product_query' => $this->productQuery($payload),
+            'matched_by' => (string) ($product['matched_by'] ?? ''),
+            'ambiguity_count' => 0,
             'latency_ms' => $latencyMs,
             'result_status' => 'success',
         ]);
@@ -200,17 +390,46 @@ final class POSService
     public function recalculateDraftTotals(string $tenantId, string $draftId, ?string $appId = null, array $payload = []): array
     {
         $draft = $this->loadDraft($tenantId, $draftId, $appId);
+        $this->applyDraftLineChanges($tenantId, $draftId, $appId, $payload);
         $lines = $this->repository->listLines($tenantId, $draftId, $appId);
         $subtotal = 0.0;
         $taxTotal = 0.0;
+        $recalculatedLines = [];
 
         foreach ($lines as $line) {
-            $lineTotal = $this->money((float) ($line['qty'] ?? 0) * (float) ($line['unit_price'] ?? 0));
-            $subtotal += $lineTotal;
-            $lineTaxRate = $this->nullableDecimal($line['tax_rate'] ?? null);
-            if ($lineTaxRate !== null) {
-                $taxTotal += $this->money($lineTotal * ($lineTaxRate / 100));
+            $pricing = $this->calculateLinePricing(
+                $this->quantity($line['qty'] ?? 1),
+                $line['base_price'] ?? $line['effective_unit_price'] ?? $line['unit_price'] ?? null,
+                $line['override_price'] ?? null,
+                $line['tax_rate'] ?? null
+            );
+            $updatedLine = $this->repository->updateLine($tenantId, $draftId, (string) ($line['id'] ?? ''), [
+                'qty' => $this->quantity($line['qty'] ?? 1),
+                'base_price' => $pricing['base_price'],
+                'override_price' => $pricing['override_price'],
+                'effective_unit_price' => $pricing['effective_unit_price'],
+                'unit_price' => $pricing['unit_price'],
+                'line_subtotal' => $pricing['line_subtotal'],
+                'tax_rate' => $pricing['tax_rate'],
+                'line_tax' => $pricing['line_tax'],
+                'line_total' => $pricing['line_total'],
+                'metadata' => array_merge(
+                    is_array($line['metadata'] ?? null) ? (array) $line['metadata'] : [],
+                    [
+                        'pricing' => [
+                            'base_price' => $pricing['base_price'],
+                            'override_price' => $pricing['override_price'],
+                            'effective_unit_price' => $pricing['effective_unit_price'],
+                        ],
+                    ]
+                ),
+            ], $appId);
+            if (!is_array($updatedLine)) {
+                throw new RuntimeException('POS_DRAFT_LINE_NOT_FOUND');
             }
+            $recalculatedLines[] = $updatedLine;
+            $subtotal += (float) ($updatedLine['line_subtotal'] ?? 0);
+            $taxTotal += (float) ($updatedLine['line_tax'] ?? 0);
         }
 
         $draft = $this->repository->updateDraft($tenantId, $draftId, [
@@ -226,7 +445,7 @@ final class POSService
             throw new RuntimeException('POS_DRAFT_NOT_FOUND');
         }
 
-        $draft['lines'] = $lines;
+        $draft['lines'] = $recalculatedLines;
 
         return $this->validatedDraft($draft);
     }
@@ -306,6 +525,51 @@ final class POSService
     }
 
     /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function repriceDraft(string $tenantId, string $draftId, ?string $appId = null, array $payload = []): array
+    {
+        $startedAt = microtime(true);
+        $draft = $this->loadEditableDraft($tenantId, $draftId, $appId);
+        $draft = $this->recalculateDraftTotals($tenantId, $draftId, $appId, $payload);
+        $latencyMs = $this->latencyMs($startedAt);
+        $lineId = $this->nullableString($payload['line_id'] ?? $payload['id'] ?? null);
+        $updatedLine = $lineId !== null ? $this->repository->findLine($tenantId, $draftId, $lineId, $appId) : null;
+
+        $this->auditLogger->log('pos_reprice_draft', 'sale_draft', $draftId, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'draft_id' => $draftId,
+            'session_id' => $draft['session_id'] ?? null,
+            'product_id' => (string) (($updatedLine['product_id'] ?? '') ?: ''),
+            'matched_product_id' => (string) (($updatedLine['product_id'] ?? '') ?: ''),
+            'product_query' => $this->productQuery($payload),
+            'matched_by' => (string) (($updatedLine['metadata']['resolved_product']['matched_by'] ?? '') ?: ''),
+            'ambiguity_count' => 0,
+            'action_name' => 'reprice_draft',
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('reprice_draft', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'reprice_draft',
+            'draft_id' => $draftId,
+            'session_id' => $draft['session_id'] ?? null,
+            'product_id' => (string) (($updatedLine['product_id'] ?? '') ?: ''),
+            'matched_product_id' => (string) (($updatedLine['product_id'] ?? '') ?: ''),
+            'product_query' => $this->productQuery($payload),
+            'matched_by' => (string) (($updatedLine['metadata']['resolved_product']['matched_by'] ?? '') ?: ''),
+            'ambiguity_count' => 0,
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return $draft;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function prepareSaleForCheckout(string $tenantId, string $draftId, ?string $appId = null): array
@@ -377,27 +641,16 @@ final class POSService
      */
     private function resolveProduct(string $tenantId, ?string $appId, array $payload): array
     {
-        $productId = $this->nullableString($payload['product_id'] ?? null);
-        if ($productId !== null) {
-            $result = $this->entitySearch->getByReference($tenantId, 'product', $productId, [], $appId);
-            if (!is_array($result)) {
-                throw new RuntimeException('POS_PRODUCT_NOT_FOUND');
-            }
-
-            return $this->hydrateProduct($tenantId, $appId, $result);
-        }
-
-        $query = $this->productQuery($payload);
-        if ($query === '') {
+        if ($this->nullableString($payload['product_id'] ?? null) === null && $this->productQuery($payload) === '') {
             throw new RuntimeException('POS_PRODUCT_REFERENCE_REQUIRED');
         }
 
-        $resolution = $this->entitySearch->resolveBestMatch($tenantId, $query, [
-            'entity_type' => 'product',
-            'limit' => max(2, (int) ($payload['limit'] ?? 5)),
-        ], $appId);
+        $resolution = $this->resolveProductForPOS($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+        ]);
         if ((bool) ($resolution['resolved'] ?? false) && is_array($resolution['result'] ?? null)) {
-            return $this->hydrateProduct($tenantId, $appId, (array) $resolution['result']);
+            return (array) $resolution['result'];
         }
         if (count((array) ($resolution['candidates'] ?? [])) > 0) {
             throw new RuntimeException('POS_PRODUCT_AMBIGUOUS');
@@ -456,18 +709,228 @@ final class POSService
     }
 
     /**
-     * @param mixed $value
+     * @param array<string, mixed> $resolved
+     * @return array<string, mixed>
      */
-    private function explicitOrResolvedPrice($explicit, $resolved): ?float
+    private function hydrateResolvedProductCandidate(string $tenantId, ?string $appId, array $resolved): array
     {
-        if ($explicit !== null && $explicit !== '' && is_numeric($explicit)) {
-            return $this->money((float) $explicit);
+        $metadata = is_array($resolved['metadata_json'] ?? null) ? (array) $resolved['metadata_json'] : [];
+        if ((bool) ($metadata['pos_snapshot_ready'] ?? false)) {
+            $unitPrice = $this->nullableDecimal($metadata['unit_price'] ?? null);
+            $taxRate = $this->nullableDecimal($metadata['tax_rate'] ?? null);
+
+            return array_merge($resolved, [
+                'sku' => $this->nullableString($metadata['sku'] ?? null),
+                'barcode' => $this->nullableString($metadata['barcode'] ?? null),
+                'base_price' => $unitPrice,
+                'unit_price' => $unitPrice,
+                'tax_rate' => $taxRate,
+                'metadata' => [
+                    'entity_contract' => (string) ($metadata['entity_contract'] ?? ''),
+                    'table' => (string) ($metadata['table'] ?? ''),
+                    'matched_by' => (string) ($resolved['matched_by'] ?? ''),
+                    'source_module' => (string) ($resolved['source_module'] ?? 'pos'),
+                    'raw_identifier' => (string) ($metadata['raw_identifier'] ?? ''),
+                ],
+            ]);
         }
-        if ($resolved !== null && $resolved !== '' && is_numeric($resolved)) {
-            return $this->money((float) $resolved);
+
+        return $this->hydrateProduct($tenantId, $appId, $resolved);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{0:array<int, array<string, mixed>>,1:string}
+     */
+    private function directProductCandidates(string $tenantId, ?string $appId, string $query, int $limit, array $payload): array
+    {
+        $lookupMode = $this->productLookupMode($payload, $query);
+        if ($lookupMode === 'barcode') {
+            return [
+                $this->repository->searchProductsForPOS($tenantId, $query, ['mode' => 'barcode', 'limit' => $limit], $appId, $this->entityRegistry),
+                'barcode',
+            ];
+        }
+        if ($lookupMode === 'sku') {
+            return [
+                $this->repository->searchProductsForPOS($tenantId, $query, ['mode' => 'sku', 'limit' => $limit], $appId, $this->entityRegistry),
+                'sku',
+            ];
+        }
+
+        foreach (['barcode', 'sku', 'exact_name', 'partial'] as $mode) {
+            $results = $this->repository->searchProductsForPOS($tenantId, $query, ['mode' => $mode, 'limit' => $limit], $appId, $this->entityRegistry);
+            if ($results !== []) {
+                return [$results, $mode];
+            }
+        }
+
+        return [[], $lookupMode];
+    }
+
+    private function productLookupMode(array $payload, string $query): string
+    {
+        if ($this->nullableString($payload['barcode'] ?? null) !== null || $this->isBarcodeLike($query)) {
+            return 'barcode';
+        }
+        if ($this->nullableString($payload['sku'] ?? null) !== null) {
+            return 'sku';
+        }
+
+        return 'auto';
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $candidates
+     * @return array<string, mixed>|null
+     */
+    private function selectResolvedProductCandidate(array $candidates): ?array
+    {
+        $top = is_array($candidates[0] ?? null) ? (array) $candidates[0] : [];
+        if ($top === []) {
+            return null;
+        }
+
+        $next = is_array($candidates[1] ?? null) ? (array) $candidates[1] : [];
+        $matchedBy = trim((string) ($top['matched_by'] ?? ''));
+        if (count($candidates) === 1) {
+            return $top;
+        }
+        if (in_array($matchedBy, ['barcode', 'sku'], true) && trim((string) ($next['matched_by'] ?? '')) !== $matchedBy) {
+            return $top;
+        }
+        if ($matchedBy === 'exact_name' && trim((string) ($next['matched_by'] ?? '')) !== 'exact_name') {
+            return $top;
         }
 
         return null;
+    }
+
+    private function isBarcodeLike(string $value): bool
+    {
+        return preg_match('/^[0-9]{8,20}$/', trim($value)) === 1;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function applyDraftLineChanges(string $tenantId, string $draftId, ?string $appId, array $payload): void
+    {
+        $updates = [];
+        if (is_array($payload['lines'] ?? null)) {
+            foreach ((array) $payload['lines'] as $candidate) {
+                if (is_array($candidate)) {
+                    $updates[] = $candidate;
+                }
+            }
+        }
+
+        $hasSingleUpdate = $this->nullableString($payload['line_id'] ?? $payload['id'] ?? null) !== null
+            || array_key_exists('qty', $payload)
+            || array_key_exists('quantity', $payload)
+            || array_key_exists('override_price', $payload)
+            || array_key_exists('base_price', $payload)
+            || array_key_exists('tax_rate', $payload);
+        if ($hasSingleUpdate) {
+            $updates[] = $payload;
+        }
+
+        foreach ($updates as $update) {
+            $lineId = $this->nullableString($update['line_id'] ?? $update['id'] ?? null);
+            if ($lineId === null) {
+                throw new RuntimeException('POS_LINE_ID_REQUIRED');
+            }
+
+            $line = $this->repository->findLine($tenantId, $draftId, $lineId, $appId);
+            if (!is_array($line)) {
+                throw new RuntimeException('POS_DRAFT_LINE_NOT_FOUND');
+            }
+
+            $qty = array_key_exists('qty', $update) || array_key_exists('quantity', $update)
+                ? $this->quantity($update['qty'] ?? $update['quantity'])
+                : $this->quantity($line['qty'] ?? 1);
+            $basePrice = array_key_exists('base_price', $update)
+                ? $update['base_price']
+                : ($line['base_price'] ?? $line['effective_unit_price'] ?? $line['unit_price'] ?? null);
+            $overridePrice = array_key_exists('override_price', $update)
+                ? $update['override_price']
+                : ($line['override_price'] ?? null);
+            $taxRate = array_key_exists('tax_rate', $update)
+                ? $update['tax_rate']
+                : ($line['tax_rate'] ?? null);
+            $pricing = $this->calculateLinePricing($qty, $basePrice, $overridePrice, $taxRate);
+
+            $this->repository->updateLine($tenantId, $draftId, $lineId, [
+                'qty' => $qty,
+                'base_price' => $pricing['base_price'],
+                'override_price' => $pricing['override_price'],
+                'effective_unit_price' => $pricing['effective_unit_price'],
+                'unit_price' => $pricing['unit_price'],
+                'line_subtotal' => $pricing['line_subtotal'],
+                'tax_rate' => $pricing['tax_rate'],
+                'line_tax' => $pricing['line_tax'],
+                'line_total' => $pricing['line_total'],
+                'metadata' => array_merge(
+                    is_array($line['metadata'] ?? null) ? (array) $line['metadata'] : [],
+                    [
+                        'pricing' => [
+                            'base_price' => $pricing['base_price'],
+                            'override_price' => $pricing['override_price'],
+                            'effective_unit_price' => $pricing['effective_unit_price'],
+                        ],
+                    ]
+                ),
+            ], $appId);
+        }
+    }
+
+    /**
+     * @param mixed $basePriceInput
+     * @param mixed $overridePriceInput
+     * @param mixed $taxRateInput
+     * @return array<string, mixed>
+     */
+    private function calculateLinePricing(float $qty, $basePriceInput, $overridePriceInput, $taxRateInput): array
+    {
+        $basePrice = $this->optionalPrice($basePriceInput, 'POS_PRODUCT_PRICE_UNAVAILABLE');
+        $overridePrice = $this->optionalPrice($overridePriceInput, 'POS_OVERRIDE_PRICE_INVALID');
+        if ($basePrice === null) {
+            $basePrice = $overridePrice;
+        }
+        if ($basePrice === null) {
+            throw new RuntimeException('POS_PRODUCT_PRICE_UNAVAILABLE');
+        }
+
+        $effectiveUnitPrice = $overridePrice ?? $basePrice;
+        $taxRate = $this->nullableDecimal($taxRateInput);
+        $lineSubtotal = $this->money($qty * $effectiveUnitPrice);
+        $lineTax = $taxRate !== null ? $this->money($lineSubtotal * ($taxRate / 100)) : null;
+
+        return [
+            'base_price' => $basePrice,
+            'override_price' => $overridePrice,
+            'effective_unit_price' => $effectiveUnitPrice,
+            'unit_price' => $effectiveUnitPrice,
+            'tax_rate' => $taxRate,
+            'line_subtotal' => $lineSubtotal,
+            'line_tax' => $lineTax,
+            'line_total' => $this->money($lineSubtotal + ($lineTax ?? 0)),
+        ];
+    }
+
+    /**
+     * @param mixed $value
+     */
+    private function optionalPrice($value, string $errorCode): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (!is_numeric($value)) {
+            throw new RuntimeException($errorCode);
+        }
+
+        return $this->money((float) $value);
     }
 
     /**

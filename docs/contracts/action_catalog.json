@@ -1,6 +1,6 @@
 {
   "contract_id": "action_catalog",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "effective_date": "2026-03-10",
   "addenda_of": null,
   "status": "canonical_draft",
@@ -610,6 +610,25 @@
       ]
     },
     {
+      "name": "pos.add_line_by_reference",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "pos_add_line_by_reference"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "medium",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
       "name": "pos.remove_draft_line",
       "type": "EXECUTABLE",
       "required_role": "operator",
@@ -658,6 +677,63 @@
       "rag_required": false,
       "json_schema_required": true,
       "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "pos.find_product",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "pos_find_product"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "pos.get_product_candidates",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "pos_get_product_candidates"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "pos.reprice_draft",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "pos_reprice_draft"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "medium",
       "gates_required": [
         "mode_guard",
         "role_guard",

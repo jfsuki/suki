@@ -1690,6 +1690,10 @@ final class ChatAgent
             'draft_id' => $runtimeObservability['draft_id'],
             'session_id' => $runtimeObservability['session_id'],
             'product_id' => $runtimeObservability['product_id'],
+            'matched_product_id' => $runtimeObservability['matched_product_id'],
+            'matched_by' => $runtimeObservability['matched_by'],
+            'product_query' => $runtimeObservability['product_query'],
+            'ambiguity_count' => $runtimeObservability['ambiguity_count'],
             'result_status' => $runtimeObservability['result_status'],
             'pending_items_count' => $runtimeObservability['pending_items_count'],
             'token_usage' => $runtimeObservability['token_usage'],
@@ -1790,6 +1794,12 @@ final class ChatAgent
             'draft_id' => trim((string) ($runtimeContext['draft_id'] ?? $routeTelemetry['draft_id'] ?? '')),
             'session_id' => trim((string) ($runtimeContext['session_id'] ?? $routeTelemetry['session_id'] ?? '')),
             'product_id' => trim((string) ($runtimeContext['product_id'] ?? $routeTelemetry['product_id'] ?? '')),
+            'matched_product_id' => trim((string) ($runtimeContext['matched_product_id'] ?? $routeTelemetry['matched_product_id'] ?? '')),
+            'matched_by' => trim((string) ($runtimeContext['matched_by'] ?? $routeTelemetry['matched_by'] ?? '')),
+            'product_query' => trim((string) ($runtimeContext['product_query'] ?? $routeTelemetry['product_query'] ?? '')),
+            'ambiguity_count' => is_numeric($runtimeContext['ambiguity_count'] ?? $routeTelemetry['ambiguity_count'] ?? null)
+                ? max(0, (int) ($runtimeContext['ambiguity_count'] ?? $routeTelemetry['ambiguity_count']))
+                : 0,
             'result_status' => trim((string) ($runtimeContext['result_status'] ?? $routeTelemetry['result_status'] ?? '')) ?: 'unknown',
             'pending_items_count' => is_numeric($runtimeContext['pending_items_count'] ?? $routeTelemetry['pending_items_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['pending_items_count'] ?? $routeTelemetry['pending_items_count']))
@@ -1937,6 +1947,12 @@ final class ChatAgent
             'draft_id' => trim((string) ($payload['draft_id'] ?? '')) ?: '',
             'session_id' => trim((string) ($payload['session_id'] ?? '')) ?: '',
             'product_id' => trim((string) ($payload['product_id'] ?? '')) ?: '',
+            'matched_product_id' => trim((string) ($payload['matched_product_id'] ?? '')) ?: '',
+            'matched_by' => trim((string) ($payload['matched_by'] ?? '')) ?: '',
+            'product_query' => trim((string) ($payload['product_query'] ?? '')) ?: '',
+            'ambiguity_count' => is_numeric($payload['ambiguity_count'] ?? null)
+                ? max(0, (int) $payload['ambiguity_count'])
+                : 0,
             'result_status' => trim((string) ($payload['result_status'] ?? '')) ?: '',
             'result_count' => is_numeric($payload['result_count'] ?? null)
                 ? max(0, (int) $payload['result_count'])

@@ -552,6 +552,25 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'AddPOSLineByReference':
+                if (trim((string) ($command['draft_id'] ?? $command['sale_draft_id'] ?? '')) === '') {
+                    return [false, 'missing_draft_id'];
+                }
+                $productId = trim((string) ($command['product_id'] ?? ''));
+                $query = trim((string) ($command['query'] ?? ''));
+                $sku = trim((string) ($command['sku'] ?? ''));
+                $barcode = trim((string) ($command['barcode'] ?? ''));
+                if ($productId === '' && $query === '' && $sku === '' && $barcode === '') {
+                    return [false, 'missing_product_reference'];
+                }
+                if (array_key_exists('qty', $command) && (!is_numeric($command['qty']) || (float) $command['qty'] <= 0)) {
+                    return [false, 'invalid_qty'];
+                }
+                if (array_key_exists('override_price', $command) && $command['override_price'] !== null && $command['override_price'] !== '' && !is_numeric($command['override_price'])) {
+                    return [false, 'invalid_override_price'];
+                }
+                return [true, 'schema_valid'];
+
             case 'RemovePOSDraftLine':
                 if (trim((string) ($command['draft_id'] ?? $command['sale_draft_id'] ?? '')) === '') {
                     return [false, 'missing_draft_id'];
@@ -575,6 +594,61 @@ final class RouterPolicyEvaluator
             case 'ListPOSOpenDrafts':
                 if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
                     return [false, 'invalid_limit'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'FindPOSProduct':
+                $productId = trim((string) ($command['product_id'] ?? ''));
+                $query = trim((string) ($command['query'] ?? ''));
+                $sku = trim((string) ($command['sku'] ?? ''));
+                $barcode = trim((string) ($command['barcode'] ?? ''));
+                if ($productId === '' && $query === '' && $sku === '' && $barcode === '') {
+                    return [false, 'missing_product_reference'];
+                }
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetPOSProductCandidates':
+                $query = trim((string) ($command['query'] ?? ''));
+                $sku = trim((string) ($command['sku'] ?? ''));
+                $barcode = trim((string) ($command['barcode'] ?? ''));
+                if ($query === '' && $sku === '' && $barcode === '') {
+                    return [false, 'missing_product_reference'];
+                }
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'RepricePOSDraft':
+                if (trim((string) ($command['draft_id'] ?? $command['sale_draft_id'] ?? '')) === '') {
+                    return [false, 'missing_draft_id'];
+                }
+                $lineId = trim((string) ($command['line_id'] ?? $command['id'] ?? ''));
+                $hasMutation = array_key_exists('qty', $command)
+                    || array_key_exists('quantity', $command)
+                    || array_key_exists('override_price', $command)
+                    || array_key_exists('tax_rate', $command)
+                    || array_key_exists('base_price', $command);
+                if ($hasMutation && $lineId === '') {
+                    return [false, 'missing_line_id'];
+                }
+                if (array_key_exists('qty', $command) && $command['qty'] !== null && $command['qty'] !== '' && (!is_numeric($command['qty']) || (float) $command['qty'] <= 0)) {
+                    return [false, 'invalid_qty'];
+                }
+                if (array_key_exists('quantity', $command) && $command['quantity'] !== null && $command['quantity'] !== '' && (!is_numeric($command['quantity']) || (float) $command['quantity'] <= 0)) {
+                    return [false, 'invalid_qty'];
+                }
+                if (array_key_exists('override_price', $command) && $command['override_price'] !== null && $command['override_price'] !== '' && !is_numeric($command['override_price'])) {
+                    return [false, 'invalid_override_price'];
+                }
+                if (array_key_exists('tax_rate', $command) && $command['tax_rate'] !== null && $command['tax_rate'] !== '' && !is_numeric($command['tax_rate'])) {
+                    return [false, 'invalid_tax_rate'];
+                }
+                if (array_key_exists('base_price', $command) && $command['base_price'] !== null && $command['base_price'] !== '' && !is_numeric($command['base_price'])) {
+                    return [false, 'invalid_base_price'];
                 }
                 return [true, 'schema_valid'];
 

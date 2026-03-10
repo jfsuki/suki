@@ -159,6 +159,12 @@ final class ConversationGateway
             'draft_id' => trim((string) ($trace['draft_id'] ?? '')),
             'session_id' => trim((string) ($trace['session_id'] ?? '')),
             'product_id' => trim((string) ($trace['product_id'] ?? '')),
+            'matched_product_id' => trim((string) ($trace['matched_product_id'] ?? '')),
+            'matched_by' => trim((string) ($trace['matched_by'] ?? '')),
+            'product_query' => trim((string) ($trace['product_query'] ?? '')),
+            'ambiguity_count' => is_numeric($trace['ambiguity_count'] ?? null)
+                ? max(0, (int) $trace['ambiguity_count'])
+                : 0,
             'result_status' => trim((string) ($trace['result_status'] ?? '')),
             'pending_items_count' => is_numeric($trace['pending_items_count'] ?? null)
                 ? max(0, (int) $trace['pending_items_count'])

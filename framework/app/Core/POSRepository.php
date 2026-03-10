@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Core;
 
 use PDO;
+use PDOStatement;
 use RuntimeException;
 
 final class POSRepository
@@ -28,6 +29,12 @@ final class POSRepository
     /** @var array<int, string> */
     private const PRODUCT_TAX_FIELDS = ['tax_rate', 'iva_rate', 'iva', 'impuesto', 'tax_percent'];
 
+    /** @var array<int, string> */
+    private const PRODUCT_ACTIVE_FIELDS = ['activo', 'active', 'is_active', 'habilitado', 'enabled'];
+
+    /** @var array<int, string> */
+    private const PRODUCT_DATE_FIELDS = ['updated_at', 'created_at'];
+
     private PDO $db;
 
     public function __construct(?PDO $db = null)
@@ -40,7 +47,7 @@ final class POSRepository
             $this->requiredTables(),
             $this->requiredIndexes(),
             [],
-            'db/migrations/' . $this->driver() . '/20260310_014_pos_core_architecture.sql'
+            'db/migrations/' . $this->driver() . '/20260310_015_pos_products_pricing_barcode.sql'
         );
     }
 
@@ -142,8 +149,13 @@ final class POSRepository
             'barcode',
             'product_label',
             'qty',
+            'base_price',
+            'override_price',
+            'effective_unit_price',
             'unit_price',
+            'line_subtotal',
             'tax_rate',
+            'line_tax',
             'line_total',
             'metadata_json',
             'created_at',
@@ -157,8 +169,13 @@ final class POSRepository
             'barcode' => $record['barcode'] ?? null,
             'product_label' => $record['product_label'] ?? '',
             'qty' => $record['qty'] ?? 0,
+            'base_price' => $record['base_price'] ?? ($record['unit_price'] ?? 0),
+            'override_price' => $record['override_price'] ?? null,
+            'effective_unit_price' => $record['effective_unit_price'] ?? ($record['unit_price'] ?? 0),
             'unit_price' => $record['unit_price'] ?? 0,
+            'line_subtotal' => $record['line_subtotal'] ?? ($record['line_total'] ?? 0),
             'tax_rate' => $record['tax_rate'] ?? null,
+            'line_tax' => $record['line_tax'] ?? null,
             'line_total' => $record['line_total'] ?? 0,
             'metadata_json' => $this->encodeJson($record['metadata'] ?? []),
             'created_at' => $record['created_at'] ?? date('Y-m-d H:i:s'),
@@ -176,6 +193,50 @@ final class POSRepository
         }
 
         return $saved;
+    }
+
+    /**
+     * @param array<string, mixed> $updates
+     * @return array<string, mixed>|null
+     */
+    public function updateLine(string $tenantId, string $draftId, string $lineId, array $updates, ?string $appId = null): ?array
+    {
+        $allowed = [
+            'qty',
+            'base_price',
+            'override_price',
+            'effective_unit_price',
+            'unit_price',
+            'tax_rate',
+            'line_subtotal',
+            'line_tax',
+            'line_total',
+            'metadata_json',
+            'updated_at',
+        ];
+        $payload = [];
+        foreach ($allowed as $column) {
+            if (!array_key_exists($column, $updates)) {
+                continue;
+            }
+            $payload[$column] = $updates[$column];
+        }
+        if (array_key_exists('metadata', $updates)) {
+            $payload['metadata_json'] = $this->encodeJson($updates['metadata']);
+        }
+        if (!array_key_exists('updated_at', $payload)) {
+            $payload['updated_at'] = date('Y-m-d H:i:s');
+        }
+        if ($payload === []) {
+            return $this->findLine($tenantId, $draftId, $lineId, $appId);
+        }
+
+        $this->lineQuery($tenantId, $appId)
+            ->where('sale_draft_id', '=', $draftId)
+            ->where('id', '=', $lineId)
+            ->update($payload);
+
+        return $this->findLine($tenantId, $draftId, $lineId, $appId);
     }
 
     /**
@@ -286,6 +347,33 @@ final class POSRepository
     }
 
     /**
+     * @param array<string, mixed> $options
+     * @return array<int, array<string, mixed>>
+     */
+    public function searchProductsForPOS(string $tenantId, string $query, array $options = [], ?string $appId = null, ?EntityRegistry $registry = null): array
+    {
+        $query = trim($query);
+        if ($query === '') {
+            return [];
+        }
+
+        $mode = strtolower(trim((string) ($options['mode'] ?? 'partial')));
+        if (!in_array($mode, ['barcode', 'sku', 'exact_name', 'partial'], true)) {
+            $mode = 'partial';
+        }
+
+        $registry = $registry ?? new EntityRegistry();
+        $results = [];
+        foreach ($this->productContracts($registry) as $contract) {
+            $results = array_merge($results, $this->searchProductContract($tenantId, $contract, $query, $mode, $appId));
+        }
+
+        $results = $this->dedupeProductResults($results);
+
+        return array_slice($results, 0, $this->intFilter($options['limit'] ?? null, 5, 1, 20));
+    }
+
+    /**
      * @param array<string, mixed> $resolvedEntity
      * @return array<string, mixed>|null
      */
@@ -373,6 +461,416 @@ final class POSRepository
         }
 
         return array_values(array_unique($columns));
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $results
+     * @return array<int, array<string, mixed>>
+     */
+    private function dedupeProductResults(array $results): array
+    {
+        $deduped = [];
+        foreach ($results as $result) {
+            $metadata = is_array($result['metadata_json'] ?? null) ? (array) $result['metadata_json'] : [];
+            $key = implode('|', [
+                (string) ($metadata['entity_contract'] ?? ''),
+                (string) ($metadata['table'] ?? ''),
+                (string) ($result['entity_id'] ?? ''),
+            ]);
+            if ($key === '||') {
+                continue;
+            }
+            if (!isset($deduped[$key]) || (float) ($deduped[$key]['score'] ?? 0) < (float) ($result['score'] ?? 0)) {
+                $deduped[$key] = $result;
+            }
+        }
+
+        $results = array_values($deduped);
+        usort($results, function (array $left, array $right): int {
+            $scoreCompare = ((float) ($right['score'] ?? 0)) <=> ((float) ($left['score'] ?? 0));
+            if ($scoreCompare !== 0) {
+                return $scoreCompare;
+            }
+
+            $leftActive = (bool) (($left['metadata_json']['active'] ?? false));
+            $rightActive = (bool) (($right['metadata_json']['active'] ?? false));
+            if ($leftActive !== $rightActive) {
+                return $rightActive <=> $leftActive;
+            }
+
+            $leftDate = (string) (($left['metadata_json']['sort_date'] ?? '') ?: '');
+            $rightDate = (string) (($right['metadata_json']['sort_date'] ?? '') ?: '');
+            $dateCompare = strcmp($rightDate, $leftDate);
+            if ($dateCompare !== 0) {
+                return $dateCompare;
+            }
+
+            return strcmp((string) ($left['label'] ?? ''), (string) ($right['label'] ?? ''));
+        });
+
+        return $results;
+    }
+
+    /**
+     * @param array<string, mixed> $contract
+     * @return array<string, mixed>
+     */
+    private function buildProductCandidate(
+        array $row,
+        array $contract,
+        string $table,
+        string $primaryKey,
+        array $labelFields,
+        array $skuFields,
+        array $barcodeFields,
+        ?string $dateField,
+        ?string $activeField,
+        string $matchedBy,
+        string $matchedStrategy,
+        int $baseScore,
+        string $matchedField,
+        string $query
+    ): array {
+        $entityId = trim((string) ($row[$primaryKey] ?? ''));
+        if ($entityId === '') {
+            $entityId = trim((string) ($row['id'] ?? ''));
+        }
+
+        $label = $this->firstNonEmpty($row, array_merge($labelFields, $skuFields, $barcodeFields, [$primaryKey]));
+        if ($label === '') {
+            $label = (string) ($contract['label'] ?? $contract['name'] ?? 'producto') . ' #' . $entityId;
+        }
+
+        $subtitleParts = [];
+        foreach ([$this->firstNonEmpty($row, $skuFields), $this->firstNonEmpty($row, $barcodeFields)] as $value) {
+            if ($value === '' || $value === trim((string) ($row[$matchedField] ?? ''))) {
+                continue;
+            }
+            $subtitleParts[] = $value;
+        }
+        $unitPrice = $this->firstNumeric($row, self::PRODUCT_PRICE_FIELDS, true);
+        if ($unitPrice !== null) {
+            $subtitleParts[] = 'precio=' . $unitPrice;
+        }
+        $subtitle = implode(' | ', array_slice(array_values(array_unique(array_filter($subtitleParts, fn($part): bool => trim((string) $part) !== ''))), 0, 3));
+
+        $metadata = [
+            'entity_contract' => (string) ($contract['name'] ?? ''),
+            'table' => $table,
+            'matched_field' => $matchedField,
+            'matched_strategy' => $matchedStrategy,
+            'sort_date' => (string) ($row[$dateField ?? ''] ?? ''),
+            'raw_identifier' => $this->firstNonEmpty($row, array_merge($barcodeFields, $skuFields)),
+            'sku' => $this->firstNonEmpty($row, $skuFields),
+            'barcode' => $this->firstNonEmpty($row, $barcodeFields),
+            'unit_price' => $unitPrice,
+            'tax_rate' => $this->firstNumeric($row, self::PRODUCT_TAX_FIELDS, true),
+            'active' => $this->isActiveRow($row, $activeField),
+            'pos_snapshot_ready' => true,
+        ];
+        $score = $baseScore + $this->activeBonus($row, $activeField) + $this->recencyBonus((string) ($row[$dateField ?? ''] ?? ''));
+        if ($query !== '' && EntitySearchSupport::normalizeText((string) ($row[$matchedField] ?? '')) === EntitySearchSupport::normalizeText($query)) {
+            $score += 20;
+        }
+
+        $candidate = [
+            'entity_type' => 'product',
+            'entity_id' => $entityId,
+            'label' => $label,
+            'subtitle' => $subtitle,
+            'score' => $score,
+            'source_module' => (string) ($contract['name'] ?? 'pos_product'),
+            'matched_by' => $matchedBy,
+            'metadata_json' => $metadata,
+        ];
+        EntitySearchContractValidator::validateResult($candidate);
+
+        return $candidate;
+    }
+
+    /**
+     * @param array<string, mixed> $contract
+     * @return array<string, array<string, mixed>>
+     */
+    private function fieldMap(array $contract): array
+    {
+        $fields = [];
+        foreach ((array) ($contract['fields'] ?? []) as $field) {
+            if (!is_array($field)) {
+                continue;
+            }
+            $name = strtolower(trim((string) ($field['name'] ?? '')));
+            if ($name !== '') {
+                $fields[$name] = $field;
+            }
+        }
+
+        if ((bool) ($contract['table']['timestamps'] ?? false)) {
+            $fields['created_at'] = ['name' => 'created_at'];
+            $fields['updated_at'] = ['name' => 'updated_at'];
+        }
+
+        return $fields;
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $fields
+     * @param array<int, string> $candidates
+     * @return array<int, string>
+     */
+    private function existingFields(array $fields, array $candidates): array
+    {
+        $result = [];
+        foreach ($candidates as $candidate) {
+            $candidate = strtolower(trim($candidate));
+            if ($candidate !== '' && array_key_exists($candidate, $fields)) {
+                $result[] = $candidate;
+            }
+        }
+
+        return array_values(array_unique($result));
+    }
+
+    /**
+     * @param array<string, array<string, mixed>> $fields
+     * @param array<int, string> $candidates
+     */
+    private function firstExistingField(array $fields, array $candidates): ?string
+    {
+        foreach ($candidates as $candidate) {
+            $candidate = strtolower(trim($candidate));
+            if ($candidate !== '' && array_key_exists($candidate, $fields)) {
+                return $candidate;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $contract
+     */
+    private function inferContractType(array $contract): ?string
+    {
+        $signals = EntitySearchSupport::normalizeText(implode(' ', [
+            (string) ($contract['name'] ?? ''),
+            (string) ($contract['label'] ?? ''),
+            (string) ($contract['table']['name'] ?? ''),
+        ]));
+
+        foreach (EntitySearchSupport::aliasesForType('product') as $alias) {
+            if (preg_match('/(?:^|\\b)' . preg_quote($alias, '/') . '(?:$|\\b)/u', $signals) === 1) {
+                return 'product';
+            }
+        }
+
+        $fields = $this->fieldMap($contract);
+        if ($this->firstExistingField($fields, array_merge(self::PRODUCT_SKU_FIELDS, self::PRODUCT_BARCODE_FIELDS)) !== null) {
+            return 'product';
+        }
+
+        return null;
+    }
+
+    private function intFilter($value, int $default, int $min, int $max): int
+    {
+        if (!is_numeric($value)) {
+            return $default;
+        }
+
+        return max($min, min($max, (int) $value));
+    }
+
+    private function isActiveRow(array $row, ?string $activeField): bool
+    {
+        if ($activeField === null) {
+            return false;
+        }
+
+        $value = strtolower(trim((string) ($row[$activeField] ?? '')));
+
+        return in_array($value, ['1', 'true', 'si', 'yes', 'active', 'activo'], true);
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function activeBonus(array $row, ?string $activeField): int
+    {
+        return $this->isActiveRow($row, $activeField) ? 15 : 0;
+    }
+
+    private function recencyBonus(string $value): int
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return 0;
+        }
+
+        try {
+            $date = new \DateTimeImmutable(str_replace('T', ' ', $value));
+        } catch (\Throwable $e) {
+            return 0;
+        }
+
+        $days = abs((int) ((new \DateTimeImmutable('now'))->diff($date)->format('%a')));
+        if ($days <= 1) {
+            return 20;
+        }
+        if ($days <= 7) {
+            return 10;
+        }
+        if ($days <= 30) {
+            return 5;
+        }
+
+        return 0;
+    }
+
+    private function normalizeMatchValue(string $value): string
+    {
+        return EntitySearchSupport::normalizeText($value);
+    }
+
+    private function primaryKey(array $contract): string
+    {
+        $primaryKey = strtolower(trim((string) ($contract['table']['primaryKey'] ?? 'id')));
+
+        return preg_match('/^[a-zA-Z0-9_]+$/', $primaryKey) === 1 ? $primaryKey : 'id';
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function productContracts(EntityRegistry $registry): array
+    {
+        $contracts = [];
+        foreach ($registry->all() as $contract) {
+            if (!is_array($contract) || ($contract['type'] ?? '') !== 'entity') {
+                continue;
+            }
+            if ($this->inferContractType($contract) !== 'product') {
+                continue;
+            }
+            $contracts[] = $contract;
+        }
+
+        return $contracts;
+    }
+
+    private function resolvedContractTable(array $contract, ?string $appId = null): string
+    {
+        $logicalTable = trim((string) ($contract['table']['name'] ?? ''));
+        if ($logicalTable === '') {
+            throw new RuntimeException('POS_PRODUCT_TABLE_REQUIRED');
+        }
+
+        return TableNamespace::resolve($logicalTable, $appId);
+    }
+
+    /**
+     * @param array<string, mixed> $contract
+     * @return array<int, array<string, mixed>>
+     */
+    private function searchProductContract(string $tenantId, array $contract, string $query, string $mode, ?string $appId = null): array
+    {
+        $table = $this->resolvedContractTable($contract, $appId);
+        if (!$this->tableExists($table)) {
+            return [];
+        }
+
+        $fields = $this->fieldMap($contract);
+        $primaryKey = $this->primaryKey($contract);
+        $labelFields = $this->existingFields($fields, self::PRODUCT_LABEL_FIELDS);
+        $skuFields = $this->existingFields($fields, self::PRODUCT_SKU_FIELDS);
+        $barcodeFields = $this->existingFields($fields, self::PRODUCT_BARCODE_FIELDS);
+        $dateField = $this->firstExistingField($fields, self::PRODUCT_DATE_FIELDS);
+        $activeField = $this->firstExistingField($fields, self::PRODUCT_ACTIVE_FIELDS);
+
+        $results = [];
+        $normalized = $this->normalizeMatchValue($query);
+        if ($normalized === '') {
+            return [];
+        }
+
+        if ($mode === 'barcode') {
+            foreach ($barcodeFields as $field) {
+                foreach ($this->fetchProductRows($table, $tenantId, $appId, 'LOWER(' . $field . ') = :match_exact', [':match_exact' => $normalized], $dateField, 2) as $row) {
+                    $results[] = $this->buildProductCandidate($row, $contract, $table, $primaryKey, $labelFields, $skuFields, $barcodeFields, $dateField, $activeField, 'barcode', 'exact', 1200, $field, $query);
+                }
+            }
+            return $results;
+        }
+
+        if ($mode === 'sku') {
+            foreach ($skuFields as $field) {
+                foreach ($this->fetchProductRows($table, $tenantId, $appId, 'LOWER(' . $field . ') = :match_exact', [':match_exact' => $normalized], $dateField, 2) as $row) {
+                    $results[] = $this->buildProductCandidate($row, $contract, $table, $primaryKey, $labelFields, $skuFields, $barcodeFields, $dateField, $activeField, 'sku', 'exact', 1100, $field, $query);
+                }
+            }
+            return $results;
+        }
+
+        if ($mode === 'exact_name') {
+            foreach ($labelFields as $field) {
+                foreach ($this->fetchProductRows($table, $tenantId, $appId, 'LOWER(' . $field . ') = :label_exact', [':label_exact' => $normalized], $dateField, 3) as $row) {
+                    $results[] = $this->buildProductCandidate($row, $contract, $table, $primaryKey, $labelFields, $skuFields, $barcodeFields, $dateField, $activeField, 'exact_name', 'exact', 980, $field, $query);
+                }
+            }
+            return $results;
+        }
+
+        foreach ($labelFields as $field) {
+            foreach ($this->fetchProductRows($table, $tenantId, $appId, 'LOWER(' . $field . ') LIKE :label_prefix', [':label_prefix' => $normalized . '%'], $dateField, 5) as $row) {
+                $results[] = $this->buildProductCandidate($row, $contract, $table, $primaryKey, $labelFields, $skuFields, $barcodeFields, $dateField, $activeField, 'partial', 'prefix', 760, $field, $query);
+            }
+            if (mb_strlen($normalized, 'UTF-8') >= 3) {
+                foreach ($this->fetchProductRows($table, $tenantId, $appId, 'LOWER(' . $field . ') LIKE :label_contains', [':label_contains' => '%' . $normalized . '%'], $dateField, 5) as $row) {
+                    $results[] = $this->buildProductCandidate($row, $contract, $table, $primaryKey, $labelFields, $skuFields, $barcodeFields, $dateField, $activeField, 'partial', 'contains', 680, $field, $query);
+                }
+            }
+        }
+
+        return $results;
+    }
+
+    /**
+     * @param array<string, mixed> $bindings
+     * @return array<int, array<string, mixed>>
+     */
+    private function fetchProductRows(
+        string $table,
+        string $tenantId,
+        ?string $appId,
+        string $extraWhere,
+        array $bindings,
+        ?string $dateField,
+        int $limit
+    ): array {
+        $where = ['tenant_id = :tenant_scope_id'];
+        $bindings = [':tenant_scope_id' => $this->stableTenantInt($tenantId)] + $bindings;
+
+        if ($appId !== null && $appId !== '' && $this->columnExists($table, 'app_id')) {
+            $where[] = 'app_id = :app_id';
+            $bindings[':app_id'] = $appId;
+        }
+        if (trim($extraWhere) !== '') {
+            $where[] = $extraWhere;
+        }
+
+        $orderField = $dateField !== null && $this->columnExists($table, $dateField)
+            ? $dateField
+            : ($this->columnExists($table, 'created_at') ? 'created_at' : 'id');
+        $secondaryOrderField = $this->columnExists($table, 'id') ? 'id' : $orderField;
+        $sql = 'SELECT * FROM ' . $this->sanitizeIdentifier($table)
+            . ' WHERE ' . implode(' AND ', $where)
+            . ' ORDER BY ' . $this->sanitizeIdentifier($orderField) . ' DESC, ' . $this->sanitizeIdentifier($secondaryOrderField) . ' DESC LIMIT ' . max(1, $limit);
+
+        $stmt = $this->db->prepare($sql);
+        $this->bindAll($stmt, $bindings);
+        $stmt->execute();
+
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
     /**
@@ -468,8 +966,13 @@ final class POSRepository
                 barcode TEXT NULL,
                 product_label TEXT NOT NULL,
                 qty REAL NOT NULL,
+                base_price REAL NOT NULL DEFAULT 0,
+                override_price REAL NULL,
+                effective_unit_price REAL NOT NULL DEFAULT 0,
                 unit_price REAL NOT NULL,
+                line_subtotal REAL NOT NULL DEFAULT 0,
                 tax_rate REAL NULL,
+                line_tax REAL NULL,
                 line_total REAL NOT NULL,
                 metadata_json TEXT NULL,
                 created_at TEXT NOT NULL,
@@ -478,6 +981,7 @@ final class POSRepository
         );
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_sale_draft_lines_tenant_draft ON ' . self::LINE_TABLE . ' (tenant_id, app_id, sale_draft_id, id)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_sale_draft_lines_tenant_product ON ' . self::LINE_TABLE . ' (tenant_id, product_id, created_at)');
+        $this->ensureLineColumnsSqlite();
     }
 
     private function ensureSchemaMySql(): void
@@ -535,8 +1039,13 @@ final class POSRepository
                 barcode VARCHAR(190) NULL,
                 product_label VARCHAR(255) NOT NULL,
                 qty DECIMAL(18,4) NOT NULL,
+                base_price DECIMAL(18,4) NOT NULL DEFAULT 0,
+                override_price DECIMAL(18,4) NULL,
+                effective_unit_price DECIMAL(18,4) NOT NULL DEFAULT 0,
                 unit_price DECIMAL(18,4) NOT NULL,
+                line_subtotal DECIMAL(18,4) NOT NULL DEFAULT 0,
                 tax_rate DECIMAL(10,4) NULL,
+                line_tax DECIMAL(18,4) NULL,
                 line_total DECIMAL(18,4) NOT NULL,
                 metadata_json JSON NULL,
                 created_at DATETIME NOT NULL,
@@ -546,6 +1055,43 @@ final class POSRepository
                 KEY idx_sale_draft_lines_tenant_product (tenant_id, product_id, created_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
+        $this->ensureLineColumnsMySql();
+    }
+
+    private function ensureLineColumnsSqlite(): void
+    {
+        $columns = [
+            'base_price' => 'ALTER TABLE ' . self::LINE_TABLE . ' ADD COLUMN base_price REAL NOT NULL DEFAULT 0',
+            'override_price' => 'ALTER TABLE ' . self::LINE_TABLE . ' ADD COLUMN override_price REAL NULL',
+            'effective_unit_price' => 'ALTER TABLE ' . self::LINE_TABLE . ' ADD COLUMN effective_unit_price REAL NOT NULL DEFAULT 0',
+            'line_subtotal' => 'ALTER TABLE ' . self::LINE_TABLE . ' ADD COLUMN line_subtotal REAL NOT NULL DEFAULT 0',
+            'line_tax' => 'ALTER TABLE ' . self::LINE_TABLE . ' ADD COLUMN line_tax REAL NULL',
+        ];
+
+        foreach ($columns as $column => $sql) {
+            if ($this->columnExists(self::LINE_TABLE, $column)) {
+                continue;
+            }
+            $this->db->exec($sql);
+        }
+    }
+
+    private function ensureLineColumnsMySql(): void
+    {
+        $columns = [
+            'base_price' => 'ALTER TABLE ' . self::LINE_TABLE . ' ADD COLUMN base_price DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER qty',
+            'override_price' => 'ALTER TABLE ' . self::LINE_TABLE . ' ADD COLUMN override_price DECIMAL(18,4) NULL AFTER base_price',
+            'effective_unit_price' => 'ALTER TABLE ' . self::LINE_TABLE . ' ADD COLUMN effective_unit_price DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER override_price',
+            'line_subtotal' => 'ALTER TABLE ' . self::LINE_TABLE . ' ADD COLUMN line_subtotal DECIMAL(18,4) NOT NULL DEFAULT 0 AFTER unit_price',
+            'line_tax' => 'ALTER TABLE ' . self::LINE_TABLE . ' ADD COLUMN line_tax DECIMAL(18,4) NULL AFTER tax_rate',
+        ];
+
+        foreach ($columns as $column => $sql) {
+            if ($this->columnExists(self::LINE_TABLE, $column)) {
+                continue;
+            }
+            $this->db->exec($sql);
+        }
     }
 
     private function draftQuery(string $tenantId, ?string $appId = null): QueryBuilder
@@ -588,8 +1134,13 @@ final class POSRepository
                 'barcode',
                 'product_label',
                 'qty',
+                'base_price',
+                'override_price',
+                'effective_unit_price',
                 'unit_price',
+                'line_subtotal',
                 'tax_rate',
+                'line_tax',
                 'line_total',
                 'metadata_json',
                 'created_at',
@@ -671,6 +1222,27 @@ final class POSRepository
      */
     private function normalizeLineRow(array $row): array
     {
+        $qty = $this->decimal($row['qty'] ?? 0);
+        $basePrice = array_key_exists('base_price', $row) && $row['base_price'] !== null && $row['base_price'] !== ''
+            ? $this->decimal($row['base_price'])
+            : $this->decimal($row['unit_price'] ?? 0);
+        $overridePrice = array_key_exists('override_price', $row) && $row['override_price'] !== null && $row['override_price'] !== ''
+            ? $this->decimal($row['override_price'])
+            : null;
+        $effectiveUnitPrice = array_key_exists('effective_unit_price', $row) && $row['effective_unit_price'] !== null && $row['effective_unit_price'] !== ''
+            ? $this->decimal($row['effective_unit_price'])
+            : ($overridePrice ?? $basePrice);
+        $lineSubtotal = array_key_exists('line_subtotal', $row) && $row['line_subtotal'] !== null && $row['line_subtotal'] !== ''
+            ? $this->decimal($row['line_subtotal'])
+            : $this->decimal($qty * $effectiveUnitPrice);
+        $taxRate = $row['tax_rate'] === null ? null : $this->decimal($row['tax_rate']);
+        $lineTax = array_key_exists('line_tax', $row) && $row['line_tax'] !== null && $row['line_tax'] !== ''
+            ? $this->decimal($row['line_tax'])
+            : ($taxRate !== null ? $this->decimal($lineSubtotal * ($taxRate / 100)) : null);
+        $lineTotal = array_key_exists('line_subtotal', $row) && $row['line_subtotal'] !== null && $row['line_subtotal'] !== ''
+            ? $this->decimal($row['line_total'] ?? ($lineSubtotal + ($lineTax ?? 0)))
+            : $this->decimal($lineSubtotal + ($lineTax ?? 0));
+
         return [
             'id' => (string) ($row['id'] ?? ''),
             'tenant_id' => (string) ($row['tenant_id'] ?? ''),
@@ -680,10 +1252,15 @@ final class POSRepository
             'sku' => $this->nullableString($row['sku'] ?? null),
             'barcode' => $this->nullableString($row['barcode'] ?? null),
             'product_label' => (string) ($row['product_label'] ?? ''),
-            'qty' => $this->decimal($row['qty'] ?? 0),
-            'unit_price' => $this->decimal($row['unit_price'] ?? 0),
-            'tax_rate' => $row['tax_rate'] === null ? null : $this->decimal($row['tax_rate']),
-            'line_total' => $this->decimal($row['line_total'] ?? 0),
+            'qty' => $qty,
+            'base_price' => $basePrice,
+            'override_price' => $overridePrice,
+            'effective_unit_price' => $effectiveUnitPrice,
+            'unit_price' => $effectiveUnitPrice,
+            'line_subtotal' => $lineSubtotal,
+            'tax_rate' => $taxRate,
+            'line_tax' => $lineTax,
+            'line_total' => $lineTotal,
             'metadata' => $this->decodeJson($row['metadata_json'] ?? null),
             'created_at' => (string) ($row['created_at'] ?? ''),
             'updated_at' => (string) ($row['updated_at'] ?? ''),
@@ -812,6 +1389,52 @@ final class POSRepository
     private function driver(): string
     {
         return strtolower((string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME));
+    }
+
+    /**
+     * @param array<string, mixed> $bindings
+     */
+    private function bindAll(PDOStatement $stmt, array $bindings): void
+    {
+        foreach ($bindings as $name => $value) {
+            if (is_int($value)) {
+                $stmt->bindValue($name, $value, PDO::PARAM_INT);
+                continue;
+            }
+            $stmt->bindValue($name, $value);
+        }
+    }
+
+    private function sanitizeIdentifier(string $value): string
+    {
+        if (preg_match('/^[a-zA-Z0-9_]+$/', $value) !== 1) {
+            throw new RuntimeException('Identificador invalido para POS.');
+        }
+
+        return $value;
+    }
+
+    private function tableExists(string $table): bool
+    {
+        $table = trim($table);
+        if ($table === '') {
+            return false;
+        }
+
+        if ($this->driver() === 'mysql') {
+            $stmt = $this->db->prepare(
+                'SELECT COUNT(*) FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = :table_name'
+            );
+            $stmt->execute([':table_name' => $table]);
+
+            return (int) $stmt->fetchColumn() > 0;
+        }
+
+        $stmt = $this->db->prepare("SELECT name FROM sqlite_master WHERE type='table' AND name = :table_name LIMIT 1");
+        $stmt->execute([':table_name' => $table]);
+        $value = $stmt->fetchColumn();
+
+        return is_string($value) && $value !== '';
     }
 
     private function columnExists(string $table, string $column): bool
