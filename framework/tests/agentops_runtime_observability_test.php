@@ -104,6 +104,13 @@ if (is_array($matchedEvent)) {
         'latency_ms',
         'error_flag',
         'error_type',
+        'supervisor_status',
+        'supervisor_score',
+        'supervisor_flags',
+        'supervisor_reasons',
+        'needs_regression_case',
+        'needs_memory_hygiene',
+        'needs_training_gap_review',
         'agentops_runtime',
     ];
     foreach ($requiredFields as $field) {
@@ -202,6 +209,27 @@ if (is_array($matchedEvent)) {
     if (!is_string($matchedEvent['error_type'] ?? null) || trim((string) $matchedEvent['error_type']) === '') {
         $failures[] = 'error_type debe ser string no vacio.';
     }
+    if (!is_string($matchedEvent['supervisor_status'] ?? null) || !in_array((string) ($matchedEvent['supervisor_status'] ?? ''), ['healthy', 'needs_review', 'flagged'], true)) {
+        $failures[] = 'supervisor_status debe ser healthy, needs_review o flagged.';
+    }
+    if (!is_numeric($matchedEvent['supervisor_score'] ?? null) || (int) $matchedEvent['supervisor_score'] < 0 || (int) $matchedEvent['supervisor_score'] > 100) {
+        $failures[] = 'supervisor_score debe ser numerico entre 0 y 100.';
+    }
+    if (!is_array($matchedEvent['supervisor_flags'] ?? null)) {
+        $failures[] = 'supervisor_flags debe ser arreglo.';
+    }
+    if (!is_array($matchedEvent['supervisor_reasons'] ?? null)) {
+        $failures[] = 'supervisor_reasons debe ser arreglo.';
+    }
+    if (!is_bool($matchedEvent['needs_regression_case'] ?? null)) {
+        $failures[] = 'needs_regression_case debe ser booleano.';
+    }
+    if (!is_bool($matchedEvent['needs_memory_hygiene'] ?? null)) {
+        $failures[] = 'needs_memory_hygiene debe ser booleano.';
+    }
+    if (!is_bool($matchedEvent['needs_training_gap_review'] ?? null)) {
+        $failures[] = 'needs_training_gap_review debe ser booleano.';
+    }
 
     $runtime = is_array($matchedEvent['agentops_runtime'] ?? null) ? (array) $matchedEvent['agentops_runtime'] : null;
     if (!is_array($runtime)) {
@@ -238,6 +266,7 @@ if (is_array($matchedEvent)) {
             'latency_ms',
             'error_flag',
             'error_type',
+            'supervisor',
         ] as $field) {
             if (!array_key_exists($field, $runtime)) {
                 $failures[] = 'agentops_runtime.' . $field . ' faltante.';
@@ -248,6 +277,35 @@ if (is_array($matchedEvent)) {
         }
         if (is_array($runtime) && array_key_exists('gate_decision', $runtime) && (string) ($runtime['gate_decision'] ?? '') !== (string) ($matchedEvent['gate_decision'] ?? '')) {
             $failures[] = 'agentops_runtime.gate_decision debe coincidir con gate_decision top-level.';
+        }
+        $supervisor = is_array($runtime['supervisor'] ?? null) ? (array) $runtime['supervisor'] : null;
+        if (!is_array($supervisor)) {
+            $failures[] = 'agentops_runtime.supervisor debe ser objeto/array.';
+        } else {
+            foreach ([
+                'status',
+                'score',
+                'flags',
+                'reasons',
+                'route_path',
+                'skill_selected',
+                'rag_used',
+                'evidence_gate_status',
+                'fallback_reason',
+                'needs_regression_case',
+                'needs_memory_hygiene',
+                'needs_training_gap_review',
+            ] as $field) {
+                if (!array_key_exists($field, $supervisor)) {
+                    $failures[] = 'agentops_runtime.supervisor.' . $field . ' faltante.';
+                }
+            }
+            if ((string) ($supervisor['status'] ?? '') !== (string) ($matchedEvent['supervisor_status'] ?? '')) {
+                $failures[] = 'agentops_runtime.supervisor.status debe coincidir con supervisor_status top-level.';
+            }
+            if ((int) ($supervisor['score'] ?? -1) !== (int) ($matchedEvent['supervisor_score'] ?? -2)) {
+                $failures[] = 'agentops_runtime.supervisor.score debe coincidir con supervisor_score top-level.';
+            }
         }
     }
 }

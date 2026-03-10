@@ -1,7 +1,7 @@
 {
   "contract_id": "agentops_metrics_contract",
-  "version": "1.2.0",
-  "effective_date": "2026-03-09",
+  "version": "1.3.0",
+  "effective_date": "2026-03-10",
   "addenda_of": null,
   "status": "canonical_draft",
   "contract_location": "docs/contracts",
@@ -25,6 +25,12 @@
     "message_id",
     "route_path",
     "gate_decision",
+    "supervisor_status",
+    "supervisor_score",
+    "supervisor_flags",
+    "supervisor_reasons",
+    "needs_regression_case",
+    "needs_memory_hygiene",
     "versions",
     "latency_ms"
   ],
@@ -46,9 +52,12 @@
     "skill_fallback_reason",
     "tool_calls_count",
     "retry_count",
+    "llm_fallback_count",
     "loop_guard_triggered",
+    "same_route_repeat_count",
     "request_mode",
-    "metrics_delta"
+    "metrics_delta",
+    "supervisor"
   ],
   "metrics_delta_fields": [
     "requests_total",
@@ -124,5 +133,14 @@
     "hallucination_flags_rate",
     "cost_per_conversation",
     "latency"
+  ],
+  "supervisor_flag_catalog": [
+    "insufficient_evidence",
+    "rag_weak_result",
+    "skill_execution_failed",
+    "policy_route_mismatch",
+    "fallback_overuse",
+    "possible_hallucination",
+    "weak_safe_fallback"
   ]
 }

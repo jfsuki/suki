@@ -64,6 +64,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('worker_respects_idempotency', fn() => $this->checkWorkerRespectsIdempotency());
         $tests[] = $this->wrap('worker_logs_route_path', fn() => $this->checkWorkerLogsRoutePath());
         $tests[] = $this->wrap('agentops_runtime_observability', fn() => $this->checkAgentOpsRuntimeObservability());
+        $tests[] = $this->wrap('agentops_supervisor', fn() => $this->checkAgentOpsSupervisor());
         $tests[] = $this->wrap('operational_queue_schema_guard', fn() => $this->checkOperationalQueueSchemaGuard());
         $tests[] = $this->wrap('schema_runtime_guard', fn() => $this->checkSchemaRuntimeGuard());
         $tests[] = $this->wrap('framework_hygiene', fn() => $this->checkFrameworkHygiene());
@@ -980,6 +981,11 @@ final class UnitTestRunner
     private function checkAgentOpsRuntimeObservability(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/agentops_runtime_observability_test.php');
+    }
+
+    private function checkAgentOpsSupervisor(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/agentops_supervisor_test.php');
     }
 
     private function checkOperationalQueueSchemaGuard(): void

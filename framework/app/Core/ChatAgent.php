@@ -20,6 +20,7 @@ final class ChatAgent
     private ?LLMRouter $llmRouter = null;
     private ?Telemetry $telemetry = null;
     private ?TelemetryService $telemetryService = null;
+    private ?AgentOpsSupervisor $agentOpsSupervisor = null;
     private ?IntentRouter $intentRouter = null;
     private ?CommandBus $commandBus = null;
     private FormWizard $wizard;
@@ -254,6 +255,8 @@ final class ChatAgent
                     'llm_called' => false,
                     'error_flag' => true,
                     'error_type' => 'security_block',
+                    'response_kind' => 'blocked',
+                    'response_text' => (string) (($securityBlock['data']['reply'] ?? $securityBlock['message'] ?? '')),
                 ]
             )));
             try {
@@ -306,6 +309,8 @@ final class ChatAgent
                     'llm_called' => false,
                     'error_flag' => false,
                     'error_type' => 'none',
+                    'response_kind' => $action,
+                    'response_text' => (string) $route->reply(),
                 ]
             )));
             try {
@@ -434,6 +439,8 @@ final class ChatAgent
                     'llm_called' => false,
                     'error_flag' => $commandErrorFlag,
                     'error_type' => $commandErrorType,
+                    'response_kind' => $action,
+                    'response_text' => $commandReply,
                 ]
             )));
             try {
@@ -497,6 +504,8 @@ final class ChatAgent
                         'llm_called' => true,
                         'error_flag' => true,
                         'error_type' => 'llm_unavailable',
+                        'response_kind' => 'respond_local',
+                        'response_text' => 'IA no disponible. Usa comandos simples.',
                     ]
                 )));
                 try {
@@ -517,6 +526,22 @@ final class ChatAgent
             }
             $provider = $llmResult['provider'] ?? 'llm';
             $usage = $this->normalizeUsage((array) ($llmResult['usage'] ?? []));
+            $json = $llmResult['json'] ?? null;
+            $responseKind = 'send_to_llm';
+            $responseText = '';
+            if (is_array($json)) {
+                $reply = $this->executeLlmJson($json, $channel, $sessionId, $userId, $mode);
+                $responseText = (string) (($reply['data']['reply'] ?? $reply['reply'] ?? $reply['message'] ?? ''));
+                $responseKind = (isset($json['command']) || (isset($json['actions']) && is_array($json['actions']) && $json['actions'] !== []))
+                    ? 'execute_command'
+                    : 'respond_local';
+            } else {
+                $responseText = (string) ($llmResult['text'] ?? '');
+                if ($responseText === '') {
+                    $responseText = 'Listo.';
+                }
+                $reply = $this->reply($responseText, $channel, $sessionId, $userId);
+            }
             $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
                 'llm_called' => true,
                 'error_flag' => false,
@@ -553,6 +578,10 @@ final class ChatAgent
                     'llm_called' => true,
                     'error_flag' => false,
                     'error_type' => 'none',
+                    'response_kind' => $responseKind,
+                    'response_text' => $responseText,
+                    'usage' => $usage,
+                    'cost_estimate' => $llmResult['cost_estimate'] ?? null,
                 ]
             )));
             try {
@@ -578,15 +607,7 @@ final class ChatAgent
             } catch (\Throwable $ignored) {
                 // observability must not block chat response
             }
-
-            $json = $llmResult['json'] ?? null;
-            if (is_array($json)) {
-                $reply = $this->executeLlmJson($json, $channel, $sessionId, $userId, $mode);
-                return $reply;
-            }
-
-            $textReply = (string) ($llmResult['text'] ?? '');
-            return $this->reply($textReply !== '' ? $textReply : 'Listo.', $channel, $sessionId, $userId);
+            return $reply;
         }
 
         $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
@@ -620,6 +641,8 @@ final class ChatAgent
                 'llm_called' => false,
                 'error_flag' => true,
                 'error_type' => 'route_error',
+                'response_kind' => 'error',
+                'response_text' => 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123',
             ]
         )));
         try {
@@ -1540,6 +1563,14 @@ final class ChatAgent
         return $this->telemetryService;
     }
 
+    private function agentOpsSupervisor(): AgentOpsSupervisor
+    {
+        if (!$this->agentOpsSupervisor) {
+            $this->agentOpsSupervisor = new AgentOpsSupervisor();
+        }
+        return $this->agentOpsSupervisor;
+    }
+
     private function intentRouter(): IntentRouter
     {
         if (!$this->intentRouter) {
@@ -1586,7 +1617,9 @@ final class ChatAgent
             ];
         }
 
-        $runtimeObservability = $this->buildAgentOpsRuntimeObservability($routeTelemetry, $latencyMs, $runtimeContext);
+        $runtimeEnvelope = $this->buildAgentOpsRuntimeEnvelope($routeTelemetry, $latencyMs, $runtimeContext);
+        $runtimeObservability = $runtimeEnvelope['runtime'];
+        $supervisor = $runtimeEnvelope['supervisor'];
 
         return [
             'event_name' => $eventName,
@@ -1629,6 +1662,13 @@ final class ChatAgent
             'metrics_delta' => $runtimeObservability['metrics_delta'],
             'error_flag' => $runtimeObservability['error_flag'],
             'error_type' => $runtimeObservability['error_type'],
+            'supervisor_status' => $supervisor['status'],
+            'supervisor_score' => $supervisor['score'],
+            'supervisor_flags' => $supervisor['flags'],
+            'supervisor_reasons' => $supervisor['reasons'],
+            'needs_regression_case' => $supervisor['needs_regression_case'],
+            'needs_memory_hygiene' => $supervisor['needs_memory_hygiene'],
+            'needs_training_gap_review' => $supervisor['needs_training_gap_review'],
             'contract_versions' => $contractVersions,
             'versions' => $versions,
             'latency_ms' => $latencyMs,
@@ -1698,9 +1738,11 @@ final class ChatAgent
             'llm_used' => $llmCalled,
             'tool_calls_count' => max(0, (int) ($runtimeContext['tool_calls_count'] ?? $routeTelemetry['tool_calls_count'] ?? 0)),
             'retry_count' => max(0, (int) ($runtimeContext['retry_count'] ?? $routeTelemetry['retry_count'] ?? 0)),
+            'llm_fallback_count' => max(0, (int) ($routeTelemetry['llm_fallback_count'] ?? 0)),
             'loop_guard_triggered' => (bool) ($routeTelemetry['loop_guard_triggered'] ?? false),
             'loop_guard_reason' => trim((string) ($routeTelemetry['loop_guard_reason'] ?? '')) ?: 'none',
             'loop_guard_stage' => trim((string) ($routeTelemetry['loop_guard_stage'] ?? '')) ?: 'none',
+            'same_route_repeat_count' => max(0, (int) ($routeTelemetry['same_route_repeat_count'] ?? 0)),
             'request_mode' => trim((string) ($routeTelemetry['request_mode'] ?? 'operation')) ?: 'operation',
             'memory_type' => trim((string) ($routeTelemetry['memory_type'] ?? '')) ?: 'none',
             'tenant_id' => trim((string) ($routeTelemetry['tenant_id'] ?? '')) ?: 'default',
@@ -1718,6 +1760,42 @@ final class ChatAgent
             'rag_error' => trim((string) ($routeTelemetry['rag_error'] ?? '')),
             'error_flag' => $errorFlag,
             'error_type' => $errorType,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $routeTelemetry
+     * @param array<string, mixed> $runtimeContext
+     * @return array{runtime: array<string, mixed>, supervisor: array<string, mixed>}
+     */
+    private function buildAgentOpsRuntimeEnvelope(array $routeTelemetry, int $latencyMs, array $runtimeContext = []): array
+    {
+        $runtimeObservability = $this->buildAgentOpsRuntimeObservability($routeTelemetry, $latencyMs, $runtimeContext);
+
+        try {
+            $supervisor = $this->agentOpsSupervisor()->evaluate($runtimeObservability, $routeTelemetry, $runtimeContext);
+        } catch (\Throwable $ignored) {
+            $supervisor = [
+                'status' => 'needs_review',
+                'score' => 0,
+                'flags' => [],
+                'reasons' => ['AgentOps Supervisor no pudo evaluar este turno.'],
+                'route_path' => $runtimeObservability['route_path'],
+                'skill_selected' => $runtimeObservability['skill_selected'],
+                'rag_used' => $runtimeObservability['rag_used'],
+                'evidence_gate_status' => $runtimeObservability['evidence_gate_status'],
+                'fallback_reason' => $runtimeObservability['fallback_reason'],
+                'needs_regression_case' => true,
+                'needs_memory_hygiene' => false,
+                'needs_training_gap_review' => false,
+            ];
+        }
+
+        $runtimeObservability['supervisor'] = $supervisor;
+
+        return [
+            'runtime' => $runtimeObservability,
+            'supervisor' => $supervisor,
         ];
     }
 

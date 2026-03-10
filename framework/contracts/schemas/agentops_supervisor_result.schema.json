@@ -1,0 +1,83 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "AgentOps Supervisor Result",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "status",
+    "score",
+    "flags",
+    "reasons",
+    "route_path",
+    "skill_selected",
+    "rag_used",
+    "evidence_gate_status",
+    "fallback_reason",
+    "needs_regression_case",
+    "needs_memory_hygiene",
+    "needs_training_gap_review"
+  ],
+  "properties": {
+    "status": {
+      "type": "string",
+      "enum": ["healthy", "needs_review", "flagged"]
+    },
+    "score": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100
+    },
+    "flags": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "insufficient_evidence",
+          "rag_weak_result",
+          "skill_execution_failed",
+          "policy_route_mismatch",
+          "fallback_overuse",
+          "possible_hallucination",
+          "weak_safe_fallback"
+        ]
+      }
+    },
+    "reasons": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "route_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "skill_selected": {
+      "type": "string",
+      "minLength": 1
+    },
+    "rag_used": {
+      "type": "boolean"
+    },
+    "evidence_gate_status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "fallback_reason": {
+      "type": "string",
+      "minLength": 1
+    },
+    "needs_regression_case": {
+      "type": "boolean"
+    },
+    "needs_memory_hygiene": {
+      "type": "boolean"
+    },
+    "needs_training_gap_review": {
+      "type": "boolean"
+    }
+  }
+}
