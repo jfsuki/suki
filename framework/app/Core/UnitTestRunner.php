@@ -99,6 +99,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('pos_sales_flow_receipt', fn() => $this->checkPOSSalesFlowReceipt());
         $tests[] = $this->wrap('pos_cash_register_arqueo', fn() => $this->checkPOSCashRegisterArqueo());
         $tests[] = $this->wrap('pos_returns_cancelations', fn() => $this->checkPOSReturnsCancelations());
+        $tests[] = $this->wrap('purchases_core_module', fn() => $this->checkPurchasesCoreModule());
         $tests[] = $this->wrap('project_memory_system', fn() => $this->checkProjectMemorySystem());
         $tests[] = $this->wrap('learning_promotion_pipeline', fn() => $this->checkLearningPromotionPipeline());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
@@ -1480,6 +1481,11 @@ final class UnitTestRunner
     private function checkPOSReturnsCancelations(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/pos_returns_cancelations_test.php');
+    }
+
+    private function checkPurchasesCoreModule(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/purchases_core_module_test.php');
     }
 
     private function checkProjectMemorySystem(): void

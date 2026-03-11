@@ -45,6 +45,15 @@
   - if you add receipt changes, keep payload preparation separate from printer/fiscal drivers
   - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
   - reuse `EntitySearchService` for product/customer resolution instead of guessing
+- If you add Purchases behavior:
+  - update `PurchasesRepository`, `PurchasesService`, `PurchasesCommandHandler`, `PurchasesMessageParser`
+  - keep draft-first design and tenant isolation
+  - resolve supplier by exact reference first and only then by `EntitySearchService`
+  - allow free purchase lines only when the user gives `product_label`; if they provide a product reference, resolve it or fail safe
+  - keep lifecycle consistent: `open draft -> completed draft + registered purchase`
+  - keep numbering tenant-scoped and lightweight: `PUR-*`
+  - leave inventory, AP, fiscal support document, media and accounting as hooks only
+  - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
 - If you add AgentOps metrics:
   - keep `docs/contracts/agentops_metrics_contract.json` aligned
   - extend `TelemetryService`, `SqlMetricsRepository` or `Agents/Telemetry`

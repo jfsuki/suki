@@ -1687,13 +1687,20 @@ final class ChatAgent
             'media_action' => $runtimeObservability['media_action'],
             'entity_search_action' => $runtimeObservability['entity_search_action'],
             'pos_action' => $runtimeObservability['pos_action'],
+            'purchases_action' => $runtimeObservability['purchases_action'],
             'draft_id' => $runtimeObservability['draft_id'],
+            'purchase_draft_id' => $runtimeObservability['purchase_draft_id'],
             'session_id' => $runtimeObservability['session_id'],
             'product_id' => $runtimeObservability['product_id'],
             'matched_product_id' => $runtimeObservability['matched_product_id'],
             'matched_by' => $runtimeObservability['matched_by'],
             'product_query' => $runtimeObservability['product_query'],
             'ambiguity_count' => $runtimeObservability['ambiguity_count'],
+            'purchase_id' => $runtimeObservability['purchase_id'],
+            'purchase_number' => $runtimeObservability['purchase_number'],
+            'supplier_id' => $runtimeObservability['supplier_id'],
+            'line_count' => $runtimeObservability['line_count'],
+            'total' => $runtimeObservability['total'],
             'result_status' => $runtimeObservability['result_status'],
             'pending_items_count' => $runtimeObservability['pending_items_count'],
             'token_usage' => $runtimeObservability['token_usage'],
@@ -1791,7 +1798,9 @@ final class ChatAgent
             'media_action' => trim((string) ($runtimeContext['media_action'] ?? $routeTelemetry['media_action'] ?? '')) ?: 'none',
             'entity_search_action' => trim((string) ($runtimeContext['entity_search_action'] ?? $routeTelemetry['entity_search_action'] ?? '')) ?: 'none',
             'pos_action' => trim((string) ($runtimeContext['pos_action'] ?? $routeTelemetry['pos_action'] ?? '')) ?: 'none',
+            'purchases_action' => trim((string) ($runtimeContext['purchases_action'] ?? $routeTelemetry['purchases_action'] ?? '')) ?: 'none',
             'draft_id' => trim((string) ($runtimeContext['draft_id'] ?? $routeTelemetry['draft_id'] ?? '')),
+            'purchase_draft_id' => trim((string) ($runtimeContext['purchase_draft_id'] ?? $routeTelemetry['purchase_draft_id'] ?? '')),
             'session_id' => trim((string) ($runtimeContext['session_id'] ?? $routeTelemetry['session_id'] ?? '')),
             'product_id' => trim((string) ($runtimeContext['product_id'] ?? $routeTelemetry['product_id'] ?? '')),
             'matched_product_id' => trim((string) ($runtimeContext['matched_product_id'] ?? $routeTelemetry['matched_product_id'] ?? '')),
@@ -1800,6 +1809,15 @@ final class ChatAgent
             'ambiguity_count' => is_numeric($runtimeContext['ambiguity_count'] ?? $routeTelemetry['ambiguity_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['ambiguity_count'] ?? $routeTelemetry['ambiguity_count']))
                 : 0,
+            'purchase_id' => trim((string) ($runtimeContext['purchase_id'] ?? $routeTelemetry['purchase_id'] ?? '')),
+            'purchase_number' => trim((string) ($runtimeContext['purchase_number'] ?? $routeTelemetry['purchase_number'] ?? '')),
+            'supplier_id' => trim((string) ($runtimeContext['supplier_id'] ?? $routeTelemetry['supplier_id'] ?? '')),
+            'line_count' => is_numeric($runtimeContext['line_count'] ?? $routeTelemetry['line_count'] ?? null)
+                ? max(0, (int) ($runtimeContext['line_count'] ?? $routeTelemetry['line_count']))
+                : null,
+            'total' => is_numeric($runtimeContext['total'] ?? $routeTelemetry['total'] ?? null)
+                ? (float) ($runtimeContext['total'] ?? $routeTelemetry['total'])
+                : null,
             'result_status' => trim((string) ($runtimeContext['result_status'] ?? $routeTelemetry['result_status'] ?? '')) ?: 'unknown',
             'pending_items_count' => is_numeric($runtimeContext['pending_items_count'] ?? $routeTelemetry['pending_items_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['pending_items_count'] ?? $routeTelemetry['pending_items_count']))
@@ -1944,7 +1962,9 @@ final class ChatAgent
             'media_action' => trim((string) ($payload['media_action'] ?? '')) ?: 'none',
             'entity_search_action' => trim((string) ($payload['entity_search_action'] ?? '')) ?: 'none',
             'pos_action' => trim((string) ($payload['pos_action'] ?? '')) ?: 'none',
+            'purchases_action' => trim((string) ($payload['purchases_action'] ?? '')) ?: 'none',
             'draft_id' => trim((string) ($payload['draft_id'] ?? '')) ?: '',
+            'purchase_draft_id' => trim((string) ($payload['purchase_draft_id'] ?? '')) ?: '',
             'session_id' => trim((string) ($payload['session_id'] ?? '')) ?: '',
             'product_id' => trim((string) ($payload['product_id'] ?? '')) ?: '',
             'matched_product_id' => trim((string) ($payload['matched_product_id'] ?? '')) ?: '',
@@ -1953,6 +1973,15 @@ final class ChatAgent
             'ambiguity_count' => is_numeric($payload['ambiguity_count'] ?? null)
                 ? max(0, (int) $payload['ambiguity_count'])
                 : 0,
+            'purchase_id' => trim((string) ($payload['purchase_id'] ?? '')) ?: '',
+            'purchase_number' => trim((string) ($payload['purchase_number'] ?? '')) ?: '',
+            'supplier_id' => trim((string) ($payload['supplier_id'] ?? '')) ?: '',
+            'line_count' => is_numeric($payload['line_count'] ?? null)
+                ? max(0, (int) $payload['line_count'])
+                : null,
+            'total' => is_numeric($payload['total'] ?? null)
+                ? (float) $payload['total']
+                : null,
             'result_status' => trim((string) ($payload['result_status'] ?? '')) ?: '',
             'result_count' => is_numeric($payload['result_count'] ?? null)
                 ? max(0, (int) $payload['result_count'])
@@ -1996,6 +2025,7 @@ final class ChatAgent
             $this->commandBus->register(new MediaCommandHandler());
             $this->commandBus->register(new EntitySearchCommandHandler());
             $this->commandBus->register(new POSCommandHandler());
+            $this->commandBus->register(new PurchasesCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
                 ['AuthLogin', 'AuthCreateUser'],
                 function (array $command, array $context): array {

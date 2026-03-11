@@ -192,8 +192,9 @@ Cuando se modifique un archivo de gobierno (AGENTS/docs):
   - contratos y formularios en `project/contracts/entities/*`, `project/contracts/invoices/*`, `framework/contracts/forms/ticket_pos.contract.json`
   - guia local en `framework/app/Modules/POS/AGENTS.md`
 - Purchases:
+  - runtime en `framework/app/Core/PurchasesRepository.php`, `PurchasesService.php`, `PurchasesCommandHandler.php`, `PurchasesMessageParser.php`
   - contratos e invoices en `project/contracts/entities/*` y `project/contracts/invoices/*`
-  - ejecucion compartida via `framework/app/Core/CrudCommandHandler.php`, `EntitySearchService.php`, `MediaService.php`
+  - guia local en `framework/app/Modules/Purchases/AGENTS.md`
 - Fiscal Engine:
   - contratos de invoice en `project/contracts/invoices/*`
   - runtime en `framework/app/Core/*Invoice*`, `ChatAgent.php`, `IntentRouter.php`

@@ -780,6 +780,93 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'CreatePurchaseDraft':
+                if (trim((string) ($command['tenant_id'] ?? '')) === '') {
+                    return [false, 'missing_tenant_id'];
+                }
+                if (array_key_exists('metadata', $command) && !is_array($command['metadata'])) {
+                    return [false, 'invalid_metadata'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetPurchaseDraft':
+                if (trim((string) ($command['draft_id'] ?? $command['purchase_draft_id'] ?? '')) === '') {
+                    return [false, 'missing_draft_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'AddPurchaseDraftLine':
+                if (trim((string) ($command['draft_id'] ?? $command['purchase_draft_id'] ?? '')) === '') {
+                    return [false, 'missing_draft_id'];
+                }
+                $productId = trim((string) ($command['product_id'] ?? ''));
+                $query = trim((string) ($command['query'] ?? ''));
+                $label = trim((string) ($command['product_label'] ?? ''));
+                $sku = trim((string) ($command['sku'] ?? ''));
+                $supplierSku = trim((string) ($command['supplier_sku'] ?? ''));
+                if ($productId === '' && $query === '' && $label === '' && $sku === '' && $supplierSku === '') {
+                    return [false, 'missing_product_reference'];
+                }
+                if (!array_key_exists('unit_cost', $command) || !is_numeric($command['unit_cost'])) {
+                    return [false, 'invalid_unit_cost'];
+                }
+                if (array_key_exists('qty', $command) && (!is_numeric($command['qty']) || (float) $command['qty'] <= 0)) {
+                    return [false, 'invalid_qty'];
+                }
+                if (array_key_exists('tax_rate', $command) && $command['tax_rate'] !== null && $command['tax_rate'] !== '' && !is_numeric($command['tax_rate'])) {
+                    return [false, 'invalid_tax_rate'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'RemovePurchaseDraftLine':
+                if (trim((string) ($command['draft_id'] ?? $command['purchase_draft_id'] ?? '')) === '') {
+                    return [false, 'missing_draft_id'];
+                }
+                if (trim((string) ($command['line_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_line_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'AttachPurchaseDraftSupplier':
+                if (trim((string) ($command['draft_id'] ?? $command['purchase_draft_id'] ?? '')) === '') {
+                    return [false, 'missing_draft_id'];
+                }
+                $supplierId = trim((string) ($command['supplier_id'] ?? ''));
+                $query = trim((string) ($command['query'] ?? ''));
+                if ($supplierId === '' && $query === '') {
+                    return [false, 'missing_supplier_reference'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'FinalizePurchase':
+                if (trim((string) ($command['draft_id'] ?? $command['purchase_draft_id'] ?? '')) === '') {
+                    return [false, 'missing_draft_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetPurchase':
+                if (trim((string) ($command['purchase_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_purchase_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListPurchases':
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                foreach (['status', 'supplier_id', 'purchase_number', 'date_from', 'date_to'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetPurchaseByNumber':
+                if (trim((string) ($command['purchase_number'] ?? $command['number'] ?? '')) === '') {
+                    return [false, 'missing_purchase_number'];
+                }
+                return [true, 'schema_valid'];
+
             case 'CreateEntity':
                 if ($entity === '') {
                     return [false, 'missing_entity'];

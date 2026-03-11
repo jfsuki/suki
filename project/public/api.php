@@ -68,6 +68,7 @@ use App\Core\MediaAccessToken;
 use App\Core\MediaService;
 use App\Core\EntitySearchService;
 use App\Core\POSService;
+use App\Core\PurchasesService;
 use App\Core\RoleContext;
 use App\Core\WebhookSecurityPolicy;
 use App\Core\Agents\ConversationQualityDashboard;
@@ -4009,6 +4010,306 @@ if ($route === 'pos/list-cash-sessions') {
         return;
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'purchases/create-draft') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = requestData();
+    if (($payload['tenant_id'] ?? '') !== '' && trim((string) $payload['tenant_id']) !== $tenantId) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 403);
+        return;
+    }
+
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $draft = (new PurchasesService())->createDraft($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+        ]);
+        respondJson($response, 'success', 'Borrador de compra creado', ['draft' => $draft, 'item' => $draft]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'purchases/get-draft') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $draft = (new PurchasesService())->getDraft(
+            $tenantId,
+            trim((string) ($payload['draft_id'] ?? $payload['purchase_draft_id'] ?? '')),
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null
+        );
+        respondJson($response, 'success', 'Borrador de compra cargado', ['draft' => $draft, 'item' => $draft]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 404);
+        return;
+    }
+}
+
+if ($route === 'purchases/add-draft-line') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = requestData();
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $draft = (new PurchasesService())->addLineToDraft($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+        ]);
+        respondJson($response, 'success', 'Linea de compra agregada', ['draft' => $draft, 'item' => $draft]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'purchases/remove-draft-line') {
+    if (!in_array($method, ['DELETE', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = requestData();
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $draft = (new PurchasesService())->removeLineFromDraft(
+            $tenantId,
+            trim((string) ($payload['draft_id'] ?? $payload['purchase_draft_id'] ?? '')),
+            trim((string) ($payload['line_id'] ?? $payload['id'] ?? '')),
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null
+        );
+        respondJson($response, 'success', 'Linea de compra eliminada', ['draft' => $draft, 'item' => $draft]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'purchases/attach-supplier') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = requestData();
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $draft = (new PurchasesService())->attachSupplierToDraft($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+        ]);
+        respondJson($response, 'success', 'Proveedor asociado al borrador de compra', ['draft' => $draft, 'item' => $draft]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'purchases/finalize') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = requestData();
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $result = (new PurchasesService())->finalizeDraft($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+            'created_by_user_id' => (string) ($sessionUser['id'] ?? 'anon'),
+        ]);
+        respondJson($response, 'success', 'Compra registrada', $result + ['item' => $result['purchase'] ?? null]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'purchases/get-purchase') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $purchase = (new PurchasesService())->getPurchase(
+            $tenantId,
+            trim((string) ($payload['purchase_id'] ?? $payload['id'] ?? '')),
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null
+        );
+        respondJson($response, 'success', 'Compra cargada', ['purchase' => $purchase, 'item' => $purchase]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 404);
+        return;
+    }
+}
+
+if ($route === 'purchases/list') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $items = (new PurchasesService())->listPurchases(
+            $tenantId,
+            $payload,
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null
+        );
+        respondJson($response, 'success', 'Compras cargadas', ['items' => $items, 'result_count' => count($items)]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'purchases/get-by-number') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $purchase = (new PurchasesService())->getPurchaseByNumber(
+            $tenantId,
+            trim((string) ($payload['purchase_number'] ?? $payload['number'] ?? '')),
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null
+        );
+        respondJson($response, 'success', 'Compra cargada por numero', ['purchase' => $purchase, 'item' => $purchase]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 404);
         return;
     }
 }

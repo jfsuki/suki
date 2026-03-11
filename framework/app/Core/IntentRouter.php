@@ -1620,6 +1620,15 @@ final class IntentRouter
             'ClosePOSCashRegister' => 'pos.close_cash_register',
             'BuildPOSCashSummary' => 'pos.build_cash_summary',
             'ListPOSCashSessions' => 'pos.list_cash_sessions',
+            'CreatePurchaseDraft' => 'purchases.create_draft',
+            'GetPurchaseDraft' => 'purchases.get_draft',
+            'AddPurchaseDraftLine' => 'purchases.add_draft_line',
+            'RemovePurchaseDraftLine' => 'purchases.remove_draft_line',
+            'AttachPurchaseDraftSupplier' => 'purchases.attach_supplier',
+            'FinalizePurchase' => 'purchases.finalize',
+            'GetPurchase' => 'purchases.get_purchase',
+            'ListPurchases' => 'purchases.list',
+            'GetPurchaseByNumber' => 'purchases.get_by_number',
             'CreateInvoice' => 'invoice.create',
             'GenerateReport' => 'report.generate',
             'ConfigureFEProvider' => 'settings.configure_fe_provider',
@@ -1649,6 +1658,7 @@ final class IntentRouter
     {
         return str_starts_with($selectedName, 'media_')
             || str_starts_with($selectedName, 'pos_')
+            || str_starts_with($selectedName, 'purchases_')
             || in_array($selectedName, ['entity_search', 'entity_resolve'], true);
     }
 

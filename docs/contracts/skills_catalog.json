@@ -1475,6 +1475,303 @@
       "context_hints": {}
     },
     {
+      "name": "purchases_create_draft",
+      "description": "Create a purchase draft before registering the supplier purchase.",
+      "intent_patterns": [
+        "re:(crea|crear|abre|abrir|nuevo|nueva).*(borrador|draft).*(compra|purchase)",
+        "re:(borrador|draft).*(compra|purchase).*(crea|crear|abre|abrir|nuevo|nueva)"
+      ],
+      "keywords": [
+        "crear borrador compra",
+        "nuevo draft compra",
+        "abrir borrador purchase"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_create_draft"
+      ],
+      "priority": 171,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "supplier_id",
+          "currency",
+          "notes"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_get_draft",
+      "description": "Load a purchase draft safely.",
+      "intent_patterns": [
+        "re:(ver|mostrar|muestra|consulta|abrir|abre).*(borrador|draft).*(compra|purchase)",
+        "re:(borrador|draft).*(compra|purchase).*(ver|mostrar|consulta|abrir|abre)"
+      ],
+      "keywords": [
+        "ver borrador compra",
+        "abrir draft compra",
+        "mostrar borrador purchase"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_get_draft"
+      ],
+      "priority": 168,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "draft_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_add_draft_line",
+      "description": "Add a line into an open purchase draft with optional product linking.",
+      "intent_patterns": [
+        "re:(agrega|agregar|anade|añade|suma).*(linea|item).*(compra|purchase)",
+        "re:(agrega|agregar|anade|añade|suma).*(linea|item|producto).*(borrador|draft).*(compra|purchase)",
+        "re:(borrador|draft).*(compra|purchase).*(agrega|agregar|anade|añade|suma).*(linea|item|producto)"
+      ],
+      "keywords": [
+        "agregar linea compra",
+        "agregar item al borrador compra",
+        "sumar linea purchase"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_add_draft_line"
+      ],
+      "priority": 181,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "draft_id",
+          "product_id",
+          "query",
+          "qty",
+          "unit_cost",
+          "tax_rate"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_remove_draft_line",
+      "description": "Remove a line from an open purchase draft.",
+      "intent_patterns": [
+        "re:(quita|quitar|elimina|eliminar|borra|borrar).*(linea|item).*(borrador|draft).*(compra|purchase)",
+        "re:(borrador|draft).*(compra|purchase).*(quita|quitar|elimina|eliminar|borra|borrar).*(linea|item)"
+      ],
+      "keywords": [
+        "quitar linea compra",
+        "eliminar item del borrador compra",
+        "borrar linea purchase"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_remove_draft_line"
+      ],
+      "priority": 162,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "draft_id",
+          "line_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_attach_supplier",
+      "description": "Attach a supplier to an open purchase draft using entity resolution.",
+      "intent_patterns": [
+        "re:(asocia|asociar|agrega|adjunta|attach).*(proveedor|supplier).*(borrador|draft)",
+        "re:(proveedor|supplier).*(borrador|draft).*(asocia|asociar|agrega|adjunta|attach)",
+        "re:(asocia|asociar|agrega|adjunta|attach).*(proveedor|supplier).*(borrador|draft).*(compra|purchase)",
+        "re:(borrador|draft).*(compra|purchase).*(proveedor|supplier).*(asocia|asociar|agrega|adjunta|attach)"
+      ],
+      "keywords": [
+        "asociar proveedor compra",
+        "asociar proveedor al borrador",
+        "adjuntar supplier al borrador",
+        "proveedor draft compra"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_attach_supplier"
+      ],
+      "priority": 169,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "draft_id",
+          "supplier_id",
+          "query"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_finalize",
+      "description": "Finalize a purchase draft into a registered purchase with line snapshots.",
+      "intent_patterns": [
+        "re:(finaliza|finalizar|registra|registrar|completa|completar).*(compra|purchase).*(draft|borrador)?",
+        "re:(draft|borrador).*(compra|purchase).*(finaliza|finalizar|registra|registrar|completa|completar)"
+      ],
+      "keywords": [
+        "finalizar compra",
+        "registrar compra",
+        "completar borrador compra"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_finalize"
+      ],
+      "priority": 173,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "draft_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_get_purchase",
+      "description": "Load a registered purchase by purchase_id.",
+      "intent_patterns": [
+        "re:(ver|mostrar|muestra|consulta|abrir|abre).*(compra|purchase)",
+        "re:(compra|purchase).*(ver|mostrar|muestra|consulta|abrir|abre)"
+      ],
+      "keywords": [
+        "ver compra",
+        "mostrar purchase",
+        "consultar compra"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_get_purchase"
+      ],
+      "priority": 161,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "purchase_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_list",
+      "description": "List purchases with lightweight filters and recency hints.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(compras|purchases)",
+        "re:(ultima|última|ultimo|último|last|latest).*(compra|purchase)"
+      ],
+      "keywords": [
+        "listar compras",
+        "ultima compra",
+        "latest purchase"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_list"
+      ],
+      "priority": 160,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "purchase_number",
+          "status",
+          "date_from",
+          "date_to",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_get_by_number",
+      "description": "Load a purchase by tenant-scoped purchase_number.",
+      "intent_patterns": [
+        "re:(numero|número|purchase_number).*(compra|purchase)",
+        "re:(compra|purchase).*(numero|número|purchase_number)"
+      ],
+      "keywords": [
+        "compra por numero",
+        "purchase number",
+        "buscar compra por numero"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_get_by_number"
+      ],
+      "priority": 159,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "purchase_number"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
       "name": "read_document",
       "description": "Handle document-reading requests before free-form fallback.",
       "intent_patterns": [
