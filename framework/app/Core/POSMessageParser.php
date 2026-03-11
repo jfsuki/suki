@@ -32,6 +32,11 @@ final class POSMessageParser
             'pos_find_product' => $this->parseFindProduct($message, $pairs, $baseCommand, $telemetry),
             'pos_get_product_candidates' => $this->parseGetProductCandidates($message, $pairs, $baseCommand, $telemetry),
             'pos_reprice_draft' => $this->parseRepriceDraft($pairs, $baseCommand, $telemetry),
+            'pos_finalize_sale' => $this->parseFinalizeSale($pairs, $baseCommand, $telemetry),
+            'pos_get_sale' => $this->parseGetSale($pairs, $baseCommand, $telemetry),
+            'pos_list_sales' => $this->parseListSales($message, $pairs, $baseCommand, $telemetry),
+            'pos_build_receipt' => $this->parseBuildReceipt($pairs, $baseCommand, $telemetry),
+            'pos_get_sale_by_number' => $this->parseGetSaleByNumber($pairs, $baseCommand, $telemetry),
             default => ['kind' => 'ask_user', 'reply' => 'No pude interpretar la operacion POS.', 'telemetry' => $telemetry],
         };
     }
@@ -269,6 +274,116 @@ final class POSMessageParser
     }
 
     /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseFinalizeSale(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $draftId = $this->draftId($pairs);
+        if ($draftId === '') {
+            return $this->askUser('Indica `draft_id` para finalizar la venta POS.', $telemetry + ['pos_action' => 'finalize_sale']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'FinalizePOSSale',
+            'draft_id' => $draftId,
+        ], $telemetry + ['pos_action' => 'finalize_sale']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseGetSale(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $saleId = $this->saleId($pairs);
+        if ($saleId === '') {
+            return $this->askUser('Indica `sale_id` para cargar la venta POS.', $telemetry + ['pos_action' => 'get_sale']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'GetPOSSale',
+            'sale_id' => $saleId,
+        ], $telemetry + ['pos_action' => 'get_sale']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseListSales(string $message, array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $limit = $this->firstValue($pairs, ['limit', 'top', 'max']);
+        if ($limit === '' && $this->containsAny($message, ['ultima', 'última', 'ultimo', 'último', 'last', 'latest', 'reciente'])) {
+            $limit = '1';
+        }
+
+        $dateFrom = $this->firstValue($pairs, ['date_from', 'desde']);
+        $dateTo = $this->firstValue($pairs, ['date_to', 'hasta']);
+        if ($dateFrom === '' && $dateTo === '' && $this->containsAny($message, ['ayer'])) {
+            $dateFrom = date('Y-m-d 00:00:00', strtotime('yesterday'));
+            $dateTo = date('Y-m-d 23:59:59', strtotime('yesterday'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'ListPOSSales',
+            'sale_number' => $this->saleNumber($pairs) ?: null,
+            'status' => $this->firstValue($pairs, ['status', 'estado']) ?: null,
+            'session_id' => $this->firstValue($pairs, ['session_id']) ?: null,
+            'customer_id' => $this->firstValue($pairs, ['customer_id']) ?: null,
+            'date_from' => $dateFrom !== '' ? $dateFrom : null,
+            'date_to' => $dateTo !== '' ? $dateTo : null,
+            'limit' => $limit !== '' ? $limit : '10',
+        ], $telemetry + ['pos_action' => 'list_sales']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseBuildReceipt(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $saleId = $this->saleId($pairs);
+        $saleNumber = $this->saleNumber($pairs);
+        if ($saleId === '' && $saleNumber === '') {
+            return $this->askUser('Indica `sale_id` o `sale_number` para preparar el ticket POS.', $telemetry + ['pos_action' => 'build_receipt']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'BuildPOSReceipt',
+            'sale_id' => $saleId !== '' ? $saleId : null,
+            'sale_number' => $saleNumber !== '' ? $saleNumber : null,
+        ], $telemetry + ['pos_action' => 'build_receipt']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseGetSaleByNumber(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $saleNumber = $this->saleNumber($pairs);
+        if ($saleNumber === '') {
+            return $this->askUser('Indica `sale_number` para cargar la venta POS.', $telemetry + ['pos_action' => 'get_sale_by_number']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'GetPOSSaleByNumber',
+            'sale_number' => $saleNumber,
+        ], $telemetry + ['pos_action' => 'get_sale_by_number']);
+    }
+
+    /**
      * @return array<string, string>
      */
     private function extractKeyValuePairs(string $message): array
@@ -314,6 +429,22 @@ final class POSMessageParser
     private function draftId(array $pairs): string
     {
         return $this->firstValue($pairs, ['draft_id', 'sale_draft_id']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     */
+    private function saleId(array $pairs): string
+    {
+        return $this->firstValue($pairs, ['sale_id', 'id']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     */
+    private function saleNumber(array $pairs): string
+    {
+        return $this->firstValue($pairs, ['sale_number', 'number', 'numero']);
     }
 
     /**
@@ -369,6 +500,21 @@ final class POSMessageParser
         }
 
         return trim(implode(' ', $kept));
+    }
+
+    /**
+     * @param array<int, string> $needles
+     */
+    private function containsAny(string $message, array $needles): bool
+    {
+        $message = mb_strtolower($message, 'UTF-8');
+        foreach ($needles as $needle) {
+            if ($needle !== '' && str_contains($message, mb_strtolower($needle, 'UTF-8'))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     /**

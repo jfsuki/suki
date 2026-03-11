@@ -981,6 +981,166 @@
       "context_hints": {}
     },
     {
+      "name": "pos_finalize_sale",
+      "description": "Finalize an open POS draft into a completed sale with line snapshots.",
+      "intent_patterns": [
+        "re:(finaliza|finalizar|cierra|cerrar|completa|completar).*(venta|sale).*(draft|borrador|carrito|pos)?",
+        "re:(draft|borrador|carrito).*(finaliza|finalizar|cierra|cerrar|completa|completar).*(venta|sale|pos)?"
+      ],
+      "keywords": [
+        "finalizar venta pos",
+        "cerrar venta pos",
+        "completar borrador pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_finalize_sale"
+      ],
+      "priority": 175,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "draft_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_get_sale",
+      "description": "Load a POS sale by sale_id.",
+      "intent_patterns": [
+        "re:(ver|mostrar|muestra|consulta|abrir|abre).*(venta|sale).*(pos)?",
+        "re:(venta|sale).*(ver|mostrar|muestra|consulta|abrir|abre).*(pos)?"
+      ],
+      "keywords": [
+        "ver venta pos",
+        "mostrar venta pos",
+        "consultar sale pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_get_sale"
+      ],
+      "priority": 164,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "sale_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_list_sales",
+      "description": "List POS sales with lightweight recency filters.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(ventas|sales).*(pos)?",
+        "re:(ultima|última|ultimo|último|last|latest).*(venta|sale).*(pos)?"
+      ],
+      "keywords": [
+        "listar ventas pos",
+        "ultima venta pos",
+        "latest sale pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_list_sales"
+      ],
+      "priority": 163,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "sale_number",
+          "status",
+          "date_from",
+          "date_to",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_build_receipt",
+      "description": "Prepare a POS ticket or receipt payload without printing hardware.",
+      "intent_patterns": [
+        "re:(ticket|receipt|recibo|comprobante).*(venta|sale).*(pos)?",
+        "re:(prepara|genera|arma|build).*(ticket|receipt|recibo).*(pos)?"
+      ],
+      "keywords": [
+        "preparar ticket pos",
+        "generar receipt pos",
+        "armar comprobante pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_build_receipt"
+      ],
+      "priority": 162,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "sale_id",
+          "sale_number"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_get_sale_by_number",
+      "description": "Load a POS sale by sale_number.",
+      "intent_patterns": [
+        "re:(ticket|venta|sale).*(numero|número|number).*(pos)?",
+        "re:(sale_number|numero|número|number)=.*"
+      ],
+      "keywords": [
+        "venta por numero pos",
+        "buscar sale number pos",
+        "ticket numero pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_get_sale_by_number"
+      ],
+      "priority": 161,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "sale_number"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
       "name": "read_document",
       "description": "Handle document-reading requests before free-form fallback.",
       "intent_patterns": [

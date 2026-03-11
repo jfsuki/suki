@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use DateTimeImmutable;
 use RuntimeException;
 
 final class POSService
@@ -597,6 +598,421 @@ final class POSService
         ];
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function finalizeDraftSale(array $payload): array
+    {
+        $startedAt = microtime(true);
+        $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
+        $draftId = $this->requireString($payload['draft_id'] ?? $payload['sale_draft_id'] ?? null, 'draft_id');
+        $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
+        $createdByUserId = $this->nullableString(
+            $payload['created_by_user_id']
+            ?? $payload['requested_by_user_id']
+            ?? $payload['user_id']
+            ?? null
+        );
+
+        $existingSale = $this->repository->findSaleByDraftId($tenantId, $draftId, $appId);
+        if (is_array($existingSale)) {
+            throw new RuntimeException('POS_DRAFT_ALREADY_FINALIZED');
+        }
+
+        $draft = $this->loadDraft($tenantId, $draftId, $appId);
+        if ((string) ($draft['status'] ?? '') !== 'open') {
+            if ($this->draftAlreadyFinalized($draft)) {
+                throw new RuntimeException('POS_DRAFT_ALREADY_FINALIZED');
+            }
+            throw new RuntimeException('POS_DRAFT_NOT_OPEN');
+        }
+
+        $draft = $this->recalculateDraftTotals($tenantId, $draftId, $appId);
+        $lines = is_array($draft['lines'] ?? null) ? (array) $draft['lines'] : [];
+        if ($lines === []) {
+            throw new RuntimeException('POS_DRAFT_EMPTY');
+        }
+        if (!$this->draftTotalsAreValid($draft, $lines)) {
+            throw new RuntimeException('POS_DRAFT_TOTALS_INVALID');
+        }
+
+        $finalizedAt = date('Y-m-d H:i:s');
+        $result = $this->repository->transaction(function () use (
+            $tenantId,
+            $draftId,
+            $appId,
+            $draft,
+            $lines,
+            $finalizedAt,
+            $createdByUserId,
+            $payload
+        ): array {
+            $currentSale = $this->repository->findSaleByDraftId($tenantId, $draftId, $appId);
+            if (is_array($currentSale)) {
+                throw new RuntimeException('POS_DRAFT_ALREADY_FINALIZED');
+            }
+
+            $currentDraft = $this->loadDraft($tenantId, $draftId, $appId);
+            if ((string) ($currentDraft['status'] ?? '') !== 'open') {
+                if ($this->draftAlreadyFinalized($currentDraft)) {
+                    throw new RuntimeException('POS_DRAFT_ALREADY_FINALIZED');
+                }
+                throw new RuntimeException('POS_DRAFT_NOT_OPEN');
+            }
+
+            $sale = $this->repository->createSale([
+                'tenant_id' => $tenantId,
+                'app_id' => $appId,
+                'session_id' => $currentDraft['session_id'] ?? null,
+                'draft_id' => $draftId,
+                'customer_id' => $currentDraft['customer_id'] ?? null,
+                'sale_number' => null,
+                'status' => 'completed',
+                'currency' => $currentDraft['currency'] ?? null,
+                'subtotal' => $currentDraft['subtotal'] ?? 0,
+                'tax_total' => $currentDraft['tax_total'] ?? 0,
+                'total' => $currentDraft['total'] ?? 0,
+                'created_by_user_id' => $createdByUserId,
+                'metadata' => $this->buildSaleMetadata($currentDraft, $payload, $finalizedAt),
+                'created_at' => $finalizedAt,
+                'updated_at' => $finalizedAt,
+            ]);
+
+            $saleId = $this->requireString($sale['id'] ?? null, 'sale_id');
+            $saleNumber = $this->buildSaleNumber($tenantId, $saleId, $finalizedAt);
+            $sale = $this->repository->updateSale($tenantId, $saleId, [
+                'sale_number' => $saleNumber,
+                'metadata' => array_merge(
+                    is_array($sale['metadata'] ?? null) ? (array) $sale['metadata'] : [],
+                    [
+                        'receipt' => [
+                            'status' => 'ready',
+                            'contract_id' => 'ticket_pos',
+                        ],
+                    ]
+                ),
+                'updated_at' => $finalizedAt,
+            ], $appId);
+            if (!is_array($sale)) {
+                throw new RuntimeException('POS_SALE_NOT_FOUND');
+            }
+
+            foreach ($lines as $line) {
+                $this->repository->insertSaleLine([
+                    'tenant_id' => $tenantId,
+                    'app_id' => $appId,
+                    'sale_id' => $saleId,
+                    'product_id' => (string) ($line['product_id'] ?? ''),
+                    'sku' => $this->nullableString($line['sku'] ?? null),
+                    'barcode' => $this->nullableString($line['barcode'] ?? null),
+                    'product_label' => trim((string) ($line['product_label'] ?? 'producto')) ?: 'producto',
+                    'qty' => $line['qty'] ?? 0,
+                    'unit_price' => $line['unit_price'] ?? $line['effective_unit_price'] ?? 0,
+                    'tax_rate' => $line['tax_rate'] ?? null,
+                    'line_total' => $line['line_total'] ?? 0,
+                    'metadata' => $this->buildSaleLineMetadata($line),
+                    'created_at' => $finalizedAt,
+                    'updated_at' => $finalizedAt,
+                ]);
+            }
+
+            $updatedDraft = $this->repository->updateDraft($tenantId, $draftId, [
+                'status' => 'checked_out',
+                'metadata' => array_merge(
+                    is_array($currentDraft['metadata'] ?? null) ? (array) $currentDraft['metadata'] : [],
+                    [
+                        'finalized_sale_id' => $saleId,
+                        'sale_number' => $saleNumber,
+                        'finalized_at' => $finalizedAt,
+                        'hooks' => [
+                            'inventory' => 'pending',
+                            'fiscal_engine' => 'pending',
+                            'cash_movement' => 'pending',
+                            'receipt' => 'ready',
+                        ],
+                    ]
+                ),
+                'updated_at' => $finalizedAt,
+            ], $appId);
+            if (!is_array($updatedDraft)) {
+                throw new RuntimeException('POS_DRAFT_NOT_FOUND');
+            }
+
+            $sale = $this->repository->loadSaleAggregate($tenantId, $saleId, $appId);
+            if (!is_array($sale)) {
+                throw new RuntimeException('POS_SALE_NOT_FOUND');
+            }
+
+            return [
+                'sale' => $sale,
+                'draft' => $updatedDraft,
+            ];
+        });
+
+        $sale = $this->validatedSale(is_array($result['sale'] ?? null) ? (array) $result['sale'] : []);
+        $draft = $this->validatedDraft(is_array($result['draft'] ?? null) ? (array) $result['draft'] : []);
+        $latencyMs = $this->latencyMs($startedAt);
+        $lineCount = count((array) ($sale['lines'] ?? []));
+        $saleId = (string) ($sale['id'] ?? '');
+        $saleNumber = (string) ($sale['sale_number'] ?? '');
+
+        $this->auditLogger->log('pos_finalize_sale', 'pos_sale', $saleId !== '' ? $saleId : null, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'finalize_sale',
+            'draft_id' => $draftId,
+            'sale_id' => $saleId,
+            'sale_number' => $saleNumber,
+            'session_id' => $sale['session_id'] ?? null,
+            'line_count' => $lineCount,
+            'total' => (float) ($sale['total'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('finalize_sale', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'finalize_sale',
+            'draft_id' => $draftId,
+            'sale_id' => $saleId,
+            'sale_number' => $saleNumber,
+            'session_id' => $sale['session_id'] ?? null,
+            'line_count' => $lineCount,
+            'total' => (float) ($sale['total'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return [
+            'sale' => $sale,
+            'draft' => $draft,
+            'sale_id' => $saleId,
+            'sale_number' => $saleNumber,
+            'line_count' => $lineCount,
+            'hooks' => is_array($sale['metadata']['hooks'] ?? null) ? (array) $sale['metadata']['hooks'] : [],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getSale(string $tenantId, string $saleId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $sale = $this->loadSale($tenantId, $saleId, $appId);
+        $latencyMs = $this->latencyMs($startedAt);
+
+        $this->auditLogger->log('pos_get_sale', 'pos_sale', $saleId, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'get_sale',
+            'draft_id' => $sale['draft_id'] ?? null,
+            'sale_id' => $saleId,
+            'sale_number' => $sale['sale_number'] ?? null,
+            'session_id' => $sale['session_id'] ?? null,
+            'line_count' => count((array) ($sale['lines'] ?? [])),
+            'total' => (float) ($sale['total'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('get_sale', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'get_sale',
+            'draft_id' => $sale['draft_id'] ?? null,
+            'sale_id' => $saleId,
+            'sale_number' => $sale['sale_number'] ?? null,
+            'session_id' => $sale['session_id'] ?? null,
+            'line_count' => count((array) ($sale['lines'] ?? [])),
+            'total' => (float) ($sale['total'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return $sale;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function listSales(string $tenantId, array $filters = [], ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $limit = max(1, min(50, (int) ($filters['limit'] ?? 10)));
+        $items = $this->repository->listSales($tenantId, $filters + ['app_id' => $appId], $limit);
+        $sales = [];
+        foreach ($items as $item) {
+            $saleId = (string) ($item['id'] ?? '');
+            $sale = $saleId !== '' ? $this->repository->loadSaleAggregate($tenantId, $saleId, $appId) : null;
+            if (!is_array($sale)) {
+                continue;
+            }
+            $sales[] = $this->validatedSale($sale);
+        }
+        $latencyMs = $this->latencyMs($startedAt);
+
+        $this->auditLogger->log('pos_list_sales', 'pos_sale', null, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'list_sales',
+            'session_id' => $this->nullableString($filters['session_id'] ?? null),
+            'line_count' => array_sum(array_map(fn(array $sale): int => count((array) ($sale['lines'] ?? [])), $sales)),
+            'total' => array_sum(array_map(fn(array $sale): float => (float) ($sale['total'] ?? 0), $sales)),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('list_sales', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'list_sales',
+            'session_id' => $this->nullableString($filters['session_id'] ?? null),
+            'result_count' => count($sales),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return $sales;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function buildReceiptPayload(string $tenantId, string $saleId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $sale = $this->loadSale($tenantId, $saleId, $appId);
+        $createdAt = $this->saleDateTime((string) ($sale['created_at'] ?? ''));
+        $session = $this->nullableString($sale['session_id'] ?? null) !== null
+            ? $this->repository->findSession($tenantId, (string) $sale['session_id'], $appId)
+            : null;
+        $customerLabel = $this->resolveSaleCustomerLabel($tenantId, $sale, $appId);
+        $footerText = $this->ticketFooterText();
+
+        $items = array_map(function (array $line): array {
+            return [
+                'product_id' => (string) ($line['product_id'] ?? ''),
+                'sku' => $this->nullableString($line['sku'] ?? null),
+                'barcode' => $this->nullableString($line['barcode'] ?? null),
+                'product_label' => trim((string) ($line['product_label'] ?? 'producto')) ?: 'producto',
+                'qty' => (float) ($line['qty'] ?? 0),
+                'unit_price' => (float) ($line['unit_price'] ?? 0),
+                'line_total' => (float) ($line['line_total'] ?? 0),
+                'metadata' => is_array($line['metadata'] ?? null) ? (array) $line['metadata'] : [],
+            ];
+        }, (array) ($sale['lines'] ?? []));
+
+        $payload = [
+            'sale_id' => (string) ($sale['id'] ?? ''),
+            'sale_number' => (string) ($sale['sale_number'] ?? ''),
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'created_at' => (string) ($sale['created_at'] ?? ''),
+            'currency' => $this->nullableString($sale['currency'] ?? null),
+            'header' => [
+                'sale_number' => (string) ($sale['sale_number'] ?? ''),
+                'date' => $createdAt->format('Y-m-d'),
+                'time' => $createdAt->format('H:i:s'),
+                'customer_label' => $customerLabel,
+                'cash_register_id' => is_array($session) ? $this->nullableString($session['cash_register_id'] ?? null) : null,
+                'store_id' => is_array($session) ? $this->nullableString($session['store_id'] ?? null) : null,
+            ],
+            'items' => $items,
+            'totals' => [
+                'subtotal' => (float) ($sale['subtotal'] ?? 0),
+                'tax_total' => (float) ($sale['tax_total'] ?? 0),
+                'total' => (float) ($sale['total'] ?? 0),
+            ],
+            'footer_hooks' => [
+                'contract_id' => 'ticket_pos',
+                'footer_text' => $footerText,
+                'printer' => 'pending',
+                'fiscal_engine' => 'pending',
+                'cash_movement' => 'pending',
+                'inventory' => 'pending',
+            ],
+        ];
+        $payload['printable_text'] = $this->buildPrintableReceiptText($payload);
+
+        POSContractValidator::validateReceipt($payload);
+
+        $latencyMs = $this->latencyMs($startedAt);
+        $this->auditLogger->log('pos_build_receipt', 'pos_sale', (string) ($sale['id'] ?? ''), [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'build_receipt',
+            'draft_id' => $sale['draft_id'] ?? null,
+            'sale_id' => $sale['id'] ?? null,
+            'sale_number' => $sale['sale_number'] ?? null,
+            'session_id' => $sale['session_id'] ?? null,
+            'line_count' => count((array) ($sale['lines'] ?? [])),
+            'total' => (float) ($sale['total'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('build_receipt', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'build_receipt',
+            'draft_id' => $sale['draft_id'] ?? null,
+            'sale_id' => $sale['id'] ?? null,
+            'sale_number' => $sale['sale_number'] ?? null,
+            'session_id' => $sale['session_id'] ?? null,
+            'line_count' => count((array) ($sale['lines'] ?? [])),
+            'total' => (float) ($sale['total'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return $payload;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getSaleByNumber(string $tenantId, string $saleNumber, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $saleNumber = $this->requireString($saleNumber, 'sale_number');
+        $sale = $this->repository->findSaleByNumber($tenantId, $saleNumber, $appId);
+        if (!is_array($sale)) {
+            throw new RuntimeException('POS_SALE_NOT_FOUND');
+        }
+
+        $loaded = $this->loadSale($tenantId, (string) ($sale['id'] ?? ''), $appId);
+        $latencyMs = $this->latencyMs($startedAt);
+
+        $this->auditLogger->log('pos_get_sale_by_number', 'pos_sale', (string) ($loaded['id'] ?? ''), [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'get_sale_by_number',
+            'draft_id' => $loaded['draft_id'] ?? null,
+            'sale_id' => $loaded['id'] ?? null,
+            'sale_number' => $loaded['sale_number'] ?? null,
+            'session_id' => $loaded['session_id'] ?? null,
+            'line_count' => count((array) ($loaded['lines'] ?? [])),
+            'total' => (float) ($loaded['total'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('get_sale_by_number', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'get_sale_by_number',
+            'draft_id' => $loaded['draft_id'] ?? null,
+            'sale_id' => $loaded['id'] ?? null,
+            'sale_number' => $loaded['sale_number'] ?? null,
+            'session_id' => $loaded['session_id'] ?? null,
+            'line_count' => count((array) ($loaded['lines'] ?? [])),
+            'total' => (float) ($loaded['total'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return $loaded;
+    }
+
     private function sessionExists(string $tenantId, string $sessionId, ?string $appId): bool
     {
         $session = $this->repository->findSession($tenantId, $sessionId, $appId);
@@ -620,6 +1036,19 @@ final class POSService
         }
 
         return $this->validatedDraft($draft);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function loadSale(string $tenantId, string $saleId, ?string $appId): array
+    {
+        $sale = $this->repository->loadSaleAggregate($tenantId, $saleId, $appId);
+        if (!is_array($sale)) {
+            throw new RuntimeException('POS_SALE_NOT_FOUND');
+        }
+
+        return $this->validatedSale($sale);
     }
 
     /**
@@ -934,6 +1363,223 @@ final class POSService
     }
 
     /**
+     * @param array<string, mixed> $draft
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function buildSaleMetadata(array $draft, array $payload, string $finalizedAt): array
+    {
+        $customerResolution = is_array($draft['metadata']['customer_resolution'] ?? null)
+            ? (array) $draft['metadata']['customer_resolution']
+            : [];
+
+        return [
+            'origin' => [
+                'source' => 'pos_draft',
+                'draft_id' => (string) ($draft['id'] ?? ''),
+                'ecommerce_origin' => $this->nullableString($payload['origin'] ?? $payload['ecommerce_origin'] ?? null),
+            ],
+            'customer_snapshot' => [
+                'label' => $this->nullableString($customerResolution['label'] ?? null),
+            ],
+            'hooks' => [
+                'inventory' => 'pending',
+                'fiscal_engine' => 'pending',
+                'cash_movement' => 'pending',
+                'receipt' => 'pending',
+            ],
+            'finalized_at' => $finalizedAt,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $line
+     * @return array<string, mixed>
+     */
+    private function buildSaleLineMetadata(array $line): array
+    {
+        return array_merge(
+            is_array($line['metadata'] ?? null) ? (array) $line['metadata'] : [],
+            [
+                'draft_line_id' => (string) ($line['id'] ?? ''),
+                'pricing_snapshot' => [
+                    'base_price' => $line['base_price'] ?? $line['unit_price'] ?? null,
+                    'override_price' => $line['override_price'] ?? null,
+                    'effective_unit_price' => $line['effective_unit_price'] ?? $line['unit_price'] ?? null,
+                    'line_subtotal' => $line['line_subtotal'] ?? null,
+                    'line_tax' => $line['line_tax'] ?? null,
+                ],
+                'hooks' => [
+                    'inventory' => 'pending',
+                    'receipt' => 'ready',
+                    'fiscal_engine' => 'pending',
+                ],
+            ]
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $draft
+     * @param array<int, array<string, mixed>> $lines
+     */
+    private function draftTotalsAreValid(array $draft, array $lines): bool
+    {
+        $subtotal = 0.0;
+        $taxTotal = 0.0;
+        foreach ($lines as $line) {
+            $subtotal += (float) ($line['line_subtotal'] ?? 0);
+            $taxTotal += (float) ($line['line_tax'] ?? 0);
+        }
+
+        return abs($this->money($subtotal) - (float) ($draft['subtotal'] ?? 0)) < 0.0001
+            && abs($this->money($taxTotal) - (float) ($draft['tax_total'] ?? 0)) < 0.0001
+            && abs($this->money($subtotal + $taxTotal) - (float) ($draft['total'] ?? 0)) < 0.0001;
+    }
+
+    /**
+     * @param array<string, mixed> $draft
+     */
+    private function draftAlreadyFinalized(array $draft): bool
+    {
+        $metadata = is_array($draft['metadata'] ?? null) ? (array) $draft['metadata'] : [];
+
+        return trim((string) ($draft['status'] ?? '')) === 'checked_out'
+            || $this->nullableString($metadata['finalized_sale_id'] ?? null) !== null
+            || $this->nullableString($metadata['sale_number'] ?? null) !== null;
+    }
+
+    private function buildSaleNumber(string $tenantId, string $saleId, string $createdAt): string
+    {
+        $prefix = strtoupper(substr((preg_replace('/[^A-Za-z0-9]/', '', $tenantId) ?? ''), 0, 6));
+        if ($prefix === '') {
+            $prefix = (string) $this->stableTenantInt($tenantId);
+        }
+        $date = $this->saleDateTime($createdAt)->format('Ymd');
+        $serial = ctype_digit($saleId) ? str_pad($saleId, 6, '0', STR_PAD_LEFT) : strtoupper($saleId);
+
+        return 'POS-' . $prefix . '-' . $date . '-' . $serial;
+    }
+
+    private function saleDateTime(string $value): DateTimeImmutable
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return new DateTimeImmutable('now');
+        }
+
+        try {
+            return new DateTimeImmutable(str_replace('T', ' ', $value));
+        } catch (\Throwable $e) {
+            return new DateTimeImmutable('now');
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $sale
+     */
+    private function resolveSaleCustomerLabel(string $tenantId, array $sale, ?string $appId): ?string
+    {
+        $metadata = is_array($sale['metadata'] ?? null) ? (array) $sale['metadata'] : [];
+        $customerSnapshot = is_array($metadata['customer_snapshot'] ?? null) ? (array) $metadata['customer_snapshot'] : [];
+        $customerLabel = $this->nullableString($customerSnapshot['label'] ?? null);
+        if ($customerLabel !== null) {
+            return $customerLabel;
+        }
+
+        $customerId = $this->nullableString($sale['customer_id'] ?? null);
+        if ($customerId === null) {
+            return null;
+        }
+
+        $result = $this->entitySearch->getByReference($tenantId, 'customer', $customerId, [], $appId);
+        if (!is_array($result)) {
+            return null;
+        }
+
+        return $this->nullableString($result['label'] ?? null);
+    }
+
+    private function ticketFooterText(): string
+    {
+        $path = FRAMEWORK_ROOT . '/contracts/forms/ticket_pos.contract.json';
+        if (!is_file($path)) {
+            return 'Gracias por su compra.';
+        }
+
+        $payload = json_decode((string) file_get_contents($path), true);
+        if (!is_array($payload)) {
+            return 'Gracias por su compra.';
+        }
+
+        foreach ((array) ($payload['reports'] ?? []) as $report) {
+            if (!is_array($report)) {
+                continue;
+            }
+            $text = trim((string) ($report['layout']['footer']['text'] ?? ''));
+            if ($text !== '') {
+                return $text;
+            }
+        }
+
+        return 'Gracias por su compra.';
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function buildPrintableReceiptText(array $payload): string
+    {
+        $lines = [];
+        $header = is_array($payload['header'] ?? null) ? (array) $payload['header'] : [];
+        $totals = is_array($payload['totals'] ?? null) ? (array) $payload['totals'] : [];
+        $footerHooks = is_array($payload['footer_hooks'] ?? null) ? (array) $payload['footer_hooks'] : [];
+
+        $lines[] = 'TICKET POS';
+        $lines[] = 'Venta ' . (string) ($payload['sale_number'] ?? '');
+        $lines[] = (string) ($header['date'] ?? '') . ' ' . (string) ($header['time'] ?? '');
+        if (trim((string) ($header['customer_label'] ?? '')) !== '') {
+            $lines[] = 'Cliente: ' . (string) $header['customer_label'];
+        }
+        foreach ((array) ($payload['items'] ?? []) as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $lines[] = trim((string) ($item['product_label'] ?? 'producto')) ?: 'producto';
+            $lines[] = '  '
+                . $this->formatMoneyText((float) ($item['qty'] ?? 0), 0, false)
+                . ' x '
+                . $this->formatMoneyText((float) ($item['unit_price'] ?? 0))
+                . ' = '
+                . $this->formatMoneyText((float) ($item['line_total'] ?? 0));
+        }
+        $lines[] = 'Subtotal: ' . $this->formatMoneyText((float) ($totals['subtotal'] ?? 0));
+        $lines[] = 'Impuesto: ' . $this->formatMoneyText((float) ($totals['tax_total'] ?? 0));
+        $lines[] = 'TOTAL: ' . $this->formatMoneyText((float) ($totals['total'] ?? 0));
+        if (trim((string) ($footerHooks['footer_text'] ?? '')) !== '') {
+            $lines[] = (string) $footerHooks['footer_text'];
+        }
+
+        return implode("\n", $lines);
+    }
+
+    private function formatMoneyText(float $value, int $decimals = 2, bool $money = true): string
+    {
+        $formatted = number_format($value, $decimals, '.', '');
+
+        return $money ? '$' . $formatted : $formatted;
+    }
+
+    private function stableTenantInt(string $tenantId): int
+    {
+        $hash = crc32((string) $tenantId);
+        $unsigned = (int) sprintf('%u', $hash);
+        $max = 2147483647;
+        $value = $unsigned % $max;
+
+        return $value > 0 ? $value : 1;
+    }
+
+    /**
      * @param array<string, mixed> $payload
      */
     private function productQuery(array $payload): string
@@ -1051,5 +1697,23 @@ final class POSService
         POSContractValidator::validateDraft($draft);
 
         return $draft;
+    }
+
+    /**
+     * @param array<string, mixed> $sale
+     * @return array<string, mixed>
+     */
+    private function validatedSale(array $sale): array
+    {
+        if (!array_key_exists('lines', $sale)) {
+            $sale['lines'] = [];
+        }
+        if (!array_key_exists('metadata', $sale) && array_key_exists('metadata_json', $sale)) {
+            $sale['metadata'] = is_array($sale['metadata_json']) ? (array) $sale['metadata_json'] : [];
+        }
+
+        POSContractValidator::validateSale($sale);
+
+        return $sale;
     }
 }

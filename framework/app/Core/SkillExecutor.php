@@ -411,6 +411,11 @@ final class SkillExecutor
             'pos_find_product',
             'pos_get_product_candidates',
             'pos_reprice_draft',
+            'pos_finalize_sale',
+            'pos_get_sale',
+            'pos_list_sales',
+            'pos_build_receipt',
+            'pos_get_sale_by_number',
         ], true);
     }
 

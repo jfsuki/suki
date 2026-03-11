@@ -1,0 +1,133 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "POSReceiptPayload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "sale_id",
+    "sale_number",
+    "tenant_id",
+    "created_at",
+    "header",
+    "items",
+    "totals",
+    "footer_hooks",
+    "printable_text"
+  ],
+  "properties": {
+    "sale_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sale_number": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app_id": {
+      "type": ["string", "null"]
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "currency": {
+      "type": ["string", "null"]
+    },
+    "header": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": ["sale_number", "date", "time"],
+      "properties": {
+        "sale_number": {
+          "type": "string",
+          "minLength": 1
+        },
+        "date": {
+          "type": "string",
+          "minLength": 1
+        },
+        "time": {
+          "type": "string",
+          "minLength": 1
+        },
+        "customer_label": {
+          "type": ["string", "null"]
+        },
+        "cash_register_id": {
+          "type": ["string", "null"]
+        },
+        "store_id": {
+          "type": ["string", "null"]
+        }
+      }
+    },
+    "items": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["product_label", "qty", "unit_price", "line_total"],
+        "properties": {
+          "product_id": {
+            "type": "string"
+          },
+          "sku": {
+            "type": ["string", "null"]
+          },
+          "barcode": {
+            "type": ["string", "null"]
+          },
+          "product_label": {
+            "type": "string",
+            "minLength": 1
+          },
+          "qty": {
+            "type": "number",
+            "exclusiveMinimum": 0
+          },
+          "unit_price": {
+            "type": "number",
+            "minimum": 0
+          },
+          "line_total": {
+            "type": "number",
+            "minimum": 0
+          },
+          "metadata": {
+            "type": "object",
+            "additionalProperties": true
+          }
+        }
+      }
+    },
+    "totals": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["subtotal", "tax_total", "total"],
+      "properties": {
+        "subtotal": {
+          "type": "number",
+          "minimum": 0
+        },
+        "tax_total": {
+          "type": "number",
+          "minimum": 0
+        },
+        "total": {
+          "type": "number",
+          "minimum": 0
+        }
+      }
+    },
+    "footer_hooks": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "printable_text": {
+      "type": "string"
+    }
+  }
+}

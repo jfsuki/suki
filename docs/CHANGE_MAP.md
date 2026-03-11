@@ -35,6 +35,8 @@
   - preserve resolution order `barcode -> sku -> exact_name -> partial -> entity_search fallback`
   - keep barcode lookups exact-only and return candidates instead of guessing on ambiguous references
   - keep line pricing fields (`base_price`, `override_price`, `effective_unit_price`, `line_subtotal`, `line_tax`, `line_total`) synchronized
+  - keep lifecycle consistent: `open draft -> checked_out draft + completed sale`
+  - if you add receipt changes, keep payload preparation separate from printer/fiscal drivers
   - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
   - reuse `EntitySearchService` for product/customer resolution instead of guessing
 - If you add AgentOps metrics:

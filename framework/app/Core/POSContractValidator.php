@@ -12,6 +12,8 @@ final class POSContractValidator
 {
     private const DRAFT_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/sale_draft.schema.json';
     private const SESSION_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/pos_session.schema.json';
+    private const SALE_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/pos_sale.schema.json';
+    private const RECEIPT_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/pos_receipt_payload.schema.json';
 
     /**
      * @param array<string, mixed> $payload
@@ -27,6 +29,22 @@ final class POSContractValidator
     public static function validateSession(array $payload): void
     {
         self::validate(self::SESSION_SCHEMA, self::normalizePayload($payload), 'POSSession');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public static function validateSale(array $payload): void
+    {
+        self::validate(self::SALE_SCHEMA, self::normalizePayload($payload), 'POSSale');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public static function validateReceipt(array $payload): void
+    {
+        self::validate(self::RECEIPT_SCHEMA, self::normalizePayload($payload), 'POSReceiptPayload');
     }
 
     /**
@@ -98,6 +116,28 @@ final class POSContractValidator
                     return $line;
                 },
                 (array) $payload['lines']
+            );
+        }
+
+        foreach (['header', 'totals', 'footer_hooks'] as $key) {
+            if (array_key_exists($key, $payload) && is_array($payload[$key])) {
+                $payload[$key] = self::normalizeObjectLikeArray((array) $payload[$key]);
+            }
+        }
+
+        if (is_array($payload['items'] ?? null)) {
+            $payload['items'] = array_map(
+                static function ($item): array {
+                    $item = is_array($item) ? $item : [];
+                    foreach (['metadata', 'metadata_json'] as $key) {
+                        if (array_key_exists($key, $item) && is_array($item[$key])) {
+                            $item[$key] = self::normalizeObjectLikeArray((array) $item[$key]);
+                        }
+                    }
+
+                    return $item;
+                },
+                (array) $payload['items']
             );
         }
 

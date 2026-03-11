@@ -21,6 +21,11 @@ final class POSCommandHandler implements CommandHandlerInterface
         'FindPOSProduct',
         'GetPOSProductCandidates',
         'RepricePOSDraft',
+        'FinalizePOSSale',
+        'GetPOSSale',
+        'ListPOSSales',
+        'BuildPOSReceipt',
+        'GetPOSSaleByNumber',
     ];
 
     public function supports(string $commandName): bool
@@ -66,6 +71,11 @@ final class POSCommandHandler implements CommandHandlerInterface
                 'FindPOSProduct' => $this->handleFindProduct($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'GetPOSProductCandidates' => $this->handleGetProductCandidates($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'RepricePOSDraft' => $this->handleRepriceDraft($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'FinalizePOSSale' => $this->handleFinalizeSale($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'GetPOSSale' => $this->handleGetSale($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'ListPOSSales' => $this->handleListSales($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'BuildPOSReceipt' => $this->handleBuildReceipt($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'GetPOSSaleByNumber' => $this->handleGetSaleByNumber($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 default => throw new RuntimeException('COMMAND_NOT_SUPPORTED'),
             };
         } catch (Throwable $e) {
@@ -524,6 +534,204 @@ final class POSCommandHandler implements CommandHandlerInterface
         ));
     }
 
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleFinalizeSale(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $result = $service->finalizeDraftSale($command + [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId !== '' ? $appId : null,
+        ]);
+        $sale = is_array($result['sale'] ?? null) ? (array) $result['sale'] : [];
+        $draft = is_array($result['draft'] ?? null) ? (array) $result['draft'] : [];
+
+        return $this->withReplyText($reply(
+            'Venta POS finalizada: sale_number=' . (string) ($sale['sale_number'] ?? '') . '.',
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'finalize_sale',
+                'sale' => $sale,
+                'draft' => $draft,
+                'item' => $sale,
+                'draft_id' => (string) ($draft['id'] ?? $command['draft_id'] ?? ''),
+                'sale_id' => (string) ($sale['id'] ?? ''),
+                'sale_number' => (string) ($sale['sale_number'] ?? ''),
+                'session_id' => (string) ($sale['session_id'] ?? ''),
+                'line_count' => count((array) ($sale['lines'] ?? [])),
+                'total' => (float) ($sale['total'] ?? 0),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleGetSale(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $saleId = $this->saleId($command);
+        $sale = $service->getSale($tenantId, $saleId, $appId !== '' ? $appId : null);
+
+        return $this->withReplyText($reply(
+            'Venta POS cargada: sale_number=' . (string) ($sale['sale_number'] ?? '') . '.',
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'get_sale',
+                'sale' => $sale,
+                'item' => $sale,
+                'draft_id' => (string) ($sale['draft_id'] ?? ''),
+                'sale_id' => (string) ($sale['id'] ?? ''),
+                'sale_number' => (string) ($sale['sale_number'] ?? ''),
+                'session_id' => (string) ($sale['session_id'] ?? ''),
+                'line_count' => count((array) ($sale['lines'] ?? [])),
+                'total' => (float) ($sale['total'] ?? 0),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleListSales(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $items = $service->listSales($tenantId, $command, $appId !== '' ? $appId : null);
+        $text = $items === []
+            ? 'No hay ventas POS para los filtros indicados.'
+            : "Ventas POS:\n" . implode("\n", array_map([$this, 'formatSaleLine'], $items));
+
+        return $this->withReplyText($reply(
+            $text,
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'list_sales',
+                'items' => $items,
+                'result_count' => count($items),
+                'line_count' => array_sum(array_map(fn(array $sale): int => count((array) ($sale['lines'] ?? [])), $items)),
+                'total' => array_sum(array_map(fn(array $sale): float => (float) ($sale['total'] ?? 0), $items)),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleBuildReceipt(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $sale = $this->resolveSaleFromCommand($service, $tenantId, $appId, $command);
+        $receipt = $service->buildReceiptPayload($tenantId, (string) ($sale['id'] ?? ''), $appId !== '' ? $appId : null);
+
+        return $this->withReplyText($reply(
+            'Ticket POS preparado: sale_number=' . (string) ($receipt['sale_number'] ?? '') . '.',
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'build_receipt',
+                'sale' => $sale,
+                'receipt' => $receipt,
+                'item' => $receipt,
+                'draft_id' => (string) ($sale['draft_id'] ?? ''),
+                'sale_id' => (string) ($sale['id'] ?? ''),
+                'sale_number' => (string) ($sale['sale_number'] ?? ''),
+                'session_id' => (string) ($sale['session_id'] ?? ''),
+                'line_count' => count((array) ($sale['lines'] ?? [])),
+                'total' => (float) ($sale['total'] ?? 0),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleGetSaleByNumber(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $saleNumber = trim((string) ($command['sale_number'] ?? $command['number'] ?? ''));
+        if ($saleNumber === '') {
+            throw new RuntimeException('POS_SALE_NUMBER_REQUIRED');
+        }
+
+        $sale = $service->getSaleByNumber($tenantId, $saleNumber, $appId !== '' ? $appId : null);
+
+        return $this->withReplyText($reply(
+            'Venta POS cargada: sale_number=' . (string) ($sale['sale_number'] ?? '') . '.',
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'get_sale_by_number',
+                'sale' => $sale,
+                'item' => $sale,
+                'draft_id' => (string) ($sale['draft_id'] ?? ''),
+                'sale_id' => (string) ($sale['id'] ?? ''),
+                'sale_number' => (string) ($sale['sale_number'] ?? ''),
+                'session_id' => (string) ($sale['session_id'] ?? ''),
+                'line_count' => count((array) ($sale['lines'] ?? [])),
+                'total' => (float) ($sale['total'] ?? 0),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
     private function draftId(array $command): string
     {
         $draftId = trim((string) ($command['draft_id'] ?? $command['sale_draft_id'] ?? ''));
@@ -532,6 +740,34 @@ final class POSCommandHandler implements CommandHandlerInterface
         }
 
         return $draftId;
+    }
+
+    private function saleId(array $command): string
+    {
+        $saleId = trim((string) ($command['sale_id'] ?? $command['id'] ?? ''));
+        if ($saleId === '') {
+            throw new RuntimeException('POS_SALE_ID_REQUIRED');
+        }
+
+        return $saleId;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function resolveSaleFromCommand(POSService $service, string $tenantId, string $appId, array $command): array
+    {
+        $saleId = trim((string) ($command['sale_id'] ?? $command['id'] ?? ''));
+        if ($saleId !== '') {
+            return $service->getSale($tenantId, $saleId, $appId !== '' ? $appId : null);
+        }
+
+        $saleNumber = trim((string) ($command['sale_number'] ?? $command['number'] ?? ''));
+        if ($saleNumber !== '') {
+            return $service->getSaleByNumber($tenantId, $saleNumber, $appId !== '' ? $appId : null);
+        }
+
+        throw new RuntimeException('POS_SALE_REFERENCE_REQUIRED');
     }
 
     private function replyCallable(array $context): callable
@@ -554,12 +790,16 @@ final class POSCommandHandler implements CommandHandlerInterface
             'module_used' => 'pos',
             'pos_action' => 'none',
             'draft_id' => '',
+            'sale_id' => '',
+            'sale_number' => '',
             'session_id' => '',
             'product_id' => '',
             'matched_product_id' => '',
             'matched_by' => '',
             'product_query' => '',
             'ambiguity_count' => 0,
+            'line_count' => 0,
+            'total' => 0,
             'result_status' => 'success',
         ], $overrides);
     }
@@ -617,6 +857,16 @@ final class POSCommandHandler implements CommandHandlerInterface
         return $label . ' | ' . $subtitle;
     }
 
+    /**
+     * @param array<string, mixed> $sale
+     */
+    private function formatSaleLine(array $sale): string
+    {
+        return '- sale_number=' . (string) ($sale['sale_number'] ?? '')
+            . ' total=' . (string) ($sale['total'] ?? 0)
+            . ' status=' . (string) ($sale['status'] ?? 'completed');
+    }
+
     private function humanizeError(string $message): string
     {
         $message = trim($message);
@@ -628,6 +878,9 @@ final class POSCommandHandler implements CommandHandlerInterface
             'POS_SESSION_NOT_FOUND' => 'No encontre esa sesion POS dentro del tenant actual.',
             'POS_DRAFT_NOT_FOUND' => 'No encontre ese borrador POS dentro del tenant actual.',
             'POS_DRAFT_NOT_OPEN' => 'Solo puedo modificar borradores POS en estado abierto.',
+            'POS_DRAFT_EMPTY' => 'No puedo cerrar una venta POS sin productos.',
+            'POS_DRAFT_TOTALS_INVALID' => 'Los totales del borrador POS no son consistentes. Recalcula antes de cerrar.',
+            'POS_DRAFT_ALREADY_FINALIZED' => 'Ese borrador POS ya fue finalizado en una venta.',
             'POS_PRODUCT_REFERENCE_REQUIRED' => 'Indica un `product_id`, `sku`, `barcode` o `query` para agregar la linea.',
             'POS_PRODUCT_NOT_FOUND' => 'No encontre un producto valido dentro del tenant actual.',
             'POS_PRODUCT_AMBIGUOUS' => 'Encontre varios productos posibles. Indica el producto exacto.',
@@ -638,6 +891,10 @@ final class POSCommandHandler implements CommandHandlerInterface
             'POS_CUSTOMER_AMBIGUOUS' => 'Encontre varios clientes posibles. Indica el cliente exacto.',
             'POS_INVALID_QTY' => 'La cantidad debe ser mayor que cero.',
             'POS_DRAFT_LINE_NOT_FOUND' => 'No encontre esa linea dentro del borrador POS.',
+            'POS_SALE_ID_REQUIRED' => 'Indica `sale_id` para continuar con la venta POS.',
+            'POS_SALE_NUMBER_REQUIRED' => 'Indica `sale_number` para continuar con la venta POS.',
+            'POS_SALE_REFERENCE_REQUIRED' => 'Indica `sale_id` o `sale_number` para ubicar la venta POS.',
+            'POS_SALE_NOT_FOUND' => 'No encontre esa venta POS dentro del tenant actual.',
             'COMMAND_NOT_SUPPORTED' => 'No pude ejecutar esa operacion POS.',
             default => $message !== '' ? $message : 'No pude procesar la operacion POS solicitada.',
         };

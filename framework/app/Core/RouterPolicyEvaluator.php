@@ -652,6 +652,43 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'FinalizePOSSale':
+                if (trim((string) ($command['draft_id'] ?? $command['sale_draft_id'] ?? '')) === '') {
+                    return [false, 'missing_draft_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetPOSSale':
+                if (trim((string) ($command['sale_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_sale_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListPOSSales':
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                foreach (['date_from', 'date_to'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
+            case 'BuildPOSReceipt':
+                $saleId = trim((string) ($command['sale_id'] ?? $command['id'] ?? ''));
+                $saleNumber = trim((string) ($command['sale_number'] ?? $command['number'] ?? ''));
+                if ($saleId === '' && $saleNumber === '') {
+                    return [false, 'missing_sale_reference'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetPOSSaleByNumber':
+                if (trim((string) ($command['sale_number'] ?? $command['number'] ?? '')) === '') {
+                    return [false, 'missing_sale_number'];
+                }
+                return [true, 'schema_valid'];
+
             case 'CreateEntity':
                 if ($entity === '') {
                     return [false, 'missing_entity'];

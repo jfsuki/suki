@@ -1,0 +1,73 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "POSSaleLine",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tenant_id",
+    "sale_id",
+    "product_id",
+    "product_label",
+    "qty",
+    "unit_price",
+    "line_total",
+    "metadata"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app_id": {
+      "type": ["string", "null"]
+    },
+    "sale_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "product_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sku": {
+      "type": ["string", "null"]
+    },
+    "barcode": {
+      "type": ["string", "null"]
+    },
+    "product_label": {
+      "type": "string",
+      "minLength": 1
+    },
+    "qty": {
+      "type": "number",
+      "exclusiveMinimum": 0
+    },
+    "unit_price": {
+      "type": "number",
+      "minimum": 0
+    },
+    "tax_rate": {
+      "type": ["number", "null"]
+    },
+    "line_total": {
+      "type": "number",
+      "minimum": 0
+    },
+    "metadata": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "created_at": {
+      "type": "string"
+    },
+    "updated_at": {
+      "type": "string"
+    }
+  }
+}
