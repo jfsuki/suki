@@ -3662,6 +3662,182 @@ if ($route === 'pos/get-sale-by-number') {
     }
 }
 
+if ($route === 'pos/open-cash-register') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = requestData();
+    if (($payload['tenant_id'] ?? '') !== '' && trim((string) $payload['tenant_id']) !== $tenantId) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 403);
+        return;
+    }
+
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $session = (new POSService())->openCashRegister($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+            'opened_by_user_id' => (string) ($sessionUser['id'] ?? 'anon'),
+        ]);
+        respondJson($response, 'success', 'Caja POS abierta', ['session' => $session, 'item' => $session]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'pos/get-open-cash-session') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $cashRegisterId = trim((string) ($payload['cash_register_id'] ?? ''));
+        $session = (new POSService())->getOpenCashSession(
+            $tenantId,
+            $cashRegisterId,
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null
+        );
+        respondJson($response, 'success', 'Caja POS abierta cargada', ['session' => $session, 'item' => $session]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 404);
+        return;
+    }
+}
+
+if ($route === 'pos/close-cash-register') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = requestData();
+    if (($payload['tenant_id'] ?? '') !== '' && trim((string) $payload['tenant_id']) !== $tenantId) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 403);
+        return;
+    }
+
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $result = (new POSService())->closeCashRegister($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+            'closed_by_user_id' => (string) ($sessionUser['id'] ?? 'anon'),
+        ]);
+        respondJson($response, 'success', 'Caja POS cerrada', $result + ['item' => $result['session'] ?? null]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'pos/build-cash-summary') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $summary = (new POSService())->buildCashSummary(
+            $tenantId,
+            trim((string) ($payload['session_id'] ?? '')),
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null
+        );
+        respondJson($response, 'success', 'Arqueo POS preparado', ['summary' => $summary, 'item' => $summary]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 404);
+        return;
+    }
+}
+
+if ($route === 'pos/list-cash-sessions') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $items = (new POSService())->listCashSessions(
+            $tenantId,
+            $payload,
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null
+        );
+        respondJson($response, 'success', 'Sesiones de caja POS cargadas', ['items' => $items, 'result_count' => count($items)]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
 if ($route === 'media/access') {
     if ($method !== 'GET') {
         respondJson($response, 'error', 'Metodo no permitido', [], 405);

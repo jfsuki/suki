@@ -14,6 +14,7 @@ final class POSContractValidator
     private const SESSION_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/pos_session.schema.json';
     private const SALE_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/pos_sale.schema.json';
     private const RECEIPT_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/pos_receipt_payload.schema.json';
+    private const CASH_SUMMARY_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/pos_cash_summary.schema.json';
 
     /**
      * @param array<string, mixed> $payload
@@ -45,6 +46,14 @@ final class POSContractValidator
     public static function validateReceipt(array $payload): void
     {
         self::validate(self::RECEIPT_SCHEMA, self::normalizePayload($payload), 'POSReceiptPayload');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public static function validateCashSummary(array $payload): void
+    {
+        self::validate(self::CASH_SUMMARY_SCHEMA, self::normalizePayload($payload), 'POSCashSummary');
     }
 
     /**
@@ -138,6 +147,15 @@ final class POSContractValidator
                     return $item;
                 },
                 (array) $payload['items']
+            );
+        }
+
+        if (is_array($payload['sales'] ?? null)) {
+            $payload['sales'] = array_map(
+                static function ($sale): array {
+                    return is_array($sale) ? $sale : [];
+                },
+                (array) $payload['sales']
             );
         }
 

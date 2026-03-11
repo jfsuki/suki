@@ -49,8 +49,106 @@ final class POSRepository
             $this->requiredTables(),
             $this->requiredIndexes(),
             [],
-            'db/migrations/' . $this->driver() . '/20260310_016_pos_sales_flow_receipt.sql'
+            'db/migrations/' . $this->driver() . '/20260311_017_pos_cash_register_arqueo.sql'
         );
+    }
+
+    /**
+     * @param array<string, mixed> $record
+     * @return array<string, mixed>
+     */
+    public function createSession(array $record): array
+    {
+        $id = $this->insertRecord(self::SESSION_TABLE, [
+            'tenant_id',
+            'app_id',
+            'store_id',
+            'cash_register_id',
+            'opened_by_user_id',
+            'closed_by_user_id',
+            'opening_amount',
+            'expected_cash_amount',
+            'counted_cash_amount',
+            'difference_amount',
+            'notes',
+            'status',
+            'opened_at',
+            'closed_at',
+            'metadata_json',
+            'created_at',
+            'updated_at',
+        ], [
+            'tenant_id' => $record['tenant_id'] ?? '',
+            'app_id' => $record['app_id'] ?? null,
+            'store_id' => $record['store_id'] ?? null,
+            'cash_register_id' => $record['cash_register_id'] ?? null,
+            'opened_by_user_id' => $record['opened_by_user_id'] ?? null,
+            'closed_by_user_id' => $record['closed_by_user_id'] ?? null,
+            'opening_amount' => $record['opening_amount'] ?? null,
+            'expected_cash_amount' => $record['expected_cash_amount'] ?? null,
+            'counted_cash_amount' => $record['counted_cash_amount'] ?? null,
+            'difference_amount' => $record['difference_amount'] ?? null,
+            'notes' => $record['notes'] ?? null,
+            'status' => $record['status'] ?? 'open',
+            'opened_at' => $record['opened_at'] ?? null,
+            'closed_at' => $record['closed_at'] ?? null,
+            'metadata_json' => $this->encodeJson($record['metadata'] ?? []),
+            'created_at' => $record['created_at'] ?? date('Y-m-d H:i:s'),
+            'updated_at' => $record['updated_at'] ?? ($record['created_at'] ?? date('Y-m-d H:i:s')),
+        ]);
+
+        $saved = $this->findSession((string) ($record['tenant_id'] ?? ''), $id, isset($record['app_id']) ? (string) $record['app_id'] : null);
+        if (!is_array($saved)) {
+            throw new RuntimeException('POS_SESSION_INSERT_FETCH_FAILED');
+        }
+
+        return $saved;
+    }
+
+    /**
+     * @param array<string, mixed> $updates
+     * @return array<string, mixed>|null
+     */
+    public function updateSession(string $tenantId, string $sessionId, array $updates, ?string $appId = null): ?array
+    {
+        $allowed = [
+            'store_id',
+            'cash_register_id',
+            'opened_by_user_id',
+            'closed_by_user_id',
+            'opening_amount',
+            'expected_cash_amount',
+            'counted_cash_amount',
+            'difference_amount',
+            'notes',
+            'status',
+            'opened_at',
+            'closed_at',
+            'metadata_json',
+            'updated_at',
+        ];
+        $payload = [];
+        foreach ($allowed as $column) {
+            if (!array_key_exists($column, $updates)) {
+                continue;
+            }
+            $payload[$column] = $updates[$column];
+        }
+        if (array_key_exists('metadata', $updates)) {
+            $payload['metadata_json'] = $this->encodeJson($updates['metadata']);
+        }
+        if (!array_key_exists('updated_at', $payload)) {
+            $payload['updated_at'] = date('Y-m-d H:i:s');
+        }
+        if ($payload === []) {
+            return $this->findSession($tenantId, $sessionId, $appId);
+        }
+
+        $this->sessionQuery($tenantId, $appId)
+            ->where('id', '=', $sessionId)
+            ->update($payload);
+
+        return $this->findSession($tenantId, $sessionId, $appId);
     }
 
     /**
@@ -600,6 +698,84 @@ final class POSRepository
             ->first();
 
         return is_array($row) ? $this->normalizeSessionRow($row) : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findOpenSessionByRegister(string $tenantId, string $cashRegisterId, ?string $appId = null): ?array
+    {
+        $row = $this->sessionQuery($tenantId, $appId)
+            ->where('cash_register_id', '=', $cashRegisterId)
+            ->where('status', '=', 'open')
+            ->orderBy('opened_at', 'DESC')
+            ->orderBy('id', 'DESC')
+            ->first();
+
+        return is_array($row) ? $this->normalizeSessionRow($row) : null;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function listSessions(string $tenantId, array $filters = [], int $limit = 20): array
+    {
+        $qb = $this->sessionQuery($tenantId, $this->nullableString($filters['app_id'] ?? null))
+            ->orderBy('opened_at', 'DESC')
+            ->orderBy('id', 'DESC')
+            ->limit(max(1, min(100, $limit)));
+
+        foreach (['status', 'cash_register_id', 'store_id', 'opened_by_user_id', 'closed_by_user_id'] as $key) {
+            $value = $this->nullableString($filters[$key] ?? null);
+            if ($value === null) {
+                continue;
+            }
+            $qb->where($key, '=', $value);
+        }
+
+        $dateFrom = $this->nullableString($filters['date_from'] ?? null);
+        if ($dateFrom !== null) {
+            $qb->where('created_at', '>=', $dateFrom);
+        }
+        $dateTo = $this->nullableString($filters['date_to'] ?? null);
+        if ($dateTo !== null) {
+            $qb->where('created_at', '<=', $dateTo);
+        }
+
+        $rows = $qb->get();
+
+        return array_map(fn(array $row): array => $this->normalizeSessionRow($row), $rows);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function summarizeSalesForSession(string $tenantId, string $sessionId, ?string $appId = null): array
+    {
+        $rows = $this->saleQuery($tenantId, $appId)
+            ->where('session_id', '=', $sessionId)
+            ->where('status', '!=', 'voided')
+            ->orderBy('created_at', 'ASC')
+            ->orderBy('id', 'ASC')
+            ->get();
+
+        $sales = array_map(fn(array $row): array => $this->normalizeSaleRow($row), $rows);
+        $items = array_map(static function (array $sale): array {
+            return [
+                'sale_id' => (string) ($sale['id'] ?? ''),
+                'sale_number' => (string) ($sale['sale_number'] ?? ''),
+                'status' => (string) ($sale['status'] ?? ''),
+                'total' => (float) ($sale['total'] ?? 0),
+                'created_at' => (string) ($sale['created_at'] ?? ''),
+            ];
+        }, $sales);
+
+        return [
+            'sales_count' => count($sales),
+            'sales_total' => $this->decimal(array_reduce($sales, static fn(float $carry, array $sale): float => $carry + (float) ($sale['total'] ?? 0), 0.0)),
+            'sales' => $items,
+        ];
     }
 
     /**
@@ -1174,6 +1350,7 @@ final class POSRepository
             self::SESSION_TABLE => [
                 'idx_pos_sessions_tenant_app_status',
                 'idx_pos_sessions_tenant_register',
+                'idx_pos_sessions_tenant_created',
             ],
             self::DRAFT_TABLE => [
                 'idx_sale_drafts_tenant_app_status',
@@ -1216,6 +1393,12 @@ final class POSRepository
                 store_id TEXT NULL,
                 cash_register_id TEXT NULL,
                 opened_by_user_id TEXT NULL,
+                closed_by_user_id TEXT NULL,
+                opening_amount REAL NULL,
+                expected_cash_amount REAL NULL,
+                counted_cash_amount REAL NULL,
+                difference_amount REAL NULL,
+                notes TEXT NULL,
                 status TEXT NOT NULL,
                 opened_at TEXT NULL,
                 closed_at TEXT NULL,
@@ -1226,6 +1409,7 @@ final class POSRepository
         );
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_pos_sessions_tenant_app_status ON ' . self::SESSION_TABLE . ' (tenant_id, app_id, status, opened_at)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_pos_sessions_tenant_register ON ' . self::SESSION_TABLE . ' (tenant_id, cash_register_id, status)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_pos_sessions_tenant_created ON ' . self::SESSION_TABLE . ' (tenant_id, app_id, created_at, id)');
 
         $this->db->exec(
             'CREATE TABLE IF NOT EXISTS ' . self::DRAFT_TABLE . ' (
@@ -1319,6 +1503,7 @@ final class POSRepository
         );
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_pos_sale_lines_tenant_sale ON ' . self::SALE_LINE_TABLE . ' (tenant_id, app_id, sale_id, id)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_pos_sale_lines_tenant_product ON ' . self::SALE_LINE_TABLE . ' (tenant_id, product_id, created_at)');
+        $this->ensureSessionColumnsSqlite();
         $this->ensureLineColumnsSqlite();
     }
 
@@ -1332,6 +1517,12 @@ final class POSRepository
                 store_id VARCHAR(120) NULL,
                 cash_register_id VARCHAR(120) NULL,
                 opened_by_user_id VARCHAR(120) NULL,
+                closed_by_user_id VARCHAR(120) NULL,
+                opening_amount DECIMAL(18,4) NULL,
+                expected_cash_amount DECIMAL(18,4) NULL,
+                counted_cash_amount DECIMAL(18,4) NULL,
+                difference_amount DECIMAL(18,4) NULL,
+                notes TEXT NULL,
                 status VARCHAR(32) NOT NULL,
                 opened_at DATETIME NULL,
                 closed_at DATETIME NULL,
@@ -1340,7 +1531,8 @@ final class POSRepository
                 updated_at DATETIME NOT NULL,
                 PRIMARY KEY (id),
                 KEY idx_pos_sessions_tenant_app_status (tenant_id, app_id, status, opened_at),
-                KEY idx_pos_sessions_tenant_register (tenant_id, cash_register_id, status)
+                KEY idx_pos_sessions_tenant_register (tenant_id, cash_register_id, status),
+                KEY idx_pos_sessions_tenant_created (tenant_id, app_id, created_at, id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
 
@@ -1439,7 +1631,46 @@ final class POSRepository
                 KEY idx_pos_sale_lines_tenant_product (tenant_id, product_id, created_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
+        $this->ensureSessionColumnsMySql();
         $this->ensureLineColumnsMySql();
+    }
+
+    private function ensureSessionColumnsSqlite(): void
+    {
+        $columns = [
+            'closed_by_user_id' => 'ALTER TABLE ' . self::SESSION_TABLE . ' ADD COLUMN closed_by_user_id TEXT NULL',
+            'opening_amount' => 'ALTER TABLE ' . self::SESSION_TABLE . ' ADD COLUMN opening_amount REAL NULL',
+            'expected_cash_amount' => 'ALTER TABLE ' . self::SESSION_TABLE . ' ADD COLUMN expected_cash_amount REAL NULL',
+            'counted_cash_amount' => 'ALTER TABLE ' . self::SESSION_TABLE . ' ADD COLUMN counted_cash_amount REAL NULL',
+            'difference_amount' => 'ALTER TABLE ' . self::SESSION_TABLE . ' ADD COLUMN difference_amount REAL NULL',
+            'notes' => 'ALTER TABLE ' . self::SESSION_TABLE . ' ADD COLUMN notes TEXT NULL',
+        ];
+
+        foreach ($columns as $column => $sql) {
+            if ($this->columnExists(self::SESSION_TABLE, $column)) {
+                continue;
+            }
+            $this->db->exec($sql);
+        }
+    }
+
+    private function ensureSessionColumnsMySql(): void
+    {
+        $columns = [
+            'closed_by_user_id' => 'ALTER TABLE ' . self::SESSION_TABLE . ' ADD COLUMN closed_by_user_id VARCHAR(120) NULL AFTER opened_by_user_id',
+            'opening_amount' => 'ALTER TABLE ' . self::SESSION_TABLE . ' ADD COLUMN opening_amount DECIMAL(18,4) NULL AFTER closed_by_user_id',
+            'expected_cash_amount' => 'ALTER TABLE ' . self::SESSION_TABLE . ' ADD COLUMN expected_cash_amount DECIMAL(18,4) NULL AFTER opening_amount',
+            'counted_cash_amount' => 'ALTER TABLE ' . self::SESSION_TABLE . ' ADD COLUMN counted_cash_amount DECIMAL(18,4) NULL AFTER expected_cash_amount',
+            'difference_amount' => 'ALTER TABLE ' . self::SESSION_TABLE . ' ADD COLUMN difference_amount DECIMAL(18,4) NULL AFTER counted_cash_amount',
+            'notes' => 'ALTER TABLE ' . self::SESSION_TABLE . ' ADD COLUMN notes TEXT NULL AFTER difference_amount',
+        ];
+
+        foreach ($columns as $column => $sql) {
+            if ($this->columnExists(self::SESSION_TABLE, $column)) {
+                continue;
+            }
+            $this->db->exec($sql);
+        }
     }
 
     private function ensureLineColumnsSqlite(): void
@@ -1608,6 +1839,12 @@ final class POSRepository
                 'store_id',
                 'cash_register_id',
                 'opened_by_user_id',
+                'closed_by_user_id',
+                'opening_amount',
+                'expected_cash_amount',
+                'counted_cash_amount',
+                'difference_amount',
+                'notes',
                 'status',
                 'opened_at',
                 'closed_at',
@@ -1774,6 +2011,20 @@ final class POSRepository
             'store_id' => $this->nullableString($row['store_id'] ?? null),
             'cash_register_id' => $this->nullableString($row['cash_register_id'] ?? null),
             'opened_by_user_id' => $this->nullableString($row['opened_by_user_id'] ?? null),
+            'closed_by_user_id' => $this->nullableString($row['closed_by_user_id'] ?? null),
+            'opening_amount' => array_key_exists('opening_amount', $row) && $row['opening_amount'] !== null && $row['opening_amount'] !== ''
+                ? $this->decimal($row['opening_amount'])
+                : null,
+            'expected_cash_amount' => array_key_exists('expected_cash_amount', $row) && $row['expected_cash_amount'] !== null && $row['expected_cash_amount'] !== ''
+                ? $this->decimal($row['expected_cash_amount'])
+                : null,
+            'counted_cash_amount' => array_key_exists('counted_cash_amount', $row) && $row['counted_cash_amount'] !== null && $row['counted_cash_amount'] !== ''
+                ? $this->decimal($row['counted_cash_amount'])
+                : null,
+            'difference_amount' => array_key_exists('difference_amount', $row) && $row['difference_amount'] !== null && $row['difference_amount'] !== ''
+                ? $this->decimal($row['difference_amount'])
+                : null,
+            'notes' => $this->nullableString($row['notes'] ?? null),
             'status' => trim((string) ($row['status'] ?? 'closed')) ?: 'closed',
             'opened_at' => $this->nullableString($row['opened_at'] ?? null),
             'closed_at' => $this->nullableString($row['closed_at'] ?? null),

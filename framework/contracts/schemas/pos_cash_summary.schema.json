@@ -1,0 +1,109 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "POSCashSummary",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "session_id",
+    "status",
+    "opening_amount",
+    "sales_count",
+    "sales_total",
+    "expected_cash_amount",
+    "hooks",
+    "sales"
+  ],
+  "properties": {
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app_id": {
+      "type": ["string", "null"]
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "cash_register_id": {
+      "type": ["string", "null"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "closed", "draft", "paused"]
+    },
+    "opening_amount": {
+      "type": "number",
+      "minimum": 0
+    },
+    "sales_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "sales_total": {
+      "type": "number",
+      "minimum": 0
+    },
+    "expected_cash_amount": {
+      "type": "number",
+      "minimum": 0
+    },
+    "counted_cash_amount": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "difference_amount": {
+      "type": ["number", "null"]
+    },
+    "opened_at": {
+      "type": ["string", "null"]
+    },
+    "closed_at": {
+      "type": ["string", "null"]
+    },
+    "opened_by_user_id": {
+      "type": ["string", "null"]
+    },
+    "closed_by_user_id": {
+      "type": ["string", "null"]
+    },
+    "notes": {
+      "type": ["string", "null"]
+    },
+    "sales": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["sale_id", "sale_number", "status", "total", "created_at"],
+        "properties": {
+          "sale_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "sale_number": {
+            "type": "string",
+            "minLength": 1
+          },
+          "status": {
+            "type": "string",
+            "minLength": 1
+          },
+          "total": {
+            "type": "number",
+            "minimum": 0
+          },
+          "created_at": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "hooks": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

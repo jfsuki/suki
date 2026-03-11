@@ -1,7 +1,7 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.6.0",
-  "effective_date": "2026-03-10",
+  "version": "1.7.0",
+  "effective_date": "2026-03-11",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
   "contract_location": "docs/contracts",
@@ -1133,6 +1133,169 @@
         ],
         "optional": [
           "sale_number"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_open_cash_register",
+      "description": "Open a POS cash register session with opening amount control.",
+      "intent_patterns": [
+        "re:(abre|abrir|apertura|inicia|iniciar).*(caja|cash register|cash).*(pos)?",
+        "re:(caja|cash register|cash).*(abre|abrir|apertura|inicia|iniciar).*(pos)?"
+      ],
+      "keywords": [
+        "abrir caja pos",
+        "apertura caja pos",
+        "open cash register pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_open_cash_register"
+      ],
+      "priority": 160,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "cash_register_id",
+          "opening_amount",
+          "notes"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_get_open_cash_session",
+      "description": "Load the current open POS cash register session.",
+      "intent_patterns": [
+        "re:(muestra|mostrar|consulta|ver|cual|cuál).*(caja|cash register).*(abierta|open).*(pos)?",
+        "re:(caja|cash register).*(abierta|open).*(pos)?"
+      ],
+      "keywords": [
+        "caja abierta pos",
+        "sesion abierta caja pos",
+        "open cash session pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_get_open_cash_session"
+      ],
+      "priority": 159,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "cash_register_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_close_cash_register",
+      "description": "Close a POS cash register session with counted cash amount.",
+      "intent_patterns": [
+        "re:(cierra|cerrar|cierre|arquea).*(caja|cash register|cash).*(pos)?",
+        "re:(caja|cash register|cash).*(cierra|cerrar|cierre).*(pos)?"
+      ],
+      "keywords": [
+        "cerrar caja pos",
+        "cierre caja pos",
+        "close cash register pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_close_cash_register"
+      ],
+      "priority": 158,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "session_id",
+          "counted_cash_amount",
+          "notes"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_build_cash_summary",
+      "description": "Prepare a POS arqueo or cash summary payload for one session.",
+      "intent_patterns": [
+        "re:(arqueo|cash summary|resumen de caja).*(pos)?",
+        "re:(prepara|genera|arma|build).*(arqueo|cash summary|resumen de caja).*(pos)?"
+      ],
+      "keywords": [
+        "arqueo pos",
+        "resumen caja pos",
+        "cash summary pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_build_cash_summary"
+      ],
+      "priority": 157,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "session_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_list_cash_sessions",
+      "description": "List POS cash register sessions with open or closed filters.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(sesiones|cajas|cash sessions|cash registers).*(pos)?",
+        "re:(cajas|cash sessions|cash registers).*(abiertas|cerradas|open|closed).*(pos)?"
+      ],
+      "keywords": [
+        "listar cajas pos",
+        "sesiones caja pos",
+        "list cash sessions pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_list_cash_sessions"
+      ],
+      "priority": 156,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "cash_register_id",
+          "status",
+          "date_from",
+          "date_to",
+          "limit"
         ]
       },
       "channel_capabilities": [

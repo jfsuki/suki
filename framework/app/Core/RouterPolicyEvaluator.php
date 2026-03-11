@@ -689,6 +689,47 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'OpenPOSCashRegister':
+                if (trim((string) ($command['cash_register_id'] ?? '')) === '') {
+                    return [false, 'missing_cash_register_id'];
+                }
+                if (!array_key_exists('opening_amount', $command) || !is_numeric($command['opening_amount']) || (float) $command['opening_amount'] < 0) {
+                    return [false, 'invalid_opening_amount'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetPOSOpenCashSession':
+                if (trim((string) ($command['cash_register_id'] ?? '')) === '') {
+                    return [false, 'missing_cash_register_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ClosePOSCashRegister':
+                if (trim((string) ($command['session_id'] ?? '')) === '') {
+                    return [false, 'missing_session_id'];
+                }
+                if (!array_key_exists('counted_cash_amount', $command) || !is_numeric($command['counted_cash_amount']) || (float) $command['counted_cash_amount'] < 0) {
+                    return [false, 'invalid_counted_cash_amount'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'BuildPOSCashSummary':
+                if (trim((string) ($command['session_id'] ?? '')) === '') {
+                    return [false, 'missing_session_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListPOSCashSessions':
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                foreach (['status', 'cash_register_id', 'date_from', 'date_to'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
             case 'CreateEntity':
                 if ($entity === '') {
                     return [false, 'missing_entity'];

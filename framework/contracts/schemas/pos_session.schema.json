@@ -30,6 +30,27 @@
     "opened_by_user_id": {
       "type": ["string", "null"]
     },
+    "closed_by_user_id": {
+      "type": ["string", "null"]
+    },
+    "opening_amount": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "expected_cash_amount": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "counted_cash_amount": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "difference_amount": {
+      "type": ["number", "null"]
+    },
+    "notes": {
+      "type": ["string", "null"]
+    },
     "status": {
       "type": "string",
       "enum": ["open", "closed", "draft", "paused"]

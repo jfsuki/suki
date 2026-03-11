@@ -416,6 +416,11 @@ final class SkillExecutor
             'pos_list_sales',
             'pos_build_receipt',
             'pos_get_sale_by_number',
+            'pos_open_cash_register',
+            'pos_get_open_cash_session',
+            'pos_close_cash_register',
+            'pos_build_cash_summary',
+            'pos_list_cash_sessions',
         ], true);
     }
 

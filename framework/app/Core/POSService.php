@@ -39,8 +39,11 @@ final class POSService
         $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
         $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
         $sessionId = $this->nullableString($payload['session_id'] ?? null);
-        if ($sessionId !== null && !$this->sessionExists($tenantId, $sessionId, $appId)) {
-            throw new RuntimeException('POS_SESSION_NOT_FOUND');
+        if ($sessionId !== null) {
+            $session = $this->loadSession($tenantId, $sessionId, $appId);
+            if ((string) ($session['status'] ?? '') !== 'open') {
+                throw new RuntimeException('POS_SESSION_NOT_OPEN');
+            }
         }
 
         $draft = $this->repository->createDraft([
@@ -529,6 +532,322 @@ final class POSService
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
+    public function openCashRegister(array $payload): array
+    {
+        $startedAt = microtime(true);
+        $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
+        $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
+        $cashRegisterId = $this->requireString($payload['cash_register_id'] ?? null, 'cash_register_id');
+        $openingAmount = $this->nonNegativeMoney(
+            $payload['opening_amount'] ?? $payload['monto_inicial'] ?? null,
+            'POS_OPENING_AMOUNT_REQUIRED'
+        );
+        $openedByUserId = $this->nullableString(
+            $payload['opened_by_user_id']
+            ?? $payload['requested_by_user_id']
+            ?? $payload['user_id']
+            ?? null
+        );
+
+        $existing = $this->repository->findOpenSessionByRegister($tenantId, $cashRegisterId, $appId);
+        if (is_array($existing)) {
+            throw new RuntimeException('POS_CASH_REGISTER_ALREADY_OPEN');
+        }
+
+        $openedAt = date('Y-m-d H:i:s');
+        $session = $this->repository->transaction(function () use (
+            $tenantId,
+            $appId,
+            $cashRegisterId,
+            $openingAmount,
+            $openedByUserId,
+            $payload,
+            $openedAt
+        ): array {
+            $current = $this->repository->findOpenSessionByRegister($tenantId, $cashRegisterId, $appId);
+            if (is_array($current)) {
+                throw new RuntimeException('POS_CASH_REGISTER_ALREADY_OPEN');
+            }
+
+            return $this->validatedSession($this->repository->createSession([
+                'tenant_id' => $tenantId,
+                'app_id' => $appId,
+                'store_id' => $this->nullableString($payload['store_id'] ?? null),
+                'cash_register_id' => $cashRegisterId,
+                'opened_by_user_id' => $openedByUserId,
+                'opening_amount' => $openingAmount,
+                'notes' => $this->nullableString($payload['notes'] ?? null),
+                'status' => 'open',
+                'opened_at' => $openedAt,
+                'metadata' => [
+                    'hooks' => [
+                        'payments' => 'cash_only_assumption',
+                        'accounting' => 'pending',
+                        'fiscal_engine' => 'pending',
+                    ],
+                ],
+                'created_at' => $openedAt,
+                'updated_at' => $openedAt,
+            ]));
+        });
+
+        $latencyMs = $this->latencyMs($startedAt);
+        $this->auditLogger->log('pos_open_cash_register', 'pos_session', $session['id'], [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'open_cash_register',
+            'cash_register_id' => $cashRegisterId,
+            'session_id' => $session['id'],
+            'opened_by_user_id' => $openedByUserId,
+            'opening_amount' => $openingAmount,
+            'sales_count' => 0,
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('open_cash_register', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'open_cash_register',
+            'cash_register_id' => $cashRegisterId,
+            'session_id' => $session['id'],
+            'opened_by_user_id' => $openedByUserId,
+            'opening_amount' => $openingAmount,
+            'sales_count' => 0,
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return $session;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getOpenCashSession(string $tenantId, string $cashRegisterId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $session = $this->repository->findOpenSessionByRegister($tenantId, $cashRegisterId, $appId);
+        if (!is_array($session)) {
+            throw new RuntimeException('POS_OPEN_CASH_SESSION_NOT_FOUND');
+        }
+
+        $session = $this->validatedSession($session);
+        $salesSummary = $this->repository->summarizeSalesForSession($tenantId, (string) ($session['id'] ?? ''), $appId);
+        $latencyMs = $this->latencyMs($startedAt);
+
+        $this->auditLogger->log('pos_get_open_cash_session', 'pos_session', (string) ($session['id'] ?? ''), [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'get_open_cash_session',
+            'cash_register_id' => $cashRegisterId,
+            'session_id' => $session['id'],
+            'opened_by_user_id' => $session['opened_by_user_id'] ?? null,
+            'opening_amount' => (float) (($session['opening_amount'] ?? 0) ?: 0),
+            'sales_count' => (int) ($salesSummary['sales_count'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('get_open_cash_session', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'get_open_cash_session',
+            'cash_register_id' => $cashRegisterId,
+            'session_id' => $session['id'],
+            'opened_by_user_id' => $session['opened_by_user_id'] ?? null,
+            'opening_amount' => (float) (($session['opening_amount'] ?? 0) ?: 0),
+            'sales_count' => (int) ($salesSummary['sales_count'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return $session;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function closeCashRegister(array $payload): array
+    {
+        $startedAt = microtime(true);
+        $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
+        $sessionId = $this->requireString($payload['session_id'] ?? null, 'session_id');
+        $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
+        $countedCashAmount = $this->nonNegativeMoney(
+            $payload['counted_cash_amount'] ?? $payload['counted_amount'] ?? $payload['monto_contado'] ?? null,
+            'POS_COUNTED_CASH_AMOUNT_REQUIRED'
+        );
+        $closedByUserId = $this->nullableString(
+            $payload['closed_by_user_id']
+            ?? $payload['requested_by_user_id']
+            ?? $payload['user_id']
+            ?? null
+        );
+
+        $session = $this->loadSession($tenantId, $sessionId, $appId);
+        if ((string) ($session['status'] ?? '') === 'closed') {
+            throw new RuntimeException('POS_CASH_SESSION_ALREADY_CLOSED');
+        }
+        if ((string) ($session['status'] ?? '') !== 'open') {
+            throw new RuntimeException('POS_CASH_SESSION_NOT_OPEN');
+        }
+
+        $closedAt = date('Y-m-d H:i:s');
+        $summary = $this->composeCashSummary($session, $appId);
+        $expectedCashAmount = (float) ($summary['expected_cash_amount'] ?? 0);
+        $differenceAmount = $this->money($countedCashAmount - $expectedCashAmount);
+
+        $updatedSession = $this->repository->updateSession($tenantId, $sessionId, [
+            'status' => 'closed',
+            'closed_at' => $closedAt,
+            'closed_by_user_id' => $closedByUserId,
+            'expected_cash_amount' => $expectedCashAmount,
+            'counted_cash_amount' => $countedCashAmount,
+            'difference_amount' => $differenceAmount,
+            'notes' => $this->nullableString($payload['notes'] ?? null) ?? $this->nullableString($session['notes'] ?? null),
+            'metadata' => array_merge(
+                is_array($session['metadata'] ?? null) ? (array) $session['metadata'] : [],
+                [
+                    'closing_summary' => [
+                        'sales_count' => (int) ($summary['sales_count'] ?? 0),
+                        'sales_total' => (float) ($summary['sales_total'] ?? 0),
+                        'expected_cash_amount' => $expectedCashAmount,
+                        'counted_cash_amount' => $countedCashAmount,
+                        'difference_amount' => $differenceAmount,
+                    ],
+                ]
+            ),
+            'updated_at' => $closedAt,
+        ], $appId);
+        if (!is_array($updatedSession)) {
+            throw new RuntimeException('POS_SESSION_NOT_FOUND');
+        }
+
+        $updatedSession = $this->validatedSession($updatedSession);
+        $finalSummary = $this->composeCashSummary($updatedSession, $appId);
+        $latencyMs = $this->latencyMs($startedAt);
+
+        $this->auditLogger->log('pos_close_cash_register', 'pos_session', $sessionId, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'close_cash_register',
+            'cash_register_id' => $updatedSession['cash_register_id'] ?? null,
+            'session_id' => $sessionId,
+            'opened_by_user_id' => $updatedSession['opened_by_user_id'] ?? null,
+            'closed_by_user_id' => $closedByUserId,
+            'opening_amount' => (float) (($updatedSession['opening_amount'] ?? 0) ?: 0),
+            'counted_cash_amount' => $countedCashAmount,
+            'difference_amount' => $differenceAmount,
+            'sales_count' => (int) ($finalSummary['sales_count'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('close_cash_register', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'close_cash_register',
+            'cash_register_id' => $updatedSession['cash_register_id'] ?? null,
+            'session_id' => $sessionId,
+            'opened_by_user_id' => $updatedSession['opened_by_user_id'] ?? null,
+            'closed_by_user_id' => $closedByUserId,
+            'opening_amount' => (float) (($updatedSession['opening_amount'] ?? 0) ?: 0),
+            'counted_cash_amount' => $countedCashAmount,
+            'difference_amount' => $differenceAmount,
+            'sales_count' => (int) ($finalSummary['sales_count'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return [
+            'session' => $updatedSession,
+            'summary' => $finalSummary,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function buildCashSummary(string $tenantId, string $sessionId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $session = $this->loadSession($tenantId, $sessionId, $appId);
+        $summary = $this->composeCashSummary($session, $appId);
+        $latencyMs = $this->latencyMs($startedAt);
+
+        $this->auditLogger->log('pos_build_cash_summary', 'pos_session', $sessionId, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'build_cash_summary',
+            'cash_register_id' => $session['cash_register_id'] ?? null,
+            'session_id' => $sessionId,
+            'opened_by_user_id' => $session['opened_by_user_id'] ?? null,
+            'closed_by_user_id' => $session['closed_by_user_id'] ?? null,
+            'opening_amount' => (float) (($summary['opening_amount'] ?? 0) ?: 0),
+            'counted_cash_amount' => $summary['counted_cash_amount'] ?? null,
+            'difference_amount' => $summary['difference_amount'] ?? null,
+            'sales_count' => (int) ($summary['sales_count'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('build_cash_summary', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'build_cash_summary',
+            'cash_register_id' => $session['cash_register_id'] ?? null,
+            'session_id' => $sessionId,
+            'opened_by_user_id' => $session['opened_by_user_id'] ?? null,
+            'closed_by_user_id' => $session['closed_by_user_id'] ?? null,
+            'opening_amount' => (float) (($summary['opening_amount'] ?? 0) ?: 0),
+            'counted_cash_amount' => $summary['counted_cash_amount'] ?? null,
+            'difference_amount' => $summary['difference_amount'] ?? null,
+            'sales_count' => (int) ($summary['sales_count'] ?? 0),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return $summary;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function listCashSessions(string $tenantId, array $filters = [], ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $limit = max(1, min(50, (int) ($filters['limit'] ?? 10)));
+        $sessions = array_map(
+            fn(array $session): array => $this->validatedSession($session),
+            $this->repository->listSessions($tenantId, $filters + ['app_id' => $appId], $limit)
+        );
+        $latencyMs = $this->latencyMs($startedAt);
+
+        $this->auditLogger->log('pos_list_cash_sessions', 'pos_session', null, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'list_cash_sessions',
+            'cash_register_id' => $this->nullableString($filters['cash_register_id'] ?? null),
+            'sales_count' => 0,
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('list_cash_sessions', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'list_cash_sessions',
+            'cash_register_id' => $this->nullableString($filters['cash_register_id'] ?? null),
+            'result_count' => count($sessions),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return $sessions;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
     public function repriceDraft(string $tenantId, string $draftId, ?string $appId = null, array $payload = []): array
     {
         $startedAt = microtime(true);
@@ -674,7 +993,7 @@ final class POSService
                 'tax_total' => $currentDraft['tax_total'] ?? 0,
                 'total' => $currentDraft['total'] ?? 0,
                 'created_by_user_id' => $createdByUserId,
-                'metadata' => $this->buildSaleMetadata($currentDraft, $payload, $finalizedAt),
+                'metadata' => $this->buildSaleMetadata($currentDraft, $payload, $finalizedAt, $appId),
                 'created_at' => $finalizedAt,
                 'updated_at' => $finalizedAt,
             ]);
@@ -1013,21 +1332,6 @@ final class POSService
         return $loaded;
     }
 
-    private function sessionExists(string $tenantId, string $sessionId, ?string $appId): bool
-    {
-        $session = $this->repository->findSession($tenantId, $sessionId, $appId);
-        if (!is_array($session)) {
-            return false;
-        }
-
-        POSContractValidator::validateSession($session);
-
-        return true;
-    }
-
-    /**
-     * @return array<string, mixed>
-     */
     private function loadDraft(string $tenantId, string $draftId, ?string $appId): array
     {
         $draft = $this->repository->loadDraftAggregate($tenantId, $draftId, $appId);
@@ -1049,6 +1353,19 @@ final class POSService
         }
 
         return $this->validatedSale($sale);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function loadSession(string $tenantId, string $sessionId, ?string $appId): array
+    {
+        $session = $this->repository->findSession($tenantId, $sessionId, $appId);
+        if (!is_array($session)) {
+            throw new RuntimeException('POS_SESSION_NOT_FOUND');
+        }
+
+        return $this->validatedSession($session);
     }
 
     /**
@@ -1363,15 +1680,37 @@ final class POSService
     }
 
     /**
+     * @param mixed $value
+     */
+    private function nonNegativeMoney($value, string $errorCode): float
+    {
+        if ($value === null || $value === '' || !is_numeric($value)) {
+            throw new RuntimeException($errorCode);
+        }
+
+        $money = $this->money((float) $value);
+        if ($money < 0) {
+            throw new RuntimeException($errorCode);
+        }
+
+        return $money;
+    }
+
+    /**
      * @param array<string, mixed> $draft
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
-    private function buildSaleMetadata(array $draft, array $payload, string $finalizedAt): array
+    private function buildSaleMetadata(array $draft, array $payload, string $finalizedAt, ?string $appId): array
     {
         $customerResolution = is_array($draft['metadata']['customer_resolution'] ?? null)
             ? (array) $draft['metadata']['customer_resolution']
             : [];
+        $session = null;
+        $sessionId = $this->nullableString($draft['session_id'] ?? null);
+        if ($sessionId !== null) {
+            $session = $this->repository->findSession((string) ($draft['tenant_id'] ?? ''), $sessionId, $appId);
+        }
 
         return [
             'origin' => [
@@ -1388,8 +1727,63 @@ final class POSService
                 'cash_movement' => 'pending',
                 'receipt' => 'pending',
             ],
+            'cash_register' => [
+                'cash_register_id' => is_array($session) ? $this->nullableString($session['cash_register_id'] ?? null) : null,
+            ],
             'finalized_at' => $finalizedAt,
         ];
+    }
+
+    /**
+     * @param array<string, mixed> $session
+     * @return array<string, mixed>
+     */
+    private function composeCashSummary(array $session, ?string $appId): array
+    {
+        $tenantId = $this->requireString($session['tenant_id'] ?? null, 'tenant_id');
+        $sessionId = $this->requireString($session['id'] ?? null, 'session_id');
+        $salesSummary = $this->repository->summarizeSalesForSession($tenantId, $sessionId, $appId);
+        $openingAmount = (float) (($session['opening_amount'] ?? 0) ?: 0);
+        $expectedComputed = $this->money($openingAmount + (float) ($salesSummary['sales_total'] ?? 0));
+        $expectedCashAmount = array_key_exists('expected_cash_amount', $session)
+            && $session['expected_cash_amount'] !== null
+            ? (float) $session['expected_cash_amount']
+            : $expectedComputed;
+        $countedCashAmount = array_key_exists('counted_cash_amount', $session) && $session['counted_cash_amount'] !== null
+            ? (float) $session['counted_cash_amount']
+            : null;
+        $differenceAmount = array_key_exists('difference_amount', $session) && $session['difference_amount'] !== null
+            ? (float) $session['difference_amount']
+            : ($countedCashAmount !== null ? $this->money($countedCashAmount - $expectedComputed) : null);
+
+        $summary = [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'session_id' => $sessionId,
+            'cash_register_id' => $this->nullableString($session['cash_register_id'] ?? null),
+            'status' => (string) ($session['status'] ?? 'open'),
+            'opening_amount' => $openingAmount,
+            'sales_count' => (int) ($salesSummary['sales_count'] ?? 0),
+            'sales_total' => (float) ($salesSummary['sales_total'] ?? 0),
+            'expected_cash_amount' => $expectedCashAmount,
+            'counted_cash_amount' => $countedCashAmount,
+            'difference_amount' => $differenceAmount,
+            'opened_at' => $this->nullableString($session['opened_at'] ?? null),
+            'closed_at' => $this->nullableString($session['closed_at'] ?? null),
+            'opened_by_user_id' => $this->nullableString($session['opened_by_user_id'] ?? null),
+            'closed_by_user_id' => $this->nullableString($session['closed_by_user_id'] ?? null),
+            'notes' => $this->nullableString($session['notes'] ?? null),
+            'sales' => is_array($salesSummary['sales'] ?? null) ? (array) $salesSummary['sales'] : [],
+            'hooks' => [
+                'payments' => 'cash_only_assumption',
+                'accounting' => 'pending',
+                'fiscal_engine' => 'pending',
+            ],
+        ];
+
+        POSContractValidator::validateCashSummary($summary);
+
+        return $summary;
     }
 
     /**
@@ -1697,6 +2091,21 @@ final class POSService
         POSContractValidator::validateDraft($draft);
 
         return $draft;
+    }
+
+    /**
+     * @param array<string, mixed> $session
+     * @return array<string, mixed>
+     */
+    private function validatedSession(array $session): array
+    {
+        if (!array_key_exists('metadata', $session) && array_key_exists('metadata_json', $session)) {
+            $session['metadata'] = is_array($session['metadata_json']) ? (array) $session['metadata_json'] : [];
+        }
+
+        POSContractValidator::validateSession($session);
+
+        return $session;
     }
 
     /**

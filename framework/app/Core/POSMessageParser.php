@@ -37,6 +37,11 @@ final class POSMessageParser
             'pos_list_sales' => $this->parseListSales($message, $pairs, $baseCommand, $telemetry),
             'pos_build_receipt' => $this->parseBuildReceipt($pairs, $baseCommand, $telemetry),
             'pos_get_sale_by_number' => $this->parseGetSaleByNumber($pairs, $baseCommand, $telemetry),
+            'pos_open_cash_register' => $this->parseOpenCashRegister($pairs, $baseCommand, $telemetry),
+            'pos_get_open_cash_session' => $this->parseGetOpenCashSession($pairs, $baseCommand, $telemetry),
+            'pos_close_cash_register' => $this->parseCloseCashRegister($pairs, $baseCommand, $telemetry),
+            'pos_build_cash_summary' => $this->parseBuildCashSummary($pairs, $baseCommand, $telemetry),
+            'pos_list_cash_sessions' => $this->parseListCashSessions($message, $pairs, $baseCommand, $telemetry),
             default => ['kind' => 'ask_user', 'reply' => 'No pude interpretar la operacion POS.', 'telemetry' => $telemetry],
         };
     }
@@ -384,6 +389,124 @@ final class POSMessageParser
     }
 
     /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseOpenCashRegister(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $cashRegisterId = $this->cashRegisterId($pairs);
+        if ($cashRegisterId === '') {
+            return $this->askUser('Indica `cash_register_id` para abrir la caja POS.', $telemetry + ['pos_action' => 'open_cash_register']);
+        }
+
+        $openingAmount = $this->firstValue($pairs, ['opening_amount', 'monto_inicial']);
+        if ($openingAmount === '') {
+            return $this->askUser('Indica `opening_amount` para abrir la caja POS.', $telemetry + ['pos_action' => 'open_cash_register']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'OpenPOSCashRegister',
+            'cash_register_id' => $cashRegisterId,
+            'opening_amount' => $openingAmount,
+            'store_id' => $this->firstValue($pairs, ['store_id']),
+            'notes' => $this->firstValue($pairs, ['notes', 'nota']),
+        ], $telemetry + ['pos_action' => 'open_cash_register']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseGetOpenCashSession(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $cashRegisterId = $this->cashRegisterId($pairs);
+        if ($cashRegisterId === '') {
+            return $this->askUser('Indica `cash_register_id` para consultar la caja POS abierta.', $telemetry + ['pos_action' => 'get_open_cash_session']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'GetPOSOpenCashSession',
+            'cash_register_id' => $cashRegisterId,
+        ], $telemetry + ['pos_action' => 'get_open_cash_session']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseCloseCashRegister(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $sessionId = $this->sessionId($pairs);
+        if ($sessionId === '') {
+            return $this->askUser('Indica `session_id` para cerrar la caja POS.', $telemetry + ['pos_action' => 'close_cash_register']);
+        }
+
+        $countedCashAmount = $this->firstValue($pairs, ['counted_cash_amount', 'counted_amount', 'monto_contado']);
+        if ($countedCashAmount === '') {
+            return $this->askUser('Indica `counted_cash_amount` para cerrar la caja POS.', $telemetry + ['pos_action' => 'close_cash_register']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'ClosePOSCashRegister',
+            'session_id' => $sessionId,
+            'counted_cash_amount' => $countedCashAmount,
+            'notes' => $this->firstValue($pairs, ['notes', 'nota']),
+        ], $telemetry + ['pos_action' => 'close_cash_register']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseBuildCashSummary(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $sessionId = $this->sessionId($pairs);
+        if ($sessionId === '') {
+            return $this->askUser('Indica `session_id` para preparar el arqueo POS.', $telemetry + ['pos_action' => 'build_cash_summary']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'BuildPOSCashSummary',
+            'session_id' => $sessionId,
+        ], $telemetry + ['pos_action' => 'build_cash_summary']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseListCashSessions(string $message, array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $status = $this->firstValue($pairs, ['status', 'estado']);
+        if ($status === '') {
+            if ($this->containsAny($message, ['abierta', 'abiertas', 'open'])) {
+                $status = 'open';
+            } elseif ($this->containsAny($message, ['cerrada', 'cerradas', 'closed'])) {
+                $status = 'closed';
+            }
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'ListPOSCashSessions',
+            'cash_register_id' => $this->cashRegisterId($pairs) ?: null,
+            'status' => $status !== '' ? $status : null,
+            'date_from' => $this->firstValue($pairs, ['date_from', 'desde']) ?: null,
+            'date_to' => $this->firstValue($pairs, ['date_to', 'hasta']) ?: null,
+            'limit' => $this->firstValue($pairs, ['limit', 'top', 'max']) ?: '10',
+        ], $telemetry + ['pos_action' => 'list_cash_sessions']);
+    }
+
+    /**
      * @return array<string, string>
      */
     private function extractKeyValuePairs(string $message): array
@@ -445,6 +568,22 @@ final class POSMessageParser
     private function saleNumber(array $pairs): string
     {
         return $this->firstValue($pairs, ['sale_number', 'number', 'numero']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     */
+    private function sessionId(array $pairs): string
+    {
+        return $this->firstValue($pairs, ['session_id']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     */
+    private function cashRegisterId(array $pairs): string
+    {
+        return $this->firstValue($pairs, ['cash_register_id', 'register_id', 'caja_id', 'codigo', 'code']);
     }
 
     /**

@@ -26,6 +26,11 @@ final class POSCommandHandler implements CommandHandlerInterface
         'ListPOSSales',
         'BuildPOSReceipt',
         'GetPOSSaleByNumber',
+        'OpenPOSCashRegister',
+        'GetPOSOpenCashSession',
+        'ClosePOSCashRegister',
+        'BuildPOSCashSummary',
+        'ListPOSCashSessions',
     ];
 
     public function supports(string $commandName): bool
@@ -76,6 +81,11 @@ final class POSCommandHandler implements CommandHandlerInterface
                 'ListPOSSales' => $this->handleListSales($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'BuildPOSReceipt' => $this->handleBuildReceipt($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'GetPOSSaleByNumber' => $this->handleGetSaleByNumber($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'OpenPOSCashRegister' => $this->handleOpenCashRegister($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'GetPOSOpenCashSession' => $this->handleGetOpenCashSession($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'ClosePOSCashRegister' => $this->handleCloseCashRegister($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'BuildPOSCashSummary' => $this->handleBuildCashSummary($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'ListPOSCashSessions' => $this->handleListCashSessions($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 default => throw new RuntimeException('COMMAND_NOT_SUPPORTED'),
             };
         } catch (Throwable $e) {
@@ -732,6 +742,199 @@ final class POSCommandHandler implements CommandHandlerInterface
         ));
     }
 
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleOpenCashRegister(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $session = $service->openCashRegister($command + [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId !== '' ? $appId : null,
+        ]);
+
+        return $this->withReplyText($reply(
+            'Caja POS abierta: session_id=' . (string) ($session['id'] ?? '') . '.',
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'open_cash_register',
+                'cash_session' => $session,
+                'item' => $session,
+                'cash_register_id' => (string) ($session['cash_register_id'] ?? ''),
+                'session_id' => (string) ($session['id'] ?? ''),
+                'opening_amount' => (float) (($session['opening_amount'] ?? 0) ?: 0),
+                'sales_count' => 0,
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleGetOpenCashSession(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $cashRegisterId = trim((string) ($command['cash_register_id'] ?? ''));
+        if ($cashRegisterId === '') {
+            throw new RuntimeException('POS_CASH_REGISTER_ID_REQUIRED');
+        }
+
+        $session = $service->getOpenCashSession($tenantId, $cashRegisterId, $appId !== '' ? $appId : null);
+
+        return $this->withReplyText($reply(
+            'Caja POS abierta encontrada: session_id=' . (string) ($session['id'] ?? '') . '.',
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'get_open_cash_session',
+                'cash_session' => $session,
+                'item' => $session,
+                'cash_register_id' => (string) ($session['cash_register_id'] ?? ''),
+                'session_id' => (string) ($session['id'] ?? ''),
+                'opening_amount' => (float) (($session['opening_amount'] ?? 0) ?: 0),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleCloseCashRegister(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $result = $service->closeCashRegister($command + [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId !== '' ? $appId : null,
+        ]);
+        $session = is_array($result['session'] ?? null) ? (array) $result['session'] : [];
+        $summary = is_array($result['summary'] ?? null) ? (array) $result['summary'] : [];
+
+        return $this->withReplyText($reply(
+            'Caja POS cerrada: session_id=' . (string) ($session['id'] ?? '') . '.',
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'close_cash_register',
+                'cash_session' => $session,
+                'cash_summary' => $summary,
+                'item' => $session,
+                'cash_register_id' => (string) ($session['cash_register_id'] ?? ''),
+                'session_id' => (string) ($session['id'] ?? ''),
+                'opening_amount' => (float) (($summary['opening_amount'] ?? 0) ?: 0),
+                'counted_cash_amount' => $summary['counted_cash_amount'] ?? null,
+                'difference_amount' => $summary['difference_amount'] ?? null,
+                'sales_count' => (int) ($summary['sales_count'] ?? 0),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleBuildCashSummary(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $sessionIdValue = $this->sessionIdValue($command);
+        $summary = $service->buildCashSummary($tenantId, $sessionIdValue, $appId !== '' ? $appId : null);
+
+        return $this->withReplyText($reply(
+            'Arqueo POS preparado: session_id=' . $sessionIdValue . '.',
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'build_cash_summary',
+                'cash_summary' => $summary,
+                'item' => $summary,
+                'cash_register_id' => (string) ($summary['cash_register_id'] ?? ''),
+                'session_id' => $sessionIdValue,
+                'opening_amount' => (float) (($summary['opening_amount'] ?? 0) ?: 0),
+                'counted_cash_amount' => $summary['counted_cash_amount'] ?? null,
+                'difference_amount' => $summary['difference_amount'] ?? null,
+                'sales_count' => (int) ($summary['sales_count'] ?? 0),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleListCashSessions(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $items = $service->listCashSessions($tenantId, $command, $appId !== '' ? $appId : null);
+        $text = $items === []
+            ? 'No hay sesiones de caja POS para los filtros indicados.'
+            : "Sesiones de caja POS:\n" . implode("\n", array_map([$this, 'formatCashSessionLine'], $items));
+
+        return $this->withReplyText($reply(
+            $text,
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'list_cash_sessions',
+                'items' => $items,
+                'result_count' => count($items),
+                'cash_register_id' => trim((string) ($command['cash_register_id'] ?? '')),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
     private function draftId(array $command): string
     {
         $draftId = trim((string) ($command['draft_id'] ?? $command['sale_draft_id'] ?? ''));
@@ -740,6 +943,16 @@ final class POSCommandHandler implements CommandHandlerInterface
         }
 
         return $draftId;
+    }
+
+    private function sessionIdValue(array $command): string
+    {
+        $sessionId = trim((string) ($command['session_id'] ?? ''));
+        if ($sessionId === '') {
+            throw new RuntimeException('POS_SESSION_ID_REQUIRED');
+        }
+
+        return $sessionId;
     }
 
     private function saleId(array $command): string
@@ -793,6 +1006,7 @@ final class POSCommandHandler implements CommandHandlerInterface
             'sale_id' => '',
             'sale_number' => '',
             'session_id' => '',
+            'cash_register_id' => '',
             'product_id' => '',
             'matched_product_id' => '',
             'matched_by' => '',
@@ -800,6 +1014,10 @@ final class POSCommandHandler implements CommandHandlerInterface
             'ambiguity_count' => 0,
             'line_count' => 0,
             'total' => 0,
+            'opening_amount' => 0,
+            'counted_cash_amount' => null,
+            'difference_amount' => null,
+            'sales_count' => 0,
             'result_status' => 'success',
         ], $overrides);
     }
@@ -867,6 +1085,17 @@ final class POSCommandHandler implements CommandHandlerInterface
             . ' status=' . (string) ($sale['status'] ?? 'completed');
     }
 
+    /**
+     * @param array<string, mixed> $session
+     */
+    private function formatCashSessionLine(array $session): string
+    {
+        return '- session_id=' . (string) ($session['id'] ?? '')
+            . ' cash_register_id=' . (string) ($session['cash_register_id'] ?? '')
+            . ' status=' . (string) ($session['status'] ?? 'open')
+            . ' opening=' . (string) (($session['opening_amount'] ?? 0) ?: 0);
+    }
+
     private function humanizeError(string $message): string
     {
         $message = trim($message);
@@ -874,8 +1103,10 @@ final class POSCommandHandler implements CommandHandlerInterface
         return match ($message) {
             'POS_TENANT_ID_REQUIRED', 'Campo requerido faltante: tenant_id.' => 'Necesito el tenant actual para continuar.',
             'POS_DRAFT_ID_REQUIRED' => 'Indica `draft_id` para continuar con el borrador POS.',
+            'POS_SESSION_ID_REQUIRED' => 'Indica `session_id` para continuar con la caja POS.',
             'POS_LINE_ID_REQUIRED' => 'Indica `line_id` para identificar la linea del borrador.',
             'POS_SESSION_NOT_FOUND' => 'No encontre esa sesion POS dentro del tenant actual.',
+            'POS_SESSION_NOT_OPEN' => 'La sesion POS indicada no esta abierta.',
             'POS_DRAFT_NOT_FOUND' => 'No encontre ese borrador POS dentro del tenant actual.',
             'POS_DRAFT_NOT_OPEN' => 'Solo puedo modificar borradores POS en estado abierto.',
             'POS_DRAFT_EMPTY' => 'No puedo cerrar una venta POS sin productos.',
@@ -895,6 +1126,13 @@ final class POSCommandHandler implements CommandHandlerInterface
             'POS_SALE_NUMBER_REQUIRED' => 'Indica `sale_number` para continuar con la venta POS.',
             'POS_SALE_REFERENCE_REQUIRED' => 'Indica `sale_id` o `sale_number` para ubicar la venta POS.',
             'POS_SALE_NOT_FOUND' => 'No encontre esa venta POS dentro del tenant actual.',
+            'POS_CASH_REGISTER_ID_REQUIRED' => 'Indica `cash_register_id` para operar la caja POS.',
+            'POS_OPENING_AMOUNT_REQUIRED' => 'Indica `opening_amount` para abrir la caja POS.',
+            'POS_COUNTED_CASH_AMOUNT_REQUIRED' => 'Indica `counted_cash_amount` para cerrar la caja POS.',
+            'POS_CASH_REGISTER_ALREADY_OPEN' => 'Ya existe una sesion de caja POS abierta para esa caja registradora.',
+            'POS_OPEN_CASH_SESSION_NOT_FOUND' => 'No encontre una sesion de caja POS abierta para esa caja registradora.',
+            'POS_CASH_SESSION_ALREADY_CLOSED' => 'Esa sesion de caja POS ya fue cerrada.',
+            'POS_CASH_SESSION_NOT_OPEN' => 'Solo puedo cerrar sesiones de caja POS en estado abierto.',
             'COMMAND_NOT_SUPPORTED' => 'No pude ejecutar esa operacion POS.',
             default => $message !== '' ? $message : 'No pude procesar la operacion POS solicitada.',
         };

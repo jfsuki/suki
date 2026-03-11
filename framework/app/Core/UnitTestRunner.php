@@ -97,6 +97,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('pos_core_module', fn() => $this->checkPOSCoreModule());
         $tests[] = $this->wrap('pos_products_pricing_barcode', fn() => $this->checkPOSProductsPricingBarcode());
         $tests[] = $this->wrap('pos_sales_flow_receipt', fn() => $this->checkPOSSalesFlowReceipt());
+        $tests[] = $this->wrap('pos_cash_register_arqueo', fn() => $this->checkPOSCashRegisterArqueo());
         $tests[] = $this->wrap('project_memory_system', fn() => $this->checkProjectMemorySystem());
         $tests[] = $this->wrap('learning_promotion_pipeline', fn() => $this->checkLearningPromotionPipeline());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
@@ -1468,6 +1469,11 @@ final class UnitTestRunner
     private function checkPOSSalesFlowReceipt(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/pos_sales_flow_receipt_test.php');
+    }
+
+    private function checkPOSCashRegisterArqueo(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/pos_cash_register_arqueo_test.php');
     }
 
     private function checkProjectMemorySystem(): void
