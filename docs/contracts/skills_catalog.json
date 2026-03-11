@@ -1,6 +1,6 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.7.0",
+  "version": "1.7.1",
   "effective_date": "2026-03-11",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
@@ -394,7 +394,7 @@
       "allowed_tools": [
         "alerts_center_alerts"
       ],
-      "priority": 160,
+      "priority": 176,
       "memory_type": null,
       "input_schema": {
         "required": [
@@ -1133,6 +1133,177 @@
         ],
         "optional": [
           "sale_number"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_cancel_sale",
+      "description": "Cancel a completed POS sale safely while preserving audit trail and future hooks.",
+      "intent_patterns": [
+        "re:(cancela|cancelar|anula|anular).*(venta|sale).*(pos)?",
+        "re:(venta|sale).*(cancela|cancelar|anula|anular).*(pos)?",
+        "re:(cancela|cancelar|anula|anular).*(sale_number|numero|nÃºmero|number)=.*"
+      ],
+      "keywords": [
+        "cancelar venta pos",
+        "anular venta pos",
+        "cancel sale pos",
+        "cancelar sale_number"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_cancel_sale"
+      ],
+      "priority": 160,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "sale_id",
+          "sale_number",
+          "reason"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_create_return",
+      "description": "Create a partial or full POS return linked to the original sale.",
+      "intent_patterns": [
+        "re:(devolucion|devolver|devuelve|return).*(venta|sale).*(pos)?",
+        "re:(venta|sale).*(devolucion|devolver|return).*(pos)?",
+        "re:(devolucion|devolver|devuelve|return).*(sale_number|numero|nÃºmero|number)=.*"
+      ],
+      "keywords": [
+        "crear devolucion pos",
+        "devolver venta pos",
+        "create return pos",
+        "devolucion sale_number"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_create_return"
+      ],
+      "priority": 174,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "sale_id",
+          "sale_number",
+          "sale_line_id",
+          "product_id",
+          "qty",
+          "reason"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_get_return",
+      "description": "Load a POS return by return_id.",
+      "intent_patterns": [
+        "re:(ver|mostrar|muestra|consulta|abrir|abre).*(devolucion|return).*(pos)?",
+        "re:(devolucion|return).*(ver|mostrar|muestra|consulta|abrir|abre).*(pos)?"
+      ],
+      "keywords": [
+        "ver devolucion pos",
+        "mostrar return pos",
+        "consultar devolucion pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_get_return"
+      ],
+      "priority": 165,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "return_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_list_returns",
+      "description": "List POS return records with recency and sale filters.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(devoluciones|returns).*(pos)?",
+        "re:(ultima|Ãºltima|ultimo|Ãºltimo|last|latest).*(devolucion|return).*(pos)?"
+      ],
+      "keywords": [
+        "listar devoluciones pos",
+        "ultima devolucion pos",
+        "list returns pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_list_returns"
+      ],
+      "priority": 164,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "sale_id",
+          "return_number",
+          "status",
+          "date_from",
+          "date_to",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "pos_build_return_receipt",
+      "description": "Prepare a POS return receipt payload without printer or fiscal note execution.",
+      "intent_patterns": [
+        "re:(ticket|receipt|recibo|comprobante).*(devolucion|return).*(pos)?",
+        "re:(prepara|genera|arma|build).*(ticket|receipt|recibo).*(devolucion|return).*(pos)?"
+      ],
+      "keywords": [
+        "ticket devolucion pos",
+        "receipt return pos",
+        "comprobante devolucion pos"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "pos_build_return_receipt"
+      ],
+      "priority": 163,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "return_id"
         ]
       },
       "channel_capabilities": [

@@ -1,6 +1,6 @@
 {
   "contract_id": "action_catalog",
-  "version": "1.6.0",
+  "version": "1.6.1",
   "effective_date": "2026-03-11",
   "addenda_of": null,
   "status": "canonical_draft",
@@ -825,6 +825,101 @@
       "allowed_tools": [
         "CommandBus",
         "pos_get_sale_by_number"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "pos.cancel_sale",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "pos_cancel_sale"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "medium",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "pos.create_return",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "pos_create_return"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "medium",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "pos.get_return",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "pos_get_return"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "pos.list_returns",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "pos_list_returns"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "pos.build_return_receipt",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "pos_build_return_receipt"
       ],
       "rag_required": false,
       "json_schema_required": true,

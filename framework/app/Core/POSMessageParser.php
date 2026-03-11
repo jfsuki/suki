@@ -37,6 +37,11 @@ final class POSMessageParser
             'pos_list_sales' => $this->parseListSales($message, $pairs, $baseCommand, $telemetry),
             'pos_build_receipt' => $this->parseBuildReceipt($pairs, $baseCommand, $telemetry),
             'pos_get_sale_by_number' => $this->parseGetSaleByNumber($pairs, $baseCommand, $telemetry),
+            'pos_cancel_sale' => $this->parseCancelSale($pairs, $baseCommand, $telemetry),
+            'pos_create_return' => $this->parseCreateReturn($message, $pairs, $baseCommand, $telemetry),
+            'pos_get_return' => $this->parseGetReturn($pairs, $baseCommand, $telemetry),
+            'pos_list_returns' => $this->parseListReturns($message, $pairs, $baseCommand, $telemetry),
+            'pos_build_return_receipt' => $this->parseBuildReturnReceipt($pairs, $baseCommand, $telemetry),
             'pos_open_cash_register' => $this->parseOpenCashRegister($pairs, $baseCommand, $telemetry),
             'pos_get_open_cash_session' => $this->parseGetOpenCashSession($pairs, $baseCommand, $telemetry),
             'pos_close_cash_register' => $this->parseCloseCashRegister($pairs, $baseCommand, $telemetry),
@@ -394,6 +399,128 @@ final class POSMessageParser
      * @param array<string, mixed> $telemetry
      * @return array<string, mixed>
      */
+    private function parseCancelSale(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $saleId = $this->saleId($pairs);
+        $saleNumber = $this->saleNumber($pairs);
+        if ($saleId === '' && $saleNumber === '') {
+            return $this->askUser('Indica `sale_id` o `sale_number` para cancelar la venta POS.', $telemetry + ['pos_action' => 'cancel_sale']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'CancelPOSSale',
+            'sale_id' => $saleId !== '' ? $saleId : null,
+            'sale_number' => $saleNumber !== '' ? $saleNumber : null,
+            'reason' => $this->firstValue($pairs, ['reason', 'motivo', 'notes', 'nota']) ?: null,
+        ], $telemetry + ['pos_action' => 'cancel_sale']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseCreateReturn(string $message, array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $saleId = $this->saleId($pairs);
+        $saleNumber = $this->saleNumber($pairs);
+        if ($saleId === '' && $saleNumber === '') {
+            return $this->askUser('Indica `sale_id` o `sale_number` para registrar la devolucion POS.', $telemetry + ['pos_action' => 'create_return']);
+        }
+
+        $saleLineId = $this->firstValue($pairs, ['sale_line_id', 'line_id']);
+        $productId = $this->firstValue($pairs, ['product_id']);
+        $qty = $this->firstValue($pairs, ['qty', 'quantity', 'cantidad']);
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'CreatePOSReturn',
+            'sale_id' => $saleId !== '' ? $saleId : null,
+            'sale_number' => $saleNumber !== '' ? $saleNumber : null,
+            'sale_line_id' => $saleLineId !== '' ? $saleLineId : null,
+            'product_id' => $productId !== '' ? $productId : null,
+            'qty' => $qty !== '' ? $qty : null,
+            'reason' => $this->firstValue($pairs, ['reason', 'motivo']) ?: null,
+            'notes' => $this->firstValue($pairs, ['notes', 'nota']) ?: null,
+            'return_scope' => $this->containsAny($message, ['parcial', 'partial']) ? 'partial' : null,
+        ], $telemetry + ['pos_action' => 'create_return']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseGetReturn(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $returnId = $this->returnId($pairs);
+        if ($returnId === '') {
+            return $this->askUser('Indica `return_id` para cargar la devolucion POS.', $telemetry + ['pos_action' => 'get_return']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'GetPOSReturn',
+            'return_id' => $returnId,
+        ], $telemetry + ['pos_action' => 'get_return']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseListReturns(string $message, array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $limit = $this->firstValue($pairs, ['limit', 'top', 'max']);
+        if ($limit === '' && $this->containsAny($message, ['ultima', 'última', 'ultimo', 'último', 'last', 'latest', 'reciente'])) {
+            $limit = '1';
+        }
+
+        $dateFrom = $this->firstValue($pairs, ['date_from', 'desde']);
+        $dateTo = $this->firstValue($pairs, ['date_to', 'hasta']);
+        if ($dateFrom === '' && $dateTo === '' && $this->containsAny($message, ['ayer'])) {
+            $dateFrom = date('Y-m-d 00:00:00', strtotime('yesterday'));
+            $dateTo = date('Y-m-d 23:59:59', strtotime('yesterday'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'ListPOSReturns',
+            'sale_id' => $this->saleId($pairs) ?: null,
+            'status' => $this->firstValue($pairs, ['status', 'estado']) ?: null,
+            'return_number' => $this->returnNumber($pairs) ?: null,
+            'date_from' => $dateFrom !== '' ? $dateFrom : null,
+            'date_to' => $dateTo !== '' ? $dateTo : null,
+            'limit' => $limit !== '' ? $limit : '10',
+        ], $telemetry + ['pos_action' => 'list_returns']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseBuildReturnReceipt(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $returnId = $this->returnId($pairs);
+        if ($returnId === '') {
+            return $this->askUser('Indica `return_id` para preparar el ticket de devolucion POS.', $telemetry + ['pos_action' => 'build_return_receipt']);
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'BuildPOSReturnReceipt',
+            'return_id' => $returnId,
+        ], $telemetry + ['pos_action' => 'build_return_receipt']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
     private function parseOpenCashRegister(array $pairs, array $baseCommand, array $telemetry): array
     {
         $cashRegisterId = $this->cashRegisterId($pairs);
@@ -568,6 +695,22 @@ final class POSMessageParser
     private function saleNumber(array $pairs): string
     {
         return $this->firstValue($pairs, ['sale_number', 'number', 'numero']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     */
+    private function returnId(array $pairs): string
+    {
+        return $this->firstValue($pairs, ['return_id', 'id']);
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     */
+    private function returnNumber(array $pairs): string
+    {
+        return $this->firstValue($pairs, ['return_number', 'numero_devolucion', 'number']);
     }
 
     /**

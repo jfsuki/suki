@@ -36,6 +36,9 @@
   - keep barcode lookups exact-only and return candidates instead of guessing on ambiguous references
   - keep line pricing fields (`base_price`, `override_price`, `effective_unit_price`, `line_subtotal`, `line_tax`, `line_total`) synchronized
   - keep lifecycle consistent: `open draft -> checked_out draft + completed sale`
+  - if you add cancelation/return behavior, keep original sale immutable enough for audit and link adjustments back to the original `sale_id`
+  - validate `returned_qty <= sold_qty pendiente` before creating `pos_return`
+  - keep cancelation and return receipts as payload preparation only; do not mix printer, fiscal note, accounting or inventory execution here
   - if you extend cash lifecycle, preserve `one open session per cash_register_id + tenant`
   - keep arqueo cash-focused until payment split engine exists: `opening_amount + sales_total -> expected_cash_amount`
   - keep sale/session linkage intact so summaries stay deterministic

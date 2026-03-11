@@ -26,6 +26,11 @@ final class POSCommandHandler implements CommandHandlerInterface
         'ListPOSSales',
         'BuildPOSReceipt',
         'GetPOSSaleByNumber',
+        'CancelPOSSale',
+        'CreatePOSReturn',
+        'GetPOSReturn',
+        'ListPOSReturns',
+        'BuildPOSReturnReceipt',
         'OpenPOSCashRegister',
         'GetPOSOpenCashSession',
         'ClosePOSCashRegister',
@@ -81,6 +86,11 @@ final class POSCommandHandler implements CommandHandlerInterface
                 'ListPOSSales' => $this->handleListSales($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'BuildPOSReceipt' => $this->handleBuildReceipt($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'GetPOSSaleByNumber' => $this->handleGetSaleByNumber($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'CancelPOSSale' => $this->handleCancelSale($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'CreatePOSReturn' => $this->handleCreateReturn($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'GetPOSReturn' => $this->handleGetReturn($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'ListPOSReturns' => $this->handleListReturns($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'BuildPOSReturnReceipt' => $this->handleBuildReturnReceipt($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'OpenPOSCashRegister' => $this->handleOpenCashRegister($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'GetPOSOpenCashSession' => $this->handleGetOpenCashSession($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'ClosePOSCashRegister' => $this->handleCloseCashRegister($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
@@ -746,6 +756,209 @@ final class POSCommandHandler implements CommandHandlerInterface
      * @param callable $reply
      * @return array<string, mixed>
      */
+    private function handleCancelSale(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $result = $service->cancelSale($command + [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId !== '' ? $appId : null,
+        ]);
+        $sale = is_array($result['sale'] ?? null) ? (array) $result['sale'] : [];
+        $receipt = is_array($result['receipt'] ?? null) ? (array) $result['receipt'] : [];
+
+        return $this->withReplyText($reply(
+            'Venta POS cancelada: sale_number=' . (string) ($sale['sale_number'] ?? '') . '.',
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'cancel_sale',
+                'sale' => $sale,
+                'receipt' => $receipt,
+                'item' => $sale,
+                'sale_id' => (string) ($sale['id'] ?? ''),
+                'sale_number' => (string) ($sale['sale_number'] ?? ''),
+                'session_id' => (string) ($sale['session_id'] ?? ''),
+                'line_count' => count((array) ($sale['lines'] ?? [])),
+                'total' => (float) ($sale['total'] ?? 0),
+                'reason' => (string) ($command['reason'] ?? ''),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleCreateReturn(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $result = $service->createReturnFromSale($command + [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId !== '' ? $appId : null,
+        ]);
+        $return = is_array($result['return'] ?? null) ? (array) $result['return'] : [];
+        $sale = is_array($result['sale'] ?? null) ? (array) $result['sale'] : [];
+        $receipt = is_array($result['receipt'] ?? null) ? (array) $result['receipt'] : [];
+
+        return $this->withReplyText($reply(
+            'Devolucion POS creada: return_number=' . (string) ($return['return_number'] ?? '') . '.',
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'create_return',
+                'sale' => $sale,
+                'return' => $return,
+                'receipt' => $receipt,
+                'item' => $return,
+                'sale_id' => (string) ($sale['id'] ?? $return['sale_id'] ?? ''),
+                'return_id' => (string) ($return['id'] ?? ''),
+                'return_number' => (string) ($return['return_number'] ?? ''),
+                'session_id' => (string) ($sale['session_id'] ?? ''),
+                'line_count' => count((array) ($return['lines'] ?? [])),
+                'total' => (float) ($return['total'] ?? 0),
+                'reason' => (string) ($return['reason'] ?? $command['reason'] ?? ''),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleGetReturn(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $returnId = $this->returnId($command);
+        $return = $service->getReturn($tenantId, $returnId, $appId !== '' ? $appId : null);
+
+        return $this->withReplyText($reply(
+            'Devolucion POS cargada: return_number=' . (string) ($return['return_number'] ?? '') . '.',
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'get_return',
+                'return' => $return,
+                'item' => $return,
+                'sale_id' => (string) ($return['sale_id'] ?? ''),
+                'return_id' => (string) ($return['id'] ?? ''),
+                'return_number' => (string) ($return['return_number'] ?? ''),
+                'line_count' => count((array) ($return['lines'] ?? [])),
+                'total' => (float) ($return['total'] ?? 0),
+                'reason' => (string) ($return['reason'] ?? ''),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleListReturns(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $items = $service->listReturns($tenantId, $command, $appId !== '' ? $appId : null);
+        $text = $items === []
+            ? 'No hay devoluciones POS para los filtros indicados.'
+            : "Devoluciones POS:\n" . implode("\n", array_map([$this, 'formatReturnLine'], $items));
+
+        return $this->withReplyText($reply(
+            $text,
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'list_returns',
+                'items' => $items,
+                'result_count' => count($items),
+                'line_count' => array_sum(array_map(fn(array $return): int => count((array) ($return['lines'] ?? [])), $items)),
+                'total' => array_sum(array_map(fn(array $return): float => (float) ($return['total'] ?? 0), $items)),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function handleBuildReturnReceipt(
+        POSService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $returnId = $this->returnId($command);
+        $return = $service->getReturn($tenantId, $returnId, $appId !== '' ? $appId : null);
+        $receipt = $service->buildReturnReceiptPayload($tenantId, $returnId, $appId !== '' ? $appId : null);
+
+        return $this->withReplyText($reply(
+            'Ticket de devolucion POS preparado: return_number=' . (string) ($return['return_number'] ?? '') . '.',
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'pos_action' => 'build_return_receipt',
+                'return' => $return,
+                'receipt' => $receipt,
+                'item' => $receipt,
+                'sale_id' => (string) ($return['sale_id'] ?? ''),
+                'return_id' => (string) ($return['id'] ?? ''),
+                'return_number' => (string) ($return['return_number'] ?? ''),
+                'line_count' => count((array) ($return['lines'] ?? [])),
+                'total' => (float) ($return['total'] ?? 0),
+                'reason' => (string) ($return['reason'] ?? ''),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
     private function handleOpenCashRegister(
         POSService $service,
         string $tenantId,
@@ -965,6 +1178,16 @@ final class POSCommandHandler implements CommandHandlerInterface
         return $saleId;
     }
 
+    private function returnId(array $command): string
+    {
+        $returnId = trim((string) ($command['return_id'] ?? $command['id'] ?? ''));
+        if ($returnId === '') {
+            throw new RuntimeException('POS_RETURN_ID_REQUIRED');
+        }
+
+        return $returnId;
+    }
+
     /**
      * @return array<string, mixed>
      */
@@ -1005,6 +1228,8 @@ final class POSCommandHandler implements CommandHandlerInterface
             'draft_id' => '',
             'sale_id' => '',
             'sale_number' => '',
+            'return_id' => '',
+            'return_number' => '',
             'session_id' => '',
             'cash_register_id' => '',
             'product_id' => '',
@@ -1014,6 +1239,7 @@ final class POSCommandHandler implements CommandHandlerInterface
             'ambiguity_count' => 0,
             'line_count' => 0,
             'total' => 0,
+            'reason' => '',
             'opening_amount' => 0,
             'counted_cash_amount' => null,
             'difference_amount' => null,
@@ -1086,6 +1312,16 @@ final class POSCommandHandler implements CommandHandlerInterface
     }
 
     /**
+     * @param array<string, mixed> $return
+     */
+    private function formatReturnLine(array $return): string
+    {
+        return '- return_number=' . (string) ($return['return_number'] ?? '')
+            . ' total=' . (string) ($return['total'] ?? 0)
+            . ' status=' . (string) ($return['status'] ?? 'completed');
+    }
+
+    /**
      * @param array<string, mixed> $session
      */
     private function formatCashSessionLine(array $session): string
@@ -1126,6 +1362,18 @@ final class POSCommandHandler implements CommandHandlerInterface
             'POS_SALE_NUMBER_REQUIRED' => 'Indica `sale_number` para continuar con la venta POS.',
             'POS_SALE_REFERENCE_REQUIRED' => 'Indica `sale_id` o `sale_number` para ubicar la venta POS.',
             'POS_SALE_NOT_FOUND' => 'No encontre esa venta POS dentro del tenant actual.',
+            'POS_SALE_ALREADY_CANCELED' => 'Esa venta POS ya fue cancelada.',
+            'POS_SALE_NOT_CANCELABLE' => 'Solo puedo cancelar ventas POS completadas y sin devoluciones.',
+            'POS_SALE_HAS_RETURNS' => 'No puedo cancelar una venta POS que ya tiene devoluciones registradas.',
+            'POS_SALE_NOT_RETURNABLE' => 'Solo puedo registrar devoluciones sobre ventas POS completadas.',
+            'POS_RETURN_ID_REQUIRED' => 'Indica `return_id` para continuar con la devolucion POS.',
+            'POS_RETURN_NOT_FOUND' => 'No encontre esa devolucion POS dentro del tenant actual.',
+            'POS_RETURN_EMPTY' => 'La devolucion POS no tiene lineas validas para procesar.',
+            'POS_RETURN_LINE_REFERENCE_REQUIRED' => 'Indica `sale_line_id` o una referencia exacta de linea para devolver.',
+            'POS_RETURN_LINE_NOT_FOUND' => 'No encontre la linea original de venta para esa devolucion POS.',
+            'POS_RETURN_LINE_AMBIGUOUS' => 'La referencia de linea para la devolucion POS es ambigua. Indica `sale_line_id`.',
+            'POS_RETURN_NO_REMAINING_QTY' => 'No queda cantidad disponible para devolver en esa linea POS.',
+            'POS_RETURN_QTY_EXCEEDED' => 'La cantidad a devolver no puede superar la cantidad vendida pendiente.',
             'POS_CASH_REGISTER_ID_REQUIRED' => 'Indica `cash_register_id` para operar la caja POS.',
             'POS_OPENING_AMOUNT_REQUIRED' => 'Indica `opening_amount` para abrir la caja POS.',
             'POS_COUNTED_CASH_AMOUNT_REQUIRED' => 'Indica `counted_cash_amount` para cerrar la caja POS.',

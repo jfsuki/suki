@@ -689,6 +689,56 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'CancelPOSSale':
+                $saleId = trim((string) ($command['sale_id'] ?? $command['id'] ?? ''));
+                $saleNumber = trim((string) ($command['sale_number'] ?? $command['number'] ?? ''));
+                if ($saleId === '' && $saleNumber === '') {
+                    return [false, 'missing_sale_reference'];
+                }
+                if (array_key_exists('reason', $command) && $command['reason'] !== null && $command['reason'] !== '' && !is_string($command['reason'])) {
+                    return [false, 'invalid_reason'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'CreatePOSReturn':
+                $saleId = trim((string) ($command['sale_id'] ?? $command['id'] ?? ''));
+                $saleNumber = trim((string) ($command['sale_number'] ?? $command['number'] ?? ''));
+                if ($saleId === '' && $saleNumber === '') {
+                    return [false, 'missing_sale_reference'];
+                }
+                if (array_key_exists('qty', $command) && $command['qty'] !== null && $command['qty'] !== '' && (!is_numeric($command['qty']) || (float) $command['qty'] <= 0)) {
+                    return [false, 'invalid_qty'];
+                }
+                foreach (['reason', 'sale_line_id', 'line_id', 'product_id'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetPOSReturn':
+                if (trim((string) ($command['return_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_return_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListPOSReturns':
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                foreach (['status', 'sale_id', 'return_number', 'date_from', 'date_to'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
+            case 'BuildPOSReturnReceipt':
+                if (trim((string) ($command['return_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_return_id'];
+                }
+                return [true, 'schema_valid'];
+
             case 'OpenPOSCashRegister':
                 if (trim((string) ($command['cash_register_id'] ?? '')) === '') {
                     return [false, 'missing_cash_register_id'];

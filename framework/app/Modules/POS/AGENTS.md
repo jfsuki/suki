@@ -4,7 +4,7 @@
 - Esta carpeta es una guia local para el dominio POS.
 - El runtime POS usa una base compartida y draft-first para preparar venta, precio y contexto operativo antes del checkout.
 - La resolucion de producto POS debe ser deterministica y rapida: `barcode -> sku -> exact_name -> partial -> entity_search fallback`.
-- La capa actual cubre borradores, product resolution, barcode lookup, pricing de linea, finalizacion `draft -> sale`, ticket/receipt preparado y lifecycle de caja POS con arqueo; fiscal, inventario, pagos complejos y hardware siguen como hooks.
+- La capa actual cubre borradores, product resolution, barcode lookup, pricing de linea, finalizacion `draft -> sale`, ticket/receipt preparado, lifecycle de caja POS con arqueo y ajustes operativos por `cancelation` / `return`; fiscal, inventario, pagos complejos y hardware siguen como hooks.
 
 ## Key classes
 - `framework/app/Core/ChatAgent.php`
@@ -24,6 +24,8 @@
 - `framework/contracts/schemas/sale_draft.schema.json`
 - `framework/contracts/schemas/pos_sale.schema.json`
 - `framework/contracts/schemas/pos_receipt_payload.schema.json`
+- `framework/contracts/schemas/pos_return.schema.json`
+- `framework/contracts/schemas/pos_return_receipt_payload.schema.json`
 - `framework/contracts/schemas/pos_session.schema.json`
 - `framework/contracts/schemas/pos_cash_summary.schema.json`
 
@@ -34,8 +36,12 @@
 - Barcode en POS no admite fuzzy guessing: si no hay match exacto, devolver `not_found`.
 - Si una referencia de producto es ambigua, devolver candidatos; no adivinar producto.
 - El lifecycle actual es `open draft -> checked_out draft + completed sale`.
+- Cancelacion POS y devolucion POS no son lo mismo:
+  - cancelacion cambia el `status` de la venta a `canceled` y conserva la venta original visible.
+  - devolucion crea `pos_return` + `pos_return_line` ligados a la venta original y valida `returned_qty <= sold_qty pendiente`.
 - El receipt/ticket se prepara como payload estructurado y texto imprimible; no hay drivers de impresion aqui.
+- Los tickets de ajuste usan payload compartido `return|cancelation`; no ejecutar aqui fiscal note, refund posting ni restock automatico.
 - Caja POS sigue la regla `un cash session open por cash_register_id + tenant`.
 - El arqueo actual es cash-focused: `opening_amount + sales_total -> expected_cash_amount`, luego `counted_cash_amount -> difference_amount`.
-- Mantener hooks ligeros para checkout, fiscal, inventario, pagos, ecommerce origin, accounting y ticket; no adelantarlos aqui.
+- Mantener hooks ligeros para checkout, fiscal, inventario, pagos, ecommerce origin, accounting, refund cash y ticket; no adelantarlos aqui.
 - No crear bypasses especificos de POS fuera del motor.

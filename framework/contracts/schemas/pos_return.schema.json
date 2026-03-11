@@ -1,12 +1,13 @@
 {
   "$schema": "http://json-schema.org/draft-07/schema#",
-  "title": "POSSale",
+  "title": "POSReturn",
   "type": "object",
   "additionalProperties": false,
   "required": [
     "id",
     "tenant_id",
-    "sale_number",
+    "sale_id",
+    "return_number",
     "status",
     "subtotal",
     "tax_total",
@@ -26,37 +27,32 @@
     "app_id": {
       "type": ["string", "null"]
     },
-    "session_id": {
-      "type": ["string", "null"]
+    "sale_id": {
+      "type": "string",
+      "minLength": 1
     },
-    "draft_id": {
-      "type": ["string", "null"]
-    },
-    "customer_id": {
-      "type": ["string", "null"]
-    },
-    "sale_number": {
+    "return_number": {
       "type": "string",
       "minLength": 1
     },
     "status": {
       "type": "string",
-      "enum": ["completed", "canceled", "voided"]
-    },
-    "currency": {
-      "type": ["string", "null"]
+      "enum": ["completed", "voided"]
     },
     "subtotal": {
       "type": "number",
       "minimum": 0
     },
     "tax_total": {
-      "type": "number",
+      "type": ["number", "null"],
       "minimum": 0
     },
     "total": {
       "type": "number",
       "minimum": 0
+    },
+    "reason": {
+      "type": ["string", "null"]
     },
     "created_by_user_id": {
       "type": ["string", "null"]
@@ -74,7 +70,7 @@
     "lines": {
       "type": "array",
       "items": {
-        "$ref": "pos_sale_line.schema.json"
+        "$ref": "pos_return_line.schema.json"
       }
     }
   }

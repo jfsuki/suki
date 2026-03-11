@@ -15,6 +15,8 @@ final class POSRepository
     private const LINE_TABLE = 'sale_draft_lines';
     private const SALE_TABLE = 'pos_sales';
     private const SALE_LINE_TABLE = 'pos_sale_lines';
+    private const RETURN_TABLE = 'pos_returns';
+    private const RETURN_LINE_TABLE = 'pos_return_lines';
 
     /** @var array<int, string> */
     private const PRODUCT_LABEL_FIELDS = ['nombre', 'name', 'descripcion', 'description', 'titulo', 'title'];
@@ -49,7 +51,7 @@ final class POSRepository
             $this->requiredTables(),
             $this->requiredIndexes(),
             [],
-            'db/migrations/' . $this->driver() . '/20260311_017_pos_cash_register_arqueo.sql'
+            'db/migrations/' . $this->driver() . '/20260311_018_pos_returns_cancelations.sql'
         );
     }
 
@@ -483,6 +485,143 @@ final class POSRepository
     }
 
     /**
+     * @param array<string, mixed> $record
+     * @return array<string, mixed>
+     */
+    public function createReturn(array $record): array
+    {
+        $id = $this->insertRecord(self::RETURN_TABLE, [
+            'tenant_id',
+            'app_id',
+            'sale_id',
+            'return_number',
+            'status',
+            'subtotal',
+            'tax_total',
+            'total',
+            'reason',
+            'created_by_user_id',
+            'metadata_json',
+            'created_at',
+            'updated_at',
+        ], [
+            'tenant_id' => $record['tenant_id'] ?? '',
+            'app_id' => $record['app_id'] ?? null,
+            'sale_id' => $record['sale_id'] ?? '',
+            'return_number' => $record['return_number'] ?? null,
+            'status' => $record['status'] ?? 'completed',
+            'subtotal' => $record['subtotal'] ?? 0,
+            'tax_total' => $record['tax_total'] ?? 0,
+            'total' => $record['total'] ?? 0,
+            'reason' => $record['reason'] ?? null,
+            'created_by_user_id' => $record['created_by_user_id'] ?? null,
+            'metadata_json' => $this->encodeJson($record['metadata'] ?? []),
+            'created_at' => $record['created_at'] ?? date('Y-m-d H:i:s'),
+            'updated_at' => $record['updated_at'] ?? ($record['created_at'] ?? date('Y-m-d H:i:s')),
+        ]);
+
+        $saved = $this->loadReturnAggregate((string) ($record['tenant_id'] ?? ''), $id, isset($record['app_id']) ? (string) $record['app_id'] : null);
+        if (!is_array($saved)) {
+            throw new RuntimeException('POS_RETURN_INSERT_FETCH_FAILED');
+        }
+
+        return $saved;
+    }
+
+    /**
+     * @param array<string, mixed> $updates
+     * @return array<string, mixed>|null
+     */
+    public function updateReturn(string $tenantId, string $returnId, array $updates, ?string $appId = null): ?array
+    {
+        $allowed = [
+            'sale_id',
+            'return_number',
+            'status',
+            'subtotal',
+            'tax_total',
+            'total',
+            'reason',
+            'created_by_user_id',
+            'metadata_json',
+            'updated_at',
+        ];
+        $payload = [];
+        foreach ($allowed as $column) {
+            if (!array_key_exists($column, $updates)) {
+                continue;
+            }
+            $payload[$column] = $updates[$column];
+        }
+        if (array_key_exists('metadata', $updates)) {
+            $payload['metadata_json'] = $this->encodeJson($updates['metadata']);
+        }
+        if (!array_key_exists('updated_at', $payload)) {
+            $payload['updated_at'] = date('Y-m-d H:i:s');
+        }
+        if ($payload === []) {
+            return $this->loadReturnAggregate($tenantId, $returnId, $appId);
+        }
+
+        $this->returnQuery($tenantId, $appId)
+            ->where('id', '=', $returnId)
+            ->update($payload);
+
+        return $this->loadReturnAggregate($tenantId, $returnId, $appId);
+    }
+
+    /**
+     * @param array<string, mixed> $record
+     * @return array<string, mixed>
+     */
+    public function insertReturnLine(array $record): array
+    {
+        $id = $this->insertRecord(self::RETURN_LINE_TABLE, [
+            'tenant_id',
+            'app_id',
+            'return_id',
+            'sale_line_id',
+            'product_id',
+            'sku',
+            'barcode',
+            'product_label',
+            'qty',
+            'unit_price',
+            'line_total',
+            'metadata_json',
+            'created_at',
+            'updated_at',
+        ], [
+            'tenant_id' => $record['tenant_id'] ?? '',
+            'app_id' => $record['app_id'] ?? null,
+            'return_id' => $record['return_id'] ?? '',
+            'sale_line_id' => $record['sale_line_id'] ?? null,
+            'product_id' => $record['product_id'] ?? '',
+            'sku' => $record['sku'] ?? null,
+            'barcode' => $record['barcode'] ?? null,
+            'product_label' => $record['product_label'] ?? '',
+            'qty' => $record['qty'] ?? 0,
+            'unit_price' => $record['unit_price'] ?? 0,
+            'line_total' => $record['line_total'] ?? 0,
+            'metadata_json' => $this->encodeJson($record['metadata'] ?? []),
+            'created_at' => $record['created_at'] ?? date('Y-m-d H:i:s'),
+            'updated_at' => $record['updated_at'] ?? ($record['created_at'] ?? date('Y-m-d H:i:s')),
+        ]);
+
+        $saved = $this->findReturnLine(
+            (string) ($record['tenant_id'] ?? ''),
+            (string) ($record['return_id'] ?? ''),
+            $id,
+            isset($record['app_id']) ? (string) $record['app_id'] : null
+        );
+        if (!is_array($saved)) {
+            throw new RuntimeException('POS_RETURN_LINE_INSERT_FETCH_FAILED');
+        }
+
+        return $saved;
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function loadDraftAggregate(string $tenantId, string $draftId, ?string $appId = null): ?array
@@ -510,6 +649,21 @@ final class POSRepository
         $sale['lines'] = $this->listSaleLines($tenantId, $saleId, $appId);
 
         return $sale;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function loadReturnAggregate(string $tenantId, string $returnId, ?string $appId = null): ?array
+    {
+        $return = $this->findReturn($tenantId, $returnId, $appId);
+        if (!is_array($return)) {
+            return null;
+        }
+
+        $return['lines'] = $this->listReturnLines($tenantId, $returnId, $appId);
+
+        return $return;
     }
 
     /**
@@ -559,6 +713,18 @@ final class POSRepository
             ->first();
 
         return is_array($row) ? $this->normalizeSaleRow($row) : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findReturn(string $tenantId, string $returnId, ?string $appId = null): ?array
+    {
+        $row = $this->returnQuery($tenantId, $appId)
+            ->where('id', '=', $returnId)
+            ->first();
+
+        return is_array($row) ? $this->normalizeReturnRow($row) : null;
     }
 
     /**
@@ -619,6 +785,39 @@ final class POSRepository
     }
 
     /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function listReturns(string $tenantId, array $filters = [], int $limit = 20): array
+    {
+        $qb = $this->returnQuery($tenantId, $this->nullableString($filters['app_id'] ?? null))
+            ->orderBy('created_at', 'DESC')
+            ->orderBy('id', 'DESC')
+            ->limit(max(1, min(200, $limit)));
+
+        foreach (['status', 'sale_id', 'return_number'] as $key) {
+            $value = $this->nullableString($filters[$key] ?? null);
+            if ($value === null) {
+                continue;
+            }
+            $qb->where($key, '=', $value);
+        }
+
+        $dateFrom = $this->nullableString($filters['date_from'] ?? null);
+        if ($dateFrom !== null) {
+            $qb->where('created_at', '>=', $dateFrom);
+        }
+        $dateTo = $this->nullableString($filters['date_to'] ?? null);
+        if ($dateTo !== null) {
+            $qb->where('created_at', '<=', $dateTo);
+        }
+
+        $rows = $qb->get();
+
+        return array_map(fn(array $row): array => $this->normalizeReturnRow($row), $rows);
+    }
+
+    /**
      * @return array<int, array<string, mixed>>
      */
     public function listLines(string $tenantId, string $draftId, ?string $appId = null): array
@@ -645,6 +844,19 @@ final class POSRepository
     }
 
     /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listReturnLines(string $tenantId, string $returnId, ?string $appId = null): array
+    {
+        $rows = $this->returnLineQuery($tenantId, $appId)
+            ->where('return_id', '=', $returnId)
+            ->orderBy('id', 'ASC')
+            ->get();
+
+        return array_map(fn(array $row): array => $this->normalizeReturnLineRow($row), $rows);
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function findLine(string $tenantId, string $draftId, string $lineId, ?string $appId = null): ?array
@@ -668,6 +880,19 @@ final class POSRepository
             ->first();
 
         return is_array($row) ? $this->normalizeSaleLineRow($row) : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findReturnLine(string $tenantId, string $returnId, string $lineId, ?string $appId = null): ?array
+    {
+        $row = $this->returnLineQuery($tenantId, $appId)
+            ->where('return_id', '=', $returnId)
+            ->where('id', '=', $lineId)
+            ->first();
+
+        return is_array($row) ? $this->normalizeReturnLineRow($row) : null;
     }
 
     /**
@@ -756,6 +981,7 @@ final class POSRepository
         $rows = $this->saleQuery($tenantId, $appId)
             ->where('session_id', '=', $sessionId)
             ->where('status', '!=', 'voided')
+            ->where('status', '!=', 'canceled')
             ->orderBy('created_at', 'ASC')
             ->orderBy('id', 'ASC')
             ->get();
@@ -1338,7 +1564,15 @@ final class POSRepository
      */
     private function requiredTables(): array
     {
-        return [self::SESSION_TABLE, self::DRAFT_TABLE, self::LINE_TABLE, self::SALE_TABLE, self::SALE_LINE_TABLE];
+        return [
+            self::SESSION_TABLE,
+            self::DRAFT_TABLE,
+            self::LINE_TABLE,
+            self::SALE_TABLE,
+            self::SALE_LINE_TABLE,
+            self::RETURN_TABLE,
+            self::RETURN_LINE_TABLE,
+        ];
     }
 
     /**
@@ -1369,6 +1603,15 @@ final class POSRepository
             self::SALE_LINE_TABLE => [
                 'idx_pos_sale_lines_tenant_sale',
                 'idx_pos_sale_lines_tenant_product',
+            ],
+            self::RETURN_TABLE => [
+                'idx_pos_returns_tenant_sale',
+                'idx_pos_returns_tenant_number',
+                'idx_pos_returns_tenant_created',
+            ],
+            self::RETURN_LINE_TABLE => [
+                'idx_pos_return_lines_tenant_return',
+                'idx_pos_return_lines_tenant_sale_line',
             ],
         ];
     }
@@ -1503,6 +1746,48 @@ final class POSRepository
         );
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_pos_sale_lines_tenant_sale ON ' . self::SALE_LINE_TABLE . ' (tenant_id, app_id, sale_id, id)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_pos_sale_lines_tenant_product ON ' . self::SALE_LINE_TABLE . ' (tenant_id, product_id, created_at)');
+        $this->db->exec(
+            'CREATE TABLE IF NOT EXISTS ' . self::RETURN_TABLE . ' (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT NOT NULL,
+                app_id TEXT NULL,
+                sale_id TEXT NOT NULL,
+                return_number TEXT NULL,
+                status TEXT NOT NULL,
+                subtotal REAL NOT NULL DEFAULT 0,
+                tax_total REAL NOT NULL DEFAULT 0,
+                total REAL NOT NULL DEFAULT 0,
+                reason TEXT NULL,
+                created_by_user_id TEXT NULL,
+                metadata_json TEXT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )'
+        );
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_pos_returns_tenant_sale ON ' . self::RETURN_TABLE . ' (tenant_id, app_id, sale_id, id)');
+        $this->db->exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_pos_returns_tenant_number ON ' . self::RETURN_TABLE . ' (tenant_id, app_id, return_number)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_pos_returns_tenant_created ON ' . self::RETURN_TABLE . ' (tenant_id, app_id, created_at, id)');
+        $this->db->exec(
+            'CREATE TABLE IF NOT EXISTS ' . self::RETURN_LINE_TABLE . ' (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT NOT NULL,
+                app_id TEXT NULL,
+                return_id TEXT NOT NULL,
+                sale_line_id TEXT NULL,
+                product_id TEXT NOT NULL,
+                sku TEXT NULL,
+                barcode TEXT NULL,
+                product_label TEXT NOT NULL,
+                qty REAL NOT NULL,
+                unit_price REAL NOT NULL,
+                line_total REAL NOT NULL,
+                metadata_json TEXT NULL,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )'
+        );
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_pos_return_lines_tenant_return ON ' . self::RETURN_LINE_TABLE . ' (tenant_id, app_id, return_id, id)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_pos_return_lines_tenant_sale_line ON ' . self::RETURN_LINE_TABLE . ' (tenant_id, app_id, sale_line_id)');
         $this->ensureSessionColumnsSqlite();
         $this->ensureLineColumnsSqlite();
     }
@@ -1629,6 +1914,50 @@ final class POSRepository
                 PRIMARY KEY (id),
                 KEY idx_pos_sale_lines_tenant_sale (tenant_id, app_id, sale_id, id),
                 KEY idx_pos_sale_lines_tenant_product (tenant_id, product_id, created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+        $this->db->exec(
+            "CREATE TABLE IF NOT EXISTS " . self::RETURN_TABLE . " (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                tenant_id VARCHAR(120) NOT NULL,
+                app_id VARCHAR(120) NULL,
+                sale_id VARCHAR(120) NOT NULL,
+                return_number VARCHAR(190) NULL,
+                status VARCHAR(32) NOT NULL,
+                subtotal DECIMAL(18,4) NOT NULL DEFAULT 0,
+                tax_total DECIMAL(18,4) NOT NULL DEFAULT 0,
+                total DECIMAL(18,4) NOT NULL DEFAULT 0,
+                reason TEXT NULL,
+                created_by_user_id VARCHAR(120) NULL,
+                metadata_json JSON NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                PRIMARY KEY (id),
+                UNIQUE KEY idx_pos_returns_tenant_number (tenant_id, app_id, return_number),
+                KEY idx_pos_returns_tenant_sale (tenant_id, app_id, sale_id, id),
+                KEY idx_pos_returns_tenant_created (tenant_id, app_id, created_at, id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
+        $this->db->exec(
+            "CREATE TABLE IF NOT EXISTS " . self::RETURN_LINE_TABLE . " (
+                id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+                tenant_id VARCHAR(120) NOT NULL,
+                app_id VARCHAR(120) NULL,
+                return_id VARCHAR(120) NOT NULL,
+                sale_line_id VARCHAR(120) NULL,
+                product_id VARCHAR(190) NOT NULL,
+                sku VARCHAR(190) NULL,
+                barcode VARCHAR(190) NULL,
+                product_label VARCHAR(255) NOT NULL,
+                qty DECIMAL(18,4) NOT NULL,
+                unit_price DECIMAL(18,4) NOT NULL,
+                line_total DECIMAL(18,4) NOT NULL,
+                metadata_json JSON NULL,
+                created_at DATETIME NOT NULL,
+                updated_at DATETIME NOT NULL,
+                PRIMARY KEY (id),
+                KEY idx_pos_return_lines_tenant_return (tenant_id, app_id, return_id, id),
+                KEY idx_pos_return_lines_tenant_sale_line (tenant_id, app_id, sale_line_id)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
         $this->ensureSessionColumnsMySql();
@@ -1829,6 +2158,63 @@ final class POSRepository
         return $qb;
     }
 
+    private function returnQuery(string $tenantId, ?string $appId = null): QueryBuilder
+    {
+        $qb = (new QueryBuilder($this->db, self::RETURN_TABLE))
+            ->setAllowedColumns([
+                'id',
+                'tenant_id',
+                'app_id',
+                'sale_id',
+                'return_number',
+                'status',
+                'subtotal',
+                'tax_total',
+                'total',
+                'reason',
+                'created_by_user_id',
+                'metadata_json',
+                'created_at',
+                'updated_at',
+            ])
+            ->where('tenant_id', '=', $tenantId);
+
+        if ($appId !== null && $appId !== '') {
+            $qb->where('app_id', '=', $appId);
+        }
+
+        return $qb;
+    }
+
+    private function returnLineQuery(string $tenantId, ?string $appId = null): QueryBuilder
+    {
+        $qb = (new QueryBuilder($this->db, self::RETURN_LINE_TABLE))
+            ->setAllowedColumns([
+                'id',
+                'tenant_id',
+                'app_id',
+                'return_id',
+                'sale_line_id',
+                'product_id',
+                'sku',
+                'barcode',
+                'product_label',
+                'qty',
+                'unit_price',
+                'line_total',
+                'metadata_json',
+                'created_at',
+                'updated_at',
+            ])
+            ->where('tenant_id', '=', $tenantId);
+
+        if ($appId !== null && $appId !== '') {
+            $qb->where('app_id', '=', $appId);
+        }
+
+        return $qb;
+    }
+
     private function sessionQuery(string $tenantId, ?string $appId = null): QueryBuilder
     {
         $qb = (new QueryBuilder($this->db, self::SESSION_TABLE))
@@ -1991,6 +2377,55 @@ final class POSRepository
             'qty' => $this->decimal($row['qty'] ?? 0),
             'unit_price' => $this->decimal($row['unit_price'] ?? 0),
             'tax_rate' => $row['tax_rate'] === null ? null : $this->decimal($row['tax_rate']),
+            'line_total' => $this->decimal($row['line_total'] ?? 0),
+            'metadata' => $this->decodeJson($row['metadata_json'] ?? null),
+            'created_at' => (string) ($row['created_at'] ?? ''),
+            'updated_at' => (string) ($row['updated_at'] ?? ''),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function normalizeReturnRow(array $row): array
+    {
+        return [
+            'id' => (string) ($row['id'] ?? ''),
+            'tenant_id' => (string) ($row['tenant_id'] ?? ''),
+            'app_id' => $this->nullableString($row['app_id'] ?? null),
+            'sale_id' => (string) ($row['sale_id'] ?? ''),
+            'return_number' => $this->nullableString($row['return_number'] ?? null),
+            'status' => trim((string) ($row['status'] ?? 'completed')) ?: 'completed',
+            'subtotal' => $this->decimal($row['subtotal'] ?? 0),
+            'tax_total' => $this->decimal($row['tax_total'] ?? 0),
+            'total' => $this->decimal($row['total'] ?? 0),
+            'reason' => $this->nullableString($row['reason'] ?? null),
+            'created_by_user_id' => $this->nullableString($row['created_by_user_id'] ?? null),
+            'metadata' => $this->decodeJson($row['metadata_json'] ?? null),
+            'created_at' => (string) ($row['created_at'] ?? ''),
+            'updated_at' => (string) ($row['updated_at'] ?? ''),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function normalizeReturnLineRow(array $row): array
+    {
+        return [
+            'id' => (string) ($row['id'] ?? ''),
+            'tenant_id' => (string) ($row['tenant_id'] ?? ''),
+            'app_id' => $this->nullableString($row['app_id'] ?? null),
+            'return_id' => (string) ($row['return_id'] ?? ''),
+            'sale_line_id' => $this->nullableString($row['sale_line_id'] ?? null),
+            'product_id' => (string) ($row['product_id'] ?? ''),
+            'sku' => $this->nullableString($row['sku'] ?? null),
+            'barcode' => $this->nullableString($row['barcode'] ?? null),
+            'product_label' => (string) ($row['product_label'] ?? ''),
+            'qty' => $this->decimal($row['qty'] ?? 0),
+            'unit_price' => $this->decimal($row['unit_price'] ?? 0),
             'line_total' => $this->decimal($row['line_total'] ?? 0),
             'metadata' => $this->decodeJson($row['metadata_json'] ?? null),
             'created_at' => (string) ($row['created_at'] ?? ''),

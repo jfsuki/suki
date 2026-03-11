@@ -1332,6 +1332,434 @@ final class POSService
         return $loaded;
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function cancelSale(array $payload): array
+    {
+        $startedAt = microtime(true);
+        $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
+        $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
+        $reason = $this->nullableString($payload['reason'] ?? $payload['notes'] ?? null);
+        $canceledByUserId = $this->nullableString(
+            $payload['created_by_user_id']
+            ?? $payload['requested_by_user_id']
+            ?? $payload['user_id']
+            ?? null
+        );
+
+        $sale = $this->resolveSaleReferenceFromPayload($tenantId, $appId, $payload);
+        $saleId = (string) ($sale['id'] ?? '');
+        if ((string) ($sale['status'] ?? '') === 'canceled') {
+            throw new RuntimeException('POS_SALE_ALREADY_CANCELED');
+        }
+        if ((string) ($sale['status'] ?? '') !== 'completed') {
+            throw new RuntimeException('POS_SALE_NOT_CANCELABLE');
+        }
+        if ($this->saleHasActiveReturns($tenantId, $saleId, $appId)) {
+            throw new RuntimeException('POS_SALE_HAS_RETURNS');
+        }
+
+        $canceledAt = date('Y-m-d H:i:s');
+        $updatedSale = $this->repository->transaction(function () use (
+            $tenantId,
+            $appId,
+            $saleId,
+            $reason,
+            $canceledByUserId,
+            $canceledAt
+        ): array {
+            $currentSale = $this->loadSale($tenantId, $saleId, $appId);
+            if ((string) ($currentSale['status'] ?? '') === 'canceled') {
+                throw new RuntimeException('POS_SALE_ALREADY_CANCELED');
+            }
+            if ((string) ($currentSale['status'] ?? '') !== 'completed') {
+                throw new RuntimeException('POS_SALE_NOT_CANCELABLE');
+            }
+            if ($this->saleHasActiveReturns($tenantId, $saleId, $appId)) {
+                throw new RuntimeException('POS_SALE_HAS_RETURNS');
+            }
+
+            $metadata = is_array($currentSale['metadata'] ?? null) ? (array) $currentSale['metadata'] : [];
+            $hooks = is_array($metadata['hooks'] ?? null) ? (array) $metadata['hooks'] : [];
+            $updatedSale = $this->repository->updateSale($tenantId, $saleId, [
+                'status' => 'canceled',
+                'metadata' => array_merge($metadata, [
+                    'cancelation' => [
+                        'reason' => $reason,
+                        'canceled_at' => $canceledAt,
+                        'canceled_by_user_id' => $canceledByUserId,
+                        'kind' => 'full_sale_cancelation',
+                    ],
+                    'hooks' => array_merge($hooks, [
+                        'receipt' => 'ready',
+                        'cash_adjustment' => 'pending',
+                        'inventory_restock' => 'pending',
+                        'fiscal_credit_note' => 'pending',
+                    ]),
+                ]),
+                'updated_at' => $canceledAt,
+            ], $appId);
+            if (!is_array($updatedSale)) {
+                throw new RuntimeException('POS_SALE_NOT_FOUND');
+            }
+
+            return $this->loadSale($tenantId, $saleId, $appId);
+        });
+
+        $receipt = $this->buildAdjustmentReceiptPayload($updatedSale, null, 'cancelation', $appId, $reason);
+        $latencyMs = $this->latencyMs($startedAt);
+
+        $this->auditLogger->log('pos_cancel_sale', 'pos_sale', $saleId, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'cancel_sale',
+            'sale_id' => $saleId,
+            'sale_number' => $updatedSale['sale_number'] ?? null,
+            'session_id' => $updatedSale['session_id'] ?? null,
+            'line_count' => count((array) ($updatedSale['lines'] ?? [])),
+            'total' => (float) ($updatedSale['total'] ?? 0),
+            'reason' => $reason,
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('cancel_sale', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'cancel_sale',
+            'sale_id' => $saleId,
+            'sale_number' => $updatedSale['sale_number'] ?? null,
+            'session_id' => $updatedSale['session_id'] ?? null,
+            'line_count' => count((array) ($updatedSale['lines'] ?? [])),
+            'total' => (float) ($updatedSale['total'] ?? 0),
+            'reason' => $reason,
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return [
+            'sale' => $updatedSale,
+            'receipt' => $receipt,
+            'sale_id' => $saleId,
+            'sale_number' => (string) ($updatedSale['sale_number'] ?? ''),
+            'line_count' => count((array) ($updatedSale['lines'] ?? [])),
+            'total' => (float) ($updatedSale['total'] ?? 0),
+            'hooks' => is_array($updatedSale['metadata']['hooks'] ?? null) ? (array) $updatedSale['metadata']['hooks'] : [],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function createReturnFromSale(array $payload): array
+    {
+        $startedAt = microtime(true);
+        $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
+        $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
+        $reason = $this->nullableString($payload['reason'] ?? null);
+        $createdByUserId = $this->nullableString(
+            $payload['created_by_user_id']
+            ?? $payload['requested_by_user_id']
+            ?? $payload['user_id']
+            ?? null
+        );
+
+        $sale = $this->resolveSaleReferenceFromPayload($tenantId, $appId, $payload);
+        $saleId = (string) ($sale['id'] ?? '');
+        if ((string) ($sale['status'] ?? '') !== 'completed') {
+            throw new RuntimeException('POS_SALE_NOT_RETURNABLE');
+        }
+
+        $returnCreatedAt = date('Y-m-d H:i:s');
+        $result = $this->repository->transaction(function () use (
+            $tenantId,
+            $appId,
+            $saleId,
+            $payload,
+            $createdByUserId,
+            $reason,
+            $returnCreatedAt
+        ): array {
+            $currentSale = $this->loadSale($tenantId, $saleId, $appId);
+            if ((string) ($currentSale['status'] ?? '') !== 'completed') {
+                throw new RuntimeException('POS_SALE_NOT_RETURNABLE');
+            }
+
+            $returnedQtyBySaleLine = $this->returnedQtyBySaleLine($tenantId, $saleId, $appId);
+            $preparedLines = $this->prepareReturnLines($currentSale, $payload, $returnedQtyBySaleLine);
+            if ($preparedLines === []) {
+                throw new RuntimeException('POS_RETURN_EMPTY');
+            }
+            $totals = $this->sumReturnLines($preparedLines);
+
+            $return = $this->repository->createReturn([
+                'tenant_id' => $tenantId,
+                'app_id' => $appId,
+                'sale_id' => $saleId,
+                'return_number' => null,
+                'status' => 'completed',
+                'subtotal' => $totals['subtotal'],
+                'tax_total' => $totals['tax_total'],
+                'total' => $totals['total'],
+                'reason' => $reason,
+                'created_by_user_id' => $createdByUserId,
+                'metadata' => $this->buildReturnMetadata($currentSale, $payload, $returnCreatedAt, $appId, $preparedLines),
+                'created_at' => $returnCreatedAt,
+                'updated_at' => $returnCreatedAt,
+            ]);
+
+            $returnId = $this->requireString($return['id'] ?? null, 'return_id');
+            $returnNumber = $this->buildReturnNumber($tenantId, $returnId, $returnCreatedAt);
+            $return = $this->repository->updateReturn($tenantId, $returnId, [
+                'return_number' => $returnNumber,
+                'metadata' => array_merge(
+                    is_array($return['metadata'] ?? null) ? (array) $return['metadata'] : [],
+                    [
+                        'receipt' => [
+                            'status' => 'ready',
+                            'kind' => 'return',
+                        ],
+                    ]
+                ),
+                'updated_at' => $returnCreatedAt,
+            ], $appId);
+            if (!is_array($return)) {
+                throw new RuntimeException('POS_RETURN_NOT_FOUND');
+            }
+
+            foreach ($preparedLines as $line) {
+                $this->repository->insertReturnLine([
+                    'tenant_id' => $tenantId,
+                    'app_id' => $appId,
+                    'return_id' => $returnId,
+                    'sale_line_id' => $line['sale_line_id'] ?? null,
+                    'product_id' => (string) ($line['product_id'] ?? ''),
+                    'sku' => $this->nullableString($line['sku'] ?? null),
+                    'barcode' => $this->nullableString($line['barcode'] ?? null),
+                    'product_label' => trim((string) ($line['product_label'] ?? 'producto')) ?: 'producto',
+                    'qty' => $line['qty'] ?? 0,
+                    'unit_price' => $line['unit_price'] ?? 0,
+                    'line_total' => $line['line_total'] ?? 0,
+                    'metadata' => $this->buildReturnLineMetadata($line),
+                    'created_at' => $returnCreatedAt,
+                    'updated_at' => $returnCreatedAt,
+                ]);
+            }
+
+            $saleMetadata = is_array($currentSale['metadata'] ?? null) ? (array) $currentSale['metadata'] : [];
+            $saleHooks = is_array($saleMetadata['hooks'] ?? null) ? (array) $saleMetadata['hooks'] : [];
+            $updatedSale = $this->repository->updateSale($tenantId, $saleId, [
+                'metadata' => array_merge($saleMetadata, [
+                    'latest_return' => [
+                        'return_id' => $returnId,
+                        'return_number' => $returnNumber,
+                        'returned_at' => $returnCreatedAt,
+                        'total' => $totals['total'],
+                    ],
+                    'hooks' => array_merge($saleHooks, [
+                        'cash_adjustment' => 'pending',
+                        'inventory_restock' => 'pending',
+                        'fiscal_credit_note' => 'pending',
+                    ]),
+                ]),
+                'updated_at' => $returnCreatedAt,
+            ], $appId);
+            if (!is_array($updatedSale)) {
+                throw new RuntimeException('POS_SALE_NOT_FOUND');
+            }
+
+            $loadedReturn = $this->loadReturn($tenantId, $returnId, $appId);
+            $loadedSale = $this->loadSale($tenantId, $saleId, $appId);
+
+            return [
+                'return' => $loadedReturn,
+                'sale' => $loadedSale,
+            ];
+        });
+
+        $return = is_array($result['return'] ?? null) ? (array) $result['return'] : [];
+        $sale = is_array($result['sale'] ?? null) ? (array) $result['sale'] : [];
+        $receipt = $this->buildAdjustmentReceiptPayload($sale, $return, 'return', $appId, $reason);
+        $latencyMs = $this->latencyMs($startedAt);
+        $returnId = (string) ($return['id'] ?? '');
+        $returnNumber = (string) ($return['return_number'] ?? '');
+        $lineCount = count((array) ($return['lines'] ?? []));
+
+        $this->auditLogger->log('pos_create_return', 'pos_return', $returnId !== '' ? $returnId : null, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'create_return',
+            'sale_id' => $saleId,
+            'return_id' => $returnId,
+            'return_number' => $returnNumber,
+            'session_id' => $sale['session_id'] ?? null,
+            'line_count' => $lineCount,
+            'total' => (float) ($return['total'] ?? 0),
+            'reason' => $reason,
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('create_return', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'create_return',
+            'sale_id' => $saleId,
+            'return_id' => $returnId,
+            'return_number' => $returnNumber,
+            'session_id' => $sale['session_id'] ?? null,
+            'line_count' => $lineCount,
+            'total' => (float) ($return['total'] ?? 0),
+            'reason' => $reason,
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return [
+            'sale' => $sale,
+            'return' => $return,
+            'receipt' => $receipt,
+            'sale_id' => $saleId,
+            'return_id' => $returnId,
+            'return_number' => $returnNumber,
+            'line_count' => $lineCount,
+            'total' => (float) ($return['total'] ?? 0),
+            'hooks' => is_array($return['metadata']['hooks'] ?? null) ? (array) $return['metadata']['hooks'] : [],
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getReturn(string $tenantId, string $returnId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $return = $this->loadReturn($tenantId, $returnId, $appId);
+        $latencyMs = $this->latencyMs($startedAt);
+
+        $this->auditLogger->log('pos_get_return', 'pos_return', $returnId, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'get_return',
+            'sale_id' => $return['sale_id'] ?? null,
+            'return_id' => $returnId,
+            'return_number' => $return['return_number'] ?? null,
+            'line_count' => count((array) ($return['lines'] ?? [])),
+            'total' => (float) ($return['total'] ?? 0),
+            'reason' => $return['reason'] ?? null,
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('get_return', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'get_return',
+            'sale_id' => $return['sale_id'] ?? null,
+            'return_id' => $returnId,
+            'return_number' => $return['return_number'] ?? null,
+            'line_count' => count((array) ($return['lines'] ?? [])),
+            'total' => (float) ($return['total'] ?? 0),
+            'reason' => $return['reason'] ?? null,
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return $return;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function listReturns(string $tenantId, array $filters = [], ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $limit = max(1, min(50, (int) ($filters['limit'] ?? 10)));
+        $items = $this->repository->listReturns($tenantId, $filters + ['app_id' => $appId], $limit);
+        $returns = [];
+        foreach ($items as $item) {
+            $returnId = (string) ($item['id'] ?? '');
+            $return = $returnId !== '' ? $this->repository->loadReturnAggregate($tenantId, $returnId, $appId) : null;
+            if (!is_array($return)) {
+                continue;
+            }
+            $returns[] = $this->validatedReturn($return);
+        }
+        $latencyMs = $this->latencyMs($startedAt);
+
+        $this->auditLogger->log('pos_list_returns', 'pos_return', null, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'list_returns',
+            'sale_id' => $this->nullableString($filters['sale_id'] ?? null),
+            'line_count' => array_sum(array_map(fn(array $return): int => count((array) ($return['lines'] ?? [])), $returns)),
+            'total' => array_sum(array_map(fn(array $return): float => (float) ($return['total'] ?? 0), $returns)),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('list_returns', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'list_returns',
+            'sale_id' => $this->nullableString($filters['sale_id'] ?? null),
+            'result_count' => count($returns),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return $returns;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function buildReturnReceiptPayload(string $tenantId, string $returnId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $return = $this->loadReturn($tenantId, $returnId, $appId);
+        $sale = $this->loadSale($tenantId, (string) ($return['sale_id'] ?? ''), $appId);
+        $receipt = $this->buildAdjustmentReceiptPayload(
+            $sale,
+            $return,
+            'return',
+            $appId,
+            $this->nullableString($return['reason'] ?? null)
+        );
+        $latencyMs = $this->latencyMs($startedAt);
+
+        $this->auditLogger->log('pos_build_return_receipt', 'pos_return', $returnId, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'pos',
+            'action_name' => 'build_return_receipt',
+            'sale_id' => $return['sale_id'] ?? null,
+            'return_id' => $returnId,
+            'return_number' => $return['return_number'] ?? null,
+            'session_id' => $sale['session_id'] ?? null,
+            'line_count' => count((array) ($return['lines'] ?? [])),
+            'total' => (float) ($return['total'] ?? 0),
+            'reason' => $return['reason'] ?? null,
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('build_return_receipt', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'build_return_receipt',
+            'sale_id' => $return['sale_id'] ?? null,
+            'return_id' => $returnId,
+            'return_number' => $return['return_number'] ?? null,
+            'session_id' => $sale['session_id'] ?? null,
+            'line_count' => count((array) ($return['lines'] ?? [])),
+            'total' => (float) ($return['total'] ?? 0),
+            'reason' => $return['reason'] ?? null,
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return $receipt;
+    }
+
     private function loadDraft(string $tenantId, string $draftId, ?string $appId): array
     {
         $draft = $this->repository->loadDraftAggregate($tenantId, $draftId, $appId);
@@ -1353,6 +1781,19 @@ final class POSService
         }
 
         return $this->validatedSale($sale);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function loadReturn(string $tenantId, string $returnId, ?string $appId): array
+    {
+        $return = $this->repository->loadReturnAggregate($tenantId, $returnId, $appId);
+        if (!is_array($return)) {
+            throw new RuntimeException('POS_RETURN_NOT_FOUND');
+        }
+
+        return $this->validatedReturn($return);
     }
 
     /**
@@ -1735,6 +2176,45 @@ final class POSService
     }
 
     /**
+     * @param array<string, mixed> $sale
+     * @param array<string, mixed> $payload
+     * @param array<int, array<string, mixed>> $lines
+     * @return array<string, mixed>
+     */
+    private function buildReturnMetadata(array $sale, array $payload, string $createdAt, ?string $appId, array $lines): array
+    {
+        $session = null;
+        $sessionId = $this->nullableString($sale['session_id'] ?? null);
+        if ($sessionId !== null) {
+            $session = $this->repository->findSession((string) ($sale['tenant_id'] ?? ''), $sessionId, $appId);
+        }
+
+        return [
+            'origin' => [
+                'source' => 'pos_sale',
+                'sale_id' => (string) ($sale['id'] ?? ''),
+                'sale_number' => (string) ($sale['sale_number'] ?? ''),
+            ],
+            'return_scope' => [
+                'mode' => $this->explicitReturnItems($payload) === [] ? 'full_remaining' : 'partial',
+                'line_count' => count($lines),
+            ],
+            'hooks' => [
+                'cash_adjustment' => 'pending',
+                'inventory_restock' => 'pending',
+                'fiscal_credit_note' => 'pending',
+                'receipt' => 'pending',
+            ],
+            'session_impact' => [
+                'session_id' => $sessionId,
+                'cash_register_id' => is_array($session) ? $this->nullableString($session['cash_register_id'] ?? null) : null,
+                'refund_amount' => $this->sumReturnLines($lines)['total'],
+            ],
+            'created_at' => $createdAt,
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $session
      * @return array<string, mixed>
      */
@@ -1813,6 +2293,30 @@ final class POSService
     }
 
     /**
+     * @param array<string, mixed> $line
+     * @return array<string, mixed>
+     */
+    private function buildReturnLineMetadata(array $line): array
+    {
+        return array_merge(
+            is_array($line['metadata'] ?? null) ? (array) $line['metadata'] : [],
+            [
+                'pricing_snapshot' => [
+                    'unit_price' => $line['unit_price'] ?? null,
+                    'line_subtotal' => $line['line_subtotal'] ?? null,
+                    'line_tax' => $line['line_tax'] ?? null,
+                    'tax_rate' => $line['tax_rate'] ?? null,
+                ],
+                'hooks' => [
+                    'cash_refund' => 'pending',
+                    'inventory_restock' => 'pending',
+                    'fiscal_credit_note' => 'pending',
+                ],
+            ]
+        );
+    }
+
+    /**
      * @param array<string, mixed> $draft
      * @param array<int, array<string, mixed>> $lines
      */
@@ -1842,6 +2346,278 @@ final class POSService
             || $this->nullableString($metadata['sale_number'] ?? null) !== null;
     }
 
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function resolveSaleReferenceFromPayload(string $tenantId, ?string $appId, array $payload): array
+    {
+        $saleId = $this->nullableString($payload['sale_id'] ?? $payload['id'] ?? null);
+        if ($saleId !== null) {
+            return $this->loadSale($tenantId, $saleId, $appId);
+        }
+
+        $saleNumber = $this->nullableString($payload['sale_number'] ?? $payload['number'] ?? null);
+        if ($saleNumber !== null) {
+            return $this->getSaleByNumber($tenantId, $saleNumber, $appId);
+        }
+
+        throw new RuntimeException('POS_SALE_REFERENCE_REQUIRED');
+    }
+
+    private function saleHasActiveReturns(string $tenantId, string $saleId, ?string $appId): bool
+    {
+        foreach ($this->repository->listReturns($tenantId, ['sale_id' => $saleId, 'app_id' => $appId], 200) as $return) {
+            if ((string) ($return['status'] ?? '') !== 'voided') {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @return array<string, float>
+     */
+    private function returnedQtyBySaleLine(string $tenantId, string $saleId, ?string $appId): array
+    {
+        $qtyBySaleLine = [];
+        foreach ($this->repository->listReturns($tenantId, ['sale_id' => $saleId, 'app_id' => $appId], 200) as $return) {
+            if ((string) ($return['status'] ?? '') === 'voided') {
+                continue;
+            }
+            $returnId = (string) ($return['id'] ?? '');
+            if ($returnId === '') {
+                continue;
+            }
+            foreach ($this->repository->listReturnLines($tenantId, $returnId, $appId) as $line) {
+                $saleLineId = $this->nullableString($line['sale_line_id'] ?? null);
+                if ($saleLineId === null) {
+                    continue;
+                }
+                $qtyBySaleLine[$saleLineId] = $this->money(
+                    (float) ($qtyBySaleLine[$saleLineId] ?? 0)
+                    + (float) ($line['qty'] ?? 0)
+                );
+            }
+        }
+
+        return $qtyBySaleLine;
+    }
+
+    /**
+     * @param array<string, mixed> $sale
+     * @param array<string, mixed> $payload
+     * @param array<string, float> $returnedQtyBySaleLine
+     * @return array<int, array<string, mixed>>
+     */
+    private function prepareReturnLines(array $sale, array $payload, array $returnedQtyBySaleLine): array
+    {
+        $saleLines = [];
+        foreach ((array) ($sale['lines'] ?? []) as $line) {
+            if (is_array($line)) {
+                $saleLines[] = (array) $line;
+            }
+        }
+
+        if ($saleLines === []) {
+            throw new RuntimeException('POS_SALE_NOT_RETURNABLE');
+        }
+
+        $saleLineById = [];
+        $saleLinesByProductId = [];
+        foreach ($saleLines as $line) {
+            $lineId = (string) ($line['id'] ?? '');
+            if ($lineId !== '') {
+                $saleLineById[$lineId] = $line;
+            }
+            $productId = $this->nullableString($line['product_id'] ?? null);
+            if ($productId !== null) {
+                $saleLinesByProductId[$productId][] = $line;
+            }
+        }
+
+        $requestedItems = $this->explicitReturnItems($payload);
+        $selectedLines = [];
+        $selectedQtyBySaleLine = [];
+        if ($requestedItems === []) {
+            foreach ($saleLines as $saleLine) {
+                $saleLineId = (string) ($saleLine['id'] ?? '');
+                if ($saleLineId === '') {
+                    continue;
+                }
+                $remainingQty = $this->money(
+                    (float) ($saleLine['qty'] ?? 0)
+                    - (float) ($returnedQtyBySaleLine[$saleLineId] ?? 0)
+                );
+                if ($remainingQty <= 0) {
+                    continue;
+                }
+                $selectedLines[] = $this->buildReturnLineSnapshot($saleLine, $remainingQty);
+            }
+
+            if ($selectedLines === []) {
+                throw new RuntimeException('POS_RETURN_NO_REMAINING_QTY');
+            }
+
+            return $selectedLines;
+        }
+
+        foreach ($requestedItems as $item) {
+            $saleLine = $this->resolveSaleLineForReturnItem($item, $saleLineById, $saleLinesByProductId);
+            $saleLineId = (string) ($saleLine['id'] ?? '');
+            $alreadyReturned = (float) ($returnedQtyBySaleLine[$saleLineId] ?? 0);
+            $alreadySelected = (float) ($selectedQtyBySaleLine[$saleLineId] ?? 0);
+            $remainingQty = $this->money((float) ($saleLine['qty'] ?? 0) - $alreadyReturned - $alreadySelected);
+            if ($remainingQty <= 0) {
+                throw new RuntimeException('POS_RETURN_NO_REMAINING_QTY');
+            }
+
+            $requestedQtyRaw = $item['qty'] ?? $item['quantity'] ?? null;
+            $requestedQty = $requestedQtyRaw === null || $requestedQtyRaw === ''
+                ? $remainingQty
+                : $this->quantity($requestedQtyRaw);
+            if ($requestedQty > ($remainingQty + 0.0001)) {
+                throw new RuntimeException('POS_RETURN_QTY_EXCEEDED');
+            }
+
+            $selectedQtyBySaleLine[$saleLineId] = $this->money($alreadySelected + $requestedQty);
+            $selectedLines[] = $this->buildReturnLineSnapshot($saleLine, $requestedQty);
+        }
+
+        return $selectedLines;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<int, array<string, mixed>>
+     */
+    private function explicitReturnItems(array $payload): array
+    {
+        $items = [];
+        if (is_array($payload['items'] ?? null)) {
+            foreach ((array) $payload['items'] as $item) {
+                if (is_array($item)) {
+                    $items[] = $item;
+                }
+            }
+        }
+
+        $singleItem = [];
+        foreach (['sale_line_id', 'line_id', 'product_id', 'qty', 'quantity'] as $key) {
+            if (array_key_exists($key, $payload)) {
+                $singleItem[$key] = $payload[$key];
+            }
+        }
+        if ($singleItem !== []) {
+            $items[] = $singleItem;
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     * @param array<string, array<string, mixed>> $saleLineById
+     * @param array<string, array<int, array<string, mixed>>> $saleLinesByProductId
+     * @return array<string, mixed>
+     */
+    private function resolveSaleLineForReturnItem(array $item, array $saleLineById, array $saleLinesByProductId): array
+    {
+        $saleLineId = $this->nullableString($item['sale_line_id'] ?? $item['line_id'] ?? null);
+        if ($saleLineId !== null) {
+            if (!is_array($saleLineById[$saleLineId] ?? null)) {
+                throw new RuntimeException('POS_RETURN_LINE_NOT_FOUND');
+            }
+
+            return (array) $saleLineById[$saleLineId];
+        }
+
+        $productId = $this->nullableString($item['product_id'] ?? null);
+        if ($productId !== null) {
+            $matches = is_array($saleLinesByProductId[$productId] ?? null) ? (array) $saleLinesByProductId[$productId] : [];
+            if (count($matches) === 1 && is_array($matches[0])) {
+                return (array) $matches[0];
+            }
+            if (count($matches) > 1) {
+                throw new RuntimeException('POS_RETURN_LINE_AMBIGUOUS');
+            }
+            throw new RuntimeException('POS_RETURN_LINE_NOT_FOUND');
+        }
+
+        if (count($saleLineById) === 1) {
+            return (array) reset($saleLineById);
+        }
+
+        throw new RuntimeException('POS_RETURN_LINE_REFERENCE_REQUIRED');
+    }
+
+    /**
+     * @param array<string, mixed> $saleLine
+     * @return array<string, mixed>
+     */
+    private function buildReturnLineSnapshot(array $saleLine, float $qty): array
+    {
+        $soldQty = max(0.0001, (float) ($saleLine['qty'] ?? 0.0001));
+        $unitPrice = $this->money((float) ($saleLine['unit_price'] ?? 0));
+        $taxRate = $this->nullableDecimal($saleLine['tax_rate'] ?? null);
+        $lineSubtotal = $this->money($qty * $unitPrice);
+
+        if ($taxRate !== null) {
+            $lineTax = $this->money($lineSubtotal * ($taxRate / 100));
+            $lineTotal = $this->money($lineSubtotal + $lineTax);
+        } else {
+            $perUnitTotal = $this->money(((float) ($saleLine['line_total'] ?? 0)) / $soldQty);
+            $lineTotal = $this->money($qty * $perUnitTotal);
+            $lineTax = $this->money($lineTotal - $lineSubtotal);
+            if (abs($lineTax) < 0.0001) {
+                $lineTax = 0.0;
+            }
+        }
+
+        return [
+            'sale_line_id' => (string) ($saleLine['id'] ?? ''),
+            'product_id' => (string) ($saleLine['product_id'] ?? ''),
+            'sku' => $this->nullableString($saleLine['sku'] ?? null),
+            'barcode' => $this->nullableString($saleLine['barcode'] ?? null),
+            'product_label' => trim((string) ($saleLine['product_label'] ?? 'producto')) ?: 'producto',
+            'qty' => $qty,
+            'unit_price' => $unitPrice,
+            'tax_rate' => $taxRate,
+            'line_subtotal' => $lineSubtotal,
+            'line_tax' => $lineTax,
+            'line_total' => $lineTotal,
+            'metadata' => [
+                'origin' => [
+                    'sale_line_id' => (string) ($saleLine['id'] ?? ''),
+                    'sale_id' => (string) ($saleLine['sale_id'] ?? ''),
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $lines
+     * @return array<string, float>
+     */
+    private function sumReturnLines(array $lines): array
+    {
+        $subtotal = 0.0;
+        $taxTotal = 0.0;
+        $total = 0.0;
+        foreach ($lines as $line) {
+            $subtotal += (float) ($line['line_subtotal'] ?? 0);
+            $taxTotal += (float) ($line['line_tax'] ?? 0);
+            $total += (float) ($line['line_total'] ?? 0);
+        }
+
+        return [
+            'subtotal' => $this->money($subtotal),
+            'tax_total' => $this->money($taxTotal),
+            'total' => $this->money($total),
+        ];
+    }
+
     private function buildSaleNumber(string $tenantId, string $saleId, string $createdAt): string
     {
         $prefix = strtoupper(substr((preg_replace('/[^A-Za-z0-9]/', '', $tenantId) ?? ''), 0, 6));
@@ -1852,6 +2628,18 @@ final class POSService
         $serial = ctype_digit($saleId) ? str_pad($saleId, 6, '0', STR_PAD_LEFT) : strtoupper($saleId);
 
         return 'POS-' . $prefix . '-' . $date . '-' . $serial;
+    }
+
+    private function buildReturnNumber(string $tenantId, string $returnId, string $createdAt): string
+    {
+        $prefix = strtoupper(substr((preg_replace('/[^A-Za-z0-9]/', '', $tenantId) ?? ''), 0, 6));
+        if ($prefix === '') {
+            $prefix = (string) $this->stableTenantInt($tenantId);
+        }
+        $date = $this->saleDateTime($createdAt)->format('Ymd');
+        $serial = ctype_digit($returnId) ? str_pad($returnId, 6, '0', STR_PAD_LEFT) : strtoupper($returnId);
+
+        return 'RET-' . $prefix . '-' . $date . '-' . $serial;
     }
 
     private function saleDateTime(string $value): DateTimeImmutable
@@ -1919,6 +2707,88 @@ final class POSService
     }
 
     /**
+     * @param array<string, mixed> $sale
+     * @param array<string, mixed>|null $return
+     * @return array<string, mixed>
+     */
+    private function buildAdjustmentReceiptPayload(array $sale, ?array $return, string $kind, ?string $appId, ?string $reason = null): array
+    {
+        $createdAtValue = $kind === 'return'
+            ? (string) (($return['created_at'] ?? '') ?: '')
+            : (string) (($sale['updated_at'] ?? $sale['created_at'] ?? '') ?: '');
+        $createdAt = $this->saleDateTime($createdAtValue);
+        $session = $this->nullableString($sale['session_id'] ?? null) !== null
+            ? $this->repository->findSession((string) ($sale['tenant_id'] ?? ''), (string) $sale['session_id'], $appId)
+            : null;
+        $customerLabel = $this->resolveSaleCustomerLabel((string) ($sale['tenant_id'] ?? ''), $sale, $appId);
+        $footerText = $this->ticketFooterText();
+        $itemsSource = $kind === 'return'
+            ? (array) (($return['lines'] ?? []) ?: [])
+            : (array) (($sale['lines'] ?? []) ?: []);
+        $totalsSource = $kind === 'return' && is_array($return)
+            ? $return
+            : $sale;
+
+        $items = array_map(function (array $line): array {
+            return [
+                'product_id' => (string) ($line['product_id'] ?? ''),
+                'sku' => $this->nullableString($line['sku'] ?? null),
+                'barcode' => $this->nullableString($line['barcode'] ?? null),
+                'product_label' => trim((string) ($line['product_label'] ?? 'producto')) ?: 'producto',
+                'qty' => (float) ($line['qty'] ?? 0),
+                'unit_price' => (float) ($line['unit_price'] ?? 0),
+                'line_total' => (float) ($line['line_total'] ?? 0),
+                'metadata' => is_array($line['metadata'] ?? null) ? (array) $line['metadata'] : [],
+            ];
+        }, $itemsSource);
+
+        $payload = [
+            'kind' => $kind,
+            'return_id' => $kind === 'return' ? $this->nullableString($return['id'] ?? null) : null,
+            'return_number' => $kind === 'return' ? $this->nullableString($return['return_number'] ?? null) : null,
+            'sale_id' => (string) ($sale['id'] ?? ''),
+            'sale_number' => (string) ($sale['sale_number'] ?? ''),
+            'tenant_id' => (string) ($sale['tenant_id'] ?? ''),
+            'app_id' => $appId,
+            'created_at' => $createdAtValue,
+            'currency' => $this->nullableString($sale['currency'] ?? null),
+            'header' => [
+                'document_number' => $kind === 'return'
+                    ? (string) (($return['return_number'] ?? '') ?: ($sale['sale_number'] ?? ''))
+                    : (string) ($sale['sale_number'] ?? ''),
+                'type_label' => $kind === 'cancelation' ? 'Cancelacion POS' : 'Devolucion POS',
+                'sale_number' => (string) ($sale['sale_number'] ?? ''),
+                'return_number' => $kind === 'return' ? $this->nullableString($return['return_number'] ?? null) : null,
+                'date' => $createdAt->format('Y-m-d'),
+                'time' => $createdAt->format('H:i:s'),
+                'customer_label' => $customerLabel,
+                'cash_register_id' => is_array($session) ? $this->nullableString($session['cash_register_id'] ?? null) : null,
+                'store_id' => is_array($session) ? $this->nullableString($session['store_id'] ?? null) : null,
+                'reason' => $reason,
+            ],
+            'items' => $items,
+            'totals' => [
+                'subtotal' => (float) ($totalsSource['subtotal'] ?? 0),
+                'tax_total' => (float) ($totalsSource['tax_total'] ?? 0),
+                'total' => (float) ($totalsSource['total'] ?? 0),
+            ],
+            'footer_hooks' => [
+                'contract_id' => 'ticket_pos',
+                'footer_text' => $footerText,
+                'printer' => 'pending',
+                'cash_adjustment' => 'pending',
+                'inventory_restock' => 'pending',
+                'fiscal_credit_note' => 'pending',
+            ],
+        ];
+        $payload['printable_text'] = $this->buildPrintableAdjustmentReceiptText($payload);
+
+        POSContractValidator::validateReturnReceipt($payload);
+
+        return $payload;
+    }
+
+    /**
      * @param array<string, mixed> $payload
      */
     private function buildPrintableReceiptText(array $payload): string
@@ -1933,6 +2803,51 @@ final class POSService
         $lines[] = (string) ($header['date'] ?? '') . ' ' . (string) ($header['time'] ?? '');
         if (trim((string) ($header['customer_label'] ?? '')) !== '') {
             $lines[] = 'Cliente: ' . (string) $header['customer_label'];
+        }
+        foreach ((array) ($payload['items'] ?? []) as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $lines[] = trim((string) ($item['product_label'] ?? 'producto')) ?: 'producto';
+            $lines[] = '  '
+                . $this->formatMoneyText((float) ($item['qty'] ?? 0), 0, false)
+                . ' x '
+                . $this->formatMoneyText((float) ($item['unit_price'] ?? 0))
+                . ' = '
+                . $this->formatMoneyText((float) ($item['line_total'] ?? 0));
+        }
+        $lines[] = 'Subtotal: ' . $this->formatMoneyText((float) ($totals['subtotal'] ?? 0));
+        $lines[] = 'Impuesto: ' . $this->formatMoneyText((float) ($totals['tax_total'] ?? 0));
+        $lines[] = 'TOTAL: ' . $this->formatMoneyText((float) ($totals['total'] ?? 0));
+        if (trim((string) ($footerHooks['footer_text'] ?? '')) !== '') {
+            $lines[] = (string) $footerHooks['footer_text'];
+        }
+
+        return implode("\n", $lines);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function buildPrintableAdjustmentReceiptText(array $payload): string
+    {
+        $lines = [];
+        $header = is_array($payload['header'] ?? null) ? (array) $payload['header'] : [];
+        $totals = is_array($payload['totals'] ?? null) ? (array) $payload['totals'] : [];
+        $footerHooks = is_array($payload['footer_hooks'] ?? null) ? (array) $payload['footer_hooks'] : [];
+        $kind = (string) ($payload['kind'] ?? 'return');
+
+        $lines[] = $kind === 'cancelation' ? 'CANCELACION POS' : 'DEVOLUCION POS';
+        $lines[] = 'Venta ' . (string) ($payload['sale_number'] ?? '');
+        if ($kind === 'return' && trim((string) ($payload['return_number'] ?? '')) !== '') {
+            $lines[] = 'Devolucion ' . (string) $payload['return_number'];
+        }
+        $lines[] = (string) ($header['date'] ?? '') . ' ' . (string) ($header['time'] ?? '');
+        if (trim((string) ($header['customer_label'] ?? '')) !== '') {
+            $lines[] = 'Cliente: ' . (string) $header['customer_label'];
+        }
+        if (trim((string) ($header['reason'] ?? '')) !== '') {
+            $lines[] = 'Motivo: ' . (string) $header['reason'];
         }
         foreach ((array) ($payload['items'] ?? []) as $item) {
             if (!is_array($item)) {
@@ -2124,5 +3039,23 @@ final class POSService
         POSContractValidator::validateSale($sale);
 
         return $sale;
+    }
+
+    /**
+     * @param array<string, mixed> $return
+     * @return array<string, mixed>
+     */
+    private function validatedReturn(array $return): array
+    {
+        if (!array_key_exists('lines', $return)) {
+            $return['lines'] = [];
+        }
+        if (!array_key_exists('metadata', $return) && array_key_exists('metadata_json', $return)) {
+            $return['metadata'] = is_array($return['metadata_json']) ? (array) $return['metadata_json'] : [];
+        }
+
+        POSContractValidator::validateReturn($return);
+
+        return $return;
     }
 }

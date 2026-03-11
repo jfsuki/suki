@@ -13,7 +13,9 @@ final class POSContractValidator
     private const DRAFT_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/sale_draft.schema.json';
     private const SESSION_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/pos_session.schema.json';
     private const SALE_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/pos_sale.schema.json';
+    private const RETURN_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/pos_return.schema.json';
     private const RECEIPT_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/pos_receipt_payload.schema.json';
+    private const RETURN_RECEIPT_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/pos_return_receipt_payload.schema.json';
     private const CASH_SUMMARY_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/pos_cash_summary.schema.json';
 
     /**
@@ -43,9 +45,25 @@ final class POSContractValidator
     /**
      * @param array<string, mixed> $payload
      */
+    public static function validateReturn(array $payload): void
+    {
+        self::validate(self::RETURN_SCHEMA, self::normalizePayload($payload), 'POSReturn');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
     public static function validateReceipt(array $payload): void
     {
         self::validate(self::RECEIPT_SCHEMA, self::normalizePayload($payload), 'POSReceiptPayload');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public static function validateReturnReceipt(array $payload): void
+    {
+        self::validate(self::RETURN_RECEIPT_SCHEMA, self::normalizePayload($payload), 'POSReturnReceiptPayload');
     }
 
     /**
