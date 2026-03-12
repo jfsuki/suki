@@ -552,9 +552,14 @@ final class SkillExecutor
     {
         return in_array($name, [
             'fiscal_create_document',
+            'fiscal_create_sales_invoice_from_sale',
+            'fiscal_create_credit_note',
+            'fiscal_create_support_document_from_purchase',
             'fiscal_get_document',
             'fiscal_list_documents',
+            'fiscal_list_documents_by_type',
             'fiscal_get_by_source',
+            'fiscal_build_document_payload',
             'fiscal_record_event',
             'fiscal_update_status',
         ], true);

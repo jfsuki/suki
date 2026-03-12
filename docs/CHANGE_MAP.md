@@ -61,9 +61,15 @@
   - update `FiscalEngineRepository`, `FiscalEngineService`, `FiscalEngineCommandHandler`, `FiscalEngineMessageParser`
   - keep the source linkage canonical: `source_module + source_entity_type + source_entity_id`
   - keep document types limited to the shared internal set until a provider adapter exists
+  - prefer explicit builders over generic creation when the source is known:
+    - `createSalesInvoiceFromSale()`
+    - `createCreditNoteFromSaleOrReturn()`
+    - `createSupportDocumentFromPurchase()`
+  - before creating FE builders, block or reuse active duplicates for the same `tenant + source + document_type`
   - keep statuses lightweight and transitions safe: `draft -> pending|prepared -> submitted -> accepted|rejected|canceled`
   - treat POS, Purchases and Ecommerce as source hooks only; do not duplicate their lifecycles here
   - keep totals lightweight: `subtotal`, `tax_total`, `total`, plus metadata hooks for tax breakdown/withholding/exemptions
+  - keep `buildDocumentPayload()` internal and structured: `header + summary + lines + references + metadata`
   - route provider submission, XML/UBL, signatures, CUFE/CUDE, webhooks and accounting to future extensions only
   - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
 - If you add AgentOps metrics:
@@ -98,7 +104,10 @@
 - Proposal lifecycle
   - `open -> accepted|rejected|implemented`
 - Fiscal lifecycle
-  - `source entity -> fiscal_document(prepared) -> fiscal_event trail -> status updates`
+  - `source entity -> explicit fiscal builder -> fiscal_document(prepared|pending) -> fiscal_event trail -> status updates`
+- FE duplicate lifecycle
+  - `same tenant + same source + same document_type + active status`
+  - returns existing document or blocks creation depending on duplicate policy
 - Provider lifecycle
   - stays pending until a future adapter submits and reconciles the document externally
 

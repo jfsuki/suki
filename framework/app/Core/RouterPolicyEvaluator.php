@@ -932,6 +932,21 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'CreateFiscalSalesInvoiceFromSale':
+                if (
+                    trim((string) ($command['sale_id'] ?? '')) === ''
+                    && trim((string) ($command['sale_number'] ?? '')) === ''
+                    && trim((string) ($command['source_entity_id'] ?? '')) === ''
+                ) {
+                    return [false, 'missing_sale_reference'];
+                }
+                foreach (['document_type', 'document_number', 'status'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
             case 'GetFiscalDocument':
                 if (trim((string) ($command['fiscal_document_id'] ?? $command['document_id'] ?? $command['id'] ?? '')) === '') {
                     return [false, 'missing_fiscal_document_id'];
@@ -949,6 +964,20 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'ListFiscalDocumentsByType':
+                if (trim((string) ($command['document_type'] ?? '')) === '') {
+                    return [false, 'missing_document_type'];
+                }
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                foreach (['document_type', 'status', 'date_from', 'date_to'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
             case 'GetFiscalDocumentBySource':
                 foreach (['source_module', 'source_entity_type', 'source_entity_id'] as $key) {
                     if (trim((string) ($command[$key] ?? '')) === '') {
@@ -957,6 +986,12 @@ final class RouterPolicyEvaluator
                 }
                 if (array_key_exists('document_type', $command) && $command['document_type'] !== null && $command['document_type'] !== '' && !is_string($command['document_type'])) {
                     return [false, 'invalid_document_type'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'BuildFiscalDocumentPayload':
+                if (trim((string) ($command['fiscal_document_id'] ?? $command['document_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_fiscal_document_id'];
                 }
                 return [true, 'schema_valid'];
 
@@ -972,6 +1007,37 @@ final class RouterPolicyEvaluator
                 }
                 if (array_key_exists('payload', $command) && $command['payload'] !== null && !is_array($command['payload'])) {
                     return [false, 'invalid_payload'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'CreateFiscalCreditNote':
+                if (
+                    trim((string) ($command['return_id'] ?? '')) === ''
+                    && trim((string) ($command['sale_id'] ?? '')) === ''
+                    && trim((string) ($command['sale_number'] ?? '')) === ''
+                    && trim((string) ($command['source_entity_id'] ?? '')) === ''
+                ) {
+                    return [false, 'missing_credit_note_source'];
+                }
+                foreach (['status', 'reason'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
+            case 'CreateFiscalSupportDocumentFromPurchase':
+                if (
+                    trim((string) ($command['purchase_id'] ?? '')) === ''
+                    && trim((string) ($command['purchase_number'] ?? '')) === ''
+                    && trim((string) ($command['source_entity_id'] ?? '')) === ''
+                ) {
+                    return [false, 'missing_purchase_reference'];
+                }
+                foreach (['document_type', 'document_number', 'status'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
                 }
                 return [true, 'schema_valid'];
 

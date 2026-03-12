@@ -1708,6 +1708,7 @@ final class ChatAgent
             'source_entity_type' => $runtimeObservability['source_entity_type'],
             'source_entity_id' => $runtimeObservability['source_entity_id'],
             'fiscal_status' => $runtimeObservability['fiscal_status'],
+            'duplicate_blocked' => $runtimeObservability['duplicate_blocked'],
             'line_count' => $runtimeObservability['line_count'],
             'total' => $runtimeObservability['total'],
             'result_status' => $runtimeObservability['result_status'],
@@ -1830,6 +1831,7 @@ final class ChatAgent
             'source_entity_type' => trim((string) ($runtimeContext['source_entity_type'] ?? $routeTelemetry['source_entity_type'] ?? '')),
             'source_entity_id' => trim((string) ($runtimeContext['source_entity_id'] ?? $routeTelemetry['source_entity_id'] ?? '')),
             'fiscal_status' => trim((string) ($runtimeContext['fiscal_status'] ?? $routeTelemetry['fiscal_status'] ?? '')),
+            'duplicate_blocked' => (($runtimeContext['duplicate_blocked'] ?? $routeTelemetry['duplicate_blocked'] ?? false) === true),
             'line_count' => is_numeric($runtimeContext['line_count'] ?? $routeTelemetry['line_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['line_count'] ?? $routeTelemetry['line_count']))
                 : null,
@@ -2003,6 +2005,7 @@ final class ChatAgent
             'source_entity_type' => trim((string) ($payload['source_entity_type'] ?? '')) ?: '',
             'source_entity_id' => trim((string) ($payload['source_entity_id'] ?? '')) ?: '',
             'fiscal_status' => trim((string) ($payload['fiscal_status'] ?? '')) ?: '',
+            'duplicate_blocked' => (($payload['duplicate_blocked'] ?? false) === true),
             'line_count' => is_numeric($payload['line_count'] ?? null)
                 ? max(0, (int) $payload['line_count'])
                 : null,

@@ -4547,6 +4547,102 @@ if ($route === 'fiscal/create-document') {
     }
 }
 
+if ($route === 'fiscal/create-sales-invoice-from-sale') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = requestData();
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $document = (new FiscalEngineService())->createSalesInvoiceFromSale($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+        ]);
+        respondJson($response, 'success', 'Factura electronica interna preparada', ['document' => $document, 'item' => $document]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'fiscal/create-credit-note') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = requestData();
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $document = (new FiscalEngineService())->createCreditNoteFromSaleOrReturn($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+        ]);
+        respondJson($response, 'success', 'Nota credito interna preparada', ['document' => $document, 'item' => $document]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
+if ($route === 'fiscal/create-support-document-from-purchase') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = requestData();
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $document = (new FiscalEngineService())->createSupportDocumentFromPurchase($payload + [
+            'tenant_id' => $tenantId,
+            'app_id' => trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null,
+        ]);
+        respondJson($response, 'success', 'Documento soporte interno preparado', ['document' => $document, 'item' => $document]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
 if ($route === 'fiscal/get-document') {
     if (!in_array($method, ['GET', 'POST'], true)) {
         respondJson($response, 'error', 'Metodo no permitido', [], 405);
@@ -4613,6 +4709,40 @@ if ($route === 'fiscal/list-documents') {
     }
 }
 
+if ($route === 'fiscal/list-documents-by-type') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $items = (new FiscalEngineService())->listDocumentsByType(
+            $tenantId,
+            trim((string) ($payload['document_type'] ?? '')),
+            $payload,
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null
+        );
+        respondJson($response, 'success', 'Documentos fiscales por tipo cargados', ['items' => $items, 'result_count' => count($items)]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+        return;
+    }
+}
+
 if ($route === 'fiscal/get-by-source') {
     if (!in_array($method, ['GET', 'POST'], true)) {
         respondJson($response, 'error', 'Metodo no permitido', [], 405);
@@ -4645,6 +4775,39 @@ if ($route === 'fiscal/get-by-source') {
         return;
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 404);
+        return;
+    }
+}
+
+if ($route === 'fiscal/build-document-payload') {
+    if (!in_array($method, ['GET', 'POST'], true)) {
+        respondJson($response, 'error', 'Metodo no permitido', [], 405);
+        return;
+    }
+
+    $sessionUser = resolveAuthenticatedSessionUser();
+    if (empty($sessionUser)) {
+        respondJson($response, 'error', 'Acceso no autorizado para este recurso.', [], 401);
+        return;
+    }
+
+    $tenantId = trim((string) ($sessionUser['tenant_id'] ?? ''));
+    $payload = array_merge($_GET, requestData());
+    setTenantContext(['tenant_id' => $tenantId], true);
+    RoleContext::setRole((string) ($sessionUser['role'] ?? 'admin'));
+    RoleContext::setUserId((string) ($sessionUser['id'] ?? 'anon'));
+    RoleContext::setUserLabel((string) ($sessionUser['label'] ?? $sessionUser['name'] ?? ''));
+
+    try {
+        $documentPayload = (new FiscalEngineService())->buildDocumentPayload(
+            $tenantId,
+            trim((string) ($payload['fiscal_document_id'] ?? $payload['document_id'] ?? $payload['id'] ?? '')),
+            trim((string) ($payload['project_id'] ?? $sessionUser['project_id'] ?? '')) ?: null
+        );
+        respondJson($response, 'success', 'Payload fiscal preparado', ['payload' => $documentPayload, 'item' => $documentPayload]);
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
         return;
     }
 }

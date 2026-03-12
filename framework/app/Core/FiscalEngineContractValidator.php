@@ -12,6 +12,7 @@ final class FiscalEngineContractValidator
 {
     private const DOCUMENT_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/fiscal_document.schema.json';
     private const EVENT_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/fiscal_event.schema.json';
+    private const PAYLOAD_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/fiscal_document_payload.schema.json';
 
     /**
      * @param array<string, mixed> $payload
@@ -27,6 +28,14 @@ final class FiscalEngineContractValidator
     public static function validateEvent(array $payload): void
     {
         self::validate(self::EVENT_SCHEMA, self::normalizePayload($payload), 'FiscalEvent');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public static function validatePayload(array $payload): void
+    {
+        self::validate(self::PAYLOAD_SCHEMA, self::normalizePayload($payload), 'FiscalDocumentPayload');
     }
 
     /**

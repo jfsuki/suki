@@ -1990,6 +1990,183 @@
       "context_hints": {}
     },
     {
+      "name": "fiscal_create_sales_invoice_from_sale",
+      "description": "Prepare an internal electronic sales invoice from an existing POS sale.",
+      "intent_patterns": [
+        "re:(crea|crear|genera|generar|prepara|preparar).*(factura electronica|factura de venta).*(venta|sale)",
+        "re:(venta|sale).*(factura electronica|factura de venta).*(crea|crear|genera|generar|prepara|preparar)"
+      ],
+      "keywords": [
+        "crear factura electronica desde venta",
+        "factura electronica",
+        "desde venta",
+        "sale_id",
+        "preparar factura de venta interna",
+        "generar factura fiscal desde sale"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "fiscal_create_sales_invoice_from_sale"
+      ],
+      "priority": 179,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "sale_id",
+          "sale_number",
+          "document_type",
+          "document_number",
+          "status"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "fiscal_create_credit_note",
+      "description": "Prepare an internal credit note from a POS return or canceled sale.",
+      "intent_patterns": [
+        "re:(crea|crear|genera|generar|prepara|preparar).*(nota credito|credit note).*(devolucion|return|venta cancelada|venta anulada)",
+        "re:(devolucion|return|venta cancelada|venta anulada).*(nota credito|credit note).*(crea|crear|genera|generar|prepara|preparar)"
+      ],
+      "keywords": [
+        "crear nota credito desde devolucion",
+        "preparar credit note interna",
+        "nota credito de venta cancelada"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "fiscal_create_credit_note"
+      ],
+      "priority": 178,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "return_id",
+          "sale_id",
+          "sale_number",
+          "status",
+          "reason"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "fiscal_create_support_document_from_purchase",
+      "description": "Prepare an internal support document from a finalized purchase.",
+      "intent_patterns": [
+        "re:(crea|crear|genera|generar|prepara|preparar).*(documento soporte|support document).*(compra|purchase)",
+        "re:(compra|purchase).*(documento soporte|support document).*(crea|crear|genera|generar|prepara|preparar)"
+      ],
+      "keywords": [
+        "crear documento soporte desde compra",
+        "preparar support document interno",
+        "documento soporte de compra"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "fiscal_create_support_document_from_purchase"
+      ],
+      "priority": 177,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "purchase_id",
+          "purchase_number",
+          "document_type",
+          "document_number",
+          "status"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "fiscal_build_document_payload",
+      "description": "Build a structured internal fiscal payload for future provider mapping.",
+      "intent_patterns": [
+        "re:(prepara|preparar|arma|armar|construye|construir).*(payload fiscal|payload del documento fiscal)",
+        "re:(payload fiscal|payload del documento fiscal).*(prepara|preparar|arma|armar|construye|construir)"
+      ],
+      "keywords": [
+        "preparar payload fiscal",
+        "armar payload documento fiscal",
+        "payload para proveedor fiscal"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "fiscal_build_document_payload"
+      ],
+      "priority": 176,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "fiscal_document_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "fiscal_list_documents_by_type",
+      "description": "List internal fiscal documents filtered by document_type.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(documentos fiscales).*(por tipo|document_type)",
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(facturas electronicas|notas credito|documentos soporte).*(internas|fiscales)?",
+        "re:(por tipo|tipo).*(documentos fiscales|facturas electronicas|notas credito|documentos soporte)"
+      ],
+      "keywords": [
+        "listar documentos fiscales por tipo",
+        "por tipo",
+        "document_type",
+        "ver facturas electronicas internas",
+        "mostrar notas credito internas"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "fiscal_list_documents_by_type"
+      ],
+      "priority": 175,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "document_type",
+          "status",
+          "date_from",
+          "date_to",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
       "name": "fiscal_create_document",
       "description": "Create or prepare an internal fiscal document from a source entity without provider submission.",
       "intent_patterns": [

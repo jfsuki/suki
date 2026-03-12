@@ -1332,6 +1332,63 @@
       ]
     },
     {
+      "name": "fiscal.create_sales_invoice_from_sale",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "fiscal_create_sales_invoice_from_sale"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "medium",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "fiscal.create_credit_note",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "fiscal_create_credit_note"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "medium",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "fiscal.create_support_document_from_purchase",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "fiscal_create_support_document_from_purchase"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "medium",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
       "name": "fiscal.get_document",
       "type": "EXECUTABLE",
       "required_role": "operator",
@@ -1351,12 +1408,50 @@
       ]
     },
     {
+      "name": "fiscal.build_document_payload",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "fiscal_build_document_payload"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
       "name": "fiscal.list_documents",
       "type": "EXECUTABLE",
       "required_role": "operator",
       "allowed_tools": [
         "CommandBus",
         "fiscal_list_documents"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "fiscal.list_documents_by_type",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "fiscal_list_documents_by_type"
       ],
       "rag_required": false,
       "json_schema_required": true,

@@ -12,9 +12,14 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
     /** @var array<int, string> */
     private const SUPPORTED = [
         'CreateFiscalDocument',
+        'CreateFiscalSalesInvoiceFromSale',
+        'CreateFiscalCreditNote',
+        'CreateFiscalSupportDocumentFromPurchase',
         'GetFiscalDocument',
         'ListFiscalDocuments',
+        'ListFiscalDocumentsByType',
         'GetFiscalDocumentBySource',
+        'BuildFiscalDocumentPayload',
         'RecordFiscalEvent',
         'UpdateFiscalDocumentStatus',
     ];
@@ -57,8 +62,32 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
                     $channel,
                     $sessionId,
                     $userId,
-                    'Documento fiscal creado: fiscal_document_id=' . (string) (($document = $service->createDocumentFromSource($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null]))['id'] ?? '') . '.',
+                    $this->createdText('Documento fiscal creado', $document = $service->createDocumentFromSource($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null])),
                     $this->documentData('create_document', $document)
+                ),
+                'CreateFiscalSalesInvoiceFromSale' => $this->respondDocument(
+                    $reply,
+                    $channel,
+                    $sessionId,
+                    $userId,
+                    $this->createdText('Factura electronica interna preparada', $document = $service->createSalesInvoiceFromSale($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null])),
+                    $this->documentData('create_sales_invoice_from_sale', $document)
+                ),
+                'CreateFiscalCreditNote' => $this->respondDocument(
+                    $reply,
+                    $channel,
+                    $sessionId,
+                    $userId,
+                    $this->createdText('Nota credito interna preparada', $document = $service->createCreditNoteFromSaleOrReturn($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null])),
+                    $this->documentData('create_credit_note', $document)
+                ),
+                'CreateFiscalSupportDocumentFromPurchase' => $this->respondDocument(
+                    $reply,
+                    $channel,
+                    $sessionId,
+                    $userId,
+                    $this->createdText('Documento soporte interno preparado', $document = $service->createSupportDocumentFromPurchase($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null])),
+                    $this->documentData('create_support_document_from_purchase', $document)
                 ),
                 'GetFiscalDocument' => $this->respondDocument(
                     $reply,
@@ -68,7 +97,18 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
                     'Documento fiscal cargado: fiscal_document_id=' . (string) (($document = $service->getDocument($tenantId, $this->documentId($command), $appId !== '' ? $appId : null))['id'] ?? '') . '.',
                     $this->documentData('get_document', $document)
                 ),
-                'ListFiscalDocuments' => $this->respondList($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'ListFiscalDocuments' => $this->respondList(
+                    $service,
+                    $tenantId,
+                    $appId,
+                    $command,
+                    $reply,
+                    $channel,
+                    $sessionId,
+                    $userId,
+                    'list_documents'
+                ),
+                'ListFiscalDocumentsByType' => $this->respondListByType($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'GetFiscalDocumentBySource' => $this->respondDocument(
                     $reply,
                     $channel,
@@ -87,6 +127,13 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
                         $appId !== '' ? $appId : null
                     ))['id'] ?? '') . '.',
                     $this->documentData('get_by_source', $document)
+                ),
+                'BuildFiscalDocumentPayload' => $this->respondPayload(
+                    $reply,
+                    $channel,
+                    $sessionId,
+                    $userId,
+                    $payload = $service->buildDocumentPayload($tenantId, $this->documentId($command), $appId !== '' ? $appId : null)
                 ),
                 'RecordFiscalEvent' => $this->respondEvent($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'UpdateFiscalDocumentStatus' => $this->respondDocument(
@@ -115,8 +162,17 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
      * @param callable $reply
      * @return array<string, mixed>
      */
-    private function respondList(FiscalEngineService $service, string $tenantId, string $appId, array $command, callable $reply, string $channel, string $sessionId, string $userId): array
-    {
+    private function respondList(
+        FiscalEngineService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId,
+        string $actionName
+    ): array {
         $items = $service->listDocuments(
             $tenantId,
             array_filter([
@@ -145,7 +201,7 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
             $userId,
             'success',
             $this->moduleData([
-                'fiscal_action' => 'list_documents',
+                'fiscal_action' => $actionName,
                 'items' => $items,
                 'result_count' => count($items),
                 'source_module' => (string) ($command['source_module'] ?? ''),
@@ -153,6 +209,72 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
                 'source_entity_id' => (string) ($command['source_entity_id'] ?? ''),
                 'document_type' => (string) ($command['document_type'] ?? ''),
                 'fiscal_status' => (string) ($command['status'] ?? ''),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function respondListByType(FiscalEngineService $service, string $tenantId, string $appId, array $command, callable $reply, string $channel, string $sessionId, string $userId): array
+    {
+        $documentType = trim((string) ($command['document_type'] ?? ''));
+        $items = $service->listDocumentsByType(
+            $tenantId,
+            $documentType,
+            array_filter([
+                'status' => $command['status'] ?? null,
+                'date_from' => $command['date_from'] ?? null,
+                'date_to' => $command['date_to'] ?? null,
+                'limit' => $command['limit'] ?? null,
+            ], static fn($value): bool => $value !== null && $value !== ''),
+            $appId !== '' ? $appId : null
+        );
+        $text = $items === []
+            ? 'No hay documentos fiscales de ese tipo.'
+            : "Documentos fiscales por tipo:\n" . implode("\n", array_map([$this, 'formatDocumentLine'], $items));
+
+        return $this->withReplyText($reply(
+            $text,
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'fiscal_action' => 'list_documents_by_type',
+                'items' => $items,
+                'result_count' => count($items),
+                'document_type' => $documentType,
+                'fiscal_status' => (string) ($command['status'] ?? ''),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function respondPayload(callable $reply, string $channel, string $sessionId, string $userId, array $payload): array
+    {
+        return $this->withReplyText($reply(
+            'Payload fiscal preparado: fiscal_document_id=' . (string) ($payload['fiscal_document_id'] ?? '') . '.',
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'fiscal_action' => 'build_document_payload',
+                'payload' => $payload,
+                'item' => $payload,
+                'fiscal_document_id' => (string) ($payload['fiscal_document_id'] ?? ''),
+                'document_type' => (string) ($payload['document_type'] ?? ''),
+                'fiscal_status' => (string) ($payload['status'] ?? ''),
+                'line_count' => count((array) ($payload['lines'] ?? [])),
+                'total' => $payload['summary']['total'] ?? null,
+                'duplicate_blocked' => (($payload['metadata']['duplicate_blocked'] ?? false) === true),
                 'result_status' => 'success',
             ])
         ));
@@ -211,8 +333,27 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
             'fiscal_status' => (string) ($document['status'] ?? ''),
             'line_count' => count((array) ($document['lines'] ?? [])),
             'total' => $document['total'] ?? null,
+            'duplicate_blocked' => $this->duplicateBlocked($document),
             'result_status' => 'success',
         ]);
+    }
+
+    private function duplicateBlocked(array $document): bool
+    {
+        $metadata = is_array($document['metadata'] ?? null) ? (array) $document['metadata'] : [];
+        $duplicate = is_array($metadata['duplicate_prevention'] ?? null) ? (array) $metadata['duplicate_prevention'] : [];
+
+        return ($duplicate['duplicate_blocked'] ?? false) === true;
+    }
+
+    private function createdText(string $label, array $document): string
+    {
+        $text = $label . ': fiscal_document_id=' . (string) ($document['id'] ?? '') . '.';
+        if ($this->duplicateBlocked($document)) {
+            $text .= ' Se reutilizo el documento activo existente.';
+        }
+
+        return $text;
     }
 
     private function documentId(array $command): string
@@ -233,7 +374,7 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
      */
     private function moduleData(array $overrides = []): array
     {
-        return $overrides + ['module_used' => 'fiscal', 'fiscal_action' => 'none', 'result_status' => 'success'];
+        return $overrides + ['module_used' => 'fiscal', 'fiscal_action' => 'none', 'duplicate_blocked' => false, 'result_status' => 'success'];
     }
 
     /**
@@ -271,6 +412,13 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
             'FISCAL_DOCUMENT_NOT_FOUND' => 'No encontre ese documento fiscal.',
             'FISCAL_DOCUMENT_SOURCE_AMBIGUOUS' => 'Encontre varios documentos fiscales para ese origen. Indica el tipo exacto.',
             'FISCAL_SOURCE_NOT_FOUND' => 'No encontre la entidad origen para representar ese documento fiscal.',
+            'FISCAL_SALES_INVOICE_SOURCE_INVALID' => 'Necesito una venta POS valida para preparar la factura electronica interna.',
+            'FISCAL_SUPPORT_DOCUMENT_SOURCE_INVALID' => 'Necesito una compra valida para preparar el documento soporte interno.',
+            'FISCAL_CREDIT_NOTE_SOURCE_INVALID' => 'Necesito una devolucion POS o una venta cancelada valida para preparar la nota credito interna.',
+            'FISCAL_DUPLICATE_ACTIVE_DOCUMENT' => 'Ya existe un documento fiscal activo de ese tipo para el mismo origen.',
+            'POS_SALE_NOT_FOUND' => 'No encontre la venta POS origen.',
+            'POS_RETURN_NOT_FOUND' => 'No encontre la devolucion POS origen.',
+            'PURCHASE_NOT_FOUND' => 'No encontre la compra origen.',
             'STATUS_REQUIRED', 'FISCAL_STATUS_INVALID' => 'Indica un estado fiscal valido.',
             'FISCAL_STATUS_TRANSITION_INVALID' => 'Ese cambio de estado fiscal no es valido.',
             'EVENT_TYPE_REQUIRED' => 'Indica `event_type` para registrar el evento fiscal.',
