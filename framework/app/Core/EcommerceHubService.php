@@ -43,15 +43,18 @@ final class EcommerceHubService
     private EcommerceHubRepository $repository;
     private AuditLogger $auditLogger;
     private EcommerceHubEventLogger $eventLogger;
+    private EcommerceAdapterResolver $adapterResolver;
 
     public function __construct(
         ?EcommerceHubRepository $repository = null,
         ?AuditLogger $auditLogger = null,
-        ?EcommerceHubEventLogger $eventLogger = null
+        ?EcommerceHubEventLogger $eventLogger = null,
+        ?EcommerceAdapterResolver $adapterResolver = null
     ) {
         $this->repository = $repository ?? new EcommerceHubRepository();
         $this->auditLogger = $auditLogger ?? new AuditLogger();
         $this->eventLogger = $eventLogger ?? new EcommerceHubEventLogger();
+        $this->adapterResolver = $adapterResolver ?? new EcommerceAdapterResolver();
     }
 
     /**
@@ -63,11 +66,12 @@ final class EcommerceHubService
         $startedAt = microtime(true);
         $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
         $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
+        $platform = $this->platform($payload['platform'] ?? null);
 
         $store = $this->repository->createStore([
             'tenant_id' => $tenantId,
             'app_id' => $appId,
-            'platform' => $this->platform($payload['platform'] ?? null),
+            'platform' => $platform,
             'store_name' => $this->requireString($payload['store_name'] ?? $payload['name'] ?? null, 'store_name'),
             'store_url' => $this->nullableString($payload['store_url'] ?? $payload['url'] ?? null),
             'status' => array_key_exists('status', $payload) && $payload['status'] !== null && $payload['status'] !== ''
@@ -80,14 +84,19 @@ final class EcommerceHubService
             'timezone' => $this->nullableString($payload['timezone'] ?? null),
             'metadata' => $this->buildStoreMetadata(
                 is_array($payload['metadata'] ?? null) ? (array) $payload['metadata'] : [],
-                []
+                [],
+                $platform
             ),
             'created_at' => date('Y-m-d H:i:s'),
             'updated_at' => date('Y-m-d H:i:s'),
         ]);
 
         $store = $this->validatedStore($store);
-        $this->logStoreEvent('create_store', $tenantId, $appId, $store, $this->latencyMs($startedAt));
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $this->logStoreEvent('create_store', $tenantId, $appId, $store, $this->latencyMs($startedAt), [
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'not_applicable',
+        ]);
 
         return $store;
     }
@@ -130,8 +139,16 @@ final class EcommerceHubService
         if (array_key_exists('connection_status', $payload) && $payload['connection_status'] !== null && $payload['connection_status'] !== '') {
             $updates['connection_status'] = $this->connectionStatus($payload['connection_status']);
         }
-        if (array_key_exists('metadata', $payload) && is_array($payload['metadata'])) {
-            $updates['metadata'] = $this->buildStoreMetadata((array) $payload['metadata'], $store);
+        $resolvedPlatform = (string) ($updates['platform'] ?? $store['platform'] ?? 'unknown');
+        if (
+            (array_key_exists('metadata', $payload) && is_array($payload['metadata']))
+            || array_key_exists('platform', $updates)
+        ) {
+            $updates['metadata'] = $this->buildStoreMetadata(
+                is_array($payload['metadata'] ?? null) ? (array) $payload['metadata'] : [],
+                $store,
+                $resolvedPlatform
+            );
         }
 
         $updated = $this->repository->updateStore($tenantId, $storeId, $updates, $appId);
@@ -140,7 +157,11 @@ final class EcommerceHubService
         }
 
         $updated = $this->validatedStore($updated);
-        $this->logStoreEvent('update_store', $tenantId, $appId, $updated, $this->latencyMs($startedAt));
+        $adapter = $this->resolveAdapter((string) ($updated['platform'] ?? 'unknown'));
+        $this->logStoreEvent('update_store', $tenantId, $appId, $updated, $this->latencyMs($startedAt), [
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'not_applicable',
+        ]);
 
         return $updated;
     }
@@ -185,7 +206,7 @@ final class EcommerceHubService
                 'metadata' => [
                     'payload_fingerprint' => $fingerprint,
                     'masked_payload' => $maskedPayload,
-                    'hooks' => $this->futureHooks(),
+                    'hooks' => $this->futureHooks($this->resolveAdapter((string) ($store['platform'] ?? 'unknown'))),
                 ],
                 'created_at' => date('Y-m-d H:i:s'),
             ]);
@@ -209,7 +230,11 @@ final class EcommerceHubService
         });
 
         $masked = $this->validatedCredential($this->maskCredential($credential));
-        $this->logCredentialEvent('register_credentials', $tenantId, $appId, $masked, $store, $this->latencyMs($startedAt));
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $this->logCredentialEvent('register_credentials', $tenantId, $appId, $masked, $store, $this->latencyMs($startedAt), [
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'credentials_registered',
+        ]);
 
         return $masked;
     }
@@ -222,55 +247,214 @@ final class EcommerceHubService
         $startedAt = microtime(true);
         $store = $this->loadStore($tenantId, $storeId, $appId);
         $credentials = $this->repository->listCredentialsByStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $validation = $this->evaluateCredentialValidation($store, $credentials, $adapter);
         $credentialsConfigured = count($credentials) > 0;
         $ready = $credentialsConfigured
             && (string) ($store['status'] ?? '') === 'active'
-            && (string) ($store['connection_status'] ?? '') === 'validated';
+            && (string) ($store['connection_status'] ?? '') === 'validated'
+            && $adapter->getPlatformKey() !== 'unknown';
 
         $setup = [
             'tenant_id' => $tenantId,
             'app_id' => $appId,
             'store_id' => $storeId,
             'platform' => (string) ($store['platform'] ?? 'unknown'),
+            'adapter_key' => $adapter->getPlatformKey(),
             'status' => (string) ($store['status'] ?? 'inactive'),
             'connection_status' => (string) ($store['connection_status'] ?? 'not_configured'),
+            'validation_result' => (string) ($validation['validation_result'] ?? 'not_checked'),
             'ready' => $ready,
             'credentials_configured' => $credentialsConfigured,
+            'capabilities' => $adapter->listCapabilities(),
             'checks' => [
                 'store_exists' => true,
-                'platform_supported' => in_array((string) ($store['platform'] ?? 'unknown'), self::PLATFORM_TYPES, true),
+                'platform_supported' => $adapter->getPlatformKey() !== 'unknown',
                 'store_active' => (string) ($store['status'] ?? '') === 'active',
                 'connection_validated' => (string) ($store['connection_status'] ?? '') === 'validated',
                 'credentials_configured' => $credentialsConfigured,
+                'adapter_resolved' => $adapter->getPlatformKey() !== 'unknown',
+                'credential_shape_valid' => (bool) ($validation['valid'] ?? false),
             ],
-            'hooks' => $this->futureHooks(),
+            'hooks' => $this->mergeMetadata(
+                $this->futureHooks($adapter),
+                [
+                    'adapter_state' => [
+                        'adapter_key' => $adapter->getPlatformKey(),
+                        'validation_result' => (string) ($validation['validation_result'] ?? 'not_checked'),
+                    ],
+                ]
+            ),
         ];
         EcommerceHubContractValidator::validateStoreSetup($setup);
 
-        $this->eventLogger->log('validate_store_setup', $tenantId, [
-            'tenant_id' => $tenantId,
-            'app_id' => $appId,
-            'module' => 'ecommerce',
-            'action_name' => 'validate_store_setup',
-            'store_id' => $storeId,
-            'platform' => (string) ($store['platform'] ?? 'unknown'),
-            'connection_status' => (string) ($store['connection_status'] ?? 'not_configured'),
-            'latency_ms' => $this->latencyMs($startedAt),
-            'result_status' => 'success',
-        ]);
-        $this->auditLogger->log('ecommerce_validate_store_setup', 'ecommerce_store', $storeId, [
-            'tenant_id' => $tenantId,
-            'app_id' => $appId,
-            'module' => 'ecommerce',
-            'action_name' => 'validate_store_setup',
-            'store_id' => $storeId,
-            'platform' => (string) ($store['platform'] ?? 'unknown'),
-            'connection_status' => (string) ($store['connection_status'] ?? 'not_configured'),
-            'latency_ms' => $this->latencyMs($startedAt),
+        $this->logStoreEvent('validate_store_setup', $tenantId, $appId, $store, $this->latencyMs($startedAt), [
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => (string) ($validation['validation_result'] ?? 'not_checked'),
             'result_status' => 'success',
         ]);
 
         return $setup;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function validateConnection(string $tenantId, string $storeId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $store = $this->loadStore($tenantId, $storeId, $appId);
+        $credentials = $this->repository->listCredentialsByStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $summary = $this->summarizeCredentials($credentials);
+        $validation = $this->evaluateCredentialValidation($store, $credentials, $adapter);
+        $resultStatus = ($validation['valid'] ?? false) === true ? 'success' : 'safe_failure';
+
+        $result = [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'store_id' => $storeId,
+            'platform' => (string) ($store['platform'] ?? 'unknown'),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'stored_connection_status' => (string) ($store['connection_status'] ?? 'not_configured'),
+            'connection_status' => (string) ($validation['connection_status'] ?? 'not_configured'),
+            'validation_result' => (string) ($validation['validation_result'] ?? 'unknown'),
+            'valid' => (bool) ($validation['valid'] ?? false),
+            'credentials_configured' => (bool) ($summary['configured'] ?? false),
+            'credential_summary' => $summary,
+            'masked_credentials' => is_array($validation['masked_credentials'] ?? null) ? (array) $validation['masked_credentials'] : [],
+            'required_credentials' => is_array($validation['required_credentials'] ?? null) ? (array) $validation['required_credentials'] : [],
+            'required_store_fields' => is_array($validation['required_store_fields'] ?? null) ? (array) $validation['required_store_fields'] : [],
+            'missing_credentials' => is_array($validation['missing_credentials'] ?? null) ? (array) $validation['missing_credentials'] : [],
+            'missing_store_fields' => is_array($validation['missing_store_fields'] ?? null) ? (array) $validation['missing_store_fields'] : [],
+            'capabilities' => $adapter->listCapabilities(),
+            'result_status' => $resultStatus,
+        ];
+
+        $this->logStoreEvent('validate_connection', $tenantId, $appId, $store, $this->latencyMs($startedAt), [
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => (string) ($result['validation_result'] ?? 'unknown'),
+            'result_status' => $resultStatus,
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getNormalizedStoreMetadata(string $tenantId, string $storeId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $store = $this->validatedStore($this->loadStore($tenantId, $storeId, $appId));
+        $credentials = $this->repository->listCredentialsByStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $summary = $this->summarizeCredentials($credentials);
+        $metadata = $adapter->getStoreMetadata($store);
+
+        $result = [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'store_id' => $storeId,
+            'platform' => (string) ($store['platform'] ?? 'unknown'),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'connection_status' => (string) ($store['connection_status'] ?? 'not_configured'),
+            'credential_summary' => $summary,
+            'capabilities' => $adapter->listCapabilities(),
+            'metadata' => $this->mergeMetadata(
+                is_array($metadata['metadata'] ?? null) ? (array) $metadata['metadata'] : [],
+                ['credential_summary' => $summary]
+            ),
+            'result_status' => 'success',
+        ];
+
+        $this->logStoreEvent('get_store_metadata', $tenantId, $appId, $store, $this->latencyMs($startedAt), [
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'metadata_ready',
+            'result_status' => 'success',
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPlatformCapabilities(string $tenantId, ?string $storeId = null, ?string $platform = null, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $resolvedStore = null;
+        if ($storeId !== null && trim($storeId) !== '') {
+            $resolvedStore = $this->loadStore($tenantId, $storeId, $appId);
+            $platform = (string) ($resolvedStore['platform'] ?? $platform ?? 'unknown');
+        }
+        if ($platform === null || trim($platform) === '') {
+            throw new RuntimeException('ECOMMERCE_PLATFORM_OR_STORE_REQUIRED');
+        }
+
+        $platform = $this->platform($platform);
+        $adapter = $this->resolveAdapter($platform);
+        $store = is_array($resolvedStore) ? $resolvedStore : ['id' => '', 'platform' => $platform, 'connection_status' => 'not_configured'];
+        $resultStatus = $adapter->getPlatformKey() === 'unknown' ? 'safe_failure' : 'success';
+        $validationResult = $adapter->getPlatformKey() === 'unknown' ? 'unsupported_platform' : 'capabilities_ready';
+
+        $result = [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'store_id' => $storeId ?? '',
+            'platform' => $platform,
+            'adapter_key' => $adapter->getPlatformKey(),
+            'capabilities' => $adapter->listCapabilities(),
+            'validation_result' => $validationResult,
+            'result_status' => $resultStatus,
+        ];
+
+        $this->logStoreEvent('get_platform_capabilities', $tenantId, $appId, $store, $this->latencyMs($startedAt), [
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => $validationResult,
+            'result_status' => $resultStatus,
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function pingStore(string $tenantId, string $storeId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $store = $this->loadStore($tenantId, $storeId, $appId);
+        $credentials = $this->repository->listCredentialsByStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $summary = $this->summarizeCredentials($credentials);
+        $ping = $this->evaluatePing($store, $credentials, $adapter);
+        $resultStatus = (string) ($ping['result_status'] ?? 'safe_failure');
+
+        $result = [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'store_id' => $storeId,
+            'platform' => (string) ($store['platform'] ?? 'unknown'),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'connection_status' => (string) ($ping['connection_status'] ?? 'not_configured'),
+            'validation_result' => (string) ($ping['validation_result'] ?? 'unknown'),
+            'ping_attempted' => (bool) ($ping['ping_attempted'] ?? false),
+            'reachable' => (bool) ($ping['reachable'] ?? false),
+            'checked_endpoint' => $this->nullableString($ping['checked_endpoint'] ?? null),
+            'message' => (string) ($ping['message'] ?? ''),
+            'credential_summary' => $summary,
+            'capabilities' => $adapter->listCapabilities(),
+            'result_status' => $resultStatus,
+        ];
+
+        $this->logStoreEvent('ping_store', $tenantId, $appId, $store, $this->latencyMs($startedAt), [
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => (string) ($ping['validation_result'] ?? 'unknown'),
+            'result_status' => $resultStatus,
+        ]);
+
+        return $result;
     }
 
     /**
@@ -285,6 +469,7 @@ final class EcommerceHubService
             $this->repository->listStores($tenantId, $filters + ['app_id' => $appId], $this->limit($filters['limit'] ?? null, 20))
         );
         $selected = is_array($items[0] ?? null) ? (array) $items[0] : [];
+        $selectedAdapter = $this->resolveAdapter((string) ($selected['platform'] ?? 'unknown'));
 
         $this->eventLogger->log('list_stores', $tenantId, [
             'tenant_id' => $tenantId,
@@ -293,6 +478,8 @@ final class EcommerceHubService
             'action_name' => 'list_stores',
             'store_id' => (string) ($selected['id'] ?? ''),
             'platform' => (string) ($selected['platform'] ?? ''),
+            'adapter_key' => $selectedAdapter->getPlatformKey(),
+            'validation_result' => 'list_result',
             'connection_status' => (string) ($selected['connection_status'] ?? ''),
             'latency_ms' => $this->latencyMs($startedAt),
             'result_count' => count($items),
@@ -305,6 +492,8 @@ final class EcommerceHubService
             'action_name' => 'list_stores',
             'store_id' => (string) ($selected['id'] ?? ''),
             'platform' => (string) ($selected['platform'] ?? ''),
+            'adapter_key' => $selectedAdapter->getPlatformKey(),
+            'validation_result' => 'list_result',
             'connection_status' => (string) ($selected['connection_status'] ?? ''),
             'latency_ms' => $this->latencyMs($startedAt),
             'result_status' => 'success',
@@ -320,7 +509,11 @@ final class EcommerceHubService
     {
         $startedAt = microtime(true);
         $store = $this->validatedStore($this->loadStore($tenantId, $storeId, $appId));
-        $this->logStoreEvent('get_store', $tenantId, $appId, $store, $this->latencyMs($startedAt));
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $this->logStoreEvent('get_store', $tenantId, $appId, $store, $this->latencyMs($startedAt), [
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'not_applicable',
+        ]);
 
         return $store;
     }
@@ -352,14 +545,18 @@ final class EcommerceHubService
                 is_array($payload['metadata'] ?? null) ? (array) $payload['metadata'] : [],
                 [
                     'store_platform' => (string) ($store['platform'] ?? 'unknown'),
-                    'hooks' => $this->futureHooks(),
+                    'hooks' => $this->futureHooks($this->resolveAdapter((string) ($store['platform'] ?? 'unknown'))),
                 ]
             ),
             'created_at' => date('Y-m-d H:i:s'),
         ]);
 
         $job = $this->validatedSyncJob($job);
-        $this->logSyncJobEvent('create_sync_job', $tenantId, $appId, $job, $store, $this->latencyMs($startedAt));
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $this->logSyncJobEvent('create_sync_job', $tenantId, $appId, $job, $store, $this->latencyMs($startedAt), [
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'sync_job_registered',
+        ]);
 
         return $job;
     }
@@ -413,6 +610,7 @@ final class EcommerceHubService
             $this->repository->listSyncJobs($tenantId, $filters + ['app_id' => $appId], $this->limit($filters['limit'] ?? null, 20))
         );
         $selected = is_array($items[0] ?? null) ? (array) $items[0] : [];
+        $selectedAdapter = $this->resolveAdapter((string) ($selected['metadata']['store_platform'] ?? 'unknown'));
 
         $this->eventLogger->log('list_sync_jobs', $tenantId, [
             'tenant_id' => $tenantId,
@@ -420,6 +618,8 @@ final class EcommerceHubService
             'module' => 'ecommerce',
             'action_name' => 'list_sync_jobs',
             'store_id' => (string) ($selected['store_id'] ?? ($filters['store_id'] ?? '')),
+            'adapter_key' => $selectedAdapter->getPlatformKey(),
+            'validation_result' => 'list_result',
             'sync_job_id' => (string) ($selected['id'] ?? ''),
             'sync_type' => (string) ($selected['sync_type'] ?? ($filters['sync_type'] ?? '')),
             'latency_ms' => $this->latencyMs($startedAt),
@@ -432,6 +632,8 @@ final class EcommerceHubService
             'module' => 'ecommerce',
             'action_name' => 'list_sync_jobs',
             'store_id' => (string) ($selected['store_id'] ?? ($filters['store_id'] ?? '')),
+            'adapter_key' => $selectedAdapter->getPlatformKey(),
+            'validation_result' => 'list_result',
             'sync_job_id' => (string) ($selected['id'] ?? ''),
             'sync_type' => (string) ($selected['sync_type'] ?? ($filters['sync_type'] ?? '')),
             'latency_ms' => $this->latencyMs($startedAt),
@@ -448,7 +650,8 @@ final class EcommerceHubService
     public function getOrderRefsByStore(string $tenantId, string $storeId, array $filters = [], ?string $appId = null): array
     {
         $startedAt = microtime(true);
-        $this->loadStore($tenantId, $storeId, $appId);
+        $store = $this->loadStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
 
         $items = array_map(
             fn(array $item): array => $this->validatedOrderRef($item),
@@ -461,6 +664,9 @@ final class EcommerceHubService
             'module' => 'ecommerce',
             'action_name' => 'list_order_refs',
             'store_id' => $storeId,
+            'platform' => (string) ($store['platform'] ?? 'unknown'),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'list_result',
             'latency_ms' => $this->latencyMs($startedAt),
             'result_count' => count($items),
             'result_status' => 'success',
@@ -471,6 +677,9 @@ final class EcommerceHubService
             'module' => 'ecommerce',
             'action_name' => 'list_order_refs',
             'store_id' => $storeId,
+            'platform' => (string) ($store['platform'] ?? 'unknown'),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'list_result',
             'latency_ms' => $this->latencyMs($startedAt),
             'result_status' => 'success',
         ]);
@@ -534,19 +743,33 @@ final class EcommerceHubService
      * @param array<string, mixed> $existingStore
      * @return array<string, mixed>
      */
-    private function buildStoreMetadata(array $inputMetadata, array $existingStore): array
+    private function buildStoreMetadata(array $inputMetadata, array $existingStore, ?string $platformOverride = null): array
     {
+        $platform = (string) ($platformOverride ?? $existingStore['platform'] ?? $inputMetadata['platform'] ?? 'unknown');
+        $adapter = $this->resolveAdapter($platform);
+        $adapterMetadata = $adapter->getStoreMetadata(
+            $existingStore + $inputMetadata + ['platform' => $platform]
+        );
+
         return $this->mergeMetadata(
             is_array($existingStore['metadata'] ?? null) ? (array) $existingStore['metadata'] : [],
             $inputMetadata,
             [
-                'hooks' => $this->futureHooks(),
+                'hooks' => $this->futureHooks($adapter),
                 'adapter_state' => [
-                    'provider_runtime' => 'pending',
+                    'provider_runtime' => $adapter->getPlatformKey() === 'unknown' ? 'fallback' : 'foundation_ready',
+                    'adapter_key' => $adapter->getPlatformKey(),
                     'product_sync' => 'pending',
                     'order_sync' => 'pending',
                     'inventory_sync' => 'pending',
                     'fiscal_linkage' => 'pending',
+                ],
+                'adapter_foundation' => [
+                    'adapter_key' => $adapter->getPlatformKey(),
+                    'platform_label' => (string) ($adapterMetadata['platform_label'] ?? ucfirst($platform)),
+                    'capabilities' => $adapter->listCapabilities(),
+                    'remote_ping_supported' => (bool) ($adapterMetadata['remote_ping_supported'] ?? false),
+                    'scope' => 'foundation',
                 ],
             ]
         );
@@ -675,12 +898,143 @@ final class EcommerceHubService
     /**
      * @return array<string, mixed>
      */
-    private function futureHooks(): array
+    private function decryptCredentialPayload(string $encryptedPayload): array
     {
+        $package = base64_decode($encryptedPayload, true);
+        if (!is_string($package) || $package === '') {
+            throw new RuntimeException('ECOMMERCE_CREDENTIAL_DECRYPT_FAILED');
+        }
+
+        $decoded = json_decode($package, true);
+        if (!is_array($decoded)) {
+            throw new RuntimeException('ECOMMERCE_CREDENTIAL_DECRYPT_FAILED');
+        }
+
+        $cipher = (string) ($decoded['cipher'] ?? '');
+        $iv = base64_decode((string) ($decoded['iv'] ?? ''), true);
+        $payload = base64_decode((string) ($decoded['payload'] ?? ''), true);
+        if ($cipher === '' || !is_string($iv) || $iv === '' || !is_string($payload) || $payload === '') {
+            throw new RuntimeException('ECOMMERCE_CREDENTIAL_DECRYPT_FAILED');
+        }
+
+        $json = openssl_decrypt($payload, $cipher, $this->encryptionKey(), OPENSSL_RAW_DATA, $iv);
+        if (!is_string($json) || $json === '') {
+            throw new RuntimeException('ECOMMERCE_CREDENTIAL_DECRYPT_FAILED');
+        }
+
+        $decodedPayload = json_decode($json, true);
+        if (!is_array($decodedPayload)) {
+            throw new RuntimeException('ECOMMERCE_CREDENTIAL_DECRYPT_FAILED');
+        }
+
+        return $decodedPayload;
+    }
+
+    /**
+     * @param array<int, array<string, mixed>> $credentials
+     * @return array<string, mixed>
+     */
+    private function summarizeCredentials(array $credentials): array
+    {
+        $latest = is_array($credentials[0] ?? null) ? (array) $credentials[0] : [];
+        $metadata = is_array($latest['metadata'] ?? null) ? (array) $latest['metadata'] : [];
+
         return [
-            'woocommerce_adapter' => 'pending',
-            'tiendanube_adapter' => 'pending',
-            'prestashop_adapter' => 'pending',
+            'configured' => $credentials !== [],
+            'count' => count($credentials),
+            'types' => array_values(array_unique(array_filter(array_map(
+                fn(array $credential): string => trim((string) ($credential['credential_type'] ?? '')),
+                $credentials
+            )))),
+            'latest_credential_id' => trim((string) ($latest['id'] ?? '')),
+            'latest_credential_type' => trim((string) ($latest['credential_type'] ?? '')),
+            'latest_last_validated_at' => $this->nullableString($latest['last_validated_at'] ?? null),
+            'latest_masked_payload' => is_array($metadata['masked_payload'] ?? null) ? (array) $metadata['masked_payload'] : [],
+        ];
+    }
+
+    private function resolveAdapter(string $platform): EcommerceAdapterInterface
+    {
+        return $this->adapterResolver->resolve($platform);
+    }
+
+    /**
+     * @param array<string, mixed> $store
+     * @param array<int, array<string, mixed>> $credentials
+     * @return array<string, mixed>
+     */
+    private function evaluateCredentialValidation(array $store, array $credentials, EcommerceAdapterInterface $adapter): array
+    {
+        $latest = is_array($credentials[0] ?? null) ? (array) $credentials[0] : [];
+        if ($latest === []) {
+            return $adapter->validateCredentials($store, []);
+        }
+
+        try {
+            $decrypted = $this->decryptCredentialPayload((string) ($latest['encrypted_payload'] ?? ''));
+        } catch (RuntimeException $e) {
+            $metadata = is_array($latest['metadata'] ?? null) ? (array) $latest['metadata'] : [];
+            return [
+                'platform' => (string) ($store['platform'] ?? 'unknown'),
+                'adapter_key' => $adapter->getPlatformKey(),
+                'valid' => false,
+                'validation_result' => 'credential_decrypt_failed',
+                'connection_status' => 'failed',
+                'required_credentials' => [],
+                'required_store_fields' => [],
+                'missing_credentials' => [],
+                'missing_store_fields' => [],
+                'remote_ping_supported' => false,
+                'capabilities' => $adapter->listCapabilities(),
+                'masked_credentials' => is_array($metadata['masked_payload'] ?? null) ? (array) $metadata['masked_payload'] : [],
+            ];
+        }
+
+        $validation = $adapter->validateCredentials($store, $decrypted);
+        $validation['masked_credentials'] = $this->maskSensitivePayload($decrypted);
+
+        return $validation;
+    }
+
+    /**
+     * @param array<string, mixed> $store
+     * @param array<int, array<string, mixed>> $credentials
+     * @return array<string, mixed>
+     */
+    private function evaluatePing(array $store, array $credentials, EcommerceAdapterInterface $adapter): array
+    {
+        $latest = is_array($credentials[0] ?? null) ? (array) $credentials[0] : [];
+        if ($latest === []) {
+            return $adapter->ping($store, []);
+        }
+
+        try {
+            $decrypted = $this->decryptCredentialPayload((string) ($latest['encrypted_payload'] ?? ''));
+        } catch (RuntimeException $e) {
+            return [
+                'platform' => (string) ($store['platform'] ?? 'unknown'),
+                'adapter_key' => $adapter->getPlatformKey(),
+                'ping_attempted' => false,
+                'reachable' => false,
+                'validation_result' => 'credential_decrypt_failed',
+                'connection_status' => 'failed',
+                'result_status' => 'failed',
+                'checked_endpoint' => null,
+                'message' => 'Stored credentials could not be decrypted safely.',
+            ];
+        }
+
+        return $adapter->ping($store, $decrypted);
+    }
+
+    private function futureHooks(?EcommerceAdapterInterface $adapter = null): array
+    {
+        $adapterKey = $adapter?->getPlatformKey() ?? 'unknown';
+
+        return [
+            'woocommerce_adapter' => $adapterKey === 'woocommerce' ? 'foundation_ready' : 'pending',
+            'tiendanube_adapter' => $adapterKey === 'tiendanube' ? 'foundation_ready' : 'pending',
+            'prestashop_adapter' => $adapterKey === 'prestashop' ? 'foundation_ready' : 'pending',
             'product_sync' => 'pending',
             'order_sync' => 'pending',
             'inventory_sync' => 'pending',
@@ -846,9 +1200,9 @@ final class EcommerceHubService
     /**
      * @param array<string, mixed> $store
      */
-    private function logStoreEvent(string $actionName, string $tenantId, ?string $appId, array $store, int $latencyMs): void
+    private function logStoreEvent(string $actionName, string $tenantId, ?string $appId, array $store, int $latencyMs, array $extra = []): void
     {
-        $payload = [
+        $payload = array_merge([
             'tenant_id' => $tenantId,
             'app_id' => $appId,
             'module' => 'ecommerce',
@@ -858,7 +1212,7 @@ final class EcommerceHubService
             'connection_status' => (string) ($store['connection_status'] ?? 'not_configured'),
             'latency_ms' => $latencyMs,
             'result_status' => 'success',
-        ];
+        ], $extra);
         $this->auditLogger->log('ecommerce_' . $actionName, 'ecommerce_store', (string) ($store['id'] ?? ''), $payload);
         $this->eventLogger->log($actionName, $tenantId, $payload);
     }
@@ -867,9 +1221,9 @@ final class EcommerceHubService
      * @param array<string, mixed> $credential
      * @param array<string, mixed> $store
      */
-    private function logCredentialEvent(string $actionName, string $tenantId, ?string $appId, array $credential, array $store, int $latencyMs): void
+    private function logCredentialEvent(string $actionName, string $tenantId, ?string $appId, array $credential, array $store, int $latencyMs, array $extra = []): void
     {
-        $payload = [
+        $payload = array_merge([
             'tenant_id' => $tenantId,
             'app_id' => $appId,
             'module' => 'ecommerce',
@@ -879,7 +1233,7 @@ final class EcommerceHubService
             'connection_status' => (string) ($store['connection_status'] ?? 'not_configured'),
             'latency_ms' => $latencyMs,
             'result_status' => 'success',
-        ];
+        ], $extra);
         $this->auditLogger->log('ecommerce_' . $actionName, 'ecommerce_credential', (string) ($credential['id'] ?? ''), $payload);
         $this->eventLogger->log($actionName, $tenantId, $payload);
     }
@@ -888,9 +1242,9 @@ final class EcommerceHubService
      * @param array<string, mixed> $job
      * @param array<string, mixed> $store
      */
-    private function logSyncJobEvent(string $actionName, string $tenantId, ?string $appId, array $job, array $store, int $latencyMs): void
+    private function logSyncJobEvent(string $actionName, string $tenantId, ?string $appId, array $job, array $store, int $latencyMs, array $extra = []): void
     {
-        $payload = [
+        $payload = array_merge([
             'tenant_id' => $tenantId,
             'app_id' => $appId,
             'module' => 'ecommerce',
@@ -902,7 +1256,7 @@ final class EcommerceHubService
             'sync_type' => (string) ($job['sync_type'] ?? ''),
             'latency_ms' => $latencyMs,
             'result_status' => 'success',
-        ];
+        ], $extra);
         $this->auditLogger->log('ecommerce_' . $actionName, 'ecommerce_sync_job', (string) ($job['id'] ?? ''), $payload);
         $this->eventLogger->log($actionName, $tenantId, $payload);
     }

@@ -26,6 +26,10 @@ final class EcommerceHubMessageParser
             'ecommerce_update_store' => $this->parseUpdateStore($pairs, $baseCommand, $telemetry),
             'ecommerce_register_credentials' => $this->parseRegisterCredentials($pairs, $baseCommand, $telemetry),
             'ecommerce_validate_store_setup' => $this->parseValidateStoreSetup($pairs, $baseCommand, $telemetry),
+            'ecommerce_validate_connection' => $this->parseValidateConnection($pairs, $baseCommand, $telemetry),
+            'ecommerce_get_store_metadata' => $this->parseGetStoreMetadata($pairs, $baseCommand, $telemetry),
+            'ecommerce_get_platform_capabilities' => $this->parseGetPlatformCapabilities($pairs, $baseCommand, $telemetry),
+            'ecommerce_ping_store' => $this->parsePingStore($pairs, $baseCommand, $telemetry),
             'ecommerce_list_stores' => $this->parseListStores($pairs, $baseCommand, $telemetry),
             'ecommerce_get_store' => $this->parseGetStore($pairs, $baseCommand, $telemetry),
             'ecommerce_create_sync_job' => $this->parseCreateSyncJob($pairs, $baseCommand, $telemetry),
@@ -134,6 +138,84 @@ final class EcommerceHubMessageParser
             'command' => 'ValidateEcommerceStoreSetup',
             'store_id' => $storeId,
         ], $this->telemetry($telemetry, 'validate_store_setup'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseValidateConnection(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $storeId = $this->firstValue($pairs, ['store_id', 'id']);
+        if ($storeId === '') {
+            return $this->askUser('Indica `store_id` para validar la conexion ecommerce.', $this->telemetry($telemetry, 'validate_connection'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'ValidateEcommerceConnection',
+            'store_id' => $storeId,
+        ], $this->telemetry($telemetry, 'validate_connection'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseGetStoreMetadata(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $storeId = $this->firstValue($pairs, ['store_id', 'id']);
+        if ($storeId === '') {
+            return $this->askUser('Indica `store_id` para cargar la metadata ecommerce.', $this->telemetry($telemetry, 'get_store_metadata'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'GetEcommerceStoreMetadata',
+            'store_id' => $storeId,
+        ], $this->telemetry($telemetry, 'get_store_metadata'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseGetPlatformCapabilities(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $storeId = $this->firstValue($pairs, ['store_id', 'id']);
+        $platform = $this->firstValue($pairs, ['platform']);
+        if ($storeId === '' && $platform === '') {
+            return $this->askUser('Indica `store_id` o `platform` para consultar capacidades ecommerce.', $this->telemetry($telemetry, 'get_platform_capabilities'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'GetEcommercePlatformCapabilities',
+            'store_id' => $storeId !== '' ? $storeId : null,
+            'platform' => $platform !== '' ? $platform : null,
+        ], $this->telemetry($telemetry, 'get_platform_capabilities'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parsePingStore(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $storeId = $this->firstValue($pairs, ['store_id', 'id']);
+        if ($storeId === '') {
+            return $this->askUser('Indica `store_id` para revisar el ping ecommerce.', $this->telemetry($telemetry, 'ping_store'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'PingEcommerceStore',
+            'store_id' => $storeId,
+        ], $this->telemetry($telemetry, 'ping_store'));
     }
 
     /**

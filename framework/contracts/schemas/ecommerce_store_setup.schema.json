@@ -7,10 +7,13 @@
     "tenant_id",
     "store_id",
     "platform",
+    "adapter_key",
     "status",
     "connection_status",
+    "validation_result",
     "ready",
     "credentials_configured",
+    "capabilities",
     "checks",
     "hooks"
   ],
@@ -22,6 +25,7 @@
       "type": "string",
       "enum": ["woocommerce", "tiendanube", "prestashop", "custom_store", "unknown"]
     },
+    "adapter_key": { "type": "string", "minLength": 1 },
     "status": {
       "type": "string",
       "enum": ["active", "inactive", "disconnected"]
@@ -30,8 +34,31 @@
       "type": "string",
       "enum": ["not_configured", "pending_validation", "validated", "failed"]
     },
+    "validation_result": { "type": "string", "minLength": 1 },
     "ready": { "type": "boolean" },
     "credentials_configured": { "type": "boolean" },
+    "capabilities": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "products_read",
+        "products_write",
+        "orders_read",
+        "orders_write",
+        "inventory_sync",
+        "webhooks",
+        "customers_read"
+      ],
+      "properties": {
+        "products_read": { "type": "boolean" },
+        "products_write": { "type": "boolean" },
+        "orders_read": { "type": "boolean" },
+        "orders_write": { "type": "boolean" },
+        "inventory_sync": { "type": "boolean" },
+        "webhooks": { "type": "boolean" },
+        "customers_read": { "type": "boolean" }
+      }
+    },
     "checks": {
       "type": "object",
       "additionalProperties": true,

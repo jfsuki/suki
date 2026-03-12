@@ -1,6 +1,6 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.7.2",
+  "version": "1.7.3",
   "effective_date": "2026-03-12",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
@@ -2505,6 +2505,131 @@
         "ecommerce_validate_store_setup"
       ],
       "priority": 165,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_validate_connection",
+      "description": "Validate the masked credential shape and adapter selection for an ecommerce store.",
+      "intent_patterns": [
+        "re:(valida|validar|revisa|revisar|verifica|verificar).*(conexion ecommerce|conexion de tienda ecommerce|adapter ecommerce)",
+        "re:(conexion ecommerce|adapter ecommerce).*(valida|validar|revisa|revisar|verifica|verificar)"
+      ],
+      "keywords": [
+        "validar conexion ecommerce",
+        "revisar conexion tienda ecommerce",
+        "adapter ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_validate_connection"
+      ],
+      "priority": 164,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_get_store_metadata",
+      "description": "Load normalized metadata and adapter context for one ecommerce store.",
+      "intent_patterns": [
+        "re:(ver|mostrar|muestra|consulta|cargar).*(metadata ecommerce|metadata de tienda ecommerce|metadata del canal ecommerce)",
+        "re:(metadata ecommerce|metadata de tienda ecommerce).*(ver|mostrar|muestra|consulta|cargar)"
+      ],
+      "keywords": [
+        "metadata ecommerce",
+        "ver metadata tienda ecommerce",
+        "store metadata ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_get_store_metadata"
+      ],
+      "priority": 163,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_get_platform_capabilities",
+      "description": "Expose normalized adapter capabilities for a store or explicit ecommerce platform.",
+      "intent_patterns": [
+        "re:(capacidades ecommerce|capabilities ecommerce|que soporta).*(woocommerce|tiendanube|prestashop|tienda ecommerce|canal ecommerce)",
+        "re:(muestra|mostrar|ver|consulta).*(capacidades ecommerce|capabilities ecommerce)"
+      ],
+      "keywords": [
+        "capacidades ecommerce",
+        "capabilities ecommerce",
+        "que soporta prestashop"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_get_platform_capabilities"
+      ],
+      "priority": 162,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "platform"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_ping_store",
+      "description": "Run the safe ping preflight for an ecommerce store adapter.",
+      "intent_patterns": [
+        "re:(ping|probar|testear|test|revisar).*(tienda ecommerce|conexion ecommerce|store ecommerce)",
+        "re:(tienda ecommerce|conexion ecommerce|store ecommerce).*(ping|probar|testear|test)"
+      ],
+      "keywords": [
+        "ping ecommerce",
+        "probar tienda ecommerce",
+        "test store ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_ping_store"
+      ],
+      "priority": 161,
       "memory_type": null,
       "input_schema": {
         "required": [

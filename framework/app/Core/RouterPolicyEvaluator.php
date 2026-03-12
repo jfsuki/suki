@@ -1107,6 +1107,26 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'ValidateEcommerceConnection':
+            case 'GetEcommerceStoreMetadata':
+            case 'PingEcommerceStore':
+                if (trim((string) ($command['store_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_store_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetEcommercePlatformCapabilities':
+                if (
+                    trim((string) ($command['store_id'] ?? '')) === ''
+                    && trim((string) ($command['platform'] ?? '')) === ''
+                ) {
+                    return [false, 'missing_store_id_or_platform'];
+                }
+                if (array_key_exists('platform', $command) && $command['platform'] !== null && $command['platform'] !== '' && !is_string($command['platform'])) {
+                    return [false, 'invalid_platform'];
+                }
+                return [true, 'schema_valid'];
+
             case 'ListEcommerceStores':
                 if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
                     return [false, 'invalid_limit'];

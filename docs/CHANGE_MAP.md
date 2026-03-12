@@ -74,11 +74,13 @@
   - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
 - If you add Ecommerce Hub behavior:
   - update `EcommerceHubRepository`, `EcommerceHubService`, `EcommerceHubCommandHandler`, `EcommerceHubMessageParser`
+  - keep adapter selection centralized in `EcommerceAdapterResolver`; use `UnknownEcommerceAdapter` as safe fallback
   - keep the hub canonical: store/channel records, encrypted credentials, sync jobs and order refs only
   - keep platform classification limited to `woocommerce`, `tiendanube`, `prestashop`, `custom_store`, `unknown` until a real adapter exists
   - persist credentials encrypted at rest and return masked payloads only; never log raw secrets
-  - keep setup validation lightweight: store status + connection status + credentials presence
-  - treat adapters, webhooks, product sync, order sync, inventory sync and fiscal linkage as future hooks only
+  - keep setup/connection validation lightweight: store status + connection status + masked credential shape + capabilities
+  - treat full product sync, order sync, inventory sync, webhook ingestion and fiscal linkage as future hooks only
+  - wire adapter actions (`validate_connection`, `get_store_metadata`, `get_platform_capabilities`, `ping_store`) through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator` and tests together
   - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
 - If you add AgentOps metrics:
   - keep `docs/contracts/agentops_metrics_contract.json` aligned

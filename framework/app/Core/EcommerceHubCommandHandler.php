@@ -15,6 +15,10 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
         'UpdateEcommerceStore',
         'RegisterEcommerceStoreCredentials',
         'ValidateEcommerceStoreSetup',
+        'ValidateEcommerceConnection',
+        'GetEcommerceStoreMetadata',
+        'GetEcommercePlatformCapabilities',
+        'PingEcommerceStore',
         'ListEcommerceStores',
         'GetEcommerceStore',
         'CreateEcommerceSyncJob',
@@ -59,6 +63,15 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
                 'UpdateEcommerceStore' => $this->respondStore($reply, $channel, $sessionId, $userId, 'Tienda ecommerce actualizada.', 'update_store', $service->updateStore($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null])),
                 'RegisterEcommerceStoreCredentials' => $this->respondCredential($reply, $channel, $sessionId, $userId, $service->registerCredentials($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null])),
                 'ValidateEcommerceStoreSetup' => $this->respondSetup($reply, $channel, $sessionId, $userId, $service->validateStoreSetup($tenantId, trim((string) ($command['store_id'] ?? '')), $appId !== '' ? $appId : null)),
+                'ValidateEcommerceConnection' => $this->respondConnectionValidation($reply, $channel, $sessionId, $userId, $service->validateConnection($tenantId, trim((string) ($command['store_id'] ?? '')), $appId !== '' ? $appId : null)),
+                'GetEcommerceStoreMetadata' => $this->respondStoreMetadata($reply, $channel, $sessionId, $userId, $service->getNormalizedStoreMetadata($tenantId, trim((string) ($command['store_id'] ?? '')), $appId !== '' ? $appId : null)),
+                'GetEcommercePlatformCapabilities' => $this->respondPlatformCapabilities($reply, $channel, $sessionId, $userId, $service->getPlatformCapabilities(
+                    $tenantId,
+                    ($storeId = trim((string) ($command['store_id'] ?? ''))) !== '' ? $storeId : null,
+                    ($platform = trim((string) ($command['platform'] ?? ''))) !== '' ? $platform : null,
+                    $appId !== '' ? $appId : null
+                )),
+                'PingEcommerceStore' => $this->respondPing($reply, $channel, $sessionId, $userId, $service->pingStore($tenantId, trim((string) ($command['store_id'] ?? '')), $appId !== '' ? $appId : null)),
                 'ListEcommerceStores' => $this->respondStoreList($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'GetEcommerceStore' => $this->respondStore($reply, $channel, $sessionId, $userId, 'Tienda ecommerce cargada.', 'get_store', $service->getStore($tenantId, trim((string) ($command['store_id'] ?? '')), $appId !== '' ? $appId : null)),
                 'CreateEcommerceSyncJob' => $this->respondSyncJob($reply, $channel, $sessionId, $userId, $service->createSyncJob($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null])),
@@ -91,7 +104,9 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
             'item' => $store,
             'store_id' => (string) ($store['id'] ?? ''),
             'platform' => (string) ($store['platform'] ?? ''),
+            'adapter_key' => $this->adapterKeyFromStore($store),
             'connection_status' => (string) ($store['connection_status'] ?? ''),
+            'validation_result' => 'not_applicable',
             'result_status' => 'success',
         ])));
     }
@@ -108,6 +123,7 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
             'credential' => $credential,
             'item' => $credential,
             'store_id' => (string) ($credential['store_id'] ?? ''),
+            'validation_result' => 'credentials_registered',
             'result_status' => 'success',
         ])));
     }
@@ -125,8 +141,98 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
             'item' => $setup,
             'store_id' => (string) ($setup['store_id'] ?? ''),
             'platform' => (string) ($setup['platform'] ?? ''),
+            'adapter_key' => (string) ($setup['adapter_key'] ?? ''),
             'connection_status' => (string) ($setup['connection_status'] ?? ''),
+            'validation_result' => (string) ($setup['validation_result'] ?? 'unknown'),
             'result_status' => 'success',
+        ])));
+    }
+
+    /**
+     * @param callable $reply
+     * @param array<string, mixed> $result
+     * @return array<string, mixed>
+     */
+    private function respondConnectionValidation(callable $reply, string $channel, string $sessionId, string $userId, array $result): array
+    {
+        $text = ($result['valid'] ?? false) === true
+            ? 'Conexion ecommerce revisada. La configuracion base es valida.'
+            : 'Conexion ecommerce revisada. La configuracion actual no quedo validada.';
+
+        return $this->withReplyText($reply($text, $channel, $sessionId, $userId, 'success', $this->moduleData([
+            'ecommerce_action' => 'validate_connection',
+            'connection_validation' => $result,
+            'item' => $result,
+            'store_id' => (string) ($result['store_id'] ?? ''),
+            'platform' => (string) ($result['platform'] ?? ''),
+            'adapter_key' => (string) ($result['adapter_key'] ?? ''),
+            'connection_status' => (string) ($result['connection_status'] ?? ''),
+            'validation_result' => (string) ($result['validation_result'] ?? 'unknown'),
+            'result_status' => (string) ($result['result_status'] ?? 'safe_failure'),
+        ])));
+    }
+
+    /**
+     * @param callable $reply
+     * @param array<string, mixed> $result
+     * @return array<string, mixed>
+     */
+    private function respondStoreMetadata(callable $reply, string $channel, string $sessionId, string $userId, array $result): array
+    {
+        return $this->withReplyText($reply('Metadata ecommerce cargada.', $channel, $sessionId, $userId, 'success', $this->moduleData([
+            'ecommerce_action' => 'get_store_metadata',
+            'store_metadata' => $result,
+            'item' => $result,
+            'store_id' => (string) ($result['store_id'] ?? ''),
+            'platform' => (string) ($result['platform'] ?? ''),
+            'adapter_key' => (string) ($result['adapter_key'] ?? ''),
+            'connection_status' => (string) ($result['connection_status'] ?? ''),
+            'validation_result' => 'metadata_ready',
+            'result_status' => (string) ($result['result_status'] ?? 'success'),
+        ])));
+    }
+
+    /**
+     * @param callable $reply
+     * @param array<string, mixed> $result
+     * @return array<string, mixed>
+     */
+    private function respondPlatformCapabilities(callable $reply, string $channel, string $sessionId, string $userId, array $result): array
+    {
+        return $this->withReplyText($reply('Capacidades ecommerce cargadas.', $channel, $sessionId, $userId, 'success', $this->moduleData([
+            'ecommerce_action' => 'get_platform_capabilities',
+            'platform_capabilities' => $result,
+            'item' => $result,
+            'store_id' => (string) ($result['store_id'] ?? ''),
+            'platform' => (string) ($result['platform'] ?? ''),
+            'adapter_key' => (string) ($result['adapter_key'] ?? ''),
+            'validation_result' => (string) ($result['validation_result'] ?? 'unknown'),
+            'result_status' => (string) ($result['result_status'] ?? 'success'),
+        ])));
+    }
+
+    /**
+     * @param callable $reply
+     * @param array<string, mixed> $result
+     * @return array<string, mixed>
+     */
+    private function respondPing(callable $reply, string $channel, string $sessionId, string $userId, array $result): array
+    {
+        $text = 'Ping ecommerce revisado.';
+        if (trim((string) ($result['message'] ?? '')) !== '') {
+            $text .= ' ' . trim((string) ($result['message'] ?? ''));
+        }
+
+        return $this->withReplyText($reply($text, $channel, $sessionId, $userId, 'success', $this->moduleData([
+            'ecommerce_action' => 'ping_store',
+            'ping_result' => $result,
+            'item' => $result,
+            'store_id' => (string) ($result['store_id'] ?? ''),
+            'platform' => (string) ($result['platform'] ?? ''),
+            'adapter_key' => (string) ($result['adapter_key'] ?? ''),
+            'connection_status' => (string) ($result['connection_status'] ?? ''),
+            'validation_result' => (string) ($result['validation_result'] ?? 'unknown'),
+            'result_status' => (string) ($result['result_status'] ?? 'safe_failure'),
         ])));
     }
 
@@ -142,8 +248,10 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
             'sync_job' => $job,
             'item' => $job,
             'store_id' => (string) ($job['store_id'] ?? ''),
+            'adapter_key' => $this->adapterKeyFromSyncJob($job),
             'sync_job_id' => (string) ($job['id'] ?? ''),
             'sync_type' => (string) ($job['sync_type'] ?? ''),
+            'validation_result' => 'sync_job_registered',
             'result_status' => 'success',
         ])));
     }
@@ -251,9 +359,11 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
             'ecommerce_action' => 'none',
             'store_id' => '',
             'platform' => '',
+            'adapter_key' => '',
             'connection_status' => '',
             'sync_job_id' => '',
             'sync_type' => '',
+            'validation_result' => 'none',
             'result_status' => 'success',
         ];
     }
@@ -290,8 +400,42 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
             'PLATFORM_REQUIRED' => 'Falta platform para crear la tienda ecommerce.',
             'CREDENTIAL_TYPE_REQUIRED' => 'Falta credential_type para registrar credenciales ecommerce.',
             'SYNC_TYPE_REQUIRED' => 'Falta sync_type para crear el sync job ecommerce.',
+            'ECOMMERCE_PLATFORM_OR_STORE_REQUIRED' => 'Necesito `store_id` o `platform` para obtener capacidades ecommerce.',
             default => $error !== '' ? $error : 'No pude ejecutar la operacion ecommerce.',
         };
+    }
+
+    /**
+     * @param array<string, mixed> $store
+     */
+    private function adapterKeyFromStore(array $store): string
+    {
+        $metadata = is_array($store['metadata'] ?? null) ? (array) $store['metadata'] : [];
+        $adapterKey = trim((string) ($metadata['adapter_foundation']['adapter_key'] ?? ''));
+        if ($adapterKey !== '') {
+            return $adapterKey;
+        }
+
+        $platform = trim((string) ($store['platform'] ?? ''));
+        if (in_array($platform, ['woocommerce', 'tiendanube', 'prestashop'], true)) {
+            return $platform;
+        }
+
+        return 'unknown';
+    }
+
+    /**
+     * @param array<string, mixed> $job
+     */
+    private function adapterKeyFromSyncJob(array $job): string
+    {
+        $metadata = is_array($job['metadata'] ?? null) ? (array) $job['metadata'] : [];
+        $platform = trim((string) ($metadata['store_platform'] ?? ''));
+        if (in_array($platform, ['woocommerce', 'tiendanube', 'prestashop'], true)) {
+            return $platform;
+        }
+
+        return 'unknown';
     }
 
     /**

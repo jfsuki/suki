@@ -106,7 +106,7 @@ final class EcommerceHubContractValidator
      */
     private static function normalizePayload(array $payload): array
     {
-        foreach (['metadata', 'metadata_json', 'checks', 'hooks'] as $key) {
+        foreach (['metadata', 'metadata_json', 'checks', 'hooks', 'capabilities'] as $key) {
             if (array_key_exists($key, $payload) && is_array($payload[$key])) {
                 $payload[$key] = self::normalizeObjectLikeArray((array) $payload[$key]);
             }
