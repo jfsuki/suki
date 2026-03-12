@@ -81,6 +81,8 @@
   - keep setup/connection validation lightweight: store status + connection status + masked credential shape + capabilities
   - product sync foundation may link local/external products, prepare normalized push payloads, register pull snapshots and record sync state without calling remote APIs
   - order sync foundation may link external orders, normalize payloads, register pull snapshots and record sync state without creating local sales, fiscal documents or inventory movements
+  - ecommerce agent skills may map natural business requests into setup, sync tracking, product sync and order sync actions using safe clarification before execution
+  - if parser/router adds ecommerce candidate resolution, keep store selection tenant-scoped and resolve products via `EntitySearchService`; return candidates instead of guessing on ambiguous references
   - resolve local products through `EntitySearchService`; do not invent matches or create local products from pull snapshots automatically
   - treat real remote product sync, real remote order sync, inventory sync, webhook ingestion and fiscal linkage as future hooks only
   - wire adapter actions (`validate_connection`, `get_store_metadata`, `get_platform_capabilities`, `ping_store`) through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator` and tests together

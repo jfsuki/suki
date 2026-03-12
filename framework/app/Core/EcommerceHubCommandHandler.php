@@ -387,6 +387,7 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
         return $this->withReplyText($reply($text, $channel, $sessionId, $userId, 'success', $this->moduleData([
             'ecommerce_action' => $actionName,
             'order_snapshot_result' => $result,
+            'snapshot' => $snapshot,
             'item' => $result,
             'store_id' => (string) ($result['store_id'] ?? $snapshot['store_id'] ?? ''),
             'platform' => (string) ($result['platform'] ?? ''),
@@ -656,9 +657,12 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
      */
     private function moduleData(array $extra = []): array
     {
+        $action = trim((string) ($extra['ecommerce_action'] ?? ''));
+
         return $extra + [
             'module_used' => 'ecommerce',
-            'ecommerce_action' => 'none',
+            'ecommerce_action' => $action !== '' ? $action : 'none',
+            'skill_group' => $this->skillGroupForAction($action),
             'store_id' => '',
             'platform' => '',
             'adapter_key' => '',
@@ -673,9 +677,44 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
             'external_product_id' => '',
             'sync_status' => '',
             'sync_direction' => '',
+            'ambiguity_detected' => false,
             'validation_result' => 'none',
             'result_status' => 'success',
         ];
+    }
+
+    private function skillGroupForAction(string $action): string
+    {
+        return match ($action) {
+            'create_store',
+            'update_store',
+            'register_credentials',
+            'validate_store_setup',
+            'validate_connection',
+            'get_store_metadata',
+            'get_platform_capabilities',
+            'ping_store',
+            'list_stores',
+            'get_store' => 'store_setup',
+            'create_sync_job',
+            'list_sync_jobs',
+            'list_order_refs' => 'sync_tracking',
+            'link_product',
+            'unlink_product',
+            'list_product_links',
+            'get_product_link',
+            'prepare_product_push_payload',
+            'register_product_pull_snapshot',
+            'mark_product_sync_status' => 'product_sync_ops',
+            'link_order',
+            'get_order_link',
+            'list_order_links',
+            'register_order_pull_snapshot',
+            'normalize_external_order',
+            'mark_order_sync_status',
+            'get_order_snapshot' => 'order_sync_ops',
+            default => 'unknown',
+        };
     }
 
     /**

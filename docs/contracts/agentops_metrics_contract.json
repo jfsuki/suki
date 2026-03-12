@@ -1,6 +1,6 @@
 {
   "contract_id": "agentops_metrics_contract",
-  "version": "1.4.3",
+  "version": "1.4.4",
   "effective_date": "2026-03-12",
   "addenda_of": null,
   "status": "canonical_draft",
@@ -32,6 +32,7 @@
     "needs_regression_case",
     "needs_memory_hygiene",
     "module_used",
+    "skill_group",
     "alert_action",
     "task_action",
     "reminder_action",
@@ -48,6 +49,7 @@
     "external_product_id",
     "sync_status",
     "sync_direction",
+    "ambiguity_detected",
     "versions",
     "latency_ms"
   ],
@@ -74,6 +76,7 @@
     "same_route_repeat_count",
     "request_mode",
     "module_used",
+    "skill_group",
     "alert_action",
     "task_action",
     "reminder_action",
@@ -90,6 +93,7 @@
     "external_product_id",
     "sync_status",
     "sync_direction",
+    "ambiguity_detected",
     "metrics_delta",
     "supervisor"
   ],

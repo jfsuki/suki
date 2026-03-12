@@ -675,7 +675,9 @@ final class SkillExecutor
             'reply' => (string) ($parsed['reply'] ?? 'Necesito un dato adicional para continuar con ecommerce.'),
             'command' => [],
             'skill_result_status' => 'needs_input',
-            'skill_fallback_reason' => 'missing_ecommerce_payload',
+            'skill_fallback_reason' => (($telemetry['ambiguity_detected'] ?? false) === true)
+                ? 'ambiguous_ecommerce_reference'
+                : 'missing_ecommerce_payload',
             'skill_failed' => false,
             'routing_hint_steps' => ['cache', 'rules', 'skills'],
             'telemetry' => $telemetry,

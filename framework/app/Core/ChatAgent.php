@@ -283,7 +283,21 @@ final class ChatAgent
         }
 
         if ($route->isLocalResponse()) {
-            $reply = $this->reply($route->reply(), $channel, $sessionId, $userId);
+            $localResponseData = $this->extractOperationalTelemetryMarkers($telemetry);
+            if (trim((string) ($localResponseData['session_id'] ?? '')) === '') {
+                unset($localResponseData['session_id']);
+            }
+            if (trim((string) ($localResponseData['user_id'] ?? '')) === '') {
+                unset($localResponseData['user_id']);
+            }
+            $reply = $this->reply(
+                $route->reply(),
+                $channel,
+                $sessionId,
+                $userId,
+                'success',
+                $localResponseData
+            );
             $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
                 'llm_called' => false,
                 'error_flag' => false,
@@ -1690,6 +1704,7 @@ final class ChatAgent
             'purchases_action' => $runtimeObservability['purchases_action'],
             'fiscal_action' => $runtimeObservability['fiscal_action'],
             'ecommerce_action' => $runtimeObservability['ecommerce_action'],
+            'skill_group' => $runtimeObservability['skill_group'],
             'draft_id' => $runtimeObservability['draft_id'],
             'purchase_draft_id' => $runtimeObservability['purchase_draft_id'],
             'session_id' => $runtimeObservability['session_id'],
@@ -1698,6 +1713,7 @@ final class ChatAgent
             'matched_by' => $runtimeObservability['matched_by'],
             'product_query' => $runtimeObservability['product_query'],
             'ambiguity_count' => $runtimeObservability['ambiguity_count'],
+            'ambiguity_detected' => $runtimeObservability['ambiguity_detected'],
             'purchase_id' => $runtimeObservability['purchase_id'],
             'purchase_number' => $runtimeObservability['purchase_number'],
             'purchase_document_id' => $runtimeObservability['purchase_document_id'],
@@ -1827,6 +1843,7 @@ final class ChatAgent
             'purchases_action' => trim((string) ($runtimeContext['purchases_action'] ?? $routeTelemetry['purchases_action'] ?? '')) ?: 'none',
             'fiscal_action' => trim((string) ($runtimeContext['fiscal_action'] ?? $routeTelemetry['fiscal_action'] ?? '')) ?: 'none',
             'ecommerce_action' => trim((string) ($runtimeContext['ecommerce_action'] ?? $routeTelemetry['ecommerce_action'] ?? '')) ?: 'none',
+            'skill_group' => $this->preferRuntimeOrRouteString($runtimeContext, $routeTelemetry, 'skill_group', 'unknown'),
             'draft_id' => trim((string) ($runtimeContext['draft_id'] ?? $routeTelemetry['draft_id'] ?? '')),
             'purchase_draft_id' => trim((string) ($runtimeContext['purchase_draft_id'] ?? $routeTelemetry['purchase_draft_id'] ?? '')),
             'session_id' => trim((string) ($runtimeContext['session_id'] ?? $routeTelemetry['session_id'] ?? '')),
@@ -1837,6 +1854,7 @@ final class ChatAgent
             'ambiguity_count' => is_numeric($runtimeContext['ambiguity_count'] ?? $routeTelemetry['ambiguity_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['ambiguity_count'] ?? $routeTelemetry['ambiguity_count']))
                 : 0,
+            'ambiguity_detected' => $this->preferRuntimeOrRouteBool($runtimeContext, $routeTelemetry, 'ambiguity_detected'),
             'purchase_id' => trim((string) ($runtimeContext['purchase_id'] ?? $routeTelemetry['purchase_id'] ?? '')),
             'purchase_number' => trim((string) ($runtimeContext['purchase_number'] ?? $routeTelemetry['purchase_number'] ?? '')),
             'purchase_document_id' => trim((string) ($runtimeContext['purchase_document_id'] ?? $routeTelemetry['purchase_document_id'] ?? '')),
@@ -2017,6 +2035,7 @@ final class ChatAgent
             'purchases_action' => trim((string) ($payload['purchases_action'] ?? '')) ?: 'none',
             'fiscal_action' => trim((string) ($payload['fiscal_action'] ?? '')) ?: 'none',
             'ecommerce_action' => trim((string) ($payload['ecommerce_action'] ?? '')) ?: 'none',
+            'skill_group' => trim((string) ($payload['skill_group'] ?? '')) ?: '',
             'draft_id' => trim((string) ($payload['draft_id'] ?? '')) ?: '',
             'purchase_draft_id' => trim((string) ($payload['purchase_draft_id'] ?? '')) ?: '',
             'session_id' => trim((string) ($payload['session_id'] ?? '')) ?: '',
@@ -2027,6 +2046,7 @@ final class ChatAgent
             'ambiguity_count' => is_numeric($payload['ambiguity_count'] ?? null)
                 ? max(0, (int) $payload['ambiguity_count'])
                 : 0,
+            'ambiguity_detected' => (($payload['ambiguity_detected'] ?? false) === true),
             'purchase_id' => trim((string) ($payload['purchase_id'] ?? '')) ?: '',
             'purchase_number' => trim((string) ($payload['purchase_number'] ?? '')) ?: '',
             'purchase_document_id' => trim((string) ($payload['purchase_document_id'] ?? '')) ?: '',
@@ -2313,6 +2333,30 @@ final class ChatAgent
             return $this->reply((string) $json['reply'], $channel, $sessionId, $userId);
         }
         return $this->reply('Listo.', $channel, $sessionId, $userId);
+    }
+
+    private function preferRuntimeOrRouteString(array $runtimeContext, array $routeTelemetry, string $key, string $default = ''): string
+    {
+        $runtimeValue = trim((string) ($runtimeContext[$key] ?? ''));
+        if ($runtimeValue !== '') {
+            return $runtimeValue;
+        }
+
+        $routeValue = trim((string) ($routeTelemetry[$key] ?? ''));
+        if ($routeValue !== '') {
+            return $routeValue;
+        }
+
+        return $default;
+    }
+
+    private function preferRuntimeOrRouteBool(array $runtimeContext, array $routeTelemetry, string $key): bool
+    {
+        if (array_key_exists($key, $runtimeContext)) {
+            return $runtimeContext[$key] === true;
+        }
+
+        return ($routeTelemetry[$key] ?? false) === true;
     }
 
     private function entityExists(string $entity): bool

@@ -1,6 +1,6 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.7.5",
+  "version": "1.7.6",
   "effective_date": "2026-03-12",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
@@ -2385,12 +2385,14 @@
       "description": "Create a canonical ecommerce store or sales channel record.",
       "intent_patterns": [
         "re:(crea|crear|registra|registrar|agrega|agregar).*(tienda ecommerce|canal ecommerce|store ecommerce)",
-        "re:(tienda ecommerce|canal ecommerce|store ecommerce).*(crea|crear|registra|registrar|agrega|agregar)"
+        "re:(tienda ecommerce|canal ecommerce|store ecommerce).*(crea|crear|registra|registrar|agrega|agregar)",
+        "re:(conecta|conectar|integra|integrar).*(mi tienda|tienda ecommerce|canal ecommerce|store ecommerce)"
       ],
       "keywords": [
         "crear tienda ecommerce",
         "registrar canal ecommerce",
-        "store ecommerce"
+        "store ecommerce",
+        "conecta mi tienda"
       ],
       "execution_mode": "tool",
       "allowed_tools": [
@@ -2524,12 +2526,14 @@
       "description": "Validate the masked credential shape and adapter selection for an ecommerce store.",
       "intent_patterns": [
         "re:(valida|validar|revisa|revisar|verifica|verificar).*(conexion ecommerce|conexion de tienda ecommerce|adapter ecommerce)",
-        "re:(conexion ecommerce|adapter ecommerce).*(valida|validar|revisa|revisar|verifica|verificar)"
+        "re:(conexion ecommerce|adapter ecommerce).*(valida|validar|revisa|revisar|verifica|verificar)",
+        "re:(valida|validar|revisa|revisar|verifica|verificar).*(conexion|conexión).*(tienda|integracion|integración|woocommerce|tiendanube|prestashop)"
       ],
       "keywords": [
         "validar conexion ecommerce",
         "revisar conexion tienda ecommerce",
-        "adapter ecommerce"
+        "adapter ecommerce",
+        "valida la conexión"
       ],
       "execution_mode": "tool",
       "allowed_tools": [
@@ -2586,12 +2590,14 @@
       "description": "Expose normalized adapter capabilities for a store or explicit ecommerce platform.",
       "intent_patterns": [
         "re:(capacidades ecommerce|capabilities ecommerce|que soporta).*(woocommerce|tiendanube|prestashop|tienda ecommerce|canal ecommerce)",
-        "re:(muestra|mostrar|ver|consulta).*(capacidades ecommerce|capabilities ecommerce)"
+        "re:(muestra|mostrar|ver|consulta).*(capacidades ecommerce|capabilities ecommerce)",
+        "re:(que puede hacer|qué puede hacer|que soporta|qué soporta).*(integracion|integración|tienda|woocommerce|tiendanube|prestashop)"
       ],
       "keywords": [
         "capacidades ecommerce",
         "capabilities ecommerce",
-        "que soporta prestashop"
+        "que soporta prestashop",
+        "que puede hacer esta integracion"
       ],
       "execution_mode": "tool",
       "allowed_tools": [
@@ -2649,11 +2655,13 @@
       "description": "List ecommerce stores with lightweight platform and status filters.",
       "intent_patterns": [
         "re:(lista|listar|muestra|mostrar|ver|consulta).*(tiendas ecommerce|canales ecommerce|stores ecommerce)",
-        "re:(tiendas ecommerce|canales ecommerce|stores ecommerce).*(lista|listar|muestra|mostrar|ver|consulta)"
+        "re:(tiendas ecommerce|canales ecommerce|stores ecommerce).*(lista|listar|muestra|mostrar|ver|consulta)",
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(mis tiendas|mis canales)"
       ],
       "keywords": [
         "listar tiendas ecommerce",
-        "ver canales ecommerce"
+        "ver canales ecommerce",
+        "lista mis tiendas"
       ],
       "execution_mode": "tool",
       "allowed_tools": [
@@ -2745,11 +2753,13 @@
       "description": "List ecommerce sync jobs by store, sync_type or status.",
       "intent_patterns": [
         "re:(lista|listar|muestra|mostrar|ver|consulta).*(sync jobs ecommerce|sincronizaciones ecommerce|sync ecommerce)",
-        "re:(sync jobs ecommerce|sincronizaciones ecommerce|sync ecommerce).*(lista|listar|muestra|mostrar|ver|consulta)"
+        "re:(sync jobs ecommerce|sincronizaciones ecommerce|sync ecommerce).*(lista|listar|muestra|mostrar|ver|consulta)",
+        "re:(revisa|revisar|mira|ver|consulta|lista|listar).*(sincronizacion|sincronización|sync).*(ecommerce|tienda|integracion|integración)"
       ],
       "keywords": [
         "listar sync ecommerce",
-        "ver sincronizaciones ecommerce"
+        "ver sincronizaciones ecommerce",
+        "revisa la sincronización"
       ],
       "execution_mode": "tool",
       "allowed_tools": [
@@ -3021,11 +3031,13 @@
       "description": "Load the latest ecommerce order snapshot for one store and external order id.",
       "intent_patterns": [
         "re:(ver|mostrar|muestra|consulta|abre|abrir).*(snapshot pedido ecommerce|snapshot orden ecommerce)",
-        "re:(snapshot pedido ecommerce|snapshot orden ecommerce).*(ver|mostrar|muestra|consulta|abre|abrir)"
+        "re:(snapshot pedido ecommerce|snapshot orden ecommerce).*(ver|mostrar|muestra|consulta|abre|abrir)",
+        "re:(mira|mirar|ver|mostrar|muestra|consulta).*(pedido externo|orden externa|external order)"
       ],
       "keywords": [
         "ver snapshot pedido ecommerce",
-        "abrir snapshot orden ecommerce"
+        "abrir snapshot orden ecommerce",
+        "mira el pedido externo"
       ],
       "execution_mode": "tool",
       "allowed_tools": [
@@ -3052,12 +3064,14 @@
       "description": "Link one local product to one ecommerce product reference for a store.",
       "intent_patterns": [
         "re:(vincula|vincular|linkea|linkear|relaciona|relacionar).*(producto ecommerce|producto tienda|producto canal)",
-        "re:(producto ecommerce|producto tienda|producto canal).*(vincula|vincular|linkea|linkear|relaciona|relacionar)"
+        "re:(producto ecommerce|producto tienda|producto canal).*(vincula|vincular|linkea|linkear|relaciona|relacionar)",
+        "re:(vincula|vincular|linkea|linkear|relaciona|relacionar).*(producto).*(tienda|store|canal)"
       ],
       "keywords": [
         "vincular producto ecommerce",
         "link product ecommerce",
-        "relacionar producto tienda"
+        "relacionar producto tienda",
+        "vincula este producto con la tienda"
       ],
       "execution_mode": "tool",
       "allowed_tools": [

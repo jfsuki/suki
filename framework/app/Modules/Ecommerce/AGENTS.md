@@ -5,6 +5,7 @@
 - El runtime canonico vive en `framework/app/Core` y cubre registro de tiendas/canales, credenciales, sync jobs y referencias externas de pedidos.
 - Este modulo ya expone una base de adapters para WooCommerce, Tiendanube y PrestaShop con resolver seguro y fallback `unknown`.
 - El alcance actual incluye validacion, metadata, capacidades, ping seguro, una base de product sync canonica y una base de order sync canonica.
+- La capa agent skill actual agrega grupos operables para setup de tienda, tracking de sync, operaciones de product sync y operaciones de order sync con mapeo natural desde solicitudes de negocio.
 - Product sync actual: links local/external, payload push preparado, snapshots pull y estado de sync.
 - Order sync actual: order links canonicos, snapshots externos normalizados y estado de sync sin crear ventas/fiscal/locales.
 - Sync remoto real sigue fuera de alcance.
@@ -55,4 +56,9 @@
   - `register_order_pull_snapshot` guarda snapshot externo + payload normalizado sin ejecutar POS, fiscal, inventario ni clientes.
   - `mark_order_sync_status` solo registra estado de sync.
 - Resolver productos locales via `EntitySearchService`; si no existe referencia real, fallar de forma explicita.
+- Parser/router ecommerce:
+  - priorizar matching deterministico por skill catalog + parser ecommerce.
+  - si faltan `store_id` o referencias de producto y hay multiples candidatos, devolver aclaracion segura con lista de candidatos; no adivinar.
+  - si el tenant solo tiene una tienda aplicable, la resolucion puede autoseleccionarla.
+  - no exponer secretos ni declarar sync exitoso cuando solo se valido/preparo un payload.
 - Los hooks para venta local, fiscal, inventario, cliente, pagos, sync remoto de productos/ordenes e ingestion webhook quedan preparados pero no implementados en este modulo base.
