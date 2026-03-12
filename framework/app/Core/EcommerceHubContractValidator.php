@@ -14,6 +14,7 @@ final class EcommerceHubContractValidator
     private const CREDENTIAL_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/ecommerce_credential.schema.json';
     private const SYNC_JOB_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/ecommerce_sync_job.schema.json';
     private const ORDER_REF_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/ecommerce_order_ref.schema.json';
+    private const PRODUCT_LINK_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/ecommerce_product_link.schema.json';
     private const STORE_SETUP_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/ecommerce_store_setup.schema.json';
 
     /**
@@ -46,6 +47,14 @@ final class EcommerceHubContractValidator
     public static function validateOrderRef(array $payload): void
     {
         self::validate(self::ORDER_REF_SCHEMA, self::normalizePayload($payload), 'EcommerceOrderRef');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public static function validateProductLink(array $payload): void
+    {
+        self::validate(self::PRODUCT_LINK_SCHEMA, self::normalizePayload($payload), 'EcommerceProductLink');
     }
 
     /**

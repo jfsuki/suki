@@ -24,6 +24,13 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
         'CreateEcommerceSyncJob',
         'ListEcommerceSyncJobs',
         'ListEcommerceOrderRefs',
+        'LinkEcommerceProduct',
+        'UnlinkEcommerceProduct',
+        'ListEcommerceProductLinks',
+        'GetEcommerceProductLink',
+        'PrepareEcommerceProductPushPayload',
+        'RegisterEcommerceProductPullSnapshot',
+        'MarkEcommerceProductSyncStatus',
     ];
 
     public function supports(string $commandName): bool
@@ -77,6 +84,29 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
                 'CreateEcommerceSyncJob' => $this->respondSyncJob($reply, $channel, $sessionId, $userId, $service->createSyncJob($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null])),
                 'ListEcommerceSyncJobs' => $this->respondSyncJobList($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'ListEcommerceOrderRefs' => $this->respondOrderRefList($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'LinkEcommerceProduct' => $this->respondProductLink($reply, $channel, $sessionId, $userId, 'Producto ecommerce vinculado.', 'link_product', $service->linkProduct($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null])),
+                'UnlinkEcommerceProduct' => $this->respondProductLink($reply, $channel, $sessionId, $userId, 'Vinculo de producto ecommerce eliminado.', 'unlink_product', $service->unlinkProduct($tenantId, trim((string) ($command['link_id'] ?? '')), $appId !== '' ? $appId : null)),
+                'ListEcommerceProductLinks' => $this->respondProductLinkList($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
+                'GetEcommerceProductLink' => $this->respondProductLink($reply, $channel, $sessionId, $userId, 'Vinculo de producto ecommerce cargado.', 'get_product_link', $service->getProductLink($tenantId, trim((string) ($command['link_id'] ?? '')), $appId !== '' ? $appId : null)),
+                'PrepareEcommerceProductPushPayload' => $this->respondPreparedProductPayload($reply, $channel, $sessionId, $userId, $service->prepareProductPushPayload(
+                    $tenantId,
+                    trim((string) ($command['store_id'] ?? '')),
+                    trim((string) ($command['local_product_id'] ?? '')),
+                    $appId !== '' ? $appId : null
+                )),
+                'RegisterEcommerceProductPullSnapshot' => $this->respondPullSnapshotRegistration($reply, $channel, $sessionId, $userId, $service->registerProductPullSnapshot(
+                    $tenantId,
+                    trim((string) ($command['store_id'] ?? '')),
+                    is_array($command['external_product_payload'] ?? null) ? (array) $command['external_product_payload'] : [],
+                    $appId !== '' ? $appId : null
+                )),
+                'MarkEcommerceProductSyncStatus' => $this->respondProductLink($reply, $channel, $sessionId, $userId, 'Estado de sync de producto ecommerce actualizado.', 'mark_product_sync_status', $service->markProductSyncStatus(
+                    $tenantId,
+                    trim((string) ($command['link_id'] ?? '')),
+                    trim((string) ($command['sync_status'] ?? '')),
+                    is_array($command['metadata'] ?? null) ? (array) $command['metadata'] : [],
+                    $appId !== '' ? $appId : null
+                )),
                 default => throw new RuntimeException('COMMAND_NOT_SUPPORTED'),
             };
         } catch (Throwable $e) {
@@ -258,6 +288,86 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
 
     /**
      * @param callable $reply
+     * @param array<string, mixed> $link
+     * @return array<string, mixed>
+     */
+    private function respondProductLink(callable $reply, string $channel, string $sessionId, string $userId, string $text, string $actionName, array $link): array
+    {
+        $validationResult = match ($actionName) {
+            'link_product' => 'product_linked',
+            'unlink_product' => 'product_unlinked',
+            'get_product_link' => 'product_link_loaded',
+            'mark_product_sync_status' => 'sync_status_recorded',
+            default => 'not_applicable',
+        };
+
+        return $this->withReplyText($reply($text, $channel, $sessionId, $userId, 'success', $this->moduleData([
+            'ecommerce_action' => $actionName,
+            'product_link' => $link,
+            'item' => $link,
+            'store_id' => (string) ($link['store_id'] ?? ''),
+            'link_id' => (string) ($link['id'] ?? ''),
+            'product_id' => (string) ($link['local_product_id'] ?? ''),
+            'local_product_id' => (string) ($link['local_product_id'] ?? ''),
+            'external_product_id' => (string) ($link['external_product_id'] ?? ''),
+            'sync_status' => (string) ($link['sync_status'] ?? ''),
+            'sync_direction' => (string) ($link['last_sync_direction'] ?? ''),
+            'validation_result' => $validationResult,
+            'result_status' => 'success',
+        ])));
+    }
+
+    /**
+     * @param callable $reply
+     * @param array<string, mixed> $result
+     * @return array<string, mixed>
+     */
+    private function respondPreparedProductPayload(callable $reply, string $channel, string $sessionId, string $userId, array $result): array
+    {
+        return $this->withReplyText($reply('Payload de push ecommerce preparado.', $channel, $sessionId, $userId, 'success', $this->moduleData([
+            'ecommerce_action' => 'prepare_product_push_payload',
+            'prepared_product_payload' => $result,
+            'item' => $result,
+            'store_id' => (string) ($result['store_id'] ?? ''),
+            'platform' => (string) ($result['platform'] ?? ''),
+            'adapter_key' => (string) ($result['adapter_key'] ?? ''),
+            'product_id' => (string) ($result['local_product_id'] ?? ''),
+            'local_product_id' => (string) ($result['local_product_id'] ?? ''),
+            'sync_direction' => (string) ($result['sync_direction'] ?? 'push_local_to_store'),
+            'validation_result' => (string) ($result['validation_result'] ?? 'unknown'),
+            'result_status' => (string) ($result['result_status'] ?? 'success'),
+        ])));
+    }
+
+    /**
+     * @param callable $reply
+     * @param array<string, mixed> $result
+     * @return array<string, mixed>
+     */
+    private function respondPullSnapshotRegistration(callable $reply, string $channel, string $sessionId, string $userId, array $result): array
+    {
+        $link = is_array($result['link'] ?? null) ? (array) $result['link'] : [];
+
+        return $this->withReplyText($reply('Snapshot pull ecommerce registrado.', $channel, $sessionId, $userId, 'success', $this->moduleData([
+            'ecommerce_action' => 'register_product_pull_snapshot',
+            'pull_snapshot_result' => $result,
+            'item' => $result,
+            'store_id' => (string) ($result['store_id'] ?? ''),
+            'platform' => (string) ($result['platform'] ?? ''),
+            'adapter_key' => (string) ($result['adapter_key'] ?? ''),
+            'link_id' => (string) ($link['id'] ?? ''),
+            'product_id' => (string) ($link['local_product_id'] ?? ''),
+            'local_product_id' => (string) ($link['local_product_id'] ?? ''),
+            'external_product_id' => (string) ($link['external_product_id'] ?? ''),
+            'sync_status' => (string) ($link['sync_status'] ?? ''),
+            'sync_direction' => (string) ($result['sync_direction'] ?? 'pull_store_to_local'),
+            'validation_result' => (string) ($result['validation_result'] ?? 'unknown'),
+            'result_status' => (string) ($result['result_status'] ?? 'success'),
+        ])));
+    }
+
+    /**
+     * @param callable $reply
      * @return array<string, mixed>
      */
     private function respondStoreList(EcommerceHubService $service, string $tenantId, string $appId, array $command, callable $reply, string $channel, string $sessionId, string $userId): array
@@ -349,6 +459,44 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
     }
 
     /**
+     * @param callable $reply
+     * @return array<string, mixed>
+     */
+    private function respondProductLinkList(EcommerceHubService $service, string $tenantId, string $appId, array $command, callable $reply, string $channel, string $sessionId, string $userId): array
+    {
+        $storeId = trim((string) ($command['store_id'] ?? ''));
+        $items = $service->listProductLinks($tenantId, $storeId, array_filter([
+            'local_product_id' => $command['local_product_id'] ?? null,
+            'external_product_id' => $command['external_product_id'] ?? null,
+            'external_sku' => $command['external_sku'] ?? null,
+            'sync_status' => $command['sync_status'] ?? null,
+            'last_sync_direction' => $command['sync_direction'] ?? null,
+            'limit' => $command['limit'] ?? null,
+        ], static fn($value): bool => $value !== null && $value !== ''), $appId !== '' ? $appId : null);
+
+        return $this->withReplyText($reply(
+            $items === [] ? 'No hay vinculos de productos ecommerce con esos filtros.' : "Vinculos de productos ecommerce:\n" . implode("\n", array_map([$this, 'formatProductLinkLine'], $items)),
+            $channel,
+            $sessionId,
+            $userId,
+            'success',
+            $this->moduleData([
+                'ecommerce_action' => 'list_product_links',
+                'items' => $items,
+                'result_count' => count($items),
+                'store_id' => $storeId,
+                'link_id' => (string) (($items[0]['id'] ?? '') ?: ''),
+                'product_id' => (string) (($items[0]['local_product_id'] ?? '') ?: ''),
+                'local_product_id' => (string) (($items[0]['local_product_id'] ?? '') ?: ''),
+                'external_product_id' => (string) (($items[0]['external_product_id'] ?? '') ?: ''),
+                'sync_status' => (string) (($items[0]['sync_status'] ?? '') ?: ''),
+                'sync_direction' => (string) (($items[0]['last_sync_direction'] ?? '') ?: ''),
+                'result_status' => 'success',
+            ])
+        ));
+    }
+
+    /**
      * @param array<string, mixed> $extra
      * @return array<string, mixed>
      */
@@ -363,6 +511,11 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
             'connection_status' => '',
             'sync_job_id' => '',
             'sync_type' => '',
+            'link_id' => '',
+            'local_product_id' => '',
+            'external_product_id' => '',
+            'sync_status' => '',
+            'sync_direction' => '',
             'validation_result' => 'none',
             'result_status' => 'success',
         ];
@@ -394,12 +547,22 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
             'ECOMMERCE_CONNECTION_STATUS_INVALID' => 'El estado de conexion ecommerce no es valido.',
             'ECOMMERCE_SYNC_JOB_STATUS_INVALID' => 'El estado del sync job ecommerce no es valido.',
             'ECOMMERCE_CREDENTIAL_PAYLOAD_REQUIRED' => 'Necesito al menos un secreto o token para registrar credenciales ecommerce.',
+            'ECOMMERCE_PRODUCT_LINK_NOT_FOUND' => 'No encontre ese vinculo de producto ecommerce en este tenant.',
+            'ECOMMERCE_PRODUCT_LINK_CONFLICT' => 'Ya existe un conflicto entre el producto local y el externo para esa tienda ecommerce.',
+            'ECOMMERCE_LOCAL_PRODUCT_NOT_FOUND' => 'No encontre ese producto local dentro del tenant actual.',
+            'ECOMMERCE_EXTERNAL_PRODUCT_ID_REQUIRED' => 'Necesito `external_product_id` para registrar el snapshot pull ecommerce.',
+            'ECOMMERCE_PRODUCT_SYNC_STATUS_INVALID' => 'El estado de sync de producto ecommerce no es valido.',
+            'ECOMMERCE_SYNC_DIRECTION_INVALID' => 'La direccion de sync ecommerce no es valida.',
             'TENANT_ID_REQUIRED' => 'Falta tenant_id para ejecutar la operacion ecommerce.',
             'STORE_ID_REQUIRED' => 'Falta store_id para ejecutar la operacion ecommerce.',
+            'LINK_ID_REQUIRED' => 'Falta link_id para ejecutar la operacion ecommerce.',
             'STORE_NAME_REQUIRED' => 'Falta store_name para crear la tienda ecommerce.',
             'PLATFORM_REQUIRED' => 'Falta platform para crear la tienda ecommerce.',
+            'LOCAL_PRODUCT_ID_REQUIRED' => 'Falta local_product_id para ejecutar la operacion ecommerce.',
+            'EXTERNAL_PRODUCT_ID_REQUIRED' => 'Falta external_product_id para ejecutar la operacion ecommerce.',
             'CREDENTIAL_TYPE_REQUIRED' => 'Falta credential_type para registrar credenciales ecommerce.',
             'SYNC_TYPE_REQUIRED' => 'Falta sync_type para crear el sync job ecommerce.',
+            'SYNC_STATUS_REQUIRED' => 'Falta sync_status para ejecutar la operacion ecommerce.',
             'ECOMMERCE_PLATFORM_OR_STORE_REQUIRED' => 'Necesito `store_id` o `platform` para obtener capacidades ecommerce.',
             default => $error !== '' ? $error : 'No pude ejecutar la operacion ecommerce.',
         };
@@ -484,5 +647,16 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
     private function formatOrderRefLine(array $item): string
     {
         return '- ' . (string) ($item['id'] ?? '') . ' | ext=' . (string) ($item['external_order_id'] ?? '') . ' | local=' . (string) ($item['local_order_status'] ?? '') . ' | ext_status=' . (string) ($item['external_status'] ?? '');
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     */
+    private function formatProductLinkLine(array $item): string
+    {
+        return '- ' . (string) ($item['id'] ?? '')
+            . ' | local=' . (string) ($item['local_product_id'] ?? '')
+            . ' | ext=' . (string) ($item['external_product_id'] ?? '')
+            . ' | status=' . (string) ($item['sync_status'] ?? '');
     }
 }

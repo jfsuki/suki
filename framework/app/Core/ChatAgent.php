@@ -1716,6 +1716,11 @@ final class ChatAgent
             'validation_result' => $runtimeObservability['validation_result'],
             'sync_job_id' => $runtimeObservability['sync_job_id'],
             'sync_type' => $runtimeObservability['sync_type'],
+            'link_id' => $runtimeObservability['link_id'],
+            'local_product_id' => $runtimeObservability['local_product_id'],
+            'external_product_id' => $runtimeObservability['external_product_id'],
+            'sync_status' => $runtimeObservability['sync_status'],
+            'sync_direction' => $runtimeObservability['sync_direction'],
             'duplicate_blocked' => $runtimeObservability['duplicate_blocked'],
             'line_count' => $runtimeObservability['line_count'],
             'total' => $runtimeObservability['total'],
@@ -1847,6 +1852,11 @@ final class ChatAgent
             'validation_result' => trim((string) ($runtimeContext['validation_result'] ?? $routeTelemetry['validation_result'] ?? '')) ?: 'none',
             'sync_job_id' => trim((string) ($runtimeContext['sync_job_id'] ?? $routeTelemetry['sync_job_id'] ?? '')),
             'sync_type' => trim((string) ($runtimeContext['sync_type'] ?? $routeTelemetry['sync_type'] ?? '')),
+            'link_id' => trim((string) ($runtimeContext['link_id'] ?? $routeTelemetry['link_id'] ?? '')),
+            'local_product_id' => trim((string) ($runtimeContext['local_product_id'] ?? $routeTelemetry['local_product_id'] ?? '')),
+            'external_product_id' => trim((string) ($runtimeContext['external_product_id'] ?? $routeTelemetry['external_product_id'] ?? '')),
+            'sync_status' => trim((string) ($runtimeContext['sync_status'] ?? $routeTelemetry['sync_status'] ?? '')),
+            'sync_direction' => trim((string) ($runtimeContext['sync_direction'] ?? $routeTelemetry['sync_direction'] ?? '')),
             'duplicate_blocked' => (($runtimeContext['duplicate_blocked'] ?? $routeTelemetry['duplicate_blocked'] ?? false) === true),
             'line_count' => is_numeric($runtimeContext['line_count'] ?? $routeTelemetry['line_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['line_count'] ?? $routeTelemetry['line_count']))
@@ -2029,6 +2039,11 @@ final class ChatAgent
             'validation_result' => trim((string) ($payload['validation_result'] ?? '')) ?: '',
             'sync_job_id' => trim((string) ($payload['sync_job_id'] ?? '')) ?: '',
             'sync_type' => trim((string) ($payload['sync_type'] ?? '')) ?: '',
+            'link_id' => trim((string) ($payload['link_id'] ?? '')) ?: '',
+            'local_product_id' => trim((string) ($payload['local_product_id'] ?? '')) ?: '',
+            'external_product_id' => trim((string) ($payload['external_product_id'] ?? '')) ?: '',
+            'sync_status' => trim((string) ($payload['sync_status'] ?? '')) ?: '',
+            'sync_direction' => trim((string) ($payload['sync_direction'] ?? '')) ?: '',
             'duplicate_blocked' => (($payload['duplicate_blocked'] ?? false) === true),
             'line_count' => is_numeric($payload['line_count'] ?? null)
                 ? max(0, (int) $payload['line_count'])

@@ -8,6 +8,8 @@ interface EcommerceAdapterInterface
 {
     public function getPlatformKey(): string;
 
+    public function supportsProductSync(): bool;
+
     /**
      * @param array<string, mixed> $store
      * @param array<string, mixed> $credentials
@@ -38,4 +40,16 @@ interface EcommerceAdapterInterface
      * @return array<string, mixed>
      */
     public function ping(array $store, array $credentials): array;
+
+    /**
+     * @param array<string, mixed> $externalPayload
+     * @return array<string, mixed>
+     */
+    public function normalizeExternalProduct(array $externalPayload): array;
+
+    /**
+     * @param array<string, mixed> $localProductPayload
+     * @return array<string, mixed>
+     */
+    public function buildProductPayload(array $localProductPayload): array;
 }

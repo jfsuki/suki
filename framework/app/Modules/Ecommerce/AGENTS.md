@@ -4,7 +4,8 @@
 - Esta carpeta orienta el dominio Ecommerce Hub compartido.
 - El runtime canonico vive en `framework/app/Core` y cubre registro de tiendas/canales, credenciales, sync jobs y referencias externas de pedidos.
 - Este modulo ya expone una base de adapters para WooCommerce, Tiendanube y PrestaShop con resolver seguro y fallback `unknown`.
-- El alcance actual es validacion, metadata, capacidades y ping seguro; sync real sigue fuera de alcance.
+- El alcance actual incluye validacion, metadata, capacidades, ping seguro y una base de product sync canonica: links local/external, payload push preparado, snapshots pull y estado de sync.
+- Sync remoto real sigue fuera de alcance.
 
 ## Key classes
 - `framework/app/Core/EcommerceHubRepository.php`
@@ -29,6 +30,7 @@
 - `framework/contracts/schemas/ecommerce_credential.schema.json`
 - `framework/contracts/schemas/ecommerce_sync_job.schema.json`
 - `framework/contracts/schemas/ecommerce_order_ref.schema.json`
+- `framework/contracts/schemas/ecommerce_product_link.schema.json`
 - `framework/contracts/schemas/ecommerce_store_setup.schema.json`
 - `project/contracts/integrations/*`
 
@@ -38,4 +40,10 @@
 - Validar setup con reglas ligeras: tienda existente, adapter resuelto, credenciales presentes y `connection_status` consistente.
 - `validate_connection` valida forma/configuracion de credenciales; no inventa conexion exitosa sin evidencia real.
 - `ping_store` es seguro por defecto: si no hay precondiciones o remote ping no aplica, responde explicitamente sin exponer secretos.
-- Los hooks para sync de productos, ordenes, inventario, fiscal y webhooks quedan preparados pero no implementados en este modulo base.
+- Product sync foundation:
+  - `link_product` y `unlink_product` solo gestionan el vinculo canonico interno.
+  - `prepare_product_push_payload` construye payload normalizado por adapter sin llamar APIs remotas.
+  - `register_product_pull_snapshot` normaliza payload externo y registra snapshot sin crear productos locales.
+  - `mark_product_sync_status` solo registra estado/direccion de sync.
+- Resolver productos locales via `EntitySearchService`; si no existe referencia real, fallar de forma explicita.
+- Los hooks para sync remoto de productos, ordenes, inventario, fiscal y webhooks quedan preparados pero no implementados en este modulo base.

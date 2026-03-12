@@ -13,6 +13,7 @@ final class EcommerceHubRepository
     private const CREDENTIAL_TABLE = 'ecommerce_credentials';
     private const SYNC_JOB_TABLE = 'ecommerce_sync_jobs';
     private const ORDER_REF_TABLE = 'ecommerce_order_refs';
+    private const PRODUCT_LINK_TABLE = 'ecommerce_product_links';
 
     private PDO $db;
 
@@ -26,7 +27,7 @@ final class EcommerceHubRepository
             $this->requiredTables(),
             $this->requiredIndexes(),
             [],
-            'db/migrations/' . $this->driver() . '/20260312_022_ecommerce_hub_architecture.sql'
+            'db/migrations/' . $this->driver() . '/20260312_023_ecommerce_product_sync_foundation.sql'
         );
     }
 
@@ -371,6 +372,145 @@ final class EcommerceHubRepository
     }
 
     /**
+     * @param array<string, mixed> $record
+     * @return array<string, mixed>
+     */
+    public function createProductLink(array $record): array
+    {
+        $id = $this->insertRecord(self::PRODUCT_LINK_TABLE, [
+            'tenant_id',
+            'app_id',
+            'store_id',
+            'local_product_id',
+            'external_product_id',
+            'external_sku',
+            'sync_status',
+            'last_sync_at',
+            'last_sync_direction',
+            'metadata_json',
+            'created_at',
+        ], [
+            'tenant_id' => $record['tenant_id'] ?? '',
+            'app_id' => $record['app_id'] ?? null,
+            'store_id' => $record['store_id'] ?? '',
+            'local_product_id' => $record['local_product_id'] ?? null,
+            'external_product_id' => $record['external_product_id'] ?? '',
+            'external_sku' => $record['external_sku'] ?? null,
+            'sync_status' => $record['sync_status'] ?? 'linked',
+            'last_sync_at' => $record['last_sync_at'] ?? null,
+            'last_sync_direction' => $record['last_sync_direction'] ?? null,
+            'metadata_json' => $this->encodeJson($record['metadata'] ?? []),
+            'created_at' => $record['created_at'] ?? date('Y-m-d H:i:s'),
+        ]);
+
+        $saved = $this->findProductLink((string) ($record['tenant_id'] ?? ''), $id, $this->nullableString($record['app_id'] ?? null));
+        if (!is_array($saved)) {
+            throw new RuntimeException('ECOMMERCE_PRODUCT_LINK_INSERT_FETCH_FAILED');
+        }
+
+        return $saved;
+    }
+
+    /**
+     * @param array<string, mixed> $updates
+     * @return array<string, mixed>|null
+     */
+    public function updateProductLink(string $tenantId, string $linkId, array $updates, ?string $appId = null): ?array
+    {
+        $payload = $this->filterPayload($updates, [
+            'local_product_id',
+            'external_product_id',
+            'external_sku',
+            'sync_status',
+            'last_sync_at',
+            'last_sync_direction',
+            'metadata_json',
+        ]);
+        if (array_key_exists('metadata', $updates)) {
+            $payload['metadata_json'] = $this->encodeJson($updates['metadata']);
+        }
+        if ($payload === []) {
+            return $this->findProductLink($tenantId, $linkId, $appId);
+        }
+
+        $this->productLinkQuery($tenantId, $appId)
+            ->where('id', '=', $linkId)
+            ->update($payload);
+
+        return $this->findProductLink($tenantId, $linkId, $appId);
+    }
+
+    public function deleteProductLink(string $tenantId, string $linkId, ?string $appId = null): int
+    {
+        return $this->productLinkQuery($tenantId, $appId)
+            ->where('id', '=', $linkId)
+            ->delete();
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findProductLink(string $tenantId, string $linkId, ?string $appId = null): ?array
+    {
+        $row = $this->productLinkQuery($tenantId, $appId)
+            ->where('id', '=', $linkId)
+            ->first();
+
+        return is_array($row) ? $this->normalizeProductLinkRow($row) : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findProductLinkByLocalProduct(string $tenantId, string $storeId, string $localProductId, ?string $appId = null): ?array
+    {
+        $row = $this->productLinkQuery($tenantId, $appId)
+            ->where('store_id', '=', $storeId)
+            ->where('local_product_id', '=', $localProductId)
+            ->orderBy('created_at', 'DESC')
+            ->orderBy('id', 'DESC')
+            ->first();
+
+        return is_array($row) ? $this->normalizeProductLinkRow($row) : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findProductLinkByExternalProduct(string $tenantId, string $storeId, string $externalProductId, ?string $appId = null): ?array
+    {
+        $row = $this->productLinkQuery($tenantId, $appId)
+            ->where('store_id', '=', $storeId)
+            ->where('external_product_id', '=', $externalProductId)
+            ->orderBy('created_at', 'DESC')
+            ->orderBy('id', 'DESC')
+            ->first();
+
+        return is_array($row) ? $this->normalizeProductLinkRow($row) : null;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function listProductLinks(string $tenantId, array $filters = [], int $limit = 20): array
+    {
+        $qb = $this->productLinkQuery($tenantId, $this->nullableString($filters['app_id'] ?? null))
+            ->orderBy('created_at', 'DESC')
+            ->orderBy('id', 'DESC')
+            ->limit(max(1, min(100, $limit)));
+
+        foreach (['store_id', 'local_product_id', 'external_product_id', 'external_sku', 'sync_status', 'last_sync_direction'] as $key) {
+            $value = $this->nullableString($filters[$key] ?? null);
+            if ($value !== null) {
+                $qb->where($key, '=', $value);
+            }
+        }
+
+        return array_map([$this, 'normalizeProductLinkRow'], $qb->get());
+    }
+
+    /**
      * @template T
      * @param callable():T $callback
      * @return T
@@ -407,6 +547,7 @@ final class EcommerceHubRepository
             self::CREDENTIAL_TABLE,
             self::SYNC_JOB_TABLE,
             self::ORDER_REF_TABLE,
+            self::PRODUCT_LINK_TABLE,
         ];
     }
 
@@ -431,6 +572,11 @@ final class EcommerceHubRepository
             self::ORDER_REF_TABLE => [
                 'idx_ecommerce_order_refs_tenant_store_external',
                 'idx_ecommerce_order_refs_tenant_status',
+            ],
+            self::PRODUCT_LINK_TABLE => [
+                'idx_ecommerce_product_links_tenant_store_local',
+                'idx_ecommerce_product_links_tenant_store_external',
+                'idx_ecommerce_product_links_tenant_status',
             ],
         ];
     }
@@ -462,6 +608,11 @@ final class EcommerceHubRepository
         $this->db->exec('CREATE TABLE IF NOT EXISTS ' . self::ORDER_REF_TABLE . ' (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id TEXT NOT NULL, app_id TEXT NULL, store_id TEXT NOT NULL, external_order_id TEXT NOT NULL, local_order_status TEXT NULL, external_status TEXT NULL, total REAL NULL, currency TEXT NULL, metadata_json TEXT NULL, created_at TEXT NOT NULL)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_order_refs_tenant_store_external ON ' . self::ORDER_REF_TABLE . ' (tenant_id, app_id, store_id, external_order_id, created_at)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_order_refs_tenant_status ON ' . self::ORDER_REF_TABLE . ' (tenant_id, store_id, local_order_status, external_status, created_at)');
+
+        $this->db->exec('CREATE TABLE IF NOT EXISTS ' . self::PRODUCT_LINK_TABLE . ' (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id TEXT NOT NULL, app_id TEXT NULL, store_id TEXT NOT NULL, local_product_id TEXT NULL, external_product_id TEXT NOT NULL, external_sku TEXT NULL, sync_status TEXT NOT NULL, last_sync_at TEXT NULL, last_sync_direction TEXT NULL, metadata_json TEXT NULL, created_at TEXT NOT NULL)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_product_links_tenant_store_local ON ' . self::PRODUCT_LINK_TABLE . ' (tenant_id, app_id, store_id, local_product_id, created_at)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_product_links_tenant_store_external ON ' . self::PRODUCT_LINK_TABLE . ' (tenant_id, app_id, store_id, external_product_id, created_at)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_product_links_tenant_status ON ' . self::PRODUCT_LINK_TABLE . ' (tenant_id, app_id, sync_status, last_sync_direction, created_at)');
     }
 
     private function ensureSchemaMySql(): void
@@ -470,6 +621,7 @@ final class EcommerceHubRepository
         $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::CREDENTIAL_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, store_id VARCHAR(120) NOT NULL, credential_type VARCHAR(64) NOT NULL, encrypted_payload LONGTEXT NOT NULL, status VARCHAR(32) NOT NULL, last_validated_at DATETIME NULL, metadata_json JSON NULL, created_at DATETIME NOT NULL, PRIMARY KEY (id), KEY idx_ecommerce_credentials_tenant_store_status (tenant_id, app_id, store_id, status, created_at), KEY idx_ecommerce_credentials_tenant_type (tenant_id, credential_type, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::SYNC_JOB_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, store_id VARCHAR(120) NOT NULL, sync_type VARCHAR(64) NOT NULL, status VARCHAR(32) NOT NULL, started_at DATETIME NULL, finished_at DATETIME NULL, result_summary TEXT NULL, metadata_json JSON NULL, created_at DATETIME NOT NULL, PRIMARY KEY (id), KEY idx_ecommerce_sync_jobs_tenant_store_status (tenant_id, app_id, store_id, status, created_at), KEY idx_ecommerce_sync_jobs_tenant_type (tenant_id, sync_type, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::ORDER_REF_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, store_id VARCHAR(120) NOT NULL, external_order_id VARCHAR(190) NOT NULL, local_order_status VARCHAR(64) NULL, external_status VARCHAR(64) NULL, total DECIMAL(18,4) NULL, currency VARCHAR(16) NULL, metadata_json JSON NULL, created_at DATETIME NOT NULL, PRIMARY KEY (id), KEY idx_ecommerce_order_refs_tenant_store_external (tenant_id, app_id, store_id, external_order_id, created_at), KEY idx_ecommerce_order_refs_tenant_status (tenant_id, store_id, local_order_status, external_status, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::PRODUCT_LINK_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, store_id VARCHAR(120) NOT NULL, local_product_id VARCHAR(120) NULL, external_product_id VARCHAR(190) NOT NULL, external_sku VARCHAR(190) NULL, sync_status VARCHAR(32) NOT NULL, last_sync_at DATETIME NULL, last_sync_direction VARCHAR(32) NULL, metadata_json JSON NULL, created_at DATETIME NOT NULL, PRIMARY KEY (id), KEY idx_ecommerce_product_links_tenant_store_local (tenant_id, app_id, store_id, local_product_id, created_at), KEY idx_ecommerce_product_links_tenant_store_external (tenant_id, app_id, store_id, external_product_id, created_at), KEY idx_ecommerce_product_links_tenant_status (tenant_id, app_id, sync_status, last_sync_direction, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
     private function storeQuery(string $tenantId, ?string $appId = null): QueryBuilder
@@ -526,6 +678,22 @@ final class EcommerceHubRepository
             ->setAllowedColumns([
                 'id', 'tenant_id', 'app_id', 'store_id', 'external_order_id', 'local_order_status',
                 'external_status', 'total', 'currency', 'metadata_json', 'created_at',
+            ])
+            ->where('tenant_id', '=', $tenantId);
+
+        if ($appId !== null && $appId !== '') {
+            $qb->where('app_id', '=', $appId);
+        }
+
+        return $qb;
+    }
+
+    private function productLinkQuery(string $tenantId, ?string $appId = null): QueryBuilder
+    {
+        $qb = (new QueryBuilder($this->db, self::PRODUCT_LINK_TABLE))
+            ->setAllowedColumns([
+                'id', 'tenant_id', 'app_id', 'store_id', 'local_product_id', 'external_product_id',
+                'external_sku', 'sync_status', 'last_sync_at', 'last_sync_direction', 'metadata_json', 'created_at',
             ])
             ->where('tenant_id', '=', $tenantId);
 
@@ -642,6 +810,28 @@ final class EcommerceHubRepository
             'external_status' => $this->nullableString($row['external_status'] ?? null),
             'total' => $row['total'] === null ? null : $this->decimal($row['total']),
             'currency' => $this->nullableString($row['currency'] ?? null),
+            'metadata' => $this->decodeJson($row['metadata_json'] ?? null),
+            'created_at' => (string) ($row['created_at'] ?? ''),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function normalizeProductLinkRow(array $row): array
+    {
+        return [
+            'id' => (string) ($row['id'] ?? ''),
+            'tenant_id' => (string) ($row['tenant_id'] ?? ''),
+            'app_id' => $this->nullableString($row['app_id'] ?? null),
+            'store_id' => (string) ($row['store_id'] ?? ''),
+            'local_product_id' => $this->nullableString($row['local_product_id'] ?? null),
+            'external_product_id' => (string) ($row['external_product_id'] ?? ''),
+            'external_sku' => $this->nullableString($row['external_sku'] ?? null),
+            'sync_status' => trim((string) ($row['sync_status'] ?? 'linked')) ?: 'linked',
+            'last_sync_at' => $this->nullableString($row['last_sync_at'] ?? null),
+            'last_sync_direction' => $this->nullableString($row['last_sync_direction'] ?? null),
             'metadata' => $this->decodeJson($row['metadata_json'] ?? null),
             'created_at' => (string) ($row['created_at'] ?? ''),
         ];

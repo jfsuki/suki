@@ -75,12 +75,15 @@
 - If you add Ecommerce Hub behavior:
   - update `EcommerceHubRepository`, `EcommerceHubService`, `EcommerceHubCommandHandler`, `EcommerceHubMessageParser`
   - keep adapter selection centralized in `EcommerceAdapterResolver`; use `UnknownEcommerceAdapter` as safe fallback
-  - keep the hub canonical: store/channel records, encrypted credentials, sync jobs and order refs only
+  - keep the hub canonical: store/channel records, encrypted credentials, sync jobs, order refs and product links only
   - keep platform classification limited to `woocommerce`, `tiendanube`, `prestashop`, `custom_store`, `unknown` until a real adapter exists
   - persist credentials encrypted at rest and return masked payloads only; never log raw secrets
   - keep setup/connection validation lightweight: store status + connection status + masked credential shape + capabilities
-  - treat full product sync, order sync, inventory sync, webhook ingestion and fiscal linkage as future hooks only
+  - product sync foundation may link local/external products, prepare normalized push payloads, register pull snapshots and record sync state without calling remote APIs
+  - resolve local products through `EntitySearchService`; do not invent matches or create local products from pull snapshots automatically
+  - treat real remote product sync, order sync, inventory sync, webhook ingestion and fiscal linkage as future hooks only
   - wire adapter actions (`validate_connection`, `get_store_metadata`, `get_platform_capabilities`, `ping_store`) through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator` and tests together
+  - wire product sync actions (`link_product`, `unlink_product`, `list_product_links`, `get_product_link`, `prepare_product_push_payload`, `register_product_pull_snapshot`, `mark_product_sync_status`) through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator` and tests together
   - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
 - If you add AgentOps metrics:
   - keep `docs/contracts/agentops_metrics_contract.json` aligned
@@ -123,6 +126,8 @@
 - Ecommerce lifecycle
   - `store created -> credentials registered -> setup validated -> sync_job queued|running|completed|failed`
   - external orders stay as canonical `ecommerce_order_ref` records until future sync/import flows materialize local entities
+  - product sync foundation lifecycle
+  - `product link created -> push payload prepared | pull snapshot registered -> sync_status recorded -> future remote sync`
 
 ## Impact hotspots
 - `framework/app/Core/ChatAgent.php`

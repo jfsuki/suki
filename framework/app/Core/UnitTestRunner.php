@@ -105,6 +105,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('fe_invoice_credit_note_support_docs', fn() => $this->checkFEInvoiceCreditNoteSupportDocs());
         $tests[] = $this->wrap('ecommerce_hub_architecture', fn() => $this->checkEcommerceHubArchitecture());
         $tests[] = $this->wrap('ecommerce_hub_adapters', fn() => $this->checkEcommerceHubAdapters());
+        $tests[] = $this->wrap('ecommerce_product_sync_foundation', fn() => $this->checkEcommerceProductSyncFoundation());
         $tests[] = $this->wrap('project_memory_system', fn() => $this->checkProjectMemorySystem());
         $tests[] = $this->wrap('learning_promotion_pipeline', fn() => $this->checkLearningPromotionPipeline());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
@@ -1516,6 +1517,11 @@ final class UnitTestRunner
     private function checkEcommerceHubAdapters(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/ecommerce_hub_adapters_test.php');
+    }
+
+    private function checkEcommerceProductSyncFoundation(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/ecommerce_product_sync_foundation_test.php');
     }
 
     private function checkProjectMemorySystem(): void

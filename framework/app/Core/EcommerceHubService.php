@@ -40,21 +40,41 @@ final class EcommerceHubService
         'failed',
     ];
 
+    /** @var array<int, string> */
+    private const PRODUCT_SYNC_STATUSES = [
+        'linked',
+        'prepared',
+        'pending_push',
+        'pending_pull',
+        'snapshot_received',
+        'synced',
+        'failed',
+    ];
+
+    /** @var array<int, string> */
+    private const SYNC_DIRECTIONS = [
+        'push_local_to_store',
+        'pull_store_to_local',
+    ];
+
     private EcommerceHubRepository $repository;
     private AuditLogger $auditLogger;
     private EcommerceHubEventLogger $eventLogger;
     private EcommerceAdapterResolver $adapterResolver;
+    private EntitySearchService $entitySearchService;
 
     public function __construct(
         ?EcommerceHubRepository $repository = null,
         ?AuditLogger $auditLogger = null,
         ?EcommerceHubEventLogger $eventLogger = null,
-        ?EcommerceAdapterResolver $adapterResolver = null
+        ?EcommerceAdapterResolver $adapterResolver = null,
+        ?EntitySearchService $entitySearchService = null
     ) {
         $this->repository = $repository ?? new EcommerceHubRepository();
         $this->auditLogger = $auditLogger ?? new AuditLogger();
         $this->eventLogger = $eventLogger ?? new EcommerceHubEventLogger();
         $this->adapterResolver = $adapterResolver ?? new EcommerceAdapterResolver();
+        $this->entitySearchService = $entitySearchService ?? new EntitySearchService();
     }
 
     /**
@@ -713,6 +733,384 @@ final class EcommerceHubService
     }
 
     /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function linkProduct(array $payload): array
+    {
+        $startedAt = microtime(true);
+        $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
+        $storeId = $this->requireString($payload['store_id'] ?? null, 'store_id');
+        $localProductReference = $this->requireString($payload['local_product_id'] ?? null, 'local_product_id');
+        $externalProductId = $this->requireString($payload['external_product_id'] ?? null, 'external_product_id');
+        $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
+        $store = $this->loadStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $localProduct = $this->resolveLocalProductReference($tenantId, $localProductReference, $appId);
+        $localProductId = (string) ($localProduct['local_product_id'] ?? '');
+        $inputMetadata = is_array($payload['metadata'] ?? null) ? (array) $payload['metadata'] : [];
+        $externalSku = $this->nullableString($payload['external_sku'] ?? ($inputMetadata['external_sku'] ?? null));
+        $existingLocal = $this->repository->findProductLinkByLocalProduct($tenantId, $storeId, $localProductId, $appId);
+        $existingExternal = $this->repository->findProductLinkByExternalProduct($tenantId, $storeId, $externalProductId, $appId);
+
+        if (
+            is_array($existingLocal)
+            && is_array($existingExternal)
+            && (string) ($existingLocal['id'] ?? '') !== (string) ($existingExternal['id'] ?? '')
+        ) {
+            throw new RuntimeException('ECOMMERCE_PRODUCT_LINK_CONFLICT');
+        }
+
+        $metadata = $this->mergeMetadata(
+            $inputMetadata,
+            [
+                'local_product' => $localProduct,
+                'link_origin' => 'foundation_manual',
+                'adapter_key' => $adapter->getPlatformKey(),
+            ]
+        );
+
+        $candidate = is_array($existingExternal) ? $existingExternal : $existingLocal;
+        if (is_array($candidate)) {
+            $link = $this->repository->updateProductLink($tenantId, (string) ($candidate['id'] ?? ''), [
+                'store_id' => $storeId,
+                'local_product_id' => $localProductId,
+                'external_product_id' => $externalProductId,
+                'external_sku' => $externalSku,
+                'sync_status' => 'linked',
+                'metadata' => $this->mergeMetadata(
+                    is_array($candidate['metadata'] ?? null) ? (array) $candidate['metadata'] : [],
+                    $metadata
+                ),
+            ], $appId);
+        } else {
+            $link = $this->repository->createProductLink([
+                'tenant_id' => $tenantId,
+                'app_id' => $appId,
+                'store_id' => $storeId,
+                'local_product_id' => $localProductId,
+                'external_product_id' => $externalProductId,
+                'external_sku' => $externalSku,
+                'sync_status' => 'linked',
+                'metadata' => $metadata,
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+        if (!is_array($link)) {
+            throw new RuntimeException('ECOMMERCE_PRODUCT_LINK_NOT_FOUND');
+        }
+
+        $link = $this->validatedProductLink($link);
+        $this->logProductLinkEvent('link_product', $tenantId, $appId, $link, $store, $this->latencyMs($startedAt), [
+            'link_id' => (string) ($link['id'] ?? ''),
+            'local_product_id' => $localProductId,
+            'external_product_id' => $externalProductId,
+            'sync_status' => (string) ($link['sync_status'] ?? 'linked'),
+            'sync_direction' => '',
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'product_linked',
+            'result_status' => 'success',
+        ]);
+
+        return $link;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function unlinkProduct(string $tenantId, string $linkId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $link = $this->loadProductLink($tenantId, $linkId, $appId);
+        $store = $this->loadStore($tenantId, (string) ($link['store_id'] ?? ''), $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $deleted = $this->repository->deleteProductLink($tenantId, $linkId, $appId);
+        if ($deleted < 1) {
+            throw new RuntimeException('ECOMMERCE_PRODUCT_LINK_NOT_FOUND');
+        }
+
+        $result = $this->validatedProductLink($link);
+        $result['deleted'] = true;
+
+        $this->logProductLinkEvent('unlink_product', $tenantId, $appId, $result, $store, $this->latencyMs($startedAt), [
+            'link_id' => (string) ($result['id'] ?? ''),
+            'local_product_id' => (string) ($result['local_product_id'] ?? ''),
+            'external_product_id' => (string) ($result['external_product_id'] ?? ''),
+            'sync_status' => (string) ($result['sync_status'] ?? 'linked'),
+            'sync_direction' => '',
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'product_unlinked',
+            'result_status' => 'success',
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function listProductLinks(string $tenantId, string $storeId, array $filters = [], ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $store = $this->loadStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $items = array_map(
+            fn(array $item): array => $this->validatedProductLink($item),
+            $this->repository->listProductLinks($tenantId, $filters + ['store_id' => $storeId, 'app_id' => $appId], $this->limit($filters['limit'] ?? null, 20))
+        );
+        $selected = is_array($items[0] ?? null) ? (array) $items[0] : [];
+
+        $this->logProductLinkEvent('list_product_links', $tenantId, $appId, $selected, $store, $this->latencyMs($startedAt), [
+            'link_id' => (string) ($selected['id'] ?? ''),
+            'local_product_id' => (string) ($selected['local_product_id'] ?? ($filters['local_product_id'] ?? '')),
+            'external_product_id' => (string) ($selected['external_product_id'] ?? ($filters['external_product_id'] ?? '')),
+            'sync_status' => (string) ($selected['sync_status'] ?? ($filters['sync_status'] ?? '')),
+            'sync_direction' => (string) ($selected['last_sync_direction'] ?? ($filters['last_sync_direction'] ?? '')),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'list_result',
+            'result_count' => count($items),
+            'result_status' => 'success',
+        ]);
+
+        return $items;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getProductLink(string $tenantId, string $linkId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $link = $this->validatedProductLink($this->loadProductLink($tenantId, $linkId, $appId));
+        $store = $this->loadStore($tenantId, (string) ($link['store_id'] ?? ''), $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+
+        $this->logProductLinkEvent('get_product_link', $tenantId, $appId, $link, $store, $this->latencyMs($startedAt), [
+            'link_id' => (string) ($link['id'] ?? ''),
+            'local_product_id' => (string) ($link['local_product_id'] ?? ''),
+            'external_product_id' => (string) ($link['external_product_id'] ?? ''),
+            'sync_status' => (string) ($link['sync_status'] ?? ''),
+            'sync_direction' => (string) ($link['last_sync_direction'] ?? ''),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'product_link_loaded',
+            'result_status' => 'success',
+        ]);
+
+        return $link;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function prepareProductPushPayload(string $tenantId, string $storeId, string $localProductId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $store = $this->loadStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $localProduct = $this->resolveLocalProductReference($tenantId, $localProductId, $appId);
+        $existingLink = $this->repository->findProductLinkByLocalProduct($tenantId, $storeId, (string) ($localProduct['local_product_id'] ?? ''), $appId);
+
+        $resultStatus = $adapter->supportsProductSync() ? 'success' : 'safe_failure';
+        $validationResult = $adapter->supportsProductSync() ? 'payload_ready' : 'product_sync_not_supported';
+        $payload = $adapter->buildProductPayload($this->mergeMetadata(
+            $localProduct,
+            [
+                'external_product_id' => is_array($existingLink) ? ($existingLink['external_product_id'] ?? null) : null,
+                'external_sku' => is_array($existingLink) ? ($existingLink['external_sku'] ?? null) : null,
+            ]
+        ));
+
+        $result = [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'store_id' => $storeId,
+            'platform' => (string) ($store['platform'] ?? 'unknown'),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'local_product_id' => (string) ($localProduct['local_product_id'] ?? ''),
+            'sync_direction' => 'push_local_to_store',
+            'supports_product_sync' => $adapter->supportsProductSync(),
+            'existing_link' => is_array($existingLink) ? $this->validatedProductLink($existingLink) : null,
+            'local_product' => $localProduct,
+            'adapter_payload' => $payload,
+            'validation_result' => $validationResult,
+            'result_status' => $resultStatus,
+        ];
+
+        $this->logProductLinkEvent('prepare_product_push_payload', $tenantId, $appId, is_array($existingLink) ? $existingLink : [
+            'id' => '',
+            'store_id' => $storeId,
+            'local_product_id' => (string) ($localProduct['local_product_id'] ?? ''),
+            'external_product_id' => '',
+            'sync_status' => '',
+            'last_sync_direction' => 'push_local_to_store',
+        ], $store, $this->latencyMs($startedAt), [
+            'link_id' => is_array($existingLink) ? (string) ($existingLink['id'] ?? '') : '',
+            'local_product_id' => (string) ($localProduct['local_product_id'] ?? ''),
+            'external_product_id' => is_array($existingLink) ? (string) ($existingLink['external_product_id'] ?? '') : '',
+            'sync_status' => is_array($existingLink) ? (string) ($existingLink['sync_status'] ?? '') : '',
+            'sync_direction' => 'push_local_to_store',
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => $validationResult,
+            'result_status' => $resultStatus,
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $externalProductPayload
+     * @return array<string, mixed>
+     */
+    public function registerProductPullSnapshot(string $tenantId, string $storeId, array $externalProductPayload, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $store = $this->loadStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $normalized = $adapter->normalizeExternalProduct($externalProductPayload);
+        if (!$adapter->supportsProductSync()) {
+            $result = [
+                'tenant_id' => $tenantId,
+                'app_id' => $appId,
+                'store_id' => $storeId,
+                'platform' => (string) ($store['platform'] ?? 'unknown'),
+                'adapter_key' => $adapter->getPlatformKey(),
+                'sync_direction' => 'pull_store_to_local',
+                'normalized_external_product' => $normalized,
+                'validation_result' => 'product_sync_not_supported',
+                'result_status' => 'safe_failure',
+            ];
+
+            $this->logProductLinkEvent('register_product_pull_snapshot', $tenantId, $appId, [
+                'id' => '',
+                'store_id' => $storeId,
+                'local_product_id' => '',
+                'external_product_id' => '',
+                'sync_status' => '',
+                'last_sync_direction' => 'pull_store_to_local',
+            ], $store, $this->latencyMs($startedAt), [
+                'link_id' => '',
+                'local_product_id' => '',
+                'external_product_id' => '',
+                'sync_status' => '',
+                'sync_direction' => 'pull_store_to_local',
+                'adapter_key' => $adapter->getPlatformKey(),
+                'validation_result' => 'product_sync_not_supported',
+                'result_status' => 'safe_failure',
+            ]);
+
+            return $result;
+        }
+
+        $externalProductId = $this->nullableString($normalized['external_product_id'] ?? null);
+        if ($externalProductId === null) {
+            throw new RuntimeException('ECOMMERCE_EXTERNAL_PRODUCT_ID_REQUIRED');
+        }
+
+        $existing = $this->repository->findProductLinkByExternalProduct($tenantId, $storeId, $externalProductId, $appId);
+        if (is_array($existing)) {
+            $link = $this->repository->updateProductLink($tenantId, (string) ($existing['id'] ?? ''), [
+                'external_sku' => $this->nullableString($normalized['external_sku'] ?? null),
+                'sync_status' => 'snapshot_received',
+                'last_sync_at' => date('Y-m-d H:i:s'),
+                'last_sync_direction' => 'pull_store_to_local',
+                'metadata' => $this->mergeMetadata(
+                    is_array($existing['metadata'] ?? null) ? (array) $existing['metadata'] : [],
+                    [
+                        'last_pull_snapshot' => $normalized,
+                        'adapter_key' => $adapter->getPlatformKey(),
+                    ]
+                ),
+            ], $appId);
+        } else {
+            $link = $this->repository->createProductLink([
+                'tenant_id' => $tenantId,
+                'app_id' => $appId,
+                'store_id' => $storeId,
+                'local_product_id' => null,
+                'external_product_id' => $externalProductId,
+                'external_sku' => $this->nullableString($normalized['external_sku'] ?? null),
+                'sync_status' => 'snapshot_received',
+                'last_sync_at' => date('Y-m-d H:i:s'),
+                'last_sync_direction' => 'pull_store_to_local',
+                'metadata' => [
+                    'last_pull_snapshot' => $normalized,
+                    'adapter_key' => $adapter->getPlatformKey(),
+                ],
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+        if (!is_array($link)) {
+            throw new RuntimeException('ECOMMERCE_PRODUCT_LINK_NOT_FOUND');
+        }
+
+        $link = $this->validatedProductLink($link);
+        $this->logProductLinkEvent('register_product_pull_snapshot', $tenantId, $appId, $link, $store, $this->latencyMs($startedAt), [
+            'link_id' => (string) ($link['id'] ?? ''),
+            'local_product_id' => (string) ($link['local_product_id'] ?? ''),
+            'external_product_id' => (string) ($link['external_product_id'] ?? ''),
+            'sync_status' => (string) ($link['sync_status'] ?? ''),
+            'sync_direction' => 'pull_store_to_local',
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'pull_snapshot_registered',
+            'result_status' => 'success',
+        ]);
+
+        return [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'store_id' => $storeId,
+            'platform' => (string) ($store['platform'] ?? 'unknown'),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'sync_direction' => 'pull_store_to_local',
+            'normalized_external_product' => $normalized,
+            'link' => $link,
+            'validation_result' => 'pull_snapshot_registered',
+            'result_status' => 'success',
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     * @return array<string, mixed>
+     */
+    public function markProductSyncStatus(string $tenantId, string $linkId, string $syncStatus, array $metadata = [], ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $link = $this->loadProductLink($tenantId, $linkId, $appId);
+        $store = $this->loadStore($tenantId, (string) ($link['store_id'] ?? ''), $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $direction = $this->nullableSyncDirection($metadata['sync_direction'] ?? null);
+
+        $updated = $this->repository->updateProductLink($tenantId, $linkId, [
+            'sync_status' => $this->productSyncStatus($syncStatus),
+            'last_sync_at' => date('Y-m-d H:i:s'),
+            'last_sync_direction' => $direction ?? ($link['last_sync_direction'] ?? null),
+            'metadata' => $this->mergeMetadata(
+                is_array($link['metadata'] ?? null) ? (array) $link['metadata'] : [],
+                $metadata
+            ),
+        ], $appId);
+        if (!is_array($updated)) {
+            throw new RuntimeException('ECOMMERCE_PRODUCT_LINK_NOT_FOUND');
+        }
+
+        $updated = $this->validatedProductLink($updated);
+        $this->logProductLinkEvent('mark_product_sync_status', $tenantId, $appId, $updated, $store, $this->latencyMs($startedAt), [
+            'link_id' => (string) ($updated['id'] ?? ''),
+            'local_product_id' => (string) ($updated['local_product_id'] ?? ''),
+            'external_product_id' => (string) ($updated['external_product_id'] ?? ''),
+            'sync_status' => (string) ($updated['sync_status'] ?? ''),
+            'sync_direction' => (string) ($updated['last_sync_direction'] ?? ''),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'sync_status_recorded',
+            'result_status' => 'success',
+        ]);
+
+        return $updated;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function loadStore(string $tenantId, string $storeId, ?string $appId = null): array
@@ -739,6 +1137,19 @@ final class EcommerceHubService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function loadProductLink(string $tenantId, string $linkId, ?string $appId = null): array
+    {
+        $link = $this->repository->findProductLink($tenantId, $linkId, $appId);
+        if (!is_array($link)) {
+            throw new RuntimeException('ECOMMERCE_PRODUCT_LINK_NOT_FOUND');
+        }
+
+        return $link;
+    }
+
+    /**
      * @param array<string, mixed> $inputMetadata
      * @param array<string, mixed> $existingStore
      * @return array<string, mixed>
@@ -759,7 +1170,7 @@ final class EcommerceHubService
                 'adapter_state' => [
                     'provider_runtime' => $adapter->getPlatformKey() === 'unknown' ? 'fallback' : 'foundation_ready',
                     'adapter_key' => $adapter->getPlatformKey(),
-                    'product_sync' => 'pending',
+                    'product_sync' => $adapter->supportsProductSync() ? 'foundation_ready' : 'pending',
                     'order_sync' => 'pending',
                     'inventory_sync' => 'pending',
                     'fiscal_linkage' => 'pending',
@@ -959,6 +1370,39 @@ final class EcommerceHubService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function resolveLocalProductReference(string $tenantId, string $localProductReference, ?string $appId = null): array
+    {
+        $resolved = $this->entitySearchService->getByReference(
+            $tenantId,
+            'product',
+            $localProductReference,
+            ['app_id' => $appId],
+            $appId
+        );
+        if (!is_array($resolved)) {
+            throw new RuntimeException('ECOMMERCE_LOCAL_PRODUCT_NOT_FOUND');
+        }
+
+        $metadata = is_array($resolved['metadata_json'] ?? null) ? (array) $resolved['metadata_json'] : [];
+
+        return [
+            'local_product_id' => (string) ($resolved['entity_id'] ?? ''),
+            'entity_type' => 'product',
+            'label' => trim((string) ($resolved['label'] ?? '')),
+            'subtitle' => $this->nullableString($resolved['subtitle'] ?? null),
+            'reference' => $this->nullableString($metadata['raw_identifier'] ?? null),
+            'sku' => $this->nullableString($metadata['raw_identifier'] ?? null),
+            'status' => $this->nullableString($metadata['status'] ?? null),
+            'source_module' => trim((string) ($resolved['source_module'] ?? '')),
+            'entity_contract' => $this->nullableString($metadata['entity_contract'] ?? null),
+            'matched_by' => trim((string) ($resolved['matched_by'] ?? '')),
+            'score' => is_numeric($resolved['score'] ?? null) ? (float) $resolved['score'] : 0.0,
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $store
      * @param array<int, array<string, mixed>> $credentials
      * @return array<string, mixed>
@@ -1027,6 +1471,35 @@ final class EcommerceHubService
         return $adapter->ping($store, $decrypted);
     }
 
+    private function productSyncStatus($value): string
+    {
+        $value = strtolower(trim((string) $value));
+        if (!in_array($value, self::PRODUCT_SYNC_STATUSES, true)) {
+            throw new RuntimeException('ECOMMERCE_PRODUCT_SYNC_STATUS_INVALID');
+        }
+
+        return $value;
+    }
+
+    private function syncDirection($value): string
+    {
+        $value = strtolower(trim((string) $value));
+        if (!in_array($value, self::SYNC_DIRECTIONS, true)) {
+            throw new RuntimeException('ECOMMERCE_SYNC_DIRECTION_INVALID');
+        }
+
+        return $value;
+    }
+
+    private function nullableSyncDirection($value): ?string
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return null;
+        }
+
+        return $this->syncDirection($value);
+    }
+
     private function futureHooks(?EcommerceAdapterInterface $adapter = null): array
     {
         $adapterKey = $adapter?->getPlatformKey() ?? 'unknown';
@@ -1035,7 +1508,7 @@ final class EcommerceHubService
             'woocommerce_adapter' => $adapterKey === 'woocommerce' ? 'foundation_ready' : 'pending',
             'tiendanube_adapter' => $adapterKey === 'tiendanube' ? 'foundation_ready' : 'pending',
             'prestashop_adapter' => $adapterKey === 'prestashop' ? 'foundation_ready' : 'pending',
-            'product_sync' => 'pending',
+            'product_sync' => $adapter?->supportsProductSync() === true ? 'foundation_ready' : 'pending',
             'order_sync' => 'pending',
             'inventory_sync' => 'pending',
             'fiscal_order_linkage' => 'pending',
@@ -1198,6 +1671,18 @@ final class EcommerceHubService
     }
 
     /**
+     * @param array<string, mixed> $item
+     * @return array<string, mixed>
+     */
+    private function validatedProductLink(array $item): array
+    {
+        $item['metadata'] = is_array($item['metadata'] ?? null) ? (array) $item['metadata'] : [];
+        EcommerceHubContractValidator::validateProductLink($item);
+
+        return $item;
+    }
+
+    /**
      * @param array<string, mixed> $store
      */
     private function logStoreEvent(string $actionName, string $tenantId, ?string $appId, array $store, int $latencyMs, array $extra = []): void
@@ -1258,6 +1743,32 @@ final class EcommerceHubService
             'result_status' => 'success',
         ], $extra);
         $this->auditLogger->log('ecommerce_' . $actionName, 'ecommerce_sync_job', (string) ($job['id'] ?? ''), $payload);
+        $this->eventLogger->log($actionName, $tenantId, $payload);
+    }
+
+    /**
+     * @param array<string, mixed> $link
+     * @param array<string, mixed> $store
+     */
+    private function logProductLinkEvent(string $actionName, string $tenantId, ?string $appId, array $link, array $store, int $latencyMs, array $extra = []): void
+    {
+        $payload = array_merge([
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'ecommerce',
+            'action_name' => $actionName,
+            'store_id' => (string) ($store['id'] ?? $link['store_id'] ?? ''),
+            'platform' => (string) ($store['platform'] ?? 'unknown'),
+            'connection_status' => (string) ($store['connection_status'] ?? 'not_configured'),
+            'link_id' => (string) ($link['id'] ?? ''),
+            'local_product_id' => (string) ($link['local_product_id'] ?? ''),
+            'external_product_id' => (string) ($link['external_product_id'] ?? ''),
+            'sync_status' => (string) ($link['sync_status'] ?? ''),
+            'sync_direction' => (string) ($link['last_sync_direction'] ?? ''),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ], $extra);
+        $this->auditLogger->log('ecommerce_' . $actionName, 'ecommerce_product_link', (string) ($link['id'] ?? ''), $payload);
         $this->eventLogger->log($actionName, $tenantId, $payload);
     }
 }

@@ -48,6 +48,14 @@ abstract class AbstractEcommerceAdapter implements EcommerceAdapterInterface
         ];
     }
 
+    public function supportsProductSync(): bool
+    {
+        $capabilities = $this->listCapabilities();
+
+        return $this->getPlatformKey() !== 'unknown'
+            && (($capabilities['products_read'] ?? false) === true || ($capabilities['products_write'] ?? false) === true);
+    }
+
     /**
      * @param array<string, mixed> $store
      * @return array<string, mixed>
@@ -142,6 +150,85 @@ abstract class AbstractEcommerceAdapter implements EcommerceAdapterInterface
             'message' => $this->supportsRemotePing()
                 ? 'Remote ping is disabled for this adapter foundation.'
                 : 'Remote ping is not implemented in this adapter foundation.',
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $externalPayload
+     * @return array<string, mixed>
+     */
+    public function normalizeExternalProduct(array $externalPayload): array
+    {
+        $externalProductId = $this->firstStringValue($externalPayload, [
+            'external_product_id',
+            'external_id',
+            'product_id',
+            'id',
+        ]);
+        $externalSku = $this->firstStringValue($externalPayload, [
+            'external_sku',
+            'sku',
+            'reference',
+            'code',
+            'product_reference',
+        ]);
+        $name = $this->firstStringValue($externalPayload, ['name', 'title', 'nombre', 'label']);
+        $status = $this->firstStringValue($externalPayload, ['status', 'state']);
+
+        return [
+            'platform' => $this->getPlatformKey(),
+            'adapter_key' => $this->getPlatformKey(),
+            'supports_product_sync' => $this->supportsProductSync(),
+            'external_product_id' => $externalProductId,
+            'external_sku' => $externalSku,
+            'name' => $name,
+            'status' => $status,
+            'normalized' => $externalProductId !== null,
+            'normalization_result' => $externalProductId !== null ? 'normalized' : 'missing_external_product_id',
+            'sync_direction' => 'pull_store_to_local',
+            'metadata' => [
+                'foundation_only' => true,
+                'source_field_count' => count($externalPayload),
+                'source_fields' => array_values(array_filter(array_map(
+                    static fn($key): string => is_string($key) ? trim($key) : '',
+                    array_keys($externalPayload)
+                ), static fn(string $key): bool => $key !== '')),
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $localProductPayload
+     * @return array<string, mixed>
+     */
+    public function buildProductPayload(array $localProductPayload): array
+    {
+        $name = $this->firstStringValue($localProductPayload, ['name', 'label', 'product_label', 'title']);
+        if ($name === null) {
+            $fallbackId = $this->firstStringValue($localProductPayload, ['local_product_id', 'id']) ?? '';
+            $name = 'Product ' . $fallbackId;
+        }
+        $sku = $this->firstStringValue($localProductPayload, ['sku', 'reference', 'external_sku']);
+        $description = $this->firstStringValue($localProductPayload, ['description', 'subtitle']);
+
+        return [
+            'platform' => $this->getPlatformKey(),
+            'adapter_key' => $this->getPlatformKey(),
+            'supports_product_sync' => $this->supportsProductSync(),
+            'build_result' => $this->supportsProductSync() ? 'payload_ready' : 'not_supported',
+            'sync_direction' => 'push_local_to_store',
+            'foundation_only' => true,
+            'payload' => [
+                'name' => $name,
+                'sku' => $sku,
+                'description' => $description,
+                'source_local_product_id' => $this->firstStringValue($localProductPayload, ['local_product_id', 'id']),
+                'source_reference' => $this->firstStringValue($localProductPayload, ['reference', 'sku']),
+            ],
+            'metadata' => [
+                'api_family' => $this->platformMetadata([])['api_family'] ?? $this->getPlatformKey(),
+                'remote_operation' => 'products.upsert.pending',
+            ],
         ];
     }
 
@@ -301,6 +388,22 @@ abstract class AbstractEcommerceAdapter implements EcommerceAdapterInterface
         }
 
         return $current;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<int, string> $keys
+     */
+    protected function firstStringValue(array $payload, array $keys): ?string
+    {
+        foreach ($keys as $key) {
+            $value = $this->nullableString($payload[$key] ?? null);
+            if ($value !== null) {
+                return $value;
+            }
+        }
+
+        return null;
     }
 
     /**

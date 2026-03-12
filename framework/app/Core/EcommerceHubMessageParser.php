@@ -35,6 +35,13 @@ final class EcommerceHubMessageParser
             'ecommerce_create_sync_job' => $this->parseCreateSyncJob($pairs, $baseCommand, $telemetry),
             'ecommerce_list_sync_jobs' => $this->parseListSyncJobs($pairs, $baseCommand, $telemetry),
             'ecommerce_list_order_refs' => $this->parseListOrderRefs($pairs, $baseCommand, $telemetry),
+            'ecommerce_link_product' => $this->parseLinkProduct($pairs, $baseCommand, $telemetry),
+            'ecommerce_unlink_product' => $this->parseUnlinkProduct($pairs, $baseCommand, $telemetry),
+            'ecommerce_list_product_links' => $this->parseListProductLinks($pairs, $baseCommand, $telemetry),
+            'ecommerce_get_product_link' => $this->parseGetProductLink($pairs, $baseCommand, $telemetry),
+            'ecommerce_prepare_product_push_payload' => $this->parsePrepareProductPushPayload($pairs, $baseCommand, $telemetry),
+            'ecommerce_register_product_pull_snapshot' => $this->parseRegisterProductPullSnapshot($pairs, $baseCommand, $telemetry),
+            'ecommerce_mark_product_sync_status' => $this->parseMarkProductSyncStatus($pairs, $baseCommand, $telemetry),
             default => ['kind' => 'ask_user', 'reply' => 'No pude interpretar la operacion ecommerce.', 'telemetry' => $telemetry],
         };
     }
@@ -315,6 +322,167 @@ final class EcommerceHubMessageParser
             'external_status' => ($externalStatus = $this->firstValue($pairs, ['external_status'])) !== '' ? $externalStatus : null,
             'limit' => $this->firstValue($pairs, ['limit']) ?: '10',
         ], $this->telemetry($telemetry, 'list_order_refs'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseLinkProduct(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $storeId = $this->firstValue($pairs, ['store_id']);
+        $localProductId = $this->firstValue($pairs, ['local_product_id', 'product_id']);
+        $externalProductId = $this->firstValue($pairs, ['external_product_id']);
+        if ($storeId === '' || $localProductId === '' || $externalProductId === '') {
+            return $this->askUser('Indica `store_id`, `local_product_id` y `external_product_id` para vincular el producto ecommerce.', $this->telemetry($telemetry, 'link_product'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'LinkEcommerceProduct',
+            'store_id' => $storeId,
+            'local_product_id' => $localProductId,
+            'external_product_id' => $externalProductId,
+            'external_sku' => ($externalSku = $this->firstValue($pairs, ['external_sku', 'sku'])) !== '' ? $externalSku : null,
+        ], $this->telemetry($telemetry, 'link_product'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseUnlinkProduct(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $linkId = $this->firstValue($pairs, ['link_id', 'id']);
+        if ($linkId === '') {
+            return $this->askUser('Indica `link_id` para eliminar el vinculo ecommerce.', $this->telemetry($telemetry, 'unlink_product'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'UnlinkEcommerceProduct',
+            'link_id' => $linkId,
+        ], $this->telemetry($telemetry, 'unlink_product'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseListProductLinks(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $storeId = $this->firstValue($pairs, ['store_id']);
+        if ($storeId === '') {
+            return $this->askUser('Indica `store_id` para listar vinculos de productos ecommerce.', $this->telemetry($telemetry, 'list_product_links'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'ListEcommerceProductLinks',
+            'store_id' => $storeId,
+            'local_product_id' => ($localProductId = $this->firstValue($pairs, ['local_product_id', 'product_id'])) !== '' ? $localProductId : null,
+            'external_product_id' => ($externalProductId = $this->firstValue($pairs, ['external_product_id'])) !== '' ? $externalProductId : null,
+            'external_sku' => ($externalSku = $this->firstValue($pairs, ['external_sku', 'sku'])) !== '' ? $externalSku : null,
+            'sync_status' => ($syncStatus = $this->firstValue($pairs, ['sync_status', 'status'])) !== '' ? $syncStatus : null,
+            'sync_direction' => ($syncDirection = $this->firstValue($pairs, ['sync_direction'])) !== '' ? $syncDirection : null,
+            'limit' => $this->firstValue($pairs, ['limit']) ?: '10',
+        ], $this->telemetry($telemetry, 'list_product_links'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseGetProductLink(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $linkId = $this->firstValue($pairs, ['link_id', 'id']);
+        if ($linkId === '') {
+            return $this->askUser('Indica `link_id` para cargar el vinculo ecommerce.', $this->telemetry($telemetry, 'get_product_link'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'GetEcommerceProductLink',
+            'link_id' => $linkId,
+        ], $this->telemetry($telemetry, 'get_product_link'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parsePrepareProductPushPayload(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $storeId = $this->firstValue($pairs, ['store_id']);
+        $localProductId = $this->firstValue($pairs, ['local_product_id', 'product_id']);
+        if ($storeId === '' || $localProductId === '') {
+            return $this->askUser('Indica `store_id` y `local_product_id` para preparar el push ecommerce.', $this->telemetry($telemetry, 'prepare_product_push_payload'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'PrepareEcommerceProductPushPayload',
+            'store_id' => $storeId,
+            'local_product_id' => $localProductId,
+        ], $this->telemetry($telemetry, 'prepare_product_push_payload'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseRegisterProductPullSnapshot(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $storeId = $this->firstValue($pairs, ['store_id']);
+        $externalProductId = $this->firstValue($pairs, ['external_product_id', 'id']);
+        if ($storeId === '' || $externalProductId === '') {
+            return $this->askUser('Indica `store_id` y `external_product_id` para registrar el snapshot pull ecommerce.', $this->telemetry($telemetry, 'register_product_pull_snapshot'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'RegisterEcommerceProductPullSnapshot',
+            'store_id' => $storeId,
+            'external_product_payload' => array_filter([
+                'external_product_id' => $externalProductId,
+                'external_sku' => ($externalSku = $this->firstValue($pairs, ['external_sku', 'sku'])) !== '' ? $externalSku : null,
+                'name' => ($name = $this->firstValue($pairs, ['name', 'title'])) !== '' ? $name : null,
+                'status' => ($status = $this->firstValue($pairs, ['status'])) !== '' ? $status : null,
+            ], static fn($value): bool => $value !== null && $value !== ''),
+        ], $this->telemetry($telemetry, 'register_product_pull_snapshot'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseMarkProductSyncStatus(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $linkId = $this->firstValue($pairs, ['link_id', 'id']);
+        $syncStatus = $this->firstValue($pairs, ['sync_status', 'status']);
+        if ($linkId === '' || $syncStatus === '') {
+            return $this->askUser('Indica `link_id` y `sync_status` para registrar el estado de sync ecommerce.', $this->telemetry($telemetry, 'mark_product_sync_status'));
+        }
+
+        $metadata = array_filter([
+            'sync_direction' => ($syncDirection = $this->firstValue($pairs, ['sync_direction'])) !== '' ? $syncDirection : null,
+            'note' => ($note = $this->firstValue($pairs, ['note'])) !== '' ? $note : null,
+        ], static fn($value): bool => $value !== null && $value !== '');
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'MarkEcommerceProductSyncStatus',
+            'link_id' => $linkId,
+            'sync_status' => $syncStatus,
+            'metadata' => $metadata,
+        ], $this->telemetry($telemetry, 'mark_product_sync_status'));
     }
 
     /**

@@ -94,4 +94,18 @@ final class TiendanubeAdapter extends AbstractEcommerceAdapter
 
         return $this->nullableString($store['store_url'] ?? null);
     }
+
+    /**
+     * @param array<string, mixed> $localProductPayload
+     * @return array<string, mixed>
+     */
+    public function buildProductPayload(array $localProductPayload): array
+    {
+        $built = parent::buildProductPayload($localProductPayload);
+        $payload = is_array($built['payload'] ?? null) ? (array) $built['payload'] : [];
+        $payload['published'] = false;
+        $built['payload'] = $payload;
+
+        return $built;
+    }
 }

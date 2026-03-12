@@ -630,6 +630,13 @@ final class SkillExecutor
             'ecommerce_create_sync_job',
             'ecommerce_list_sync_jobs',
             'ecommerce_list_order_refs',
+            'ecommerce_link_product',
+            'ecommerce_unlink_product',
+            'ecommerce_list_product_links',
+            'ecommerce_get_product_link',
+            'ecommerce_prepare_product_push_payload',
+            'ecommerce_register_product_pull_snapshot',
+            'ecommerce_mark_product_sync_status',
         ], true);
     }
 

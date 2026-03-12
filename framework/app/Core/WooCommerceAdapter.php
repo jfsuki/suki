@@ -75,4 +75,19 @@ final class WooCommerceAdapter extends AbstractEcommerceAdapter
 
         return rtrim($storeUrl, '/') . '/wp-json/wc/v3';
     }
+
+    /**
+     * @param array<string, mixed> $localProductPayload
+     * @return array<string, mixed>
+     */
+    public function buildProductPayload(array $localProductPayload): array
+    {
+        $built = parent::buildProductPayload($localProductPayload);
+        $payload = is_array($built['payload'] ?? null) ? (array) $built['payload'] : [];
+        $payload['type'] = 'simple';
+        $payload['status'] = 'draft';
+        $built['payload'] = $payload;
+
+        return $built;
+    }
 }

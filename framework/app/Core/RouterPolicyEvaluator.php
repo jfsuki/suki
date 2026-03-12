@@ -1172,6 +1172,69 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'LinkEcommerceProduct':
+                if (trim((string) ($command['store_id'] ?? '')) === '') {
+                    return [false, 'missing_store_id'];
+                }
+                if (trim((string) ($command['local_product_id'] ?? '')) === '') {
+                    return [false, 'missing_local_product_id'];
+                }
+                if (trim((string) ($command['external_product_id'] ?? '')) === '') {
+                    return [false, 'missing_external_product_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'UnlinkEcommerceProduct':
+            case 'GetEcommerceProductLink':
+                if (trim((string) ($command['link_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_link_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListEcommerceProductLinks':
+                if (trim((string) ($command['store_id'] ?? '')) === '') {
+                    return [false, 'missing_store_id'];
+                }
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                foreach (['local_product_id', 'external_product_id', 'external_sku', 'sync_status', 'sync_direction'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
+            case 'PrepareEcommerceProductPushPayload':
+                if (trim((string) ($command['store_id'] ?? '')) === '') {
+                    return [false, 'missing_store_id'];
+                }
+                if (trim((string) ($command['local_product_id'] ?? '')) === '') {
+                    return [false, 'missing_local_product_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'RegisterEcommerceProductPullSnapshot':
+                if (trim((string) ($command['store_id'] ?? '')) === '') {
+                    return [false, 'missing_store_id'];
+                }
+                if (!is_array($command['external_product_payload'] ?? null)) {
+                    return [false, 'missing_external_product_payload'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'MarkEcommerceProductSyncStatus':
+                if (trim((string) ($command['link_id'] ?? '')) === '') {
+                    return [false, 'missing_link_id'];
+                }
+                if (trim((string) ($command['sync_status'] ?? '')) === '') {
+                    return [false, 'missing_sync_status'];
+                }
+                if (array_key_exists('metadata', $command) && !is_array($command['metadata'])) {
+                    return [false, 'invalid_metadata'];
+                }
+                return [true, 'schema_valid'];
+
             case 'CreateEntity':
                 if ($entity === '') {
                     return [false, 'missing_entity'];

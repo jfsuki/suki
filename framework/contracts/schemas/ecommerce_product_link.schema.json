@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EcommerceProductLink",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tenant_id",
+    "store_id",
+    "external_product_id",
+    "sync_status",
+    "metadata",
+    "created_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "app_id": { "type": ["string", "null"] },
+    "store_id": { "type": "string", "minLength": 1 },
+    "local_product_id": { "type": ["string", "null"] },
+    "external_product_id": { "type": "string", "minLength": 1 },
+    "external_sku": { "type": ["string", "null"] },
+    "sync_status": {
+      "type": "string",
+      "enum": [
+        "linked",
+        "prepared",
+        "pending_push",
+        "pending_pull",
+        "snapshot_received",
+        "synced",
+        "failed"
+      ]
+    },
+    "last_sync_at": { "type": ["string", "null"] },
+    "last_sync_direction": {
+      "type": ["string", "null"],
+      "enum": [null, "push_local_to_store", "pull_store_to_local"]
+    },
+    "metadata": { "type": "object", "additionalProperties": true },
+    "created_at": { "type": "string" }
+  }
+}

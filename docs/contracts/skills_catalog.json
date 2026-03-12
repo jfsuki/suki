@@ -1,6 +1,6 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.7.3",
+  "version": "1.7.4",
   "effective_date": "2026-03-12",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
@@ -2801,6 +2801,232 @@
           "local_order_status",
           "external_status",
           "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_link_product",
+      "description": "Link one local product to one ecommerce product reference for a store.",
+      "intent_patterns": [
+        "re:(vincula|vincular|linkea|linkear|relaciona|relacionar).*(producto ecommerce|producto tienda|producto canal)",
+        "re:(producto ecommerce|producto tienda|producto canal).*(vincula|vincular|linkea|linkear|relaciona|relacionar)"
+      ],
+      "keywords": [
+        "vincular producto ecommerce",
+        "link product ecommerce",
+        "relacionar producto tienda"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_link_product"
+      ],
+      "priority": 160,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "local_product_id",
+          "external_product_id",
+          "external_sku"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_unlink_product",
+      "description": "Remove one ecommerce product link safely by link_id.",
+      "intent_patterns": [
+        "re:(desvincula|desvincular|elimina|eliminar|quita|quitar).*(link ecommerce|vinculo ecommerce|producto ecommerce)",
+        "re:(link ecommerce|vinculo ecommerce|producto ecommerce).*(desvincula|desvincular|elimina|eliminar|quita|quitar)"
+      ],
+      "keywords": [
+        "desvincular producto ecommerce",
+        "eliminar link ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_unlink_product"
+      ],
+      "priority": 159,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "link_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_list_product_links",
+      "description": "List ecommerce product links for one store with lightweight filters.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(vinculos ecommerce|links ecommerce|productos vinculados ecommerce)",
+        "re:(vinculos ecommerce|links ecommerce|productos vinculados ecommerce).*(lista|listar|muestra|mostrar|ver|consulta)"
+      ],
+      "keywords": [
+        "listar vinculos ecommerce",
+        "links ecommerce",
+        "productos vinculados ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_list_product_links"
+      ],
+      "priority": 158,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "local_product_id",
+          "external_product_id",
+          "sync_status",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_get_product_link",
+      "description": "Load one ecommerce product link by link_id.",
+      "intent_patterns": [
+        "re:(ver|mostrar|muestra|consulta|abre|abrir).*(link ecommerce|vinculo ecommerce|producto vinculado ecommerce)",
+        "re:(link ecommerce|vinculo ecommerce|producto vinculado ecommerce).*(ver|mostrar|muestra|consulta|abre|abrir)"
+      ],
+      "keywords": [
+        "ver link ecommerce",
+        "abrir vinculo ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_get_product_link"
+      ],
+      "priority": 157,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "link_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_prepare_product_push_payload",
+      "description": "Prepare the normalized outbound ecommerce product payload for one local product.",
+      "intent_patterns": [
+        "re:(prepara|preparar|arma|armar|construye|construir).*(payload push ecommerce|push ecommerce producto|payload producto ecommerce)",
+        "re:(payload push ecommerce|push ecommerce producto|payload producto ecommerce).*(prepara|preparar|arma|armar|construye|construir)"
+      ],
+      "keywords": [
+        "preparar payload push ecommerce",
+        "payload producto ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_prepare_product_push_payload"
+      ],
+      "priority": 156,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "local_product_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_register_product_pull_snapshot",
+      "description": "Register a normalized inbound ecommerce product snapshot without creating local products automatically.",
+      "intent_patterns": [
+        "re:(registra|registrar|guarda|guardar).*(snapshot pull ecommerce|pull ecommerce producto|snapshot producto ecommerce)",
+        "re:(snapshot pull ecommerce|pull ecommerce producto|snapshot producto ecommerce).*(registra|registrar|guarda|guardar)"
+      ],
+      "keywords": [
+        "registrar snapshot pull ecommerce",
+        "pull ecommerce producto"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_register_product_pull_snapshot"
+      ],
+      "priority": 155,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "external_product_id",
+          "external_sku",
+          "name",
+          "status"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_mark_product_sync_status",
+      "description": "Record the sync status of one ecommerce product link safely.",
+      "intent_patterns": [
+        "re:(marca|marcar|actualiza|actualizar|cambia|cambiar).*(estado sync ecommerce|sync producto ecommerce|estado de producto ecommerce)",
+        "re:(estado sync ecommerce|sync producto ecommerce|estado de producto ecommerce).*(marca|marcar|actualiza|actualizar|cambia|cambiar)"
+      ],
+      "keywords": [
+        "marcar sync producto ecommerce",
+        "estado producto ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_mark_product_sync_status"
+      ],
+      "priority": 154,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "link_id",
+          "sync_status",
+          "sync_direction"
         ]
       },
       "channel_capabilities": [

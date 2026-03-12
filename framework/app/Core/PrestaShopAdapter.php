@@ -74,4 +74,19 @@ final class PrestaShopAdapter extends AbstractEcommerceAdapter
 
         return rtrim($storeUrl, '/') . '/api/';
     }
+
+    /**
+     * @param array<string, mixed> $localProductPayload
+     * @return array<string, mixed>
+     */
+    public function buildProductPayload(array $localProductPayload): array
+    {
+        $built = parent::buildProductPayload($localProductPayload);
+        $payload = is_array($built['payload'] ?? null) ? (array) $built['payload'] : [];
+        $payload['reference'] = $payload['sku'] ?? null;
+        unset($payload['sku']);
+        $built['payload'] = $payload;
+
+        return $built;
+    }
 }

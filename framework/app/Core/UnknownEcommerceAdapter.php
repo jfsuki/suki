@@ -19,6 +19,11 @@ final class UnknownEcommerceAdapter implements EcommerceAdapterInterface
         return 'unknown';
     }
 
+    public function supportsProductSync(): bool
+    {
+        return false;
+    }
+
     /**
      * @param array<string, mixed> $store
      * @param array<string, mixed> $credentials
@@ -118,6 +123,50 @@ final class UnknownEcommerceAdapter implements EcommerceAdapterInterface
             'result_status' => 'not_implemented',
             'checked_endpoint' => null,
             'message' => 'No adapter foundation is available for this platform.',
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $externalPayload
+     * @return array<string, mixed>
+     */
+    public function normalizeExternalProduct(array $externalPayload): array
+    {
+        return [
+            'platform' => $this->requestedPlatform,
+            'adapter_key' => $this->getPlatformKey(),
+            'supports_product_sync' => false,
+            'external_product_id' => null,
+            'external_sku' => null,
+            'name' => null,
+            'status' => null,
+            'normalized' => false,
+            'normalization_result' => 'unsupported_platform',
+            'sync_direction' => 'pull_store_to_local',
+            'metadata' => [
+                'foundation_only' => true,
+                'requested_platform' => $this->requestedPlatform,
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $localProductPayload
+     * @return array<string, mixed>
+     */
+    public function buildProductPayload(array $localProductPayload): array
+    {
+        return [
+            'platform' => $this->requestedPlatform,
+            'adapter_key' => $this->getPlatformKey(),
+            'supports_product_sync' => false,
+            'build_result' => 'unsupported_platform',
+            'sync_direction' => 'push_local_to_store',
+            'foundation_only' => true,
+            'payload' => [],
+            'metadata' => [
+                'requested_platform' => $this->requestedPlatform,
+            ],
         ];
     }
 
