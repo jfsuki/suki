@@ -1646,6 +1646,15 @@ final class IntentRouter
             'BuildFiscalDocumentPayload' => 'fiscal.build_document_payload',
             'RecordFiscalEvent' => 'fiscal.record_event',
             'UpdateFiscalDocumentStatus' => 'fiscal.update_status',
+            'CreateEcommerceStore' => 'ecommerce.create_store',
+            'UpdateEcommerceStore' => 'ecommerce.update_store',
+            'RegisterEcommerceStoreCredentials' => 'ecommerce.register_credentials',
+            'ValidateEcommerceStoreSetup' => 'ecommerce.validate_store_setup',
+            'ListEcommerceStores' => 'ecommerce.list_stores',
+            'GetEcommerceStore' => 'ecommerce.get_store',
+            'CreateEcommerceSyncJob' => 'ecommerce.create_sync_job',
+            'ListEcommerceSyncJobs' => 'ecommerce.list_sync_jobs',
+            'ListEcommerceOrderRefs' => 'ecommerce.list_order_refs',
             'CreateInvoice' => 'invoice.create',
             'GenerateReport' => 'report.generate',
             'ConfigureFEProvider' => 'settings.configure_fe_provider',
@@ -1677,6 +1686,7 @@ final class IntentRouter
             || str_starts_with($selectedName, 'pos_')
             || str_starts_with($selectedName, 'purchases_')
             || str_starts_with($selectedName, 'fiscal_')
+            || str_starts_with($selectedName, 'ecommerce_')
             || in_array($selectedName, ['entity_search', 'entity_resolve'], true);
     }
 

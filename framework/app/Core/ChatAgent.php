@@ -1689,6 +1689,7 @@ final class ChatAgent
             'pos_action' => $runtimeObservability['pos_action'],
             'purchases_action' => $runtimeObservability['purchases_action'],
             'fiscal_action' => $runtimeObservability['fiscal_action'],
+            'ecommerce_action' => $runtimeObservability['ecommerce_action'],
             'draft_id' => $runtimeObservability['draft_id'],
             'purchase_draft_id' => $runtimeObservability['purchase_draft_id'],
             'session_id' => $runtimeObservability['session_id'],
@@ -1708,6 +1709,11 @@ final class ChatAgent
             'source_entity_type' => $runtimeObservability['source_entity_type'],
             'source_entity_id' => $runtimeObservability['source_entity_id'],
             'fiscal_status' => $runtimeObservability['fiscal_status'],
+            'store_id' => $runtimeObservability['store_id'],
+            'platform' => $runtimeObservability['platform'],
+            'connection_status' => $runtimeObservability['connection_status'],
+            'sync_job_id' => $runtimeObservability['sync_job_id'],
+            'sync_type' => $runtimeObservability['sync_type'],
             'duplicate_blocked' => $runtimeObservability['duplicate_blocked'],
             'line_count' => $runtimeObservability['line_count'],
             'total' => $runtimeObservability['total'],
@@ -1810,6 +1816,7 @@ final class ChatAgent
             'pos_action' => trim((string) ($runtimeContext['pos_action'] ?? $routeTelemetry['pos_action'] ?? '')) ?: 'none',
             'purchases_action' => trim((string) ($runtimeContext['purchases_action'] ?? $routeTelemetry['purchases_action'] ?? '')) ?: 'none',
             'fiscal_action' => trim((string) ($runtimeContext['fiscal_action'] ?? $routeTelemetry['fiscal_action'] ?? '')) ?: 'none',
+            'ecommerce_action' => trim((string) ($runtimeContext['ecommerce_action'] ?? $routeTelemetry['ecommerce_action'] ?? '')) ?: 'none',
             'draft_id' => trim((string) ($runtimeContext['draft_id'] ?? $routeTelemetry['draft_id'] ?? '')),
             'purchase_draft_id' => trim((string) ($runtimeContext['purchase_draft_id'] ?? $routeTelemetry['purchase_draft_id'] ?? '')),
             'session_id' => trim((string) ($runtimeContext['session_id'] ?? $routeTelemetry['session_id'] ?? '')),
@@ -1831,6 +1838,11 @@ final class ChatAgent
             'source_entity_type' => trim((string) ($runtimeContext['source_entity_type'] ?? $routeTelemetry['source_entity_type'] ?? '')),
             'source_entity_id' => trim((string) ($runtimeContext['source_entity_id'] ?? $routeTelemetry['source_entity_id'] ?? '')),
             'fiscal_status' => trim((string) ($runtimeContext['fiscal_status'] ?? $routeTelemetry['fiscal_status'] ?? '')),
+            'store_id' => trim((string) ($runtimeContext['store_id'] ?? $routeTelemetry['store_id'] ?? '')),
+            'platform' => trim((string) ($runtimeContext['platform'] ?? $routeTelemetry['platform'] ?? '')),
+            'connection_status' => trim((string) ($runtimeContext['connection_status'] ?? $routeTelemetry['connection_status'] ?? '')),
+            'sync_job_id' => trim((string) ($runtimeContext['sync_job_id'] ?? $routeTelemetry['sync_job_id'] ?? '')),
+            'sync_type' => trim((string) ($runtimeContext['sync_type'] ?? $routeTelemetry['sync_type'] ?? '')),
             'duplicate_blocked' => (($runtimeContext['duplicate_blocked'] ?? $routeTelemetry['duplicate_blocked'] ?? false) === true),
             'line_count' => is_numeric($runtimeContext['line_count'] ?? $routeTelemetry['line_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['line_count'] ?? $routeTelemetry['line_count']))
@@ -1984,6 +1996,7 @@ final class ChatAgent
             'pos_action' => trim((string) ($payload['pos_action'] ?? '')) ?: 'none',
             'purchases_action' => trim((string) ($payload['purchases_action'] ?? '')) ?: 'none',
             'fiscal_action' => trim((string) ($payload['fiscal_action'] ?? '')) ?: 'none',
+            'ecommerce_action' => trim((string) ($payload['ecommerce_action'] ?? '')) ?: 'none',
             'draft_id' => trim((string) ($payload['draft_id'] ?? '')) ?: '',
             'purchase_draft_id' => trim((string) ($payload['purchase_draft_id'] ?? '')) ?: '',
             'session_id' => trim((string) ($payload['session_id'] ?? '')) ?: '',
@@ -2005,6 +2018,11 @@ final class ChatAgent
             'source_entity_type' => trim((string) ($payload['source_entity_type'] ?? '')) ?: '',
             'source_entity_id' => trim((string) ($payload['source_entity_id'] ?? '')) ?: '',
             'fiscal_status' => trim((string) ($payload['fiscal_status'] ?? '')) ?: '',
+            'store_id' => trim((string) ($payload['store_id'] ?? '')) ?: '',
+            'platform' => trim((string) ($payload['platform'] ?? '')) ?: '',
+            'connection_status' => trim((string) ($payload['connection_status'] ?? '')) ?: '',
+            'sync_job_id' => trim((string) ($payload['sync_job_id'] ?? '')) ?: '',
+            'sync_type' => trim((string) ($payload['sync_type'] ?? '')) ?: '',
             'duplicate_blocked' => (($payload['duplicate_blocked'] ?? false) === true),
             'line_count' => is_numeric($payload['line_count'] ?? null)
                 ? max(0, (int) $payload['line_count'])
@@ -2057,6 +2075,7 @@ final class ChatAgent
             $this->commandBus->register(new POSCommandHandler());
             $this->commandBus->register(new PurchasesCommandHandler());
             $this->commandBus->register(new FiscalEngineCommandHandler());
+            $this->commandBus->register(new EcommerceHubCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
                 ['AuthLogin', 'AuthCreateUser'],
                 function (array $command, array $context): array {

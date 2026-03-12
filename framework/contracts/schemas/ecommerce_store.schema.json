@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EcommerceStore",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tenant_id",
+    "platform",
+    "store_name",
+    "status",
+    "connection_status",
+    "metadata",
+    "created_at",
+    "updated_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "app_id": { "type": ["string", "null"] },
+    "platform": {
+      "type": "string",
+      "enum": ["woocommerce", "tiendanube", "prestashop", "custom_store", "unknown"]
+    },
+    "store_name": { "type": "string", "minLength": 1 },
+    "store_url": { "type": ["string", "null"] },
+    "status": {
+      "type": "string",
+      "enum": ["active", "inactive", "disconnected"]
+    },
+    "connection_status": {
+      "type": "string",
+      "enum": ["not_configured", "pending_validation", "validated", "failed"]
+    },
+    "currency": { "type": ["string", "null"] },
+    "timezone": { "type": ["string", "null"] },
+    "metadata": { "type": "object", "additionalProperties": true },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" }
+  }
+}

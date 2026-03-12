@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EcommerceStoreSetup",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "store_id",
+    "platform",
+    "status",
+    "connection_status",
+    "ready",
+    "credentials_configured",
+    "checks",
+    "hooks"
+  ],
+  "properties": {
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "app_id": { "type": ["string", "null"] },
+    "store_id": { "type": "string", "minLength": 1 },
+    "platform": {
+      "type": "string",
+      "enum": ["woocommerce", "tiendanube", "prestashop", "custom_store", "unknown"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "inactive", "disconnected"]
+    },
+    "connection_status": {
+      "type": "string",
+      "enum": ["not_configured", "pending_validation", "validated", "failed"]
+    },
+    "ready": { "type": "boolean" },
+    "credentials_configured": { "type": "boolean" },
+    "checks": {
+      "type": "object",
+      "additionalProperties": true,
+      "required": [
+        "store_exists",
+        "platform_supported",
+        "store_active",
+        "connection_validated",
+        "credentials_configured"
+      ],
+      "properties": {
+        "store_exists": { "type": "boolean" },
+        "platform_supported": { "type": "boolean" },
+        "store_active": { "type": "boolean" },
+        "connection_validated": { "type": "boolean" },
+        "credentials_configured": { "type": "boolean" }
+      }
+    },
+    "hooks": { "type": "object", "additionalProperties": true }
+  }
+}

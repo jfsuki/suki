@@ -1053,6 +1053,105 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'CreateEcommerceStore':
+                if (trim((string) ($command['tenant_id'] ?? '')) === '') {
+                    return [false, 'missing_tenant_id'];
+                }
+                if (trim((string) ($command['platform'] ?? '')) === '') {
+                    return [false, 'missing_platform'];
+                }
+                if (trim((string) ($command['store_name'] ?? $command['name'] ?? '')) === '') {
+                    return [false, 'missing_store_name'];
+                }
+                if (array_key_exists('metadata', $command) && !is_array($command['metadata'])) {
+                    return [false, 'invalid_metadata'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'UpdateEcommerceStore':
+                if (trim((string) ($command['store_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_store_id'];
+                }
+                if (array_key_exists('metadata', $command) && !is_array($command['metadata'])) {
+                    return [false, 'invalid_metadata'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'RegisterEcommerceStoreCredentials':
+                if (trim((string) ($command['store_id'] ?? '')) === '') {
+                    return [false, 'missing_store_id'];
+                }
+                if (trim((string) ($command['credential_type'] ?? '')) === '') {
+                    return [false, 'missing_credential_type'];
+                }
+                $hasCredentialPayload = (
+                    trim((string) ($command['token'] ?? '')) !== ''
+                    || trim((string) ($command['api_key'] ?? '')) !== ''
+                    || trim((string) ($command['secret'] ?? '')) !== ''
+                    || trim((string) ($command['client_secret'] ?? '')) !== ''
+                    || trim((string) ($command['password'] ?? '')) !== ''
+                    || trim((string) ($command['key'] ?? '')) !== ''
+                    || is_array($command['credentials'] ?? null)
+                    || is_array($command['payload'] ?? null)
+                    || trim((string) ($command['payload_json'] ?? '')) !== ''
+                );
+                if (!$hasCredentialPayload) {
+                    return [false, 'missing_credential_payload'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ValidateEcommerceStoreSetup':
+            case 'GetEcommerceStore':
+                if (trim((string) ($command['store_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_store_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListEcommerceStores':
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                foreach (['platform', 'status', 'connection_status'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
+            case 'CreateEcommerceSyncJob':
+                if (trim((string) ($command['store_id'] ?? '')) === '') {
+                    return [false, 'missing_store_id'];
+                }
+                if (trim((string) ($command['sync_type'] ?? '')) === '') {
+                    return [false, 'missing_sync_type'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListEcommerceSyncJobs':
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                foreach (['store_id', 'sync_type', 'status'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListEcommerceOrderRefs':
+                if (trim((string) ($command['store_id'] ?? '')) === '') {
+                    return [false, 'missing_store_id'];
+                }
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                foreach (['external_order_id', 'local_order_status', 'external_status'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
             case 'CreateEntity':
                 if ($entity === '') {
                     return [false, 'missing_entity'];

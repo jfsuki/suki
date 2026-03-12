@@ -1,7 +1,7 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.7.1",
-  "effective_date": "2026-03-11",
+  "version": "1.7.2",
+  "effective_date": "2026-03-12",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
   "contract_location": "docs/contracts",
@@ -2373,6 +2373,309 @@
           "fiscal_document_id",
           "status",
           "reason"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_create_store",
+      "description": "Create a canonical ecommerce store or sales channel record.",
+      "intent_patterns": [
+        "re:(crea|crear|registra|registrar|agrega|agregar).*(tienda ecommerce|canal ecommerce|store ecommerce)",
+        "re:(tienda ecommerce|canal ecommerce|store ecommerce).*(crea|crear|registra|registrar|agrega|agregar)"
+      ],
+      "keywords": [
+        "crear tienda ecommerce",
+        "registrar canal ecommerce",
+        "store ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_create_store"
+      ],
+      "priority": 168,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "platform",
+          "store_name",
+          "store_url",
+          "status",
+          "connection_status",
+          "currency",
+          "timezone"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_update_store",
+      "description": "Update metadata or status of an existing ecommerce store.",
+      "intent_patterns": [
+        "re:(actualiza|actualizar|edita|editar|cambia|cambiar).*(tienda ecommerce|canal ecommerce|store ecommerce)",
+        "re:(tienda ecommerce|canal ecommerce|store ecommerce).*(actualiza|actualizar|edita|editar|cambia|cambiar)"
+      ],
+      "keywords": [
+        "actualizar tienda ecommerce",
+        "editar canal ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_update_store"
+      ],
+      "priority": 167,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "platform",
+          "store_name",
+          "store_url",
+          "status",
+          "connection_status",
+          "currency",
+          "timezone"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_register_credentials",
+      "description": "Register masked ecommerce credentials without exposing raw secrets.",
+      "intent_patterns": [
+        "re:(registra|registrar|guarda|guardar|configura|configurar).*(credenciales ecommerce|token ecommerce|api key ecommerce)",
+        "re:(credenciales ecommerce|token ecommerce|api key ecommerce).*(registra|registrar|guarda|guardar|configura|configurar)"
+      ],
+      "keywords": [
+        "registrar credenciales ecommerce",
+        "configurar token ecommerce",
+        "api key ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_register_credentials"
+      ],
+      "priority": 166,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "credential_type",
+          "token",
+          "api_key",
+          "secret"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_validate_store_setup",
+      "description": "Validate the lightweight setup state of an ecommerce store.",
+      "intent_patterns": [
+        "re:(valida|validar|revisa|revisar|verifica|verificar).*(tienda ecommerce|configuracion ecommerce|setup ecommerce)",
+        "re:(tienda ecommerce|configuracion ecommerce|setup ecommerce).*(valida|validar|revisa|revisar|verifica|verificar)"
+      ],
+      "keywords": [
+        "validar setup ecommerce",
+        "revisar configuracion ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_validate_store_setup"
+      ],
+      "priority": 165,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_list_stores",
+      "description": "List ecommerce stores with lightweight platform and status filters.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(tiendas ecommerce|canales ecommerce|stores ecommerce)",
+        "re:(tiendas ecommerce|canales ecommerce|stores ecommerce).*(lista|listar|muestra|mostrar|ver|consulta)"
+      ],
+      "keywords": [
+        "listar tiendas ecommerce",
+        "ver canales ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_list_stores"
+      ],
+      "priority": 164,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "platform",
+          "status",
+          "connection_status",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_get_store",
+      "description": "Load a single ecommerce store by store_id.",
+      "intent_patterns": [
+        "re:(ver|mostrar|muestra|consulta|abre|abrir).*(tienda ecommerce|canal ecommerce|store ecommerce)",
+        "re:(tienda ecommerce|canal ecommerce|store ecommerce).*(ver|mostrar|muestra|consulta|abre|abrir)"
+      ],
+      "keywords": [
+        "ver tienda ecommerce",
+        "abrir store ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_get_store"
+      ],
+      "priority": 163,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_create_sync_job",
+      "description": "Create a sync job tracking record for an ecommerce store.",
+      "intent_patterns": [
+        "re:(crea|crear|registra|registrar|programa|programar).*(sync ecommerce|sincronizacion ecommerce|sync job ecommerce)",
+        "re:(sync ecommerce|sincronizacion ecommerce|sync job ecommerce).*(crea|crear|registra|registrar|programa|programar)"
+      ],
+      "keywords": [
+        "crear sync ecommerce",
+        "registrar sync job ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_create_sync_job"
+      ],
+      "priority": 162,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "sync_type",
+          "status",
+          "result_summary"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_list_sync_jobs",
+      "description": "List ecommerce sync jobs by store, sync_type or status.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(sync jobs ecommerce|sincronizaciones ecommerce|sync ecommerce)",
+        "re:(sync jobs ecommerce|sincronizaciones ecommerce|sync ecommerce).*(lista|listar|muestra|mostrar|ver|consulta)"
+      ],
+      "keywords": [
+        "listar sync ecommerce",
+        "ver sincronizaciones ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_list_sync_jobs"
+      ],
+      "priority": 161,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "sync_type",
+          "status",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_list_order_refs",
+      "description": "List canonical ecommerce order references for a store.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(pedidos ecommerce|ordenes ecommerce|order refs ecommerce)",
+        "re:(pedidos ecommerce|ordenes ecommerce|order refs ecommerce).*(lista|listar|muestra|mostrar|ver|consulta)"
+      ],
+      "keywords": [
+        "listar pedidos ecommerce",
+        "ordenes ecommerce",
+        "order refs ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_list_order_refs"
+      ],
+      "priority": 160,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "external_order_id",
+          "local_order_status",
+          "external_status",
+          "limit"
         ]
       },
       "channel_capabilities": [

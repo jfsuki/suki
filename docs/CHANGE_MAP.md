@@ -72,6 +72,14 @@
   - keep `buildDocumentPayload()` internal and structured: `header + summary + lines + references + metadata`
   - route provider submission, XML/UBL, signatures, CUFE/CUDE, webhooks and accounting to future extensions only
   - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
+- If you add Ecommerce Hub behavior:
+  - update `EcommerceHubRepository`, `EcommerceHubService`, `EcommerceHubCommandHandler`, `EcommerceHubMessageParser`
+  - keep the hub canonical: store/channel records, encrypted credentials, sync jobs and order refs only
+  - keep platform classification limited to `woocommerce`, `tiendanube`, `prestashop`, `custom_store`, `unknown` until a real adapter exists
+  - persist credentials encrypted at rest and return masked payloads only; never log raw secrets
+  - keep setup validation lightweight: store status + connection status + credentials presence
+  - treat adapters, webhooks, product sync, order sync, inventory sync and fiscal linkage as future hooks only
+  - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
 - If you add AgentOps metrics:
   - keep `docs/contracts/agentops_metrics_contract.json` aligned
   - extend `TelemetryService`, `SqlMetricsRepository` or `Agents/Telemetry`
@@ -110,6 +118,9 @@
   - returns existing document or blocks creation depending on duplicate policy
 - Provider lifecycle
   - stays pending until a future adapter submits and reconciles the document externally
+- Ecommerce lifecycle
+  - `store created -> credentials registered -> setup validated -> sync_job queued|running|completed|failed`
+  - external orders stay as canonical `ecommerce_order_ref` records until future sync/import flows materialize local entities
 
 ## Impact hotspots
 - `framework/app/Core/ChatAgent.php`

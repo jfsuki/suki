@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EcommerceOrderRef",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tenant_id",
+    "store_id",
+    "external_order_id",
+    "metadata",
+    "created_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "app_id": { "type": ["string", "null"] },
+    "store_id": { "type": "string", "minLength": 1 },
+    "external_order_id": { "type": "string", "minLength": 1 },
+    "local_order_status": { "type": ["string", "null"] },
+    "external_status": { "type": ["string", "null"] },
+    "total": { "type": ["number", "null"], "minimum": 0 },
+    "currency": { "type": ["string", "null"] },
+    "metadata": { "type": "object", "additionalProperties": true },
+    "created_at": { "type": "string" }
+  }
+}
