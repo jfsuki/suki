@@ -1698,7 +1698,10 @@ final class ChatAgent
             'ambiguity_count' => $runtimeObservability['ambiguity_count'],
             'purchase_id' => $runtimeObservability['purchase_id'],
             'purchase_number' => $runtimeObservability['purchase_number'],
+            'purchase_document_id' => $runtimeObservability['purchase_document_id'],
+            'media_file_id' => $runtimeObservability['media_file_id'],
             'supplier_id' => $runtimeObservability['supplier_id'],
+            'document_type' => $runtimeObservability['document_type'],
             'line_count' => $runtimeObservability['line_count'],
             'total' => $runtimeObservability['total'],
             'result_status' => $runtimeObservability['result_status'],
@@ -1811,7 +1814,10 @@ final class ChatAgent
                 : 0,
             'purchase_id' => trim((string) ($runtimeContext['purchase_id'] ?? $routeTelemetry['purchase_id'] ?? '')),
             'purchase_number' => trim((string) ($runtimeContext['purchase_number'] ?? $routeTelemetry['purchase_number'] ?? '')),
+            'purchase_document_id' => trim((string) ($runtimeContext['purchase_document_id'] ?? $routeTelemetry['purchase_document_id'] ?? '')),
+            'media_file_id' => trim((string) ($runtimeContext['media_file_id'] ?? $routeTelemetry['media_file_id'] ?? '')),
             'supplier_id' => trim((string) ($runtimeContext['supplier_id'] ?? $routeTelemetry['supplier_id'] ?? '')),
+            'document_type' => trim((string) ($runtimeContext['document_type'] ?? $routeTelemetry['document_type'] ?? '')),
             'line_count' => is_numeric($runtimeContext['line_count'] ?? $routeTelemetry['line_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['line_count'] ?? $routeTelemetry['line_count']))
                 : null,
@@ -1975,7 +1981,10 @@ final class ChatAgent
                 : 0,
             'purchase_id' => trim((string) ($payload['purchase_id'] ?? '')) ?: '',
             'purchase_number' => trim((string) ($payload['purchase_number'] ?? '')) ?: '',
+            'purchase_document_id' => trim((string) ($payload['purchase_document_id'] ?? '')) ?: '',
+            'media_file_id' => trim((string) ($payload['media_file_id'] ?? '')) ?: '',
             'supplier_id' => trim((string) ($payload['supplier_id'] ?? '')) ?: '',
+            'document_type' => trim((string) ($payload['document_type'] ?? '')) ?: '',
             'line_count' => is_numeric($payload['line_count'] ?? null)
                 ? max(0, (int) $payload['line_count'])
                 : null,

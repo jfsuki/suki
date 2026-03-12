@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PurchaseDocument",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tenant_id",
+    "media_file_id",
+    "document_type",
+    "metadata"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "app_id": { "type": ["string", "null"] },
+    "purchase_id": { "type": ["string", "null"] },
+    "purchase_draft_id": { "type": ["string", "null"] },
+    "media_file_id": { "type": "string", "minLength": 1 },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "supplier_invoice",
+        "supplier_xml",
+        "support_document",
+        "payment_proof",
+        "general_attachment"
+      ]
+    },
+    "document_number": { "type": ["string", "null"] },
+    "supplier_id": { "type": ["string", "null"] },
+    "issue_date": { "type": ["string", "null"] },
+    "total_amount": { "type": ["number", "null"], "minimum": 0 },
+    "currency": { "type": ["string", "null"] },
+    "notes": { "type": ["string", "null"] },
+    "metadata": { "type": "object", "additionalProperties": true },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" }
+  }
+}

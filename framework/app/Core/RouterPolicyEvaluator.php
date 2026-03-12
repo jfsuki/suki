@@ -867,6 +867,57 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'AttachPurchaseDraftDocument':
+                if (trim((string) ($command['draft_id'] ?? $command['purchase_draft_id'] ?? '')) === '') {
+                    return [false, 'missing_draft_id'];
+                }
+                if (trim((string) ($command['media_file_id'] ?? $command['media_id'] ?? '')) === '') {
+                    return [false, 'missing_media_file_id'];
+                }
+                if (array_key_exists('total_amount', $command) && $command['total_amount'] !== null && $command['total_amount'] !== '' && !is_numeric($command['total_amount'])) {
+                    return [false, 'invalid_total_amount'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'AttachPurchaseDocument':
+                $purchaseId = trim((string) ($command['purchase_id'] ?? ''));
+                $purchaseNumber = trim((string) ($command['purchase_number'] ?? $command['number'] ?? ''));
+                $purchaseQuery = trim((string) ($command['purchase_query'] ?? $command['query'] ?? ''));
+                if ($purchaseId === '' && $purchaseNumber === '' && $purchaseQuery === '') {
+                    return [false, 'missing_purchase_reference'];
+                }
+                if (trim((string) ($command['media_file_id'] ?? $command['media_id'] ?? '')) === '') {
+                    return [false, 'missing_media_file_id'];
+                }
+                if (array_key_exists('total_amount', $command) && $command['total_amount'] !== null && $command['total_amount'] !== '' && !is_numeric($command['total_amount'])) {
+                    return [false, 'invalid_total_amount'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListPurchaseDocuments':
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                foreach (['purchase_id', 'purchase_number', 'purchase_query', 'purchase_draft_id', 'draft_id', 'media_file_id', 'document_type', 'supplier_id', 'supplier_query', 'document_number', 'date_from', 'date_to'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetPurchaseDocument':
+            case 'DetachPurchaseDocument':
+            case 'RegisterPurchaseDocumentMetadata':
+                if (trim((string) ($command['purchase_document_id'] ?? $command['document_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_purchase_document_id'];
+                }
+                if ((string) ($command['command'] ?? '') === 'RegisterPurchaseDocumentMetadata') {
+                    if (array_key_exists('total_amount', $command) && $command['total_amount'] !== null && $command['total_amount'] !== '' && !is_numeric($command['total_amount'])) {
+                        return [false, 'invalid_total_amount'];
+                    }
+                }
+                return [true, 'schema_valid'];
+
             case 'CreateEntity':
                 if ($entity === '') {
                     return [false, 'missing_entity'];

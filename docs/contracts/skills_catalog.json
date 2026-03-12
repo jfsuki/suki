@@ -547,8 +547,8 @@
       "name": "media_delete",
       "description": "Delete a file linked to a record with explicit confirmation.",
       "intent_patterns": [
-        "re:(elimina|eliminar|borra|borrar|quitar).*(archivo|documento|imagen|media)",
-        "re:(archivo|documento|imagen|media).*(elimina|eliminar|borra|borrar|quitar)"
+        "re:(elimina|eliminar|borra|borrar|quitar)\\b.*(archivo|documento|imagen|media)",
+        "re:(archivo|documento|imagen|media).*(elimina|eliminar|borra|borrar|quitar)\\b"
       ],
       "keywords": [
         "eliminar archivo",
@@ -1764,6 +1764,224 @@
         ],
         "optional": [
           "purchase_number"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_attach_document_to_draft",
+      "description": "Attach a media/document file to an open purchase draft without duplicating storage.",
+      "intent_patterns": [
+        "re:(adjunta|adjuntar|asocia|asociar|vincula|vincular).*(documento|archivo|factura|xml|soporte).*(borrador|draft).*(compra|purchase)",
+        "re:(borrador|draft).*(compra|purchase).*(adjunta|adjuntar|asocia|asociar|vincula|vincular).*(documento|archivo|factura|xml|soporte)"
+      ],
+      "keywords": [
+        "adjuntar documento al borrador compra",
+        "asociar factura proveedor al draft compra",
+        "vincular xml al borrador purchase"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_attach_document_to_draft"
+      ],
+      "priority": 176,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "draft_id",
+          "media_file_id",
+          "document_type",
+          "document_number",
+          "supplier_id",
+          "issue_date",
+          "total_amount",
+          "currency",
+          "notes"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_attach_document",
+      "description": "Attach a supplier invoice or support file to a finalized purchase using media references.",
+      "intent_patterns": [
+        "re:(adjunta|adjuntar|asocia|asociar|vincula|vincular).*(documento|archivo|factura|xml|soporte).*(compra|purchase)",
+        "re:(compra|purchase).*(adjunta|adjuntar|asocia|asociar|vincula|vincular).*(documento|archivo|factura|xml|soporte)"
+      ],
+      "keywords": [
+        "adjuntar documento compra",
+        "asociar factura proveedor a compra",
+        "vincular soporte purchase"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_attach_document"
+      ],
+      "priority": 175,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "purchase_id",
+          "purchase_number",
+          "purchase_query",
+          "media_file_id",
+          "document_type",
+          "document_number",
+          "supplier_id",
+          "supplier_query",
+          "issue_date",
+          "total_amount",
+          "currency",
+          "notes"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_list_documents",
+      "description": "List purchase-linked documents with lightweight purchase or draft filters.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(documentos|archivos|adjuntos).*(compra|purchase)",
+        "re:(documentos|archivos|adjuntos).*(compra|purchase).*(lista|listar|muestra|mostrar|ver|consulta)"
+      ],
+      "keywords": [
+        "listar documentos compra",
+        "ver adjuntos de compra",
+        "mostrar archivos purchase"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_list_documents"
+      ],
+      "priority": 158,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "purchase_id",
+          "purchase_number",
+          "purchase_draft_id",
+          "document_type",
+          "supplier_id",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_get_document",
+      "description": "Load a linked purchase document by purchase_document_id.",
+      "intent_patterns": [
+        "re:(ver|mostrar|muestra|consulta|abre|abrir).*(documento|archivo|adjunto).*(compra|purchase)",
+        "re:(documento|archivo|adjunto).*(compra|purchase).*(ver|mostrar|muestra|consulta|abre|abrir)"
+      ],
+      "keywords": [
+        "ver documento compra",
+        "abrir adjunto compra",
+        "mostrar archivo purchase"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_get_document"
+      ],
+      "priority": 157,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "purchase_document_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_detach_document",
+      "description": "Detach a linked media file from a purchase record while preserving the media asset.",
+      "intent_patterns": [
+        "re:(quita|quitar|desvincula|desvincular|elimina|eliminar).*(documento|archivo|adjunto).*(compra|purchase)",
+        "re:(documento|archivo|adjunto).*(compra|purchase).*(quita|quitar|desvincula|desvincular|elimina|eliminar)"
+      ],
+      "keywords": [
+        "desvincular documento compra",
+        "quitar adjunto compra",
+        "eliminar enlace documento purchase"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_detach_document"
+      ],
+      "priority": 156,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "purchase_document_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "purchases_register_document_metadata",
+      "description": "Register or update supplier invoice metadata linked to a purchase document.",
+      "intent_patterns": [
+        "re:(registra|registrar|actualiza|actualizar|completa|completar).*(metadata|datos|numero|nÃºmero|fecha|total).*(documento|factura|xml).*(compra|purchase)",
+        "re:(documento|factura|xml).*(compra|purchase).*(registra|registrar|actualiza|actualizar|completa|completar).*(metadata|datos|numero|nÃºmero|fecha|total)"
+      ],
+      "keywords": [
+        "registrar metadata documento compra",
+        "actualizar datos factura proveedor",
+        "completar documento purchase"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "purchases_register_document_metadata"
+      ],
+      "priority": 155,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "purchase_document_id",
+          "document_type",
+          "document_number",
+          "supplier_id",
+          "supplier_query",
+          "issue_date",
+          "total_amount",
+          "currency",
+          "notes"
         ]
       },
       "channel_capabilities": [

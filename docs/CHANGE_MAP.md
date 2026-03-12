@@ -52,7 +52,10 @@
   - allow free purchase lines only when the user gives `product_label`; if they provide a product reference, resolve it or fail safe
   - keep lifecycle consistent: `open draft -> completed draft + registered purchase`
   - keep numbering tenant-scoped and lightweight: `PUR-*`
-  - leave inventory, AP, fiscal support document, media and accounting as hooks only
+  - reuse `MediaService` for supplier invoice/support files; purchases only stores `purchase_document` linkage + metadata
+  - keep document intents limited to `supplier_invoice`, `supplier_xml`, `support_document`, `payment_proof`, `general_attachment`
+  - validate `media_file_id` and purchase/draft ownership before linking documents
+  - leave OCR, XML parsing, inventory, AP, fiscal support document issuance and accounting as hooks only
   - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
 - If you add AgentOps metrics:
   - keep `docs/contracts/agentops_metrics_contract.json` aligned

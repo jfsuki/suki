@@ -13,6 +13,7 @@ final class PurchasesRepository
     private const LINE_TABLE = 'purchase_draft_lines';
     private const PURCHASE_TABLE = 'purchases';
     private const PURCHASE_LINE_TABLE = 'purchase_lines';
+    private const DOCUMENT_TABLE = 'purchase_documents';
 
     private PDO $db;
 
@@ -26,7 +27,7 @@ final class PurchasesRepository
             $this->requiredTables(),
             $this->requiredIndexes(),
             [],
-            'db/migrations/' . $this->driver() . '/20260311_019_purchases_module_core.sql'
+            'db/migrations/' . $this->driver() . '/20260312_020_purchases_documents_support.sql'
         );
     }
 
@@ -252,6 +253,67 @@ final class PurchasesRepository
     }
 
     /**
+     * @param array<string, mixed> $record
+     * @return array<string, mixed>
+     */
+    public function createDocument(array $record): array
+    {
+        $id = $this->insertRecord(self::DOCUMENT_TABLE, [
+            'tenant_id', 'app_id', 'purchase_id', 'purchase_draft_id', 'media_file_id', 'document_type',
+            'document_number', 'supplier_id', 'issue_date', 'total_amount', 'currency', 'notes',
+            'metadata_json', 'created_at', 'updated_at',
+        ], [
+            'tenant_id' => $record['tenant_id'] ?? '',
+            'app_id' => $record['app_id'] ?? null,
+            'purchase_id' => $record['purchase_id'] ?? null,
+            'purchase_draft_id' => $record['purchase_draft_id'] ?? null,
+            'media_file_id' => $record['media_file_id'] ?? '',
+            'document_type' => $record['document_type'] ?? 'general_attachment',
+            'document_number' => $record['document_number'] ?? null,
+            'supplier_id' => $record['supplier_id'] ?? null,
+            'issue_date' => $record['issue_date'] ?? null,
+            'total_amount' => $record['total_amount'] ?? null,
+            'currency' => $record['currency'] ?? null,
+            'notes' => $record['notes'] ?? null,
+            'metadata_json' => $this->encodeJson($record['metadata'] ?? []),
+            'created_at' => $record['created_at'] ?? date('Y-m-d H:i:s'),
+            'updated_at' => $record['updated_at'] ?? ($record['created_at'] ?? date('Y-m-d H:i:s')),
+        ]);
+
+        $saved = $this->findDocument((string) ($record['tenant_id'] ?? ''), $id, $this->nullableString($record['app_id'] ?? null));
+        if (!is_array($saved)) {
+            throw new RuntimeException('PURCHASE_DOCUMENT_INSERT_FETCH_FAILED');
+        }
+
+        return $saved;
+    }
+
+    /**
+     * @param array<string, mixed> $updates
+     * @return array<string, mixed>|null
+     */
+    public function updateDocument(string $tenantId, string $documentId, array $updates, ?string $appId = null): ?array
+    {
+        $payload = $this->filterPayload($updates, [
+            'purchase_id', 'purchase_draft_id', 'media_file_id', 'document_type', 'document_number',
+            'supplier_id', 'issue_date', 'total_amount', 'currency', 'notes', 'metadata_json', 'updated_at',
+        ]);
+        if (array_key_exists('metadata', $updates)) {
+            $payload['metadata_json'] = $this->encodeJson($updates['metadata']);
+        }
+        if (!array_key_exists('updated_at', $payload)) {
+            $payload['updated_at'] = date('Y-m-d H:i:s');
+        }
+        if ($payload === []) {
+            return $this->findDocument($tenantId, $documentId, $appId);
+        }
+
+        $this->documentQuery($tenantId, $appId)->where('id', '=', $documentId)->update($payload);
+
+        return $this->findDocument($tenantId, $documentId, $appId);
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function loadDraftAggregate(string $tenantId, string $draftId, ?string $appId = null): ?array
@@ -325,6 +387,16 @@ final class PurchasesRepository
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function findDocument(string $tenantId, string $documentId, ?string $appId = null): ?array
+    {
+        $row = $this->documentQuery($tenantId, $appId)->where('id', '=', $documentId)->first();
+
+        return is_array($row) ? $this->normalizeDocumentRow($row) : null;
+    }
+
+    /**
      * @param array<string, mixed> $filters
      * @return array<int, array<string, mixed>>
      */
@@ -351,6 +423,35 @@ final class PurchasesRepository
         }
 
         return array_map(fn(array $row): array => $this->normalizePurchaseRow($row), $qb->get());
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function listDocuments(string $tenantId, array $filters = [], int $limit = 20): array
+    {
+        $qb = $this->documentQuery($tenantId, $this->nullableString($filters['app_id'] ?? null))
+            ->orderBy('created_at', 'DESC')
+            ->orderBy('id', 'DESC')
+            ->limit(max(1, min(100, $limit)));
+
+        foreach (['purchase_id', 'purchase_draft_id', 'media_file_id', 'document_type', 'supplier_id', 'document_number'] as $key) {
+            $value = $this->nullableString($filters[$key] ?? null);
+            if ($value !== null) {
+                $qb->where($key, '=', $value);
+            }
+        }
+        $dateFrom = $this->nullableString($filters['date_from'] ?? null);
+        if ($dateFrom !== null) {
+            $qb->where('created_at', '>=', $dateFrom);
+        }
+        $dateTo = $this->nullableString($filters['date_to'] ?? null);
+        if ($dateTo !== null) {
+            $qb->where('created_at', '<=', $dateTo);
+        }
+
+        return array_map(fn(array $row): array => $this->normalizeDocumentRow($row), $qb->get());
     }
 
     /**
@@ -424,6 +525,23 @@ final class PurchasesRepository
     }
 
     /**
+     * @return array<string, mixed>|null
+     */
+    public function deleteDocument(string $tenantId, string $documentId, ?string $appId = null): ?array
+    {
+        $current = $this->findDocument($tenantId, $documentId, $appId);
+        if (!is_array($current)) {
+            return null;
+        }
+
+        $this->documentQuery($tenantId, $appId)
+            ->where('id', '=', $documentId)
+            ->delete();
+
+        return $current;
+    }
+
+    /**
      * @template T
      * @param callable():T $callback
      * @return T
@@ -455,7 +573,7 @@ final class PurchasesRepository
      */
     private function requiredTables(): array
     {
-        return [self::DRAFT_TABLE, self::LINE_TABLE, self::PURCHASE_TABLE, self::PURCHASE_LINE_TABLE];
+        return [self::DRAFT_TABLE, self::LINE_TABLE, self::PURCHASE_TABLE, self::PURCHASE_LINE_TABLE, self::DOCUMENT_TABLE];
     }
 
     /**
@@ -468,6 +586,7 @@ final class PurchasesRepository
             self::LINE_TABLE => ['idx_purchase_draft_lines_tenant_draft', 'idx_purchase_draft_lines_tenant_product'],
             self::PURCHASE_TABLE => ['idx_purchases_tenant_app_created', 'idx_purchases_tenant_number', 'idx_purchases_tenant_draft'],
             self::PURCHASE_LINE_TABLE => ['idx_purchase_lines_tenant_purchase', 'idx_purchase_lines_tenant_product'],
+            self::DOCUMENT_TABLE => ['idx_purchase_documents_tenant_draft', 'idx_purchase_documents_tenant_purchase', 'idx_purchase_documents_tenant_media', 'idx_purchase_documents_tenant_type'],
         ];
     }
 
@@ -499,6 +618,12 @@ final class PurchasesRepository
         $this->db->exec('CREATE TABLE IF NOT EXISTS ' . self::PURCHASE_LINE_TABLE . ' (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id TEXT NOT NULL, app_id TEXT NULL, purchase_id TEXT NOT NULL, product_id TEXT NULL, sku TEXT NULL, supplier_sku TEXT NULL, product_label TEXT NOT NULL, qty REAL NOT NULL, unit_cost REAL NOT NULL, tax_rate REAL NULL, line_total REAL NOT NULL, metadata_json TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_purchase_lines_tenant_purchase ON ' . self::PURCHASE_LINE_TABLE . ' (tenant_id, app_id, purchase_id, id)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_purchase_lines_tenant_product ON ' . self::PURCHASE_LINE_TABLE . ' (tenant_id, product_id, created_at)');
+
+        $this->db->exec('CREATE TABLE IF NOT EXISTS ' . self::DOCUMENT_TABLE . ' (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id TEXT NOT NULL, app_id TEXT NULL, purchase_id TEXT NULL, purchase_draft_id TEXT NULL, media_file_id TEXT NOT NULL, document_type TEXT NOT NULL, document_number TEXT NULL, supplier_id TEXT NULL, issue_date TEXT NULL, total_amount REAL NULL, currency TEXT NULL, notes TEXT NULL, metadata_json TEXT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_purchase_documents_tenant_draft ON ' . self::DOCUMENT_TABLE . ' (tenant_id, app_id, purchase_draft_id, created_at)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_purchase_documents_tenant_purchase ON ' . self::DOCUMENT_TABLE . ' (tenant_id, app_id, purchase_id, created_at)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_purchase_documents_tenant_media ON ' . self::DOCUMENT_TABLE . ' (tenant_id, media_file_id, created_at)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_purchase_documents_tenant_type ON ' . self::DOCUMENT_TABLE . ' (tenant_id, document_type, created_at)');
     }
 
     private function ensureSchemaMySql(): void
@@ -507,6 +632,7 @@ final class PurchasesRepository
         $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::LINE_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, purchase_draft_id VARCHAR(120) NOT NULL, product_id VARCHAR(190) NULL, sku VARCHAR(190) NULL, supplier_sku VARCHAR(190) NULL, product_label VARCHAR(255) NOT NULL, qty DECIMAL(18,4) NOT NULL, unit_cost DECIMAL(18,4) NOT NULL, tax_rate DECIMAL(10,4) NULL, line_total DECIMAL(18,4) NOT NULL, metadata_json JSON NULL, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, PRIMARY KEY (id), KEY idx_purchase_draft_lines_tenant_draft (tenant_id, app_id, purchase_draft_id, id), KEY idx_purchase_draft_lines_tenant_product (tenant_id, product_id, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::PURCHASE_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, purchase_number VARCHAR(190) NULL, supplier_id VARCHAR(190) NULL, draft_id VARCHAR(120) NULL, status VARCHAR(32) NOT NULL, currency VARCHAR(16) NULL, subtotal DECIMAL(18,4) NOT NULL DEFAULT 0, tax_total DECIMAL(18,4) NOT NULL DEFAULT 0, total DECIMAL(18,4) NOT NULL DEFAULT 0, notes TEXT NULL, created_by_user_id VARCHAR(120) NULL, metadata_json JSON NULL, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, PRIMARY KEY (id), UNIQUE KEY idx_purchases_tenant_number (tenant_id, app_id, purchase_number), KEY idx_purchases_tenant_app_created (tenant_id, app_id, created_at, id), KEY idx_purchases_tenant_draft (tenant_id, app_id, draft_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::PURCHASE_LINE_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, purchase_id VARCHAR(120) NOT NULL, product_id VARCHAR(190) NULL, sku VARCHAR(190) NULL, supplier_sku VARCHAR(190) NULL, product_label VARCHAR(255) NOT NULL, qty DECIMAL(18,4) NOT NULL, unit_cost DECIMAL(18,4) NOT NULL, tax_rate DECIMAL(10,4) NULL, line_total DECIMAL(18,4) NOT NULL, metadata_json JSON NULL, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, PRIMARY KEY (id), KEY idx_purchase_lines_tenant_purchase (tenant_id, app_id, purchase_id, id), KEY idx_purchase_lines_tenant_product (tenant_id, product_id, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::DOCUMENT_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, purchase_id VARCHAR(120) NULL, purchase_draft_id VARCHAR(120) NULL, media_file_id VARCHAR(120) NOT NULL, document_type VARCHAR(64) NOT NULL, document_number VARCHAR(190) NULL, supplier_id VARCHAR(190) NULL, issue_date DATETIME NULL, total_amount DECIMAL(18,4) NULL, currency VARCHAR(16) NULL, notes TEXT NULL, metadata_json JSON NULL, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL, PRIMARY KEY (id), KEY idx_purchase_documents_tenant_draft (tenant_id, app_id, purchase_draft_id, created_at), KEY idx_purchase_documents_tenant_purchase (tenant_id, app_id, purchase_id, created_at), KEY idx_purchase_documents_tenant_media (tenant_id, media_file_id, created_at), KEY idx_purchase_documents_tenant_type (tenant_id, document_type, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
     private function draftQuery(string $tenantId, ?string $appId = null): QueryBuilder
@@ -552,6 +678,19 @@ final class PurchasesRepository
     {
         $qb = (new QueryBuilder($this->db, self::PURCHASE_LINE_TABLE))
             ->setAllowedColumns(['id', 'tenant_id', 'app_id', 'purchase_id', 'product_id', 'sku', 'supplier_sku', 'product_label', 'qty', 'unit_cost', 'tax_rate', 'line_total', 'metadata_json', 'created_at', 'updated_at'])
+            ->where('tenant_id', '=', $tenantId);
+
+        if ($appId !== null && $appId !== '') {
+            $qb->where('app_id', '=', $appId);
+        }
+
+        return $qb;
+    }
+
+    private function documentQuery(string $tenantId, ?string $appId = null): QueryBuilder
+    {
+        $qb = (new QueryBuilder($this->db, self::DOCUMENT_TABLE))
+            ->setAllowedColumns(['id', 'tenant_id', 'app_id', 'purchase_id', 'purchase_draft_id', 'media_file_id', 'document_type', 'document_number', 'supplier_id', 'issue_date', 'total_amount', 'currency', 'notes', 'metadata_json', 'created_at', 'updated_at'])
             ->where('tenant_id', '=', $tenantId);
 
         if ($appId !== null && $appId !== '') {
@@ -680,6 +819,32 @@ final class PurchasesRepository
             'unit_cost' => $this->decimal($row['unit_cost'] ?? 0),
             'tax_rate' => $row['tax_rate'] === null ? null : $this->decimal($row['tax_rate']),
             'line_total' => $this->decimal($row['line_total'] ?? 0),
+            'metadata' => $this->decodeJson($row['metadata_json'] ?? null),
+            'created_at' => (string) ($row['created_at'] ?? ''),
+            'updated_at' => (string) ($row['updated_at'] ?? ''),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function normalizeDocumentRow(array $row): array
+    {
+        return [
+            'id' => (string) ($row['id'] ?? ''),
+            'tenant_id' => (string) ($row['tenant_id'] ?? ''),
+            'app_id' => $this->nullableString($row['app_id'] ?? null),
+            'purchase_id' => $this->nullableString($row['purchase_id'] ?? null),
+            'purchase_draft_id' => $this->nullableString($row['purchase_draft_id'] ?? null),
+            'media_file_id' => (string) ($row['media_file_id'] ?? ''),
+            'document_type' => trim((string) ($row['document_type'] ?? 'general_attachment')) ?: 'general_attachment',
+            'document_number' => $this->nullableString($row['document_number'] ?? null),
+            'supplier_id' => $this->nullableString($row['supplier_id'] ?? null),
+            'issue_date' => $this->nullableString($row['issue_date'] ?? null),
+            'total_amount' => $row['total_amount'] === null ? null : $this->decimal($row['total_amount']),
+            'currency' => $this->nullableString($row['currency'] ?? null),
+            'notes' => $this->nullableString($row['notes'] ?? null),
             'metadata' => $this->decodeJson($row['metadata_json'] ?? null),
             'created_at' => (string) ($row['created_at'] ?? ''),
             'updated_at' => (string) ($row['updated_at'] ?? ''),

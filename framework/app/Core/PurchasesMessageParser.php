@@ -31,6 +31,12 @@ final class PurchasesMessageParser
             'purchases_get_purchase' => $this->parseGetPurchase($pairs, $baseCommand, $telemetry),
             'purchases_list' => $this->commandResult($baseCommand + ['command' => 'ListPurchases', 'status' => $this->firstValue($pairs, ['status']), 'supplier_id' => $this->firstValue($pairs, ['supplier_id']), 'purchase_number' => $this->firstValue($pairs, ['purchase_number', 'number']), 'date_from' => $this->firstValue($pairs, ['date_from', 'desde']), 'date_to' => $this->firstValue($pairs, ['date_to', 'hasta']), 'limit' => $this->firstValue($pairs, ['limit']) ?: '10'], $this->telemetry($telemetry, 'list')),
             'purchases_get_by_number' => $this->parseGetByNumber($pairs, $baseCommand, $telemetry),
+            'purchases_attach_document_to_draft' => $this->parseAttachDocumentToDraft($pairs, $baseCommand, $telemetry),
+            'purchases_attach_document' => $this->parseAttachDocument($pairs, $baseCommand, $telemetry),
+            'purchases_list_documents' => $this->parseListDocuments($pairs, $baseCommand, $telemetry),
+            'purchases_get_document' => $this->parseGetDocument($pairs, $baseCommand, $telemetry),
+            'purchases_detach_document' => $this->parseDetachDocument($pairs, $baseCommand, $telemetry),
+            'purchases_register_document_metadata' => $this->parseRegisterDocumentMetadata($pairs, $baseCommand, $telemetry),
             default => ['kind' => 'ask_user', 'reply' => 'No pude interpretar la operacion de compras.', 'telemetry' => $telemetry],
         };
     }
@@ -180,6 +186,134 @@ final class PurchasesMessageParser
     }
 
     /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseAttachDocumentToDraft(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $draftId = $this->firstValue($pairs, ['draft_id', 'purchase_draft_id']);
+        $mediaFileId = $this->firstValue($pairs, ['media_file_id', 'media_id']);
+        if ($draftId === '' || $mediaFileId === '') {
+            return $this->askUser('Indica `draft_id` y `media_file_id` para asociar el documento al borrador.', $this->telemetry($telemetry, 'attach_document_to_draft'));
+        }
+
+        return $this->commandResult($baseCommand + $this->documentCommandPayload($pairs) + [
+            'command' => 'AttachPurchaseDraftDocument',
+            'draft_id' => $draftId,
+            'media_file_id' => $mediaFileId,
+        ], $this->telemetry($telemetry, 'attach_document_to_draft'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseAttachDocument(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $purchaseId = $this->firstValue($pairs, ['purchase_id', 'id']);
+        $purchaseNumber = $this->firstValue($pairs, ['purchase_number', 'number']);
+        $purchaseQuery = $this->firstValue($pairs, ['purchase_query', 'query']);
+        $mediaFileId = $this->firstValue($pairs, ['media_file_id', 'media_id']);
+        if (($purchaseId === '' && $purchaseNumber === '' && $purchaseQuery === '') || $mediaFileId === '') {
+            return $this->askUser('Indica `purchase_id` o `purchase_number` y `media_file_id` para asociar el documento.', $this->telemetry($telemetry, 'attach_document'));
+        }
+
+        return $this->commandResult($baseCommand + $this->documentCommandPayload($pairs) + [
+            'command' => 'AttachPurchaseDocument',
+            'purchase_id' => $purchaseId !== '' ? $purchaseId : null,
+            'purchase_number' => $purchaseNumber !== '' ? $purchaseNumber : null,
+            'purchase_query' => $purchaseQuery !== '' ? $purchaseQuery : null,
+            'media_file_id' => $mediaFileId,
+        ], $this->telemetry($telemetry, 'attach_document'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseListDocuments(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        return $this->commandResult($baseCommand + [
+            'command' => 'ListPurchaseDocuments',
+            'purchase_id' => ($purchaseId = $this->firstValue($pairs, ['purchase_id'])) !== '' ? $purchaseId : null,
+            'purchase_number' => ($purchaseNumber = $this->firstValue($pairs, ['purchase_number', 'number'])) !== '' ? $purchaseNumber : null,
+            'purchase_query' => ($purchaseQuery = $this->firstValue($pairs, ['purchase_query', 'query'])) !== '' ? $purchaseQuery : null,
+            'purchase_draft_id' => ($draftId = $this->firstValue($pairs, ['purchase_draft_id', 'draft_id'])) !== '' ? $draftId : null,
+            'media_file_id' => ($mediaFileId = $this->firstValue($pairs, ['media_file_id', 'media_id'])) !== '' ? $mediaFileId : null,
+            'document_type' => ($documentType = $this->firstValue($pairs, ['document_type'])) !== '' ? $documentType : null,
+            'supplier_id' => ($supplierId = $this->firstValue($pairs, ['supplier_id'])) !== '' ? $supplierId : null,
+            'supplier_query' => ($supplierQuery = $this->firstValue($pairs, ['supplier_query', 'supplier'])) !== '' ? $supplierQuery : null,
+            'document_number' => ($documentNumber = $this->firstValue($pairs, ['document_number'])) !== '' ? $documentNumber : null,
+            'date_from' => ($dateFrom = $this->firstValue($pairs, ['date_from', 'desde'])) !== '' ? $dateFrom : null,
+            'date_to' => ($dateTo = $this->firstValue($pairs, ['date_to', 'hasta'])) !== '' ? $dateTo : null,
+            'limit' => $this->firstValue($pairs, ['limit']) ?: '10',
+        ], $this->telemetry($telemetry, 'list_documents'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseGetDocument(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $documentId = $this->firstValue($pairs, ['purchase_document_id', 'document_id', 'id']);
+        if ($documentId === '') {
+            return $this->askUser('Indica `purchase_document_id` para cargar el documento.', $this->telemetry($telemetry, 'get_document'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'GetPurchaseDocument',
+            'purchase_document_id' => $documentId,
+        ], $this->telemetry($telemetry, 'get_document'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseDetachDocument(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $documentId = $this->firstValue($pairs, ['purchase_document_id', 'document_id', 'id']);
+        if ($documentId === '') {
+            return $this->askUser('Indica `purchase_document_id` para desvincular el documento.', $this->telemetry($telemetry, 'detach_document'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'DetachPurchaseDocument',
+            'purchase_document_id' => $documentId,
+        ], $this->telemetry($telemetry, 'detach_document'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseRegisterDocumentMetadata(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $documentId = $this->firstValue($pairs, ['purchase_document_id', 'document_id', 'id']);
+        if ($documentId === '') {
+            return $this->askUser('Indica `purchase_document_id` para registrar metadata del documento.', $this->telemetry($telemetry, 'register_document_metadata'));
+        }
+
+        return $this->commandResult($baseCommand + $this->documentCommandPayload($pairs) + [
+            'command' => 'RegisterPurchaseDocumentMetadata',
+            'purchase_document_id' => $documentId,
+        ], $this->telemetry($telemetry, 'register_document_metadata'));
+    }
+
+    /**
      * @return array<string, string>
      */
     private function extractKeyValuePairs(string $message): array
@@ -235,6 +369,24 @@ final class PurchasesMessageParser
     private function askUser(string $reply, array $telemetry): array
     {
         return ['kind' => 'ask_user', 'reply' => $reply, 'telemetry' => $telemetry];
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @return array<string, mixed>
+     */
+    private function documentCommandPayload(array $pairs): array
+    {
+        return [
+            'document_type' => ($documentType = $this->firstValue($pairs, ['document_type'])) !== '' ? $documentType : null,
+            'document_number' => ($documentNumber = $this->firstValue($pairs, ['document_number'])) !== '' ? $documentNumber : null,
+            'supplier_id' => ($supplierId = $this->firstValue($pairs, ['supplier_id'])) !== '' ? $supplierId : null,
+            'supplier_query' => ($supplierQuery = $this->firstValue($pairs, ['supplier_query', 'supplier'])) !== '' ? $supplierQuery : null,
+            'issue_date' => ($issueDate = $this->firstValue($pairs, ['issue_date', 'fecha'])) !== '' ? $issueDate : null,
+            'total_amount' => ($totalAmount = $this->firstValue($pairs, ['total_amount', 'total'])) !== '' ? $totalAmount : null,
+            'currency' => ($currency = $this->firstValue($pairs, ['currency', 'moneda'])) !== '' ? $currency : null,
+            'notes' => ($notes = $this->firstValue($pairs, ['notes', 'nota'])) !== '' ? $notes : null,
+        ];
     }
 
     /**

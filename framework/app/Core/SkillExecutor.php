@@ -490,6 +490,12 @@ final class SkillExecutor
             'purchases_get_purchase',
             'purchases_list',
             'purchases_get_by_number',
+            'purchases_attach_document_to_draft',
+            'purchases_attach_document',
+            'purchases_list_documents',
+            'purchases_get_document',
+            'purchases_detach_document',
+            'purchases_register_document_metadata',
         ], true);
     }
 

@@ -12,6 +12,7 @@ final class PurchasesContractValidator
 {
     private const DRAFT_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/purchase_draft.schema.json';
     private const PURCHASE_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/purchase.schema.json';
+    private const DOCUMENT_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/purchase_document.schema.json';
 
     /**
      * @param array<string, mixed> $payload
@@ -27,6 +28,14 @@ final class PurchasesContractValidator
     public static function validatePurchase(array $payload): void
     {
         self::validate(self::PURCHASE_SCHEMA, self::normalizePayload($payload), 'Purchase');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public static function validateDocument(array $payload): void
+    {
+        self::validate(self::DOCUMENT_SCHEMA, self::normalizePayload($payload), 'PurchaseDocument');
     }
 
     /**

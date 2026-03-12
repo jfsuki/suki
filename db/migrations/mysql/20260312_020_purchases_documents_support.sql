@@ -1,0 +1,23 @@
+CREATE TABLE IF NOT EXISTS purchase_documents (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    tenant_id VARCHAR(120) NOT NULL,
+    app_id VARCHAR(120) NULL,
+    purchase_id VARCHAR(120) NULL,
+    purchase_draft_id VARCHAR(120) NULL,
+    media_file_id VARCHAR(120) NOT NULL,
+    document_type VARCHAR(64) NOT NULL,
+    document_number VARCHAR(190) NULL,
+    supplier_id VARCHAR(190) NULL,
+    issue_date DATETIME NULL,
+    total_amount DECIMAL(18,4) NULL,
+    currency VARCHAR(16) NULL,
+    notes TEXT NULL,
+    metadata_json JSON NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_purchase_documents_tenant_draft (tenant_id, app_id, purchase_draft_id, created_at),
+    KEY idx_purchase_documents_tenant_purchase (tenant_id, app_id, purchase_id, created_at),
+    KEY idx_purchase_documents_tenant_media (tenant_id, media_file_id, created_at),
+    KEY idx_purchase_documents_tenant_type (tenant_id, document_type, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

@@ -9,21 +9,41 @@ use RuntimeException;
 
 final class PurchasesService
 {
+    /** @var array<int, string> */
+    private const DOCUMENT_TYPES = [
+        'supplier_invoice',
+        'supplier_xml',
+        'support_document',
+        'payment_proof',
+        'general_attachment',
+    ];
+
     private PurchasesRepository $repository;
     private EntitySearchService $entitySearch;
+    private MediaService $mediaService;
     private AuditLogger $auditLogger;
     private PurchasesEventLogger $eventLogger;
 
     public function __construct(
         ?PurchasesRepository $repository = null,
         ?EntitySearchService $entitySearch = null,
-        ?AuditLogger $auditLogger = null,
+        MediaService|AuditLogger|null $mediaService = null,
+        PurchasesEventLogger|AuditLogger|null $auditLogger = null,
         ?PurchasesEventLogger $eventLogger = null
     ) {
         $this->repository = $repository ?? new PurchasesRepository();
         $this->entitySearch = $entitySearch ?? new EntitySearchService();
-        $this->auditLogger = $auditLogger ?? new AuditLogger();
-        $this->eventLogger = $eventLogger ?? new PurchasesEventLogger();
+
+        if ($mediaService instanceof MediaService) {
+            $this->mediaService = $mediaService;
+            $this->auditLogger = $auditLogger instanceof AuditLogger ? $auditLogger : new AuditLogger();
+            $this->eventLogger = $eventLogger ?? ($auditLogger instanceof PurchasesEventLogger ? $auditLogger : new PurchasesEventLogger());
+            return;
+        }
+
+        $this->mediaService = new MediaService();
+        $this->auditLogger = $mediaService instanceof AuditLogger ? $mediaService : new AuditLogger();
+        $this->eventLogger = $auditLogger instanceof PurchasesEventLogger ? $auditLogger : ($eventLogger ?? new PurchasesEventLogger());
     }
 
     /**
@@ -408,6 +428,210 @@ final class PurchasesService
     }
 
     /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function attachDocumentToPurchaseDraft(array $payload): array
+    {
+        $startedAt = microtime(true);
+        $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
+        $draftId = $this->requireString($payload['draft_id'] ?? $payload['purchase_draft_id'] ?? null, 'draft_id');
+        $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
+        $draft = $this->loadDraft($tenantId, $draftId, $appId);
+        $media = $this->loadLinkedMedia($tenantId, $this->requireString($payload['media_file_id'] ?? null, 'media_file_id'), $appId);
+        $existing = $this->repository->listDocuments($tenantId, [
+            'app_id' => $appId,
+            'purchase_draft_id' => $draftId,
+            'media_file_id' => (string) ($media['id'] ?? ''),
+        ], 1);
+        if ($existing !== []) {
+            $document = $this->decorateDocument($this->validatedDocument((array) $existing[0]), $tenantId, $appId, $media);
+            $this->logDocumentEvent('attach_document_to_draft', $tenantId, $appId, $document, $this->latencyMs($startedAt), [
+                'result_status' => 'success',
+                'deduped' => true,
+            ]);
+
+            return $document;
+        }
+
+        $document = $this->repository->createDocument($this->documentRecordFromPayload($payload, $tenantId, $appId, $media, [
+            'purchase_id' => null,
+            'purchase_draft_id' => $draftId,
+            'supplier_id' => $draft['supplier_id'] ?? null,
+            'currency' => $draft['currency'] ?? null,
+            'total_amount' => $draft['total'] ?? null,
+            'link_scope' => 'purchase_draft',
+        ]));
+        $document = $this->decorateDocument($this->validatedDocument($document), $tenantId, $appId, $media);
+        $this->logDocumentEvent('attach_document_to_draft', $tenantId, $appId, $document, $this->latencyMs($startedAt));
+
+        return $document;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function attachDocumentToPurchase(array $payload): array
+    {
+        $startedAt = microtime(true);
+        $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
+        $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
+        $purchase = $this->resolvePurchaseReference($tenantId, $appId, $payload);
+        $media = $this->loadLinkedMedia($tenantId, $this->requireString($payload['media_file_id'] ?? null, 'media_file_id'), $appId);
+        $purchaseId = (string) ($purchase['id'] ?? '');
+        $existing = $this->repository->listDocuments($tenantId, [
+            'app_id' => $appId,
+            'purchase_id' => $purchaseId,
+            'media_file_id' => (string) ($media['id'] ?? ''),
+        ], 1);
+        if ($existing !== []) {
+            $document = $this->decorateDocument($this->validatedDocument((array) $existing[0]), $tenantId, $appId, $media);
+            $this->logDocumentEvent('attach_document', $tenantId, $appId, $document, $this->latencyMs($startedAt), [
+                'result_status' => 'success',
+                'deduped' => true,
+            ]);
+
+            return $document;
+        }
+
+        $document = $this->repository->createDocument($this->documentRecordFromPayload($payload, $tenantId, $appId, $media, [
+            'purchase_id' => $purchaseId,
+            'purchase_draft_id' => $this->nullableString($purchase['draft_id'] ?? null),
+            'supplier_id' => $purchase['supplier_id'] ?? null,
+            'currency' => $purchase['currency'] ?? null,
+            'total_amount' => $purchase['total'] ?? null,
+            'link_scope' => 'purchase',
+        ]));
+        $document = $this->decorateDocument($this->validatedDocument($document), $tenantId, $appId, $media);
+        $this->logDocumentEvent('attach_document', $tenantId, $appId, $document, $this->latencyMs($startedAt), [
+            'purchase_number' => $purchase['purchase_number'] ?? null,
+        ]);
+
+        return $document;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function listPurchaseDocuments(string $tenantId, array $filters = [], ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $resolvedFilters = $this->documentFilters($tenantId, $filters, $appId);
+        $limit = max(1, min(50, (int) ($resolvedFilters['limit'] ?? 20)));
+        $items = $this->repository->listDocuments($tenantId, $resolvedFilters, $limit);
+        $documents = array_map(
+            fn(array $document): array => $this->decorateDocument($this->validatedDocument($document), $tenantId, $appId),
+            $items
+        );
+
+        $latencyMs = $this->latencyMs($startedAt);
+        $this->auditLogger->log('purchases_list_documents', 'purchase_document', null, [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'purchases',
+            'action_name' => 'list_documents',
+            'purchase_id' => $resolvedFilters['purchase_id'] ?? null,
+            'purchase_draft_id' => $resolvedFilters['purchase_draft_id'] ?? null,
+            'supplier_id' => $resolvedFilters['supplier_id'] ?? null,
+            'document_type' => $resolvedFilters['document_type'] ?? null,
+            'line_count' => count($documents),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+        $this->eventLogger->log('list_documents', $tenantId, [
+            'app_id' => $appId,
+            'action_name' => 'list_documents',
+            'purchase_id' => $resolvedFilters['purchase_id'] ?? null,
+            'purchase_draft_id' => $resolvedFilters['purchase_draft_id'] ?? null,
+            'supplier_id' => $resolvedFilters['supplier_id'] ?? null,
+            'document_type' => $resolvedFilters['document_type'] ?? null,
+            'result_count' => count($documents),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ]);
+
+        return $documents;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getPurchaseDocument(string $tenantId, string $documentId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $document = $this->decorateDocument($this->loadPurchaseDocument($tenantId, $documentId, $appId), $tenantId, $appId);
+        $this->logDocumentEvent('get_document', $tenantId, $appId, $document, $this->latencyMs($startedAt));
+
+        return $document;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function detachPurchaseDocument(string $tenantId, string $documentId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $document = $this->decorateDocument($this->loadPurchaseDocument($tenantId, $documentId, $appId), $tenantId, $appId);
+        $deleted = $this->repository->deleteDocument($tenantId, $documentId, $appId);
+        if (!is_array($deleted)) {
+            throw new RuntimeException('PURCHASE_DOCUMENT_NOT_FOUND');
+        }
+        $this->logDocumentEvent('detach_document', $tenantId, $appId, $document, $this->latencyMs($startedAt));
+
+        return ['deleted' => true, 'document' => $document];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function registerDocumentMetadata(array $payload): array
+    {
+        $startedAt = microtime(true);
+        $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
+        $documentId = $this->requireString($payload['purchase_document_id'] ?? $payload['document_id'] ?? $payload['id'] ?? null, 'purchase_document_id');
+        $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
+        $document = $this->loadPurchaseDocument($tenantId, $documentId, $appId);
+        $updates = [];
+
+        if (array_key_exists('document_type', $payload) && $payload['document_type'] !== null && $payload['document_type'] !== '') {
+            $updates['document_type'] = $this->documentType($payload['document_type']);
+        }
+        foreach (['document_number', 'currency', 'notes'] as $field) {
+            if (array_key_exists($field, $payload)) {
+                $updates[$field] = $this->nullableString($payload[$field]);
+            }
+        }
+        if (array_key_exists('issue_date', $payload)) {
+            $updates['issue_date'] = $this->nullableDateTime($payload['issue_date']);
+        }
+        if (array_key_exists('total_amount', $payload)) {
+            $updates['total_amount'] = $this->nullableMoney($payload['total_amount']);
+        }
+        if (array_key_exists('supplier_id', $payload) || array_key_exists('supplier_query', $payload) || array_key_exists('supplier', $payload) || array_key_exists('query', $payload)) {
+            $updates['supplier_id'] = $this->resolveSupplierIdForDocument($tenantId, $appId, $payload);
+        }
+        if (array_key_exists('metadata', $payload) || array_key_exists('metadata_json', $payload)) {
+            $updates['metadata'] = array_merge(
+                is_array($document['metadata'] ?? null) ? (array) $document['metadata'] : [],
+                $this->documentMetadata($payload['metadata'] ?? $payload['metadata_json'] ?? [])
+            );
+        }
+
+        $updated = $this->repository->updateDocument($tenantId, $documentId, $updates, $appId);
+        if (!is_array($updated)) {
+            throw new RuntimeException('PURCHASE_DOCUMENT_NOT_FOUND');
+        }
+
+        $document = $this->decorateDocument($this->validatedDocument($updated), $tenantId, $appId);
+        $this->logDocumentEvent('register_document_metadata', $tenantId, $appId, $document, $this->latencyMs($startedAt));
+
+        return $document;
+    }
+
+    /**
      * @return array<string, mixed>
      */
     private function loadDraft(string $tenantId, string $draftId, ?string $appId): array
@@ -517,6 +741,149 @@ final class PurchasesService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function loadPurchaseDocument(string $tenantId, string $documentId, ?string $appId): array
+    {
+        $document = $this->repository->findDocument($tenantId, $documentId, $appId);
+        if (!is_array($document)) {
+            throw new RuntimeException('PURCHASE_DOCUMENT_NOT_FOUND');
+        }
+
+        return $this->validatedDocument($document);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function resolvePurchaseReference(string $tenantId, ?string $appId, array $payload): array
+    {
+        $purchaseId = $this->nullableString($payload['purchase_id'] ?? null);
+        if ($purchaseId !== null) {
+            return $this->loadPurchase($tenantId, $purchaseId, $appId);
+        }
+
+        $purchaseNumber = $this->nullableString($payload['purchase_number'] ?? $payload['number'] ?? null);
+        if ($purchaseNumber !== null) {
+            return $this->getPurchaseByNumber($tenantId, $purchaseNumber, $appId);
+        }
+
+        $query = $this->nullableString($payload['purchase_query'] ?? $payload['query'] ?? null);
+        if ($query === null) {
+            throw new RuntimeException('PURCHASE_REFERENCE_REQUIRED');
+        }
+
+        try {
+            return $this->getPurchaseByNumber($tenantId, $query, $appId);
+        } catch (RuntimeException $e) {
+            if ((string) $e->getMessage() !== 'PURCHASE_NOT_FOUND') {
+                throw $e;
+            }
+        }
+
+        $resolution = $this->entitySearch->resolveBestMatch($tenantId, $query, [
+            'entity_type' => 'purchase',
+            'limit' => max(2, (int) ($payload['limit'] ?? 5)),
+        ], $appId);
+        if ((bool) ($resolution['resolved'] ?? false) && is_array($resolution['result'] ?? null)) {
+            return $this->loadPurchase($tenantId, (string) (((array) $resolution['result'])['entity_id'] ?? ''), $appId);
+        }
+        if (count((array) ($resolution['candidates'] ?? [])) > 0) {
+            throw new RuntimeException('PURCHASE_AMBIGUOUS');
+        }
+
+        throw new RuntimeException('PURCHASE_NOT_FOUND');
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<string, mixed>
+     */
+    private function documentFilters(string $tenantId, array $filters, ?string $appId): array
+    {
+        $resolved = [
+            'app_id' => $appId,
+            'document_type' => array_key_exists('document_type', $filters)
+                ? $this->documentType($filters['document_type'] ?? null, true)
+                : null,
+            'document_number' => $this->nullableString($filters['document_number'] ?? null),
+            'media_file_id' => $this->nullableString($filters['media_file_id'] ?? null),
+            'supplier_id' => $this->nullableString($filters['supplier_id'] ?? null),
+            'date_from' => $this->nullableDateTime($filters['date_from'] ?? null),
+            'date_to' => $this->nullableDateTime($filters['date_to'] ?? null),
+            'limit' => max(1, min(50, (int) ($filters['limit'] ?? 20))),
+        ];
+
+        $draftId = $this->nullableString($filters['purchase_draft_id'] ?? $filters['draft_id'] ?? null);
+        if ($draftId !== null) {
+            $this->loadDraft($tenantId, $draftId, $appId);
+            $resolved['purchase_draft_id'] = $draftId;
+        }
+
+        if (
+            array_key_exists('purchase_id', $filters)
+            || array_key_exists('purchase_number', $filters)
+            || array_key_exists('purchase_query', $filters)
+            || array_key_exists('query', $filters)
+            || array_key_exists('number', $filters)
+        ) {
+            $purchase = $this->resolvePurchaseReference($tenantId, $appId, $filters);
+            $resolved['purchase_id'] = (string) ($purchase['id'] ?? '');
+        }
+
+        if (($resolved['supplier_id'] ?? null) === null && (
+            array_key_exists('supplier_query', $filters)
+            || array_key_exists('supplier', $filters)
+            || array_key_exists('supplier_name', $filters)
+        )) {
+            $resolved['supplier_id'] = $this->resolveSupplierIdForDocument($tenantId, $appId, $filters);
+        }
+
+        return array_filter(
+            $resolved,
+            static fn($value): bool => $value !== null && $value !== ''
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $context
+     * @param array<string, mixed> $media
+     * @return array<string, mixed>
+     */
+    private function documentRecordFromPayload(array $payload, string $tenantId, ?string $appId, array $media, array $context): array
+    {
+        $createdAt = date('Y-m-d H:i:s');
+        $metadata = array_merge(
+            $this->documentMetadata($payload['metadata'] ?? $payload['metadata_json'] ?? []),
+            [
+                'hooks' => $this->documentHooks(),
+                'linked_media' => $this->mediaSnapshot($media),
+                'link_scope' => (string) ($context['link_scope'] ?? 'purchase'),
+            ]
+        );
+
+        return [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'purchase_id' => $this->nullableString($context['purchase_id'] ?? null),
+            'purchase_draft_id' => $this->nullableString($context['purchase_draft_id'] ?? null),
+            'media_file_id' => (string) ($media['id'] ?? ''),
+            'document_type' => $this->documentType($payload['document_type'] ?? null),
+            'document_number' => $this->nullableString($payload['document_number'] ?? null),
+            'supplier_id' => $this->resolveSupplierIdForDocument($tenantId, $appId, $payload, $this->nullableString($context['supplier_id'] ?? null)),
+            'issue_date' => $this->nullableDateTime($payload['issue_date'] ?? null),
+            'total_amount' => $this->nullableMoney($payload['total_amount'] ?? ($context['total_amount'] ?? null)),
+            'currency' => $this->nullableString($payload['currency'] ?? ($context['currency'] ?? null)),
+            'notes' => $this->nullableString($payload['notes'] ?? null),
+            'metadata' => $metadata,
+            'created_at' => $createdAt,
+            'updated_at' => $createdAt,
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $draft
      * @param array<int, array<string, mixed>> $lines
      */
@@ -565,6 +932,131 @@ final class PurchasesService
             'fiscal_support_document' => 'pending',
             'media_documents' => 'available',
             'accounting_posting' => 'pending',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function documentHooks(): array
+    {
+        return [
+            'ocr_extraction' => 'pending',
+            'xml_parsing' => 'pending',
+            'dian_support_document' => 'pending',
+            'accounting_posting' => 'pending',
+            'accounts_payable_reconciliation' => 'pending',
+            'inventory_evidence_linkage' => 'pending',
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function loadLinkedMedia(string $tenantId, string $mediaId, ?string $appId): array
+    {
+        try {
+            return $this->mediaService->get($tenantId, $mediaId, $appId);
+        } catch (RuntimeException $e) {
+            if ((string) $e->getMessage() === 'MEDIA_NOT_FOUND') {
+                throw new RuntimeException('PURCHASE_DOCUMENT_MEDIA_NOT_FOUND');
+            }
+            throw $e;
+        }
+    }
+
+    private function resolveSupplierIdForDocument(string $tenantId, ?string $appId, array $payload, ?string $fallbackSupplierId = null): ?string
+    {
+        $supplierId = $this->nullableString($payload['supplier_id'] ?? null);
+        if ($supplierId !== null) {
+            $supplier = $this->entitySearch->getByReference($tenantId, 'supplier', $supplierId, [], $appId);
+            if (!is_array($supplier)) {
+                throw new RuntimeException('PURCHASE_SUPPLIER_NOT_FOUND');
+            }
+
+            return (string) ($supplier['entity_id'] ?? '');
+        }
+
+        $supplierQuery = $this->nullableString($payload['supplier_query'] ?? $payload['supplier'] ?? $payload['supplier_name'] ?? null);
+        if ($supplierQuery !== null) {
+            $supplier = $this->resolveSupplier($tenantId, $appId, ['query' => $supplierQuery] + $payload);
+
+            return (string) ($supplier['entity_id'] ?? '');
+        }
+
+        return $fallbackSupplierId;
+    }
+
+    private function documentType($value, bool $nullable = false): ?string
+    {
+        $value = $this->nullableString($value);
+        if ($value === null) {
+            return $nullable ? null : 'general_attachment';
+        }
+        if (!in_array($value, self::DOCUMENT_TYPES, true)) {
+            throw new RuntimeException('PURCHASE_DOCUMENT_TYPE_INVALID');
+        }
+
+        return $value;
+    }
+
+    private function nullableDateTime($value): ?string
+    {
+        $value = $this->nullableString($value);
+        if ($value === null) {
+            return null;
+        }
+
+        try {
+            return (new DateTimeImmutable(str_replace('T', ' ', $value)))->format('Y-m-d H:i:s');
+        } catch (\Throwable $e) {
+            throw new RuntimeException('PURCHASE_DOCUMENT_ISSUE_DATE_INVALID');
+        }
+    }
+
+    private function nullableMoney($value): ?float
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+        if (!is_numeric($value)) {
+            throw new RuntimeException('PURCHASE_DOCUMENT_TOTAL_INVALID');
+        }
+
+        return round((float) $value, 4);
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<string, mixed>
+     */
+    private function documentMetadata($value): array
+    {
+        if (is_string($value) && trim($value) !== '') {
+            $decoded = json_decode($value, true);
+            if (is_array($decoded)) {
+                $value = $decoded;
+            }
+        }
+
+        return is_array($value) ? $value : [];
+    }
+
+    /**
+     * @param array<string, mixed> $media
+     * @return array<string, mixed>
+     */
+    private function mediaSnapshot(array $media): array
+    {
+        return [
+            'media_file_id' => (string) ($media['id'] ?? ''),
+            'entity_type' => (string) ($media['entity_type'] ?? ''),
+            'entity_id' => (string) ($media['entity_id'] ?? ''),
+            'file_type' => (string) ($media['file_type'] ?? ''),
+            'mime_type' => (string) ($media['mime_type'] ?? ''),
+            'storage_path' => (string) ($media['storage_path'] ?? ''),
+            'file_size' => max(0, (int) ($media['file_size'] ?? 0)),
+            'original_name' => (string) ($media['original_name'] ?? ''),
         ];
     }
 
@@ -760,6 +1252,55 @@ final class PurchasesService
         PurchasesContractValidator::validatePurchase($purchase);
 
         return $purchase;
+    }
+
+    /**
+     * @param array<string, mixed> $document
+     * @return array<string, mixed>
+     */
+    private function validatedDocument(array $document): array
+    {
+        $document['metadata'] = is_array($document['metadata'] ?? null) ? (array) $document['metadata'] : [];
+        PurchasesContractValidator::validateDocument($document);
+
+        return $document;
+    }
+
+    /**
+     * @param array<string, mixed> $document
+     * @param array<string, mixed>|null $media
+     * @return array<string, mixed>
+     */
+    private function decorateDocument(array $document, string $tenantId, ?string $appId, ?array $media = null): array
+    {
+        $document['metadata'] = is_array($document['metadata'] ?? null) ? (array) $document['metadata'] : [];
+        $document['media'] = $media ?? $this->loadLinkedMedia($tenantId, (string) ($document['media_file_id'] ?? ''), $appId);
+
+        return $document;
+    }
+
+    /**
+     * @param array<string, mixed> $document
+     * @param array<string, mixed> $extra
+     */
+    private function logDocumentEvent(string $actionName, string $tenantId, ?string $appId, array $document, int $latencyMs, array $extra = []): void
+    {
+        $payload = $extra + [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'purchases',
+            'action_name' => $actionName,
+            'purchase_id' => $document['purchase_id'] ?? null,
+            'purchase_draft_id' => $document['purchase_draft_id'] ?? null,
+            'purchase_document_id' => (string) ($document['id'] ?? ''),
+            'media_file_id' => (string) ($document['media_file_id'] ?? ''),
+            'supplier_id' => $document['supplier_id'] ?? null,
+            'document_type' => (string) ($document['document_type'] ?? 'general_attachment'),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ];
+        $this->auditLogger->log('purchases_' . $actionName, 'purchase_document', (string) ($document['id'] ?? ''), $payload);
+        $this->eventLogger->log($actionName, $tenantId, $payload);
     }
 
     private function stableTenantInt(string $tenantId): int
