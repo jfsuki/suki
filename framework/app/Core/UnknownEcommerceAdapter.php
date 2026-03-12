@@ -24,6 +24,11 @@ final class UnknownEcommerceAdapter implements EcommerceAdapterInterface
         return false;
     }
 
+    public function supportsOrderSync(): bool
+    {
+        return false;
+    }
+
     /**
      * @param array<string, mixed> $store
      * @param array<string, mixed> $credentials
@@ -162,6 +167,52 @@ final class UnknownEcommerceAdapter implements EcommerceAdapterInterface
             'supports_product_sync' => false,
             'build_result' => 'unsupported_platform',
             'sync_direction' => 'push_local_to_store',
+            'foundation_only' => true,
+            'payload' => [],
+            'metadata' => [
+                'requested_platform' => $this->requestedPlatform,
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $externalPayload
+     * @return array<string, mixed>
+     */
+    public function normalizeExternalOrder(array $externalPayload): array
+    {
+        return [
+            'platform' => $this->requestedPlatform,
+            'adapter_key' => $this->getPlatformKey(),
+            'supports_order_sync' => false,
+            'external_order_id' => null,
+            'external_status' => null,
+            'normalized_status' => 'unknown',
+            'currency' => null,
+            'total' => null,
+            'line_items' => [],
+            'line_count' => 0,
+            'customer_reference' => null,
+            'normalized' => false,
+            'normalization_result' => 'unsupported_platform',
+            'metadata' => [
+                'foundation_only' => true,
+                'requested_platform' => $this->requestedPlatform,
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $localPayload
+     * @return array<string, mixed>
+     */
+    public function buildOrderReferencePayload(array $localPayload): array
+    {
+        return [
+            'platform' => $this->requestedPlatform,
+            'adapter_key' => $this->getPlatformKey(),
+            'supports_order_sync' => false,
+            'build_result' => 'unsupported_platform',
             'foundation_only' => true,
             'payload' => [],
             'metadata' => [

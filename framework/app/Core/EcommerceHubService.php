@@ -52,6 +52,28 @@ final class EcommerceHubService
     ];
 
     /** @var array<int, string> */
+    private const ORDER_SYNC_STATUSES = [
+        'linked',
+        'normalized',
+        'pending_push',
+        'pending_pull',
+        'snapshot_received',
+        'synced',
+        'failed',
+    ];
+
+    /** @var array<int, string> */
+    private const ORDER_STATUSES = [
+        'pending',
+        'paid',
+        'processing',
+        'completed',
+        'canceled',
+        'refunded',
+        'unknown',
+    ];
+
+    /** @var array<int, string> */
     private const SYNC_DIRECTIONS = [
         'push_local_to_store',
         'pull_store_to_local',
@@ -736,6 +758,423 @@ final class EcommerceHubService
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
+    public function linkOrder(array $payload): array
+    {
+        $startedAt = microtime(true);
+        $tenantId = $this->requireString($payload['tenant_id'] ?? null, 'tenant_id');
+        $storeId = $this->requireString($payload['store_id'] ?? null, 'store_id');
+        $externalOrderId = $this->requireString($payload['external_order_id'] ?? null, 'external_order_id');
+        $appId = $this->nullableString($payload['app_id'] ?? $payload['project_id'] ?? null);
+        $store = $this->loadStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $inputMetadata = is_array($payload['metadata'] ?? null) ? (array) $payload['metadata'] : [];
+        $externalStatusInput = $this->nullableString($payload['external_status'] ?? ($inputMetadata['external_status'] ?? null));
+        $localStatusInput = $this->nullableString($payload['local_status'] ?? ($inputMetadata['local_status'] ?? null));
+        $existing = $this->repository->findOrderLinkByExternalOrder($tenantId, $storeId, $externalOrderId, $appId);
+
+        $metadata = $this->mergeMetadata(
+            $inputMetadata,
+            [
+                'link_origin' => 'foundation_manual',
+                'adapter_key' => $adapter->getPlatformKey(),
+                'future_hooks' => $this->futureOrderHooks(),
+            ]
+        );
+        if ($externalStatusInput !== null) {
+            $metadata['external_status_raw'] = $externalStatusInput;
+        }
+
+        if (is_array($existing)) {
+            $link = $this->repository->updateOrderLink($tenantId, (string) ($existing['id'] ?? ''), [
+                'local_reference_type' => $this->nullableString($payload['local_reference_type'] ?? null),
+                'local_reference_id' => $this->nullableString($payload['local_reference_id'] ?? null),
+                'external_status' => $this->nullableOrderStatus($externalStatusInput),
+                'local_status' => $this->nullableOrderStatus($localStatusInput),
+                'currency' => $this->nullableCurrencyCode($payload['currency'] ?? null),
+                'total' => $this->nullableAmount($payload['total'] ?? null),
+                'sync_status' => 'linked',
+                'metadata' => $this->mergeMetadata(
+                    is_array($existing['metadata'] ?? null) ? (array) $existing['metadata'] : [],
+                    $metadata
+                ),
+            ], $appId);
+        } else {
+            $link = $this->repository->createOrderLink([
+                'tenant_id' => $tenantId,
+                'app_id' => $appId,
+                'store_id' => $storeId,
+                'external_order_id' => $externalOrderId,
+                'local_reference_type' => $this->nullableString($payload['local_reference_type'] ?? null),
+                'local_reference_id' => $this->nullableString($payload['local_reference_id'] ?? null),
+                'external_status' => $this->nullableOrderStatus($externalStatusInput),
+                'local_status' => $this->nullableOrderStatus($localStatusInput),
+                'currency' => $this->nullableCurrencyCode($payload['currency'] ?? null),
+                'total' => $this->nullableAmount($payload['total'] ?? null),
+                'sync_status' => 'linked',
+                'metadata' => $metadata,
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+        }
+        if (!is_array($link)) {
+            throw new RuntimeException('ECOMMERCE_ORDER_LINK_NOT_FOUND');
+        }
+
+        $link = $this->validatedOrderLink($link);
+        $this->logOrderLinkEvent('link_order', $tenantId, $appId, $link, $store, $this->latencyMs($startedAt), [
+            'link_id' => (string) ($link['id'] ?? ''),
+            'external_order_id' => $externalOrderId,
+            'local_reference_type' => (string) ($link['local_reference_type'] ?? ''),
+            'local_reference_id' => (string) ($link['local_reference_id'] ?? ''),
+            'sync_status' => (string) ($link['sync_status'] ?? 'linked'),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'order_linked',
+            'result_status' => 'success',
+        ]);
+
+        return $link;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getOrderLink(string $tenantId, string $linkId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $link = $this->validatedOrderLink($this->loadOrderLink($tenantId, $linkId, $appId));
+        $store = $this->loadStore($tenantId, (string) ($link['store_id'] ?? ''), $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+
+        $this->logOrderLinkEvent('get_order_link', $tenantId, $appId, $link, $store, $this->latencyMs($startedAt), [
+            'link_id' => (string) ($link['id'] ?? ''),
+            'external_order_id' => (string) ($link['external_order_id'] ?? ''),
+            'local_reference_type' => (string) ($link['local_reference_type'] ?? ''),
+            'local_reference_id' => (string) ($link['local_reference_id'] ?? ''),
+            'sync_status' => (string) ($link['sync_status'] ?? ''),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'order_link_loaded',
+            'result_status' => 'success',
+        ]);
+
+        return $link;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function listOrderLinks(string $tenantId, string $storeId, array $filters = [], ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $store = $this->loadStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $items = array_map(
+            fn(array $item): array => $this->validatedOrderLink($item),
+            $this->repository->listOrderLinks($tenantId, $filters + ['store_id' => $storeId, 'app_id' => $appId], $this->limit($filters['limit'] ?? null, 20))
+        );
+        $selected = is_array($items[0] ?? null) ? (array) $items[0] : [];
+
+        $this->logOrderLinkEvent('list_order_links', $tenantId, $appId, $selected, $store, $this->latencyMs($startedAt), [
+            'link_id' => (string) ($selected['id'] ?? ''),
+            'external_order_id' => (string) ($selected['external_order_id'] ?? ($filters['external_order_id'] ?? '')),
+            'local_reference_type' => (string) ($selected['local_reference_type'] ?? ($filters['local_reference_type'] ?? '')),
+            'local_reference_id' => (string) ($selected['local_reference_id'] ?? ($filters['local_reference_id'] ?? '')),
+            'sync_status' => (string) ($selected['sync_status'] ?? ($filters['sync_status'] ?? '')),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'list_result',
+            'result_count' => count($items),
+            'result_status' => 'success',
+        ]);
+
+        return $items;
+    }
+
+    /**
+     * @param array<string, mixed> $externalOrderPayload
+     * @return array<string, mixed>
+     */
+    public function normalizeExternalOrderPayload(string $tenantId, string $storeId, array $externalOrderPayload, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $store = $this->loadStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $normalized = $adapter->normalizeExternalOrder($externalOrderPayload);
+        $externalOrderId = $this->nullableString($normalized['external_order_id'] ?? ($externalOrderPayload['external_order_id'] ?? null));
+
+        if (!$adapter->supportsOrderSync()) {
+            $result = [
+                'tenant_id' => $tenantId,
+                'app_id' => $appId,
+                'store_id' => $storeId,
+                'platform' => (string) ($store['platform'] ?? 'unknown'),
+                'adapter_key' => $adapter->getPlatformKey(),
+                'normalized_external_order' => $normalized,
+                'validation_result' => 'order_sync_not_supported',
+                'result_status' => 'safe_failure',
+            ];
+
+            $this->logOrderSnapshotEvent('normalize_external_order', $tenantId, $appId, [
+                'id' => '',
+                'store_id' => $storeId,
+                'external_order_id' => $externalOrderId ?? '',
+            ], $store, $this->latencyMs($startedAt), [
+                'link_id' => '',
+                'external_order_id' => $externalOrderId ?? '',
+                'local_reference_type' => '',
+                'local_reference_id' => '',
+                'sync_status' => '',
+                'adapter_key' => $adapter->getPlatformKey(),
+                'validation_result' => 'order_sync_not_supported',
+                'result_status' => 'safe_failure',
+            ]);
+
+            return $result;
+        }
+
+        if ($externalOrderId === null) {
+            throw new RuntimeException('ECOMMERCE_EXTERNAL_ORDER_ID_REQUIRED');
+        }
+
+        $existingLink = $this->repository->findOrderLinkByExternalOrder($tenantId, $storeId, $externalOrderId, $appId);
+        $result = [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'store_id' => $storeId,
+            'platform' => (string) ($store['platform'] ?? 'unknown'),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'external_order_id' => $externalOrderId,
+            'supports_order_sync' => $adapter->supportsOrderSync(),
+            'existing_link' => is_array($existingLink) ? $this->validatedOrderLink($existingLink) : null,
+            'normalized_external_order' => $normalized,
+            'validation_result' => 'external_order_normalized',
+            'result_status' => 'success',
+        ];
+
+        $this->logOrderSnapshotEvent('normalize_external_order', $tenantId, $appId, [
+            'id' => '',
+            'store_id' => $storeId,
+            'external_order_id' => $externalOrderId,
+        ], $store, $this->latencyMs($startedAt), [
+            'link_id' => is_array($existingLink) ? (string) ($existingLink['id'] ?? '') : '',
+            'external_order_id' => $externalOrderId,
+            'local_reference_type' => is_array($existingLink) ? (string) ($existingLink['local_reference_type'] ?? '') : '',
+            'local_reference_id' => is_array($existingLink) ? (string) ($existingLink['local_reference_id'] ?? '') : '',
+            'sync_status' => is_array($existingLink) ? (string) ($existingLink['sync_status'] ?? '') : '',
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'external_order_normalized',
+            'result_status' => 'success',
+        ]);
+
+        return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $externalOrderPayload
+     * @return array<string, mixed>
+     */
+    public function registerOrderPullSnapshot(string $tenantId, string $storeId, array $externalOrderPayload, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $store = $this->loadStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $normalized = $adapter->normalizeExternalOrder($externalOrderPayload);
+        $externalOrderId = $this->nullableString($normalized['external_order_id'] ?? ($externalOrderPayload['external_order_id'] ?? null));
+
+        if (!$adapter->supportsOrderSync()) {
+            $result = [
+                'tenant_id' => $tenantId,
+                'app_id' => $appId,
+                'store_id' => $storeId,
+                'platform' => (string) ($store['platform'] ?? 'unknown'),
+                'adapter_key' => $adapter->getPlatformKey(),
+                'normalized_external_order' => $normalized,
+                'validation_result' => 'order_sync_not_supported',
+                'result_status' => 'safe_failure',
+            ];
+
+            $this->logOrderSnapshotEvent('register_order_pull_snapshot', $tenantId, $appId, [
+                'id' => '',
+                'store_id' => $storeId,
+                'external_order_id' => $externalOrderId ?? '',
+            ], $store, $this->latencyMs($startedAt), [
+                'link_id' => '',
+                'external_order_id' => $externalOrderId ?? '',
+                'local_reference_type' => '',
+                'local_reference_id' => '',
+                'sync_status' => '',
+                'adapter_key' => $adapter->getPlatformKey(),
+                'validation_result' => 'order_sync_not_supported',
+                'result_status' => 'safe_failure',
+            ]);
+
+            return $result;
+        }
+
+        if ($externalOrderId === null) {
+            throw new RuntimeException('ECOMMERCE_EXTERNAL_ORDER_ID_REQUIRED');
+        }
+
+        $capturedAt = date('Y-m-d H:i:s');
+        $existing = $this->repository->findOrderLinkByExternalOrder($tenantId, $storeId, $externalOrderId, $appId);
+        $normalizedStatus = $this->orderStatus($normalized['normalized_status'] ?? 'unknown');
+        $snapshot = $this->repository->createOrderSnapshot([
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'store_id' => $storeId,
+            'external_order_id' => $externalOrderId,
+            'snapshot_payload' => $externalOrderPayload,
+            'normalized_payload' => $normalized,
+            'captured_at' => $capturedAt,
+            'metadata' => [
+                'adapter_key' => $adapter->getPlatformKey(),
+                'sync_direction' => 'pull_store_to_local',
+            ],
+        ]);
+
+        $linkMetadata = [
+            'adapter_key' => $adapter->getPlatformKey(),
+            'last_pull_snapshot_id' => (string) ($snapshot['id'] ?? ''),
+            'last_pull_snapshot' => $normalized,
+            'external_status_raw' => $this->nullableString($normalized['external_status'] ?? null),
+            'future_hooks' => $this->futureOrderHooks(),
+        ];
+        if (is_array($existing)) {
+            $link = $this->repository->updateOrderLink($tenantId, (string) ($existing['id'] ?? ''), [
+                'external_status' => $normalizedStatus,
+                'currency' => $this->nullableCurrencyCode($normalized['currency'] ?? null),
+                'total' => $this->nullableAmount($normalized['total'] ?? null),
+                'sync_status' => 'snapshot_received',
+                'last_sync_at' => $capturedAt,
+                'metadata' => $this->mergeMetadata(
+                    is_array($existing['metadata'] ?? null) ? (array) $existing['metadata'] : [],
+                    $linkMetadata
+                ),
+            ], $appId);
+        } else {
+            $link = $this->repository->createOrderLink([
+                'tenant_id' => $tenantId,
+                'app_id' => $appId,
+                'store_id' => $storeId,
+                'external_order_id' => $externalOrderId,
+                'external_status' => $normalizedStatus,
+                'currency' => $this->nullableCurrencyCode($normalized['currency'] ?? null),
+                'total' => $this->nullableAmount($normalized['total'] ?? null),
+                'sync_status' => 'snapshot_received',
+                'last_sync_at' => $capturedAt,
+                'metadata' => $linkMetadata,
+                'created_at' => $capturedAt,
+            ]);
+        }
+        if (!is_array($link)) {
+            throw new RuntimeException('ECOMMERCE_ORDER_LINK_NOT_FOUND');
+        }
+
+        $link = $this->validatedOrderLink($link);
+        $snapshot = $this->validatedOrderSnapshot($snapshot);
+        $this->logOrderSnapshotEvent('register_order_pull_snapshot', $tenantId, $appId, $snapshot, $store, $this->latencyMs($startedAt), [
+            'link_id' => (string) ($link['id'] ?? ''),
+            'external_order_id' => $externalOrderId,
+            'local_reference_type' => (string) ($link['local_reference_type'] ?? ''),
+            'local_reference_id' => (string) ($link['local_reference_id'] ?? ''),
+            'sync_status' => (string) ($link['sync_status'] ?? ''),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'pull_snapshot_registered',
+            'result_status' => 'success',
+        ]);
+
+        return [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'store_id' => $storeId,
+            'platform' => (string) ($store['platform'] ?? 'unknown'),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'external_order_id' => $externalOrderId,
+            'normalized_external_order' => $normalized,
+            'snapshot' => $snapshot,
+            'link' => $link,
+            'validation_result' => 'pull_snapshot_registered',
+            'result_status' => 'success',
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $metadata
+     * @return array<string, mixed>
+     */
+    public function markOrderSyncStatus(string $tenantId, string $linkId, string $syncStatus, array $metadata = [], ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $link = $this->loadOrderLink($tenantId, $linkId, $appId);
+        $store = $this->loadStore($tenantId, (string) ($link['store_id'] ?? ''), $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $updates = [
+            'sync_status' => $this->orderSyncStatus($syncStatus),
+            'last_sync_at' => date('Y-m-d H:i:s'),
+            'metadata' => $this->mergeMetadata(
+                is_array($link['metadata'] ?? null) ? (array) $link['metadata'] : [],
+                $metadata
+            ),
+        ];
+
+        $externalStatusInput = $this->nullableString($metadata['external_status'] ?? null);
+        if ($externalStatusInput !== null) {
+            $updates['external_status'] = $this->orderStatus($externalStatusInput);
+            $updates['metadata'] = $this->mergeMetadata((array) $updates['metadata'], ['external_status_raw' => $externalStatusInput]);
+        }
+
+        $localStatusInput = $this->nullableString($metadata['local_status'] ?? null);
+        if ($localStatusInput !== null) {
+            $updates['local_status'] = $this->orderStatus($localStatusInput);
+        }
+
+        $updated = $this->repository->updateOrderLink($tenantId, $linkId, $updates, $appId);
+        if (!is_array($updated)) {
+            throw new RuntimeException('ECOMMERCE_ORDER_LINK_NOT_FOUND');
+        }
+
+        $updated = $this->validatedOrderLink($updated);
+        $this->logOrderLinkEvent('mark_order_sync_status', $tenantId, $appId, $updated, $store, $this->latencyMs($startedAt), [
+            'link_id' => (string) ($updated['id'] ?? ''),
+            'external_order_id' => (string) ($updated['external_order_id'] ?? ''),
+            'local_reference_type' => (string) ($updated['local_reference_type'] ?? ''),
+            'local_reference_id' => (string) ($updated['local_reference_id'] ?? ''),
+            'sync_status' => (string) ($updated['sync_status'] ?? ''),
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'sync_status_recorded',
+            'result_status' => 'success',
+        ]);
+
+        return $updated;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getOrderSnapshot(string $tenantId, string $storeId, string $externalOrderId, ?string $appId = null): array
+    {
+        $startedAt = microtime(true);
+        $store = $this->loadStore($tenantId, $storeId, $appId);
+        $adapter = $this->resolveAdapter((string) ($store['platform'] ?? 'unknown'));
+        $snapshot = $this->validatedOrderSnapshot($this->loadOrderSnapshot($tenantId, $storeId, $externalOrderId, $appId));
+        $link = $this->repository->findOrderLinkByExternalOrder($tenantId, $storeId, $externalOrderId, $appId);
+
+        $this->logOrderSnapshotEvent('get_order_snapshot', $tenantId, $appId, $snapshot, $store, $this->latencyMs($startedAt), [
+            'link_id' => is_array($link) ? (string) ($link['id'] ?? '') : '',
+            'external_order_id' => $externalOrderId,
+            'local_reference_type' => is_array($link) ? (string) ($link['local_reference_type'] ?? '') : '',
+            'local_reference_id' => is_array($link) ? (string) ($link['local_reference_id'] ?? '') : '',
+            'sync_status' => is_array($link) ? (string) ($link['sync_status'] ?? '') : '',
+            'adapter_key' => $adapter->getPlatformKey(),
+            'validation_result' => 'snapshot_loaded',
+            'result_status' => 'success',
+        ]);
+
+        return $snapshot;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
     public function linkProduct(array $payload): array
     {
         $startedAt = microtime(true);
@@ -1150,6 +1589,32 @@ final class EcommerceHubService
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    private function loadOrderLink(string $tenantId, string $linkId, ?string $appId = null): array
+    {
+        $link = $this->repository->findOrderLink($tenantId, $linkId, $appId);
+        if (!is_array($link)) {
+            throw new RuntimeException('ECOMMERCE_ORDER_LINK_NOT_FOUND');
+        }
+
+        return $link;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function loadOrderSnapshot(string $tenantId, string $storeId, string $externalOrderId, ?string $appId = null): array
+    {
+        $snapshot = $this->repository->findLatestOrderSnapshot($tenantId, $storeId, $externalOrderId, $appId);
+        if (!is_array($snapshot)) {
+            throw new RuntimeException('ECOMMERCE_ORDER_SNAPSHOT_NOT_FOUND');
+        }
+
+        return $snapshot;
+    }
+
+    /**
      * @param array<string, mixed> $inputMetadata
      * @param array<string, mixed> $existingStore
      * @return array<string, mixed>
@@ -1171,7 +1636,7 @@ final class EcommerceHubService
                     'provider_runtime' => $adapter->getPlatformKey() === 'unknown' ? 'fallback' : 'foundation_ready',
                     'adapter_key' => $adapter->getPlatformKey(),
                     'product_sync' => $adapter->supportsProductSync() ? 'foundation_ready' : 'pending',
-                    'order_sync' => 'pending',
+                    'order_sync' => $adapter->supportsOrderSync() ? 'foundation_ready' : 'pending',
                     'inventory_sync' => 'pending',
                     'fiscal_linkage' => 'pending',
                 ],
@@ -1481,6 +1946,44 @@ final class EcommerceHubService
         return $value;
     }
 
+    private function orderSyncStatus($value): string
+    {
+        $value = strtolower(trim((string) $value));
+        if (!in_array($value, self::ORDER_SYNC_STATUSES, true)) {
+            throw new RuntimeException('ECOMMERCE_ORDER_SYNC_STATUS_INVALID');
+        }
+
+        return $value;
+    }
+
+    private function orderStatus($value): string
+    {
+        $value = strtolower(trim((string) $value));
+        $value = match ($value) {
+            'on-hold', 'awaiting_payment', 'unpaid', 'payment_pending', 'held' => 'pending',
+            'authorized' => 'paid',
+            'in_progress', 'confirmed', 'preparing' => 'processing',
+            'delivered', 'shipped', 'fulfilled' => 'completed',
+            'cancelled', 'void', 'annulled' => 'canceled',
+            'partial_refund', 'partially_refunded', 'returned' => 'refunded',
+            default => $value,
+        };
+        if (!in_array($value, self::ORDER_STATUSES, true)) {
+            throw new RuntimeException('ECOMMERCE_ORDER_STATUS_INVALID');
+        }
+
+        return $value;
+    }
+
+    private function nullableOrderStatus($value): ?string
+    {
+        if ($value === null || trim((string) $value) === '') {
+            return null;
+        }
+
+        return $this->orderStatus($value);
+    }
+
     private function syncDirection($value): string
     {
         $value = strtolower(trim((string) $value));
@@ -1509,10 +2012,24 @@ final class EcommerceHubService
             'tiendanube_adapter' => $adapterKey === 'tiendanube' ? 'foundation_ready' : 'pending',
             'prestashop_adapter' => $adapterKey === 'prestashop' ? 'foundation_ready' : 'pending',
             'product_sync' => $adapter?->supportsProductSync() === true ? 'foundation_ready' : 'pending',
-            'order_sync' => 'pending',
+            'order_sync' => $adapter?->supportsOrderSync() === true ? 'foundation_ready' : 'pending',
             'inventory_sync' => 'pending',
             'fiscal_order_linkage' => 'pending',
             'internal_order_ingest' => 'pending',
+        ];
+    }
+
+    /**
+     * @return array<string, string>
+     */
+    private function futureOrderHooks(): array
+    {
+        return [
+            'local_sale_creation' => 'pending',
+            'fiscal_document_linkage' => 'pending',
+            'inventory_movement' => 'pending',
+            'customer_resolution' => 'pending',
+            'payment_reconciliation' => 'pending',
         ];
     }
 
@@ -1608,6 +2125,13 @@ final class EcommerceHubService
         return $value === '' ? null : $value;
     }
 
+    private function nullableCurrencyCode($value): ?string
+    {
+        $currency = $this->nullableString($value);
+
+        return $currency !== null ? strtoupper($currency) : null;
+    }
+
     private function limit($value, int $default): int
     {
         if ($value === null || $value === '' || !is_numeric($value)) {
@@ -1678,6 +2202,34 @@ final class EcommerceHubService
     {
         $item['metadata'] = is_array($item['metadata'] ?? null) ? (array) $item['metadata'] : [];
         EcommerceHubContractValidator::validateProductLink($item);
+
+        return $item;
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     * @return array<string, mixed>
+     */
+    private function validatedOrderLink(array $item): array
+    {
+        $item['metadata'] = is_array($item['metadata'] ?? null) ? (array) $item['metadata'] : [];
+        EcommerceHubContractValidator::validateOrderLink($item);
+
+        return $item;
+    }
+
+    /**
+     * @param array<string, mixed> $item
+     * @return array<string, mixed>
+     */
+    private function validatedOrderSnapshot(array $item): array
+    {
+        $item['snapshot_payload'] = is_array($item['snapshot_payload'] ?? null) ? (array) $item['snapshot_payload'] : [];
+        if (!array_key_exists('normalized_payload', $item) || !is_array($item['normalized_payload'])) {
+            $item['normalized_payload'] = $item['normalized_payload'] ?? null;
+        }
+        $item['metadata'] = is_array($item['metadata'] ?? null) ? (array) $item['metadata'] : [];
+        EcommerceHubContractValidator::validateOrderSnapshot($item);
 
         return $item;
     }
@@ -1769,6 +2321,58 @@ final class EcommerceHubService
             'result_status' => 'success',
         ], $extra);
         $this->auditLogger->log('ecommerce_' . $actionName, 'ecommerce_product_link', (string) ($link['id'] ?? ''), $payload);
+        $this->eventLogger->log($actionName, $tenantId, $payload);
+    }
+
+    /**
+     * @param array<string, mixed> $link
+     * @param array<string, mixed> $store
+     */
+    private function logOrderLinkEvent(string $actionName, string $tenantId, ?string $appId, array $link, array $store, int $latencyMs, array $extra = []): void
+    {
+        $payload = array_merge([
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'ecommerce',
+            'action_name' => $actionName,
+            'store_id' => (string) ($store['id'] ?? $link['store_id'] ?? ''),
+            'platform' => (string) ($store['platform'] ?? 'unknown'),
+            'connection_status' => (string) ($store['connection_status'] ?? 'not_configured'),
+            'link_id' => (string) ($link['id'] ?? ''),
+            'external_order_id' => (string) ($link['external_order_id'] ?? ''),
+            'local_reference_type' => (string) ($link['local_reference_type'] ?? ''),
+            'local_reference_id' => (string) ($link['local_reference_id'] ?? ''),
+            'sync_status' => (string) ($link['sync_status'] ?? ''),
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ], $extra);
+        $this->auditLogger->log('ecommerce_' . $actionName, 'ecommerce_order_link', (string) ($link['id'] ?? ''), $payload);
+        $this->eventLogger->log($actionName, $tenantId, $payload);
+    }
+
+    /**
+     * @param array<string, mixed> $snapshot
+     * @param array<string, mixed> $store
+     */
+    private function logOrderSnapshotEvent(string $actionName, string $tenantId, ?string $appId, array $snapshot, array $store, int $latencyMs, array $extra = []): void
+    {
+        $payload = array_merge([
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'module' => 'ecommerce',
+            'action_name' => $actionName,
+            'store_id' => (string) ($store['id'] ?? $snapshot['store_id'] ?? ''),
+            'platform' => (string) ($store['platform'] ?? 'unknown'),
+            'connection_status' => (string) ($store['connection_status'] ?? 'not_configured'),
+            'link_id' => '',
+            'external_order_id' => (string) ($snapshot['external_order_id'] ?? ''),
+            'local_reference_type' => '',
+            'local_reference_id' => '',
+            'sync_status' => '',
+            'latency_ms' => $latencyMs,
+            'result_status' => 'success',
+        ], $extra);
+        $this->auditLogger->log('ecommerce_' . $actionName, 'ecommerce_order_snapshot', (string) ($snapshot['id'] ?? ''), $payload);
         $this->eventLogger->log($actionName, $tenantId, $payload);
     }
 }

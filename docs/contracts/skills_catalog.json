@@ -1,6 +1,6 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.7.4",
+  "version": "1.7.5",
   "effective_date": "2026-03-12",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
@@ -2801,6 +2801,245 @@
           "local_order_status",
           "external_status",
           "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_link_order",
+      "description": "Link one ecommerce order to an optional local reference for a store.",
+      "intent_patterns": [
+        "re:(vincula|vincular|linkea|linkear|relaciona|relacionar).*(pedido ecommerce|orden ecommerce|order ecommerce)",
+        "re:(pedido ecommerce|orden ecommerce|order ecommerce).*(vincula|vincular|linkea|linkear|relaciona|relacionar)"
+      ],
+      "keywords": [
+        "vincular pedido ecommerce",
+        "link order ecommerce",
+        "relacionar orden ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_link_order"
+      ],
+      "priority": 160,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "external_order_id",
+          "local_reference_type",
+          "local_reference_id",
+          "external_status",
+          "local_status",
+          "currency",
+          "total"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_get_order_link",
+      "description": "Load one ecommerce order link by link_id.",
+      "intent_patterns": [
+        "re:(ver|mostrar|muestra|consulta|abre|abrir).*(vinculo pedido ecommerce|link pedido ecommerce|orden vinculada ecommerce)",
+        "re:(vinculo pedido ecommerce|link pedido ecommerce|orden vinculada ecommerce).*(ver|mostrar|muestra|consulta|abre|abrir)"
+      ],
+      "keywords": [
+        "ver vinculo pedido ecommerce",
+        "abrir link pedido ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_get_order_link"
+      ],
+      "priority": 159,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "link_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_list_order_links",
+      "description": "List ecommerce order links for one store with lightweight filters.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(vinculos de pedidos ecommerce|links de pedidos ecommerce|ordenes vinculadas ecommerce)",
+        "re:(vinculos de pedidos ecommerce|links de pedidos ecommerce|ordenes vinculadas ecommerce).*(lista|listar|muestra|mostrar|ver|consulta)"
+      ],
+      "keywords": [
+        "listar vinculos de pedidos ecommerce",
+        "links pedidos ecommerce",
+        "ordenes vinculadas ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_list_order_links"
+      ],
+      "priority": 158,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "external_order_id",
+          "local_reference_type",
+          "local_reference_id",
+          "external_status",
+          "local_status",
+          "currency",
+          "sync_status",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_register_order_pull_snapshot",
+      "description": "Register a normalized inbound ecommerce order snapshot without creating local sales automatically.",
+      "intent_patterns": [
+        "re:(registra|registrar|guarda|guardar).*(snapshot pull pedido ecommerce|pull pedido ecommerce|snapshot orden ecommerce)",
+        "re:(snapshot pull pedido ecommerce|pull pedido ecommerce|snapshot orden ecommerce).*(registra|registrar|guarda|guardar)"
+      ],
+      "keywords": [
+        "registrar snapshot pedido ecommerce",
+        "pull pedido ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_register_order_pull_snapshot"
+      ],
+      "priority": 157,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "external_order_id",
+          "status",
+          "currency",
+          "total"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_normalize_external_order",
+      "description": "Normalize one external ecommerce order payload for safe downstream sync preparation.",
+      "intent_patterns": [
+        "re:(normaliza|normalizar|prepara|preparar|mapea|mapear).*(pedido ecommerce|orden ecommerce|payload order ecommerce)",
+        "re:(pedido ecommerce|orden ecommerce|payload order ecommerce).*(normaliza|normalizar|prepara|preparar|mapea|mapear)"
+      ],
+      "keywords": [
+        "normalizar pedido ecommerce",
+        "payload order ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_normalize_external_order"
+      ],
+      "priority": 156,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "external_order_id",
+          "status",
+          "currency",
+          "total"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_mark_order_sync_status",
+      "description": "Record the sync status of one ecommerce order link safely.",
+      "intent_patterns": [
+        "re:(marca|marcar|actualiza|actualizar|cambia|cambiar).*(estado sync pedido ecommerce|sync orden ecommerce|estado de pedido ecommerce)",
+        "re:(estado sync pedido ecommerce|sync orden ecommerce|estado de pedido ecommerce).*(marca|marcar|actualiza|actualizar|cambia|cambiar)"
+      ],
+      "keywords": [
+        "marcar sync pedido ecommerce",
+        "estado pedido ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_mark_order_sync_status"
+      ],
+      "priority": 155,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "link_id",
+          "sync_status",
+          "external_status",
+          "local_status"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "ecommerce_get_order_snapshot",
+      "description": "Load the latest ecommerce order snapshot for one store and external order id.",
+      "intent_patterns": [
+        "re:(ver|mostrar|muestra|consulta|abre|abrir).*(snapshot pedido ecommerce|snapshot orden ecommerce)",
+        "re:(snapshot pedido ecommerce|snapshot orden ecommerce).*(ver|mostrar|muestra|consulta|abre|abrir)"
+      ],
+      "keywords": [
+        "ver snapshot pedido ecommerce",
+        "abrir snapshot orden ecommerce"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "ecommerce_get_order_snapshot"
+      ],
+      "priority": 154,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "store_id",
+          "external_order_id"
         ]
       },
       "channel_capabilities": [

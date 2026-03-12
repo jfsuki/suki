@@ -75,14 +75,16 @@
 - If you add Ecommerce Hub behavior:
   - update `EcommerceHubRepository`, `EcommerceHubService`, `EcommerceHubCommandHandler`, `EcommerceHubMessageParser`
   - keep adapter selection centralized in `EcommerceAdapterResolver`; use `UnknownEcommerceAdapter` as safe fallback
-  - keep the hub canonical: store/channel records, encrypted credentials, sync jobs, order refs and product links only
+  - keep the hub canonical: store/channel records, encrypted credentials, sync jobs, order refs, order links, order snapshots and product links only
   - keep platform classification limited to `woocommerce`, `tiendanube`, `prestashop`, `custom_store`, `unknown` until a real adapter exists
   - persist credentials encrypted at rest and return masked payloads only; never log raw secrets
   - keep setup/connection validation lightweight: store status + connection status + masked credential shape + capabilities
   - product sync foundation may link local/external products, prepare normalized push payloads, register pull snapshots and record sync state without calling remote APIs
+  - order sync foundation may link external orders, normalize payloads, register pull snapshots and record sync state without creating local sales, fiscal documents or inventory movements
   - resolve local products through `EntitySearchService`; do not invent matches or create local products from pull snapshots automatically
-  - treat real remote product sync, order sync, inventory sync, webhook ingestion and fiscal linkage as future hooks only
+  - treat real remote product sync, real remote order sync, inventory sync, webhook ingestion and fiscal linkage as future hooks only
   - wire adapter actions (`validate_connection`, `get_store_metadata`, `get_platform_capabilities`, `ping_store`) through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator` and tests together
+  - wire order sync actions (`link_order`, `get_order_link`, `list_order_links`, `register_order_pull_snapshot`, `normalize_external_order`, `mark_order_sync_status`, `get_order_snapshot`) through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator` and tests together
   - wire product sync actions (`link_product`, `unlink_product`, `list_product_links`, `get_product_link`, `prepare_product_push_payload`, `register_product_pull_snapshot`, `mark_product_sync_status`) through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator` and tests together
   - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
 - If you add AgentOps metrics:
@@ -125,9 +127,11 @@
   - stays pending until a future adapter submits and reconciles the document externally
 - Ecommerce lifecycle
   - `store created -> credentials registered -> setup validated -> sync_job queued|running|completed|failed`
-  - external orders stay as canonical `ecommerce_order_ref` records until future sync/import flows materialize local entities
+  - external orders may stay as lightweight `ecommerce_order_ref` records while order sync foundation tracks canonical `ecommerce_order_link + ecommerce_order_snapshot`
   - product sync foundation lifecycle
   - `product link created -> push payload prepared | pull snapshot registered -> sync_status recorded -> future remote sync`
+  - order sync foundation lifecycle
+  - `order link created | external order normalized -> pull snapshot registered -> sync_status recorded -> future sale|fiscal|inventory|customer|payment linkage`
 
 ## Impact hotspots
 - `framework/app/Core/ChatAgent.php`

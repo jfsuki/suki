@@ -15,6 +15,8 @@ final class EcommerceHubContractValidator
     private const SYNC_JOB_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/ecommerce_sync_job.schema.json';
     private const ORDER_REF_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/ecommerce_order_ref.schema.json';
     private const PRODUCT_LINK_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/ecommerce_product_link.schema.json';
+    private const ORDER_LINK_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/ecommerce_order_link.schema.json';
+    private const ORDER_SNAPSHOT_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/ecommerce_order_snapshot.schema.json';
     private const STORE_SETUP_SCHEMA = FRAMEWORK_ROOT . '/contracts/schemas/ecommerce_store_setup.schema.json';
 
     /**
@@ -55,6 +57,22 @@ final class EcommerceHubContractValidator
     public static function validateProductLink(array $payload): void
     {
         self::validate(self::PRODUCT_LINK_SCHEMA, self::normalizePayload($payload), 'EcommerceProductLink');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public static function validateOrderLink(array $payload): void
+    {
+        self::validate(self::ORDER_LINK_SCHEMA, self::normalizePayload($payload), 'EcommerceOrderLink');
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public static function validateOrderSnapshot(array $payload): void
+    {
+        self::validate(self::ORDER_SNAPSHOT_SCHEMA, self::normalizePayload($payload), 'EcommerceOrderSnapshot');
     }
 
     /**

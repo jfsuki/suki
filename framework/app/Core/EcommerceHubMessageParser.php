@@ -35,6 +35,13 @@ final class EcommerceHubMessageParser
             'ecommerce_create_sync_job' => $this->parseCreateSyncJob($pairs, $baseCommand, $telemetry),
             'ecommerce_list_sync_jobs' => $this->parseListSyncJobs($pairs, $baseCommand, $telemetry),
             'ecommerce_list_order_refs' => $this->parseListOrderRefs($pairs, $baseCommand, $telemetry),
+            'ecommerce_link_order' => $this->parseLinkOrder($pairs, $baseCommand, $telemetry),
+            'ecommerce_get_order_link' => $this->parseGetOrderLink($pairs, $baseCommand, $telemetry),
+            'ecommerce_list_order_links' => $this->parseListOrderLinks($pairs, $baseCommand, $telemetry),
+            'ecommerce_register_order_pull_snapshot' => $this->parseRegisterOrderPullSnapshot($pairs, $baseCommand, $telemetry),
+            'ecommerce_normalize_external_order' => $this->parseNormalizeExternalOrder($pairs, $baseCommand, $telemetry),
+            'ecommerce_mark_order_sync_status' => $this->parseMarkOrderSyncStatus($pairs, $baseCommand, $telemetry),
+            'ecommerce_get_order_snapshot' => $this->parseGetOrderSnapshot($pairs, $baseCommand, $telemetry),
             'ecommerce_link_product' => $this->parseLinkProduct($pairs, $baseCommand, $telemetry),
             'ecommerce_unlink_product' => $this->parseUnlinkProduct($pairs, $baseCommand, $telemetry),
             'ecommerce_list_product_links' => $this->parseListProductLinks($pairs, $baseCommand, $telemetry),
@@ -330,6 +337,170 @@ final class EcommerceHubMessageParser
      * @param array<string, mixed> $telemetry
      * @return array<string, mixed>
      */
+    private function parseLinkOrder(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $storeId = $this->firstValue($pairs, ['store_id']);
+        $externalOrderId = $this->firstValue($pairs, ['external_order_id', 'order_id', 'id']);
+        if ($storeId === '' || $externalOrderId === '') {
+            return $this->askUser('Indica `store_id` y `external_order_id` para vincular el pedido ecommerce.', $this->telemetry($telemetry, 'link_order'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'LinkEcommerceOrder',
+            'store_id' => $storeId,
+            'external_order_id' => $externalOrderId,
+            'local_reference_type' => ($localReferenceType = $this->firstValue($pairs, ['local_reference_type'])) !== '' ? $localReferenceType : null,
+            'local_reference_id' => ($localReferenceId = $this->firstValue($pairs, ['local_reference_id'])) !== '' ? $localReferenceId : null,
+            'external_status' => ($externalStatus = $this->firstValue($pairs, ['external_status', 'status'])) !== '' ? $externalStatus : null,
+            'local_status' => ($localStatus = $this->firstValue($pairs, ['local_status'])) !== '' ? $localStatus : null,
+            'currency' => ($currency = $this->firstValue($pairs, ['currency', 'moneda'])) !== '' ? $currency : null,
+            'total' => ($total = $this->firstValue($pairs, ['total'])) !== '' ? $total : null,
+        ], $this->telemetry($telemetry, 'link_order'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseGetOrderLink(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $linkId = $this->firstValue($pairs, ['link_id', 'id']);
+        if ($linkId === '') {
+            return $this->askUser('Indica `link_id` para cargar el vinculo de pedido ecommerce.', $this->telemetry($telemetry, 'get_order_link'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'GetEcommerceOrderLink',
+            'link_id' => $linkId,
+        ], $this->telemetry($telemetry, 'get_order_link'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseListOrderLinks(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $storeId = $this->firstValue($pairs, ['store_id']);
+        if ($storeId === '') {
+            return $this->askUser('Indica `store_id` para listar vinculos de pedidos ecommerce.', $this->telemetry($telemetry, 'list_order_links'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'ListEcommerceOrderLinks',
+            'store_id' => $storeId,
+            'external_order_id' => ($externalOrderId = $this->firstValue($pairs, ['external_order_id', 'order_id'])) !== '' ? $externalOrderId : null,
+            'local_reference_type' => ($localReferenceType = $this->firstValue($pairs, ['local_reference_type'])) !== '' ? $localReferenceType : null,
+            'local_reference_id' => ($localReferenceId = $this->firstValue($pairs, ['local_reference_id'])) !== '' ? $localReferenceId : null,
+            'external_status' => ($externalStatus = $this->firstValue($pairs, ['external_status'])) !== '' ? $externalStatus : null,
+            'local_status' => ($localStatus = $this->firstValue($pairs, ['local_status'])) !== '' ? $localStatus : null,
+            'currency' => ($currency = $this->firstValue($pairs, ['currency', 'moneda'])) !== '' ? $currency : null,
+            'sync_status' => ($syncStatus = $this->firstValue($pairs, ['sync_status', 'status'])) !== '' ? $syncStatus : null,
+            'limit' => $this->firstValue($pairs, ['limit']) ?: '10',
+        ], $this->telemetry($telemetry, 'list_order_links'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseRegisterOrderPullSnapshot(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $storeId = $this->firstValue($pairs, ['store_id']);
+        $externalOrderId = $this->firstValue($pairs, ['external_order_id', 'order_id', 'id']);
+        if ($storeId === '' || $externalOrderId === '') {
+            return $this->askUser('Indica `store_id` y `external_order_id` para registrar el snapshot pull del pedido ecommerce.', $this->telemetry($telemetry, 'register_order_pull_snapshot'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'RegisterEcommerceOrderPullSnapshot',
+            'store_id' => $storeId,
+            'external_order_payload' => $this->buildExternalOrderPayload($pairs, $externalOrderId),
+        ], $this->telemetry($telemetry, 'register_order_pull_snapshot'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseNormalizeExternalOrder(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $storeId = $this->firstValue($pairs, ['store_id']);
+        $externalOrderId = $this->firstValue($pairs, ['external_order_id', 'order_id', 'id']);
+        if ($storeId === '' || $externalOrderId === '') {
+            return $this->askUser('Indica `store_id` y `external_order_id` para normalizar el pedido ecommerce.', $this->telemetry($telemetry, 'normalize_external_order'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'NormalizeEcommerceExternalOrder',
+            'store_id' => $storeId,
+            'external_order_payload' => $this->buildExternalOrderPayload($pairs, $externalOrderId),
+        ], $this->telemetry($telemetry, 'normalize_external_order'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseMarkOrderSyncStatus(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $linkId = $this->firstValue($pairs, ['link_id', 'id']);
+        $syncStatus = $this->firstValue($pairs, ['sync_status', 'status']);
+        if ($linkId === '' || $syncStatus === '') {
+            return $this->askUser('Indica `link_id` y `sync_status` para registrar el estado de sync del pedido ecommerce.', $this->telemetry($telemetry, 'mark_order_sync_status'));
+        }
+
+        $metadata = array_filter([
+            'external_status' => ($externalStatus = $this->firstValue($pairs, ['external_status'])) !== '' ? $externalStatus : null,
+            'local_status' => ($localStatus = $this->firstValue($pairs, ['local_status'])) !== '' ? $localStatus : null,
+            'note' => ($note = $this->firstValue($pairs, ['note'])) !== '' ? $note : null,
+        ], static fn($value): bool => $value !== null && $value !== '');
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'MarkEcommerceOrderSyncStatus',
+            'link_id' => $linkId,
+            'sync_status' => $syncStatus,
+            'metadata' => $metadata,
+        ], $this->telemetry($telemetry, 'mark_order_sync_status'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
+    private function parseGetOrderSnapshot(array $pairs, array $baseCommand, array $telemetry): array
+    {
+        $storeId = $this->firstValue($pairs, ['store_id']);
+        $externalOrderId = $this->firstValue($pairs, ['external_order_id', 'order_id', 'id']);
+        if ($storeId === '' || $externalOrderId === '') {
+            return $this->askUser('Indica `store_id` y `external_order_id` para cargar el snapshot del pedido ecommerce.', $this->telemetry($telemetry, 'get_order_snapshot'));
+        }
+
+        return $this->commandResult($baseCommand + [
+            'command' => 'GetEcommerceOrderSnapshot',
+            'store_id' => $storeId,
+            'external_order_id' => $externalOrderId,
+        ], $this->telemetry($telemetry, 'get_order_snapshot'));
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @param array<string, mixed> $baseCommand
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>
+     */
     private function parseLinkProduct(array $pairs, array $baseCommand, array $telemetry): array
     {
         $storeId = $this->firstValue($pairs, ['store_id']);
@@ -565,5 +736,19 @@ final class EcommerceHubMessageParser
         }
 
         return '';
+    }
+
+    /**
+     * @param array<string, string> $pairs
+     * @return array<string, mixed>
+     */
+    private function buildExternalOrderPayload(array $pairs, string $externalOrderId): array
+    {
+        return array_filter([
+            'external_order_id' => $externalOrderId,
+            'status' => ($status = $this->firstValue($pairs, ['status', 'external_status'])) !== '' ? $status : null,
+            'currency' => ($currency = $this->firstValue($pairs, ['currency', 'moneda'])) !== '' ? $currency : null,
+            'total' => ($total = $this->firstValue($pairs, ['total'])) !== '' ? $total : null,
+        ], static fn($value): bool => $value !== null && $value !== '');
     }
 }

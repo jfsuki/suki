@@ -56,6 +56,14 @@ abstract class AbstractEcommerceAdapter implements EcommerceAdapterInterface
             && (($capabilities['products_read'] ?? false) === true || ($capabilities['products_write'] ?? false) === true);
     }
 
+    public function supportsOrderSync(): bool
+    {
+        $capabilities = $this->listCapabilities();
+
+        return $this->getPlatformKey() !== 'unknown'
+            && (($capabilities['orders_read'] ?? false) === true || ($capabilities['orders_write'] ?? false) === true);
+    }
+
     /**
      * @param array<string, mixed> $store
      * @return array<string, mixed>
@@ -232,6 +240,98 @@ abstract class AbstractEcommerceAdapter implements EcommerceAdapterInterface
         ];
     }
 
+    /**
+     * @param array<string, mixed> $externalPayload
+     * @return array<string, mixed>
+     */
+    public function normalizeExternalOrder(array $externalPayload): array
+    {
+        $externalOrderId = $this->firstStringValue($externalPayload, [
+            'external_order_id',
+            'external_id',
+            'order_id',
+            'id',
+            'number',
+        ]);
+        $externalStatus = $this->firstStringValue($externalPayload, [
+            'external_status',
+            'status',
+            'order_status',
+            'current_state',
+            'financial_status',
+            'fulfillment_status',
+        ]);
+        $currency = $this->firstStringValue($externalPayload, ['currency', 'currency_code', 'currency_iso']);
+        $currency = $currency !== null ? strtoupper($currency) : null;
+        $total = $this->firstNumericValue($externalPayload, ['total', 'grand_total', 'amount_total', 'total_paid']);
+        $lineItems = $this->normalizeOrderLineItems($externalPayload);
+
+        return [
+            'platform' => $this->getPlatformKey(),
+            'adapter_key' => $this->getPlatformKey(),
+            'supports_order_sync' => $this->supportsOrderSync(),
+            'external_order_id' => $externalOrderId,
+            'external_status' => $externalStatus,
+            'normalized_status' => $this->normalizeOrderStatusValue($externalStatus),
+            'currency' => $currency,
+            'total' => $total,
+            'line_items' => $lineItems,
+            'line_count' => count($lineItems),
+            'customer_reference' => $this->firstStringValue($externalPayload, [
+                'customer_email',
+                'email',
+                'customer_id',
+                'customer_reference',
+            ]),
+            'normalized' => $externalOrderId !== null,
+            'normalization_result' => $externalOrderId !== null ? 'normalized' : 'missing_external_order_id',
+            'metadata' => [
+                'foundation_only' => true,
+                'source_field_count' => count($externalPayload),
+                'source_fields' => array_values(array_filter(array_map(
+                    static fn($key): string => is_string($key) ? trim($key) : '',
+                    array_keys($externalPayload)
+                ), static fn(string $key): bool => $key !== '')),
+                'future_hooks' => [
+                    'local_sale_creation' => 'pending',
+                    'fiscal_linkage' => 'pending',
+                    'inventory_movement' => 'pending',
+                    'customer_resolution' => 'pending',
+                    'payment_reconciliation' => 'pending',
+                ],
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $localPayload
+     * @return array<string, mixed>
+     */
+    public function buildOrderReferencePayload(array $localPayload): array
+    {
+        $currency = $this->firstStringValue($localPayload, ['currency', 'currency_code']);
+        $currency = $currency !== null ? strtoupper($currency) : null;
+
+        return [
+            'platform' => $this->getPlatformKey(),
+            'adapter_key' => $this->getPlatformKey(),
+            'supports_order_sync' => $this->supportsOrderSync(),
+            'build_result' => $this->supportsOrderSync() ? 'payload_ready' : 'not_supported',
+            'foundation_only' => true,
+            'payload' => [
+                'source_local_reference_type' => $this->firstStringValue($localPayload, ['local_reference_type', 'reference_type']),
+                'source_local_reference_id' => $this->firstStringValue($localPayload, ['local_reference_id', 'reference_id', 'id']),
+                'status' => $this->normalizeOrderStatusValue($this->firstStringValue($localPayload, ['local_status', 'status'])),
+                'currency' => $currency,
+                'total' => $this->firstNumericValue($localPayload, ['total', 'amount_total']),
+            ],
+            'metadata' => [
+                'api_family' => $this->platformMetadata([])['api_family'] ?? $this->getPlatformKey(),
+                'remote_operation' => 'orders.upsert.pending',
+            ],
+        ];
+    }
+
     protected function platformLabel(): string
     {
         return ucfirst(str_replace('_', ' ', $this->getPlatformKey()));
@@ -404,6 +504,72 @@ abstract class AbstractEcommerceAdapter implements EcommerceAdapterInterface
         }
 
         return null;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<int, string> $keys
+     */
+    protected function firstNumericValue(array $payload, array $keys): ?float
+    {
+        foreach ($keys as $key) {
+            $value = $payload[$key] ?? null;
+            if ($value === null || $value === '') {
+                continue;
+            }
+            if (is_numeric($value)) {
+                return round((float) $value, 4);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<int, array<string, mixed>>
+     */
+    protected function normalizeOrderLineItems(array $payload): array
+    {
+        $lineSource = $payload['line_items'] ?? $payload['items'] ?? $payload['products'] ?? null;
+        if (!is_array($lineSource)) {
+            return [];
+        }
+
+        $normalized = [];
+        foreach ($lineSource as $line) {
+            if (!is_array($line)) {
+                continue;
+            }
+            $normalized[] = [
+                'external_product_id' => $this->firstStringValue($line, ['external_product_id', 'product_id', 'id']),
+                'sku' => $this->firstStringValue($line, ['sku', 'reference', 'product_reference']),
+                'name' => $this->firstStringValue($line, ['name', 'title', 'product_name']),
+                'quantity' => $this->firstNumericValue($line, ['quantity', 'qty', 'units']),
+                'unit_price' => $this->firstNumericValue($line, ['unit_price', 'price', 'price_unit']),
+                'total' => $this->firstNumericValue($line, ['total', 'line_total', 'subtotal']),
+            ];
+        }
+
+        return $normalized;
+    }
+
+    protected function normalizeOrderStatusValue(?string $status): string
+    {
+        $status = strtolower(trim((string) $status));
+        if ($status === '') {
+            return 'unknown';
+        }
+
+        return match (true) {
+            in_array($status, ['pending', 'on-hold', 'awaiting_payment', 'unpaid', 'payment_pending', 'held'], true) => 'pending',
+            in_array($status, ['paid', 'authorized'], true) => 'paid',
+            in_array($status, ['processing', 'in_progress', 'confirmed', 'preparing'], true) => 'processing',
+            in_array($status, ['completed', 'delivered', 'shipped', 'fulfilled'], true) => 'completed',
+            in_array($status, ['canceled', 'cancelled', 'void', 'annulled'], true) => 'canceled',
+            in_array($status, ['refunded', 'partial_refund', 'partially_refunded', 'returned'], true) => 'refunded',
+            default => 'unknown',
+        };
     }
 
     /**

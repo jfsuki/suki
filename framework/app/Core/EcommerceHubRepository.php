@@ -13,6 +13,8 @@ final class EcommerceHubRepository
     private const CREDENTIAL_TABLE = 'ecommerce_credentials';
     private const SYNC_JOB_TABLE = 'ecommerce_sync_jobs';
     private const ORDER_REF_TABLE = 'ecommerce_order_refs';
+    private const ORDER_LINK_TABLE = 'ecommerce_order_links';
+    private const ORDER_SNAPSHOT_TABLE = 'ecommerce_order_snapshots';
     private const PRODUCT_LINK_TABLE = 'ecommerce_product_links';
 
     private PDO $db;
@@ -27,7 +29,7 @@ final class EcommerceHubRepository
             $this->requiredTables(),
             $this->requiredIndexes(),
             [],
-            'db/migrations/' . $this->driver() . '/20260312_023_ecommerce_product_sync_foundation.sql'
+            'db/migrations/' . $this->driver() . '/20260312_024_ecommerce_order_sync_foundation.sql'
         );
     }
 
@@ -375,6 +377,182 @@ final class EcommerceHubRepository
      * @param array<string, mixed> $record
      * @return array<string, mixed>
      */
+    public function createOrderLink(array $record): array
+    {
+        $id = $this->insertRecord(self::ORDER_LINK_TABLE, [
+            'tenant_id',
+            'app_id',
+            'store_id',
+            'external_order_id',
+            'local_reference_type',
+            'local_reference_id',
+            'external_status',
+            'local_status',
+            'currency',
+            'total',
+            'sync_status',
+            'last_sync_at',
+            'metadata_json',
+            'created_at',
+        ], [
+            'tenant_id' => $record['tenant_id'] ?? '',
+            'app_id' => $record['app_id'] ?? null,
+            'store_id' => $record['store_id'] ?? '',
+            'external_order_id' => $record['external_order_id'] ?? '',
+            'local_reference_type' => $record['local_reference_type'] ?? null,
+            'local_reference_id' => $record['local_reference_id'] ?? null,
+            'external_status' => $record['external_status'] ?? null,
+            'local_status' => $record['local_status'] ?? null,
+            'currency' => $record['currency'] ?? null,
+            'total' => $record['total'] ?? null,
+            'sync_status' => $record['sync_status'] ?? 'linked',
+            'last_sync_at' => $record['last_sync_at'] ?? null,
+            'metadata_json' => $this->encodeJson($record['metadata'] ?? []),
+            'created_at' => $record['created_at'] ?? date('Y-m-d H:i:s'),
+        ]);
+
+        $saved = $this->findOrderLink((string) ($record['tenant_id'] ?? ''), $id, $this->nullableString($record['app_id'] ?? null));
+        if (!is_array($saved)) {
+            throw new RuntimeException('ECOMMERCE_ORDER_LINK_INSERT_FETCH_FAILED');
+        }
+
+        return $saved;
+    }
+
+    /**
+     * @param array<string, mixed> $updates
+     * @return array<string, mixed>|null
+     */
+    public function updateOrderLink(string $tenantId, string $linkId, array $updates, ?string $appId = null): ?array
+    {
+        $payload = $this->filterPayload($updates, [
+            'local_reference_type',
+            'local_reference_id',
+            'external_status',
+            'local_status',
+            'currency',
+            'total',
+            'sync_status',
+            'last_sync_at',
+            'metadata_json',
+        ]);
+        if (array_key_exists('metadata', $updates)) {
+            $payload['metadata_json'] = $this->encodeJson($updates['metadata']);
+        }
+        if ($payload === []) {
+            return $this->findOrderLink($tenantId, $linkId, $appId);
+        }
+
+        $this->orderLinkQuery($tenantId, $appId)
+            ->where('id', '=', $linkId)
+            ->update($payload);
+
+        return $this->findOrderLink($tenantId, $linkId, $appId);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findOrderLink(string $tenantId, string $linkId, ?string $appId = null): ?array
+    {
+        $row = $this->orderLinkQuery($tenantId, $appId)
+            ->where('id', '=', $linkId)
+            ->first();
+
+        return is_array($row) ? $this->normalizeOrderLinkRow($row) : null;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findOrderLinkByExternalOrder(string $tenantId, string $storeId, string $externalOrderId, ?string $appId = null): ?array
+    {
+        $row = $this->orderLinkQuery($tenantId, $appId)
+            ->where('store_id', '=', $storeId)
+            ->where('external_order_id', '=', $externalOrderId)
+            ->orderBy('created_at', 'DESC')
+            ->orderBy('id', 'DESC')
+            ->first();
+
+        return is_array($row) ? $this->normalizeOrderLinkRow($row) : null;
+    }
+
+    /**
+     * @param array<string, mixed> $filters
+     * @return array<int, array<string, mixed>>
+     */
+    public function listOrderLinks(string $tenantId, array $filters = [], int $limit = 20): array
+    {
+        $qb = $this->orderLinkQuery($tenantId, $this->nullableString($filters['app_id'] ?? null))
+            ->orderBy('created_at', 'DESC')
+            ->orderBy('id', 'DESC')
+            ->limit(max(1, min(100, $limit)));
+
+        foreach (['store_id', 'external_order_id', 'local_reference_type', 'local_reference_id', 'external_status', 'local_status', 'currency', 'sync_status'] as $key) {
+            $value = $this->nullableString($filters[$key] ?? null);
+            if ($value !== null) {
+                $qb->where($key, '=', $value);
+            }
+        }
+
+        return array_map([$this, 'normalizeOrderLinkRow'], $qb->get());
+    }
+
+    /**
+     * @param array<string, mixed> $record
+     * @return array<string, mixed>
+     */
+    public function createOrderSnapshot(array $record): array
+    {
+        $id = $this->insertRecord(self::ORDER_SNAPSHOT_TABLE, [
+            'tenant_id',
+            'app_id',
+            'store_id',
+            'external_order_id',
+            'snapshot_payload_json',
+            'normalized_payload_json',
+            'captured_at',
+            'metadata_json',
+        ], [
+            'tenant_id' => $record['tenant_id'] ?? '',
+            'app_id' => $record['app_id'] ?? null,
+            'store_id' => $record['store_id'] ?? '',
+            'external_order_id' => $record['external_order_id'] ?? '',
+            'snapshot_payload_json' => $this->encodeJson($record['snapshot_payload'] ?? []),
+            'normalized_payload_json' => array_key_exists('normalized_payload', $record)
+                ? $this->encodeJson($record['normalized_payload'])
+                : null,
+            'captured_at' => $record['captured_at'] ?? date('Y-m-d H:i:s'),
+            'metadata_json' => $this->encodeJson($record['metadata'] ?? []),
+        ]);
+
+        $saved = $this->findLatestOrderSnapshot((string) ($record['tenant_id'] ?? ''), (string) ($record['store_id'] ?? ''), (string) ($record['external_order_id'] ?? ''), $this->nullableString($record['app_id'] ?? null));
+        if (!is_array($saved) || (string) ($saved['id'] ?? '') !== $id) {
+            throw new RuntimeException('ECOMMERCE_ORDER_SNAPSHOT_INSERT_FETCH_FAILED');
+        }
+
+        return $saved;
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function findLatestOrderSnapshot(string $tenantId, string $storeId, string $externalOrderId, ?string $appId = null): ?array
+    {
+        $row = $this->orderSnapshotQuery($tenantId, $appId)
+            ->where('store_id', '=', $storeId)
+            ->where('external_order_id', '=', $externalOrderId)
+            ->orderBy('captured_at', 'DESC')
+            ->orderBy('id', 'DESC')
+            ->first();
+
+        return is_array($row) ? $this->normalizeOrderSnapshotRow($row) : null;
+    }
+
+    /**
+     * @param array<string, mixed> $record
+     * @return array<string, mixed>
+     */
     public function createProductLink(array $record): array
     {
         $id = $this->insertRecord(self::PRODUCT_LINK_TABLE, [
@@ -547,6 +725,8 @@ final class EcommerceHubRepository
             self::CREDENTIAL_TABLE,
             self::SYNC_JOB_TABLE,
             self::ORDER_REF_TABLE,
+            self::ORDER_LINK_TABLE,
+            self::ORDER_SNAPSHOT_TABLE,
             self::PRODUCT_LINK_TABLE,
         ];
     }
@@ -572,6 +752,13 @@ final class EcommerceHubRepository
             self::ORDER_REF_TABLE => [
                 'idx_ecommerce_order_refs_tenant_store_external',
                 'idx_ecommerce_order_refs_tenant_status',
+            ],
+            self::ORDER_LINK_TABLE => [
+                'idx_ecommerce_order_links_tenant_store_external',
+                'idx_ecommerce_order_links_tenant_status',
+            ],
+            self::ORDER_SNAPSHOT_TABLE => [
+                'idx_ecommerce_order_snapshots_tenant_store_external',
             ],
             self::PRODUCT_LINK_TABLE => [
                 'idx_ecommerce_product_links_tenant_store_local',
@@ -609,6 +796,13 @@ final class EcommerceHubRepository
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_order_refs_tenant_store_external ON ' . self::ORDER_REF_TABLE . ' (tenant_id, app_id, store_id, external_order_id, created_at)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_order_refs_tenant_status ON ' . self::ORDER_REF_TABLE . ' (tenant_id, store_id, local_order_status, external_status, created_at)');
 
+        $this->db->exec('CREATE TABLE IF NOT EXISTS ' . self::ORDER_LINK_TABLE . ' (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id TEXT NOT NULL, app_id TEXT NULL, store_id TEXT NOT NULL, external_order_id TEXT NOT NULL, local_reference_type TEXT NULL, local_reference_id TEXT NULL, external_status TEXT NULL, local_status TEXT NULL, currency TEXT NULL, total REAL NULL, sync_status TEXT NOT NULL, last_sync_at TEXT NULL, metadata_json TEXT NULL, created_at TEXT NOT NULL)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_order_links_tenant_store_external ON ' . self::ORDER_LINK_TABLE . ' (tenant_id, app_id, store_id, external_order_id, created_at)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_order_links_tenant_status ON ' . self::ORDER_LINK_TABLE . ' (tenant_id, app_id, sync_status, external_status, local_status, created_at)');
+
+        $this->db->exec('CREATE TABLE IF NOT EXISTS ' . self::ORDER_SNAPSHOT_TABLE . ' (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id TEXT NOT NULL, app_id TEXT NULL, store_id TEXT NOT NULL, external_order_id TEXT NOT NULL, snapshot_payload_json TEXT NOT NULL, normalized_payload_json TEXT NULL, captured_at TEXT NOT NULL, metadata_json TEXT NULL)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_order_snapshots_tenant_store_external ON ' . self::ORDER_SNAPSHOT_TABLE . ' (tenant_id, app_id, store_id, external_order_id, captured_at)');
+
         $this->db->exec('CREATE TABLE IF NOT EXISTS ' . self::PRODUCT_LINK_TABLE . ' (id INTEGER PRIMARY KEY AUTOINCREMENT, tenant_id TEXT NOT NULL, app_id TEXT NULL, store_id TEXT NOT NULL, local_product_id TEXT NULL, external_product_id TEXT NOT NULL, external_sku TEXT NULL, sync_status TEXT NOT NULL, last_sync_at TEXT NULL, last_sync_direction TEXT NULL, metadata_json TEXT NULL, created_at TEXT NOT NULL)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_product_links_tenant_store_local ON ' . self::PRODUCT_LINK_TABLE . ' (tenant_id, app_id, store_id, local_product_id, created_at)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ecommerce_product_links_tenant_store_external ON ' . self::PRODUCT_LINK_TABLE . ' (tenant_id, app_id, store_id, external_product_id, created_at)');
@@ -621,6 +815,8 @@ final class EcommerceHubRepository
         $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::CREDENTIAL_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, store_id VARCHAR(120) NOT NULL, credential_type VARCHAR(64) NOT NULL, encrypted_payload LONGTEXT NOT NULL, status VARCHAR(32) NOT NULL, last_validated_at DATETIME NULL, metadata_json JSON NULL, created_at DATETIME NOT NULL, PRIMARY KEY (id), KEY idx_ecommerce_credentials_tenant_store_status (tenant_id, app_id, store_id, status, created_at), KEY idx_ecommerce_credentials_tenant_type (tenant_id, credential_type, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::SYNC_JOB_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, store_id VARCHAR(120) NOT NULL, sync_type VARCHAR(64) NOT NULL, status VARCHAR(32) NOT NULL, started_at DATETIME NULL, finished_at DATETIME NULL, result_summary TEXT NULL, metadata_json JSON NULL, created_at DATETIME NOT NULL, PRIMARY KEY (id), KEY idx_ecommerce_sync_jobs_tenant_store_status (tenant_id, app_id, store_id, status, created_at), KEY idx_ecommerce_sync_jobs_tenant_type (tenant_id, sync_type, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::ORDER_REF_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, store_id VARCHAR(120) NOT NULL, external_order_id VARCHAR(190) NOT NULL, local_order_status VARCHAR(64) NULL, external_status VARCHAR(64) NULL, total DECIMAL(18,4) NULL, currency VARCHAR(16) NULL, metadata_json JSON NULL, created_at DATETIME NOT NULL, PRIMARY KEY (id), KEY idx_ecommerce_order_refs_tenant_store_external (tenant_id, app_id, store_id, external_order_id, created_at), KEY idx_ecommerce_order_refs_tenant_status (tenant_id, store_id, local_order_status, external_status, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::ORDER_LINK_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, store_id VARCHAR(120) NOT NULL, external_order_id VARCHAR(190) NOT NULL, local_reference_type VARCHAR(120) NULL, local_reference_id VARCHAR(120) NULL, external_status VARCHAR(64) NULL, local_status VARCHAR(64) NULL, currency VARCHAR(16) NULL, total DECIMAL(18,4) NULL, sync_status VARCHAR(32) NOT NULL, last_sync_at DATETIME NULL, metadata_json JSON NULL, created_at DATETIME NOT NULL, PRIMARY KEY (id), KEY idx_ecommerce_order_links_tenant_store_external (tenant_id, app_id, store_id, external_order_id, created_at), KEY idx_ecommerce_order_links_tenant_status (tenant_id, app_id, sync_status, external_status, local_status, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::ORDER_SNAPSHOT_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, store_id VARCHAR(120) NOT NULL, external_order_id VARCHAR(190) NOT NULL, snapshot_payload_json JSON NOT NULL, normalized_payload_json JSON NULL, captured_at DATETIME NOT NULL, metadata_json JSON NULL, PRIMARY KEY (id), KEY idx_ecommerce_order_snapshots_tenant_store_external (tenant_id, app_id, store_id, external_order_id, captured_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
         $this->db->exec("CREATE TABLE IF NOT EXISTS " . self::PRODUCT_LINK_TABLE . " (id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT, tenant_id VARCHAR(120) NOT NULL, app_id VARCHAR(120) NULL, store_id VARCHAR(120) NOT NULL, local_product_id VARCHAR(120) NULL, external_product_id VARCHAR(190) NOT NULL, external_sku VARCHAR(190) NULL, sync_status VARCHAR(32) NOT NULL, last_sync_at DATETIME NULL, last_sync_direction VARCHAR(32) NULL, metadata_json JSON NULL, created_at DATETIME NOT NULL, PRIMARY KEY (id), KEY idx_ecommerce_product_links_tenant_store_local (tenant_id, app_id, store_id, local_product_id, created_at), KEY idx_ecommerce_product_links_tenant_store_external (tenant_id, app_id, store_id, external_product_id, created_at), KEY idx_ecommerce_product_links_tenant_status (tenant_id, app_id, sync_status, last_sync_direction, created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
     }
 
@@ -678,6 +874,39 @@ final class EcommerceHubRepository
             ->setAllowedColumns([
                 'id', 'tenant_id', 'app_id', 'store_id', 'external_order_id', 'local_order_status',
                 'external_status', 'total', 'currency', 'metadata_json', 'created_at',
+            ])
+            ->where('tenant_id', '=', $tenantId);
+
+        if ($appId !== null && $appId !== '') {
+            $qb->where('app_id', '=', $appId);
+        }
+
+        return $qb;
+    }
+
+    private function orderLinkQuery(string $tenantId, ?string $appId = null): QueryBuilder
+    {
+        $qb = (new QueryBuilder($this->db, self::ORDER_LINK_TABLE))
+            ->setAllowedColumns([
+                'id', 'tenant_id', 'app_id', 'store_id', 'external_order_id', 'local_reference_type',
+                'local_reference_id', 'external_status', 'local_status', 'currency', 'total',
+                'sync_status', 'last_sync_at', 'metadata_json', 'created_at',
+            ])
+            ->where('tenant_id', '=', $tenantId);
+
+        if ($appId !== null && $appId !== '') {
+            $qb->where('app_id', '=', $appId);
+        }
+
+        return $qb;
+    }
+
+    private function orderSnapshotQuery(string $tenantId, ?string $appId = null): QueryBuilder
+    {
+        $qb = (new QueryBuilder($this->db, self::ORDER_SNAPSHOT_TABLE))
+            ->setAllowedColumns([
+                'id', 'tenant_id', 'app_id', 'store_id', 'external_order_id', 'snapshot_payload_json',
+                'normalized_payload_json', 'captured_at', 'metadata_json',
             ])
             ->where('tenant_id', '=', $tenantId);
 
@@ -834,6 +1063,54 @@ final class EcommerceHubRepository
             'last_sync_direction' => $this->nullableString($row['last_sync_direction'] ?? null),
             'metadata' => $this->decodeJson($row['metadata_json'] ?? null),
             'created_at' => (string) ($row['created_at'] ?? ''),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function normalizeOrderLinkRow(array $row): array
+    {
+        return [
+            'id' => (string) ($row['id'] ?? ''),
+            'tenant_id' => (string) ($row['tenant_id'] ?? ''),
+            'app_id' => $this->nullableString($row['app_id'] ?? null),
+            'store_id' => (string) ($row['store_id'] ?? ''),
+            'external_order_id' => (string) ($row['external_order_id'] ?? ''),
+            'local_reference_type' => $this->nullableString($row['local_reference_type'] ?? null),
+            'local_reference_id' => $this->nullableString($row['local_reference_id'] ?? null),
+            'external_status' => $this->nullableString($row['external_status'] ?? null),
+            'local_status' => $this->nullableString($row['local_status'] ?? null),
+            'currency' => $this->nullableString($row['currency'] ?? null),
+            'total' => $row['total'] === null ? null : $this->decimal($row['total']),
+            'sync_status' => trim((string) ($row['sync_status'] ?? 'linked')) ?: 'linked',
+            'last_sync_at' => $this->nullableString($row['last_sync_at'] ?? null),
+            'metadata' => $this->decodeJson($row['metadata_json'] ?? null),
+            'created_at' => (string) ($row['created_at'] ?? ''),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function normalizeOrderSnapshotRow(array $row): array
+    {
+        $normalizedPayload = $this->decodeJson($row['normalized_payload_json'] ?? null);
+
+        return [
+            'id' => (string) ($row['id'] ?? ''),
+            'tenant_id' => (string) ($row['tenant_id'] ?? ''),
+            'app_id' => $this->nullableString($row['app_id'] ?? null),
+            'store_id' => (string) ($row['store_id'] ?? ''),
+            'external_order_id' => (string) ($row['external_order_id'] ?? ''),
+            'snapshot_payload' => $this->decodeJson($row['snapshot_payload_json'] ?? null),
+            'normalized_payload' => $normalizedPayload === [] && $this->nullableString($row['normalized_payload_json'] ?? null) === null
+                ? null
+                : $normalizedPayload,
+            'captured_at' => (string) ($row['captured_at'] ?? ''),
+            'metadata' => $this->decodeJson($row['metadata_json'] ?? null),
         ];
     }
 

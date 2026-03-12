@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EcommerceOrderSnapshot",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tenant_id",
+    "store_id",
+    "external_order_id",
+    "snapshot_payload",
+    "captured_at",
+    "metadata"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "app_id": { "type": ["string", "null"] },
+    "store_id": { "type": "string", "minLength": 1 },
+    "external_order_id": { "type": "string", "minLength": 1 },
+    "snapshot_payload": { "type": "object", "additionalProperties": true },
+    "normalized_payload": { "type": ["object", "null"], "additionalProperties": true },
+    "captured_at": { "type": "string" },
+    "metadata": { "type": "object", "additionalProperties": true }
+  }
+}

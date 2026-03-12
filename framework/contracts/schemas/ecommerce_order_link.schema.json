@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "EcommerceOrderLink",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tenant_id",
+    "store_id",
+    "external_order_id",
+    "sync_status",
+    "metadata",
+    "created_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "app_id": { "type": ["string", "null"] },
+    "store_id": { "type": "string", "minLength": 1 },
+    "external_order_id": { "type": "string", "minLength": 1 },
+    "local_reference_type": { "type": ["string", "null"] },
+    "local_reference_id": { "type": ["string", "null"] },
+    "external_status": { "type": ["string", "null"] },
+    "local_status": {
+      "type": ["string", "null"],
+      "enum": [null, "pending", "paid", "processing", "completed", "canceled", "refunded", "unknown"]
+    },
+    "currency": { "type": ["string", "null"] },
+    "total": { "type": ["number", "null"], "minimum": 0 },
+    "sync_status": {
+      "type": "string",
+      "enum": [
+        "linked",
+        "normalized",
+        "pending_push",
+        "pending_pull",
+        "snapshot_received",
+        "synced",
+        "failed"
+      ]
+    },
+    "last_sync_at": { "type": ["string", "null"] },
+    "metadata": { "type": "object", "additionalProperties": true },
+    "created_at": { "type": "string" }
+  }
+}

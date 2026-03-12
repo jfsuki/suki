@@ -10,6 +10,8 @@ interface EcommerceAdapterInterface
 
     public function supportsProductSync(): bool;
 
+    public function supportsOrderSync(): bool;
+
     /**
      * @param array<string, mixed> $store
      * @param array<string, mixed> $credentials
@@ -52,4 +54,16 @@ interface EcommerceAdapterInterface
      * @return array<string, mixed>
      */
     public function buildProductPayload(array $localProductPayload): array;
+
+    /**
+     * @param array<string, mixed> $externalPayload
+     * @return array<string, mixed>
+     */
+    public function normalizeExternalOrder(array $externalPayload): array;
+
+    /**
+     * @param array<string, mixed> $localPayload
+     * @return array<string, mixed>
+     */
+    public function buildOrderReferencePayload(array $localPayload): array;
 }
