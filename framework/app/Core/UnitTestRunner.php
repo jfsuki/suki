@@ -101,6 +101,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('pos_returns_cancelations', fn() => $this->checkPOSReturnsCancelations());
         $tests[] = $this->wrap('purchases_core_module', fn() => $this->checkPurchasesCoreModule());
         $tests[] = $this->wrap('purchases_documents_module', fn() => $this->checkPurchasesDocumentsModule());
+        $tests[] = $this->wrap('fiscal_engine_architecture', fn() => $this->checkFiscalEngineArchitecture());
         $tests[] = $this->wrap('project_memory_system', fn() => $this->checkProjectMemorySystem());
         $tests[] = $this->wrap('learning_promotion_pipeline', fn() => $this->checkLearningPromotionPipeline());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
@@ -1492,6 +1493,11 @@ final class UnitTestRunner
     private function checkPurchasesDocumentsModule(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/purchases_documents_module_test.php');
+    }
+
+    private function checkFiscalEngineArchitecture(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/fiscal_engine_architecture_test.php');
     }
 
     private function checkProjectMemorySystem(): void

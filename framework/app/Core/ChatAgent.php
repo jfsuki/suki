@@ -1688,6 +1688,7 @@ final class ChatAgent
             'entity_search_action' => $runtimeObservability['entity_search_action'],
             'pos_action' => $runtimeObservability['pos_action'],
             'purchases_action' => $runtimeObservability['purchases_action'],
+            'fiscal_action' => $runtimeObservability['fiscal_action'],
             'draft_id' => $runtimeObservability['draft_id'],
             'purchase_draft_id' => $runtimeObservability['purchase_draft_id'],
             'session_id' => $runtimeObservability['session_id'],
@@ -1699,9 +1700,14 @@ final class ChatAgent
             'purchase_id' => $runtimeObservability['purchase_id'],
             'purchase_number' => $runtimeObservability['purchase_number'],
             'purchase_document_id' => $runtimeObservability['purchase_document_id'],
+            'fiscal_document_id' => $runtimeObservability['fiscal_document_id'],
             'media_file_id' => $runtimeObservability['media_file_id'],
             'supplier_id' => $runtimeObservability['supplier_id'],
             'document_type' => $runtimeObservability['document_type'],
+            'source_module' => $runtimeObservability['source_module'],
+            'source_entity_type' => $runtimeObservability['source_entity_type'],
+            'source_entity_id' => $runtimeObservability['source_entity_id'],
+            'fiscal_status' => $runtimeObservability['fiscal_status'],
             'line_count' => $runtimeObservability['line_count'],
             'total' => $runtimeObservability['total'],
             'result_status' => $runtimeObservability['result_status'],
@@ -1802,6 +1808,7 @@ final class ChatAgent
             'entity_search_action' => trim((string) ($runtimeContext['entity_search_action'] ?? $routeTelemetry['entity_search_action'] ?? '')) ?: 'none',
             'pos_action' => trim((string) ($runtimeContext['pos_action'] ?? $routeTelemetry['pos_action'] ?? '')) ?: 'none',
             'purchases_action' => trim((string) ($runtimeContext['purchases_action'] ?? $routeTelemetry['purchases_action'] ?? '')) ?: 'none',
+            'fiscal_action' => trim((string) ($runtimeContext['fiscal_action'] ?? $routeTelemetry['fiscal_action'] ?? '')) ?: 'none',
             'draft_id' => trim((string) ($runtimeContext['draft_id'] ?? $routeTelemetry['draft_id'] ?? '')),
             'purchase_draft_id' => trim((string) ($runtimeContext['purchase_draft_id'] ?? $routeTelemetry['purchase_draft_id'] ?? '')),
             'session_id' => trim((string) ($runtimeContext['session_id'] ?? $routeTelemetry['session_id'] ?? '')),
@@ -1815,9 +1822,14 @@ final class ChatAgent
             'purchase_id' => trim((string) ($runtimeContext['purchase_id'] ?? $routeTelemetry['purchase_id'] ?? '')),
             'purchase_number' => trim((string) ($runtimeContext['purchase_number'] ?? $routeTelemetry['purchase_number'] ?? '')),
             'purchase_document_id' => trim((string) ($runtimeContext['purchase_document_id'] ?? $routeTelemetry['purchase_document_id'] ?? '')),
+            'fiscal_document_id' => trim((string) ($runtimeContext['fiscal_document_id'] ?? $routeTelemetry['fiscal_document_id'] ?? '')),
             'media_file_id' => trim((string) ($runtimeContext['media_file_id'] ?? $routeTelemetry['media_file_id'] ?? '')),
             'supplier_id' => trim((string) ($runtimeContext['supplier_id'] ?? $routeTelemetry['supplier_id'] ?? '')),
             'document_type' => trim((string) ($runtimeContext['document_type'] ?? $routeTelemetry['document_type'] ?? '')),
+            'source_module' => trim((string) ($runtimeContext['source_module'] ?? $routeTelemetry['source_module'] ?? '')),
+            'source_entity_type' => trim((string) ($runtimeContext['source_entity_type'] ?? $routeTelemetry['source_entity_type'] ?? '')),
+            'source_entity_id' => trim((string) ($runtimeContext['source_entity_id'] ?? $routeTelemetry['source_entity_id'] ?? '')),
+            'fiscal_status' => trim((string) ($runtimeContext['fiscal_status'] ?? $routeTelemetry['fiscal_status'] ?? '')),
             'line_count' => is_numeric($runtimeContext['line_count'] ?? $routeTelemetry['line_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['line_count'] ?? $routeTelemetry['line_count']))
                 : null,
@@ -1969,6 +1981,7 @@ final class ChatAgent
             'entity_search_action' => trim((string) ($payload['entity_search_action'] ?? '')) ?: 'none',
             'pos_action' => trim((string) ($payload['pos_action'] ?? '')) ?: 'none',
             'purchases_action' => trim((string) ($payload['purchases_action'] ?? '')) ?: 'none',
+            'fiscal_action' => trim((string) ($payload['fiscal_action'] ?? '')) ?: 'none',
             'draft_id' => trim((string) ($payload['draft_id'] ?? '')) ?: '',
             'purchase_draft_id' => trim((string) ($payload['purchase_draft_id'] ?? '')) ?: '',
             'session_id' => trim((string) ($payload['session_id'] ?? '')) ?: '',
@@ -1982,9 +1995,14 @@ final class ChatAgent
             'purchase_id' => trim((string) ($payload['purchase_id'] ?? '')) ?: '',
             'purchase_number' => trim((string) ($payload['purchase_number'] ?? '')) ?: '',
             'purchase_document_id' => trim((string) ($payload['purchase_document_id'] ?? '')) ?: '',
+            'fiscal_document_id' => trim((string) ($payload['fiscal_document_id'] ?? '')) ?: '',
             'media_file_id' => trim((string) ($payload['media_file_id'] ?? '')) ?: '',
             'supplier_id' => trim((string) ($payload['supplier_id'] ?? '')) ?: '',
             'document_type' => trim((string) ($payload['document_type'] ?? '')) ?: '',
+            'source_module' => trim((string) ($payload['source_module'] ?? '')) ?: '',
+            'source_entity_type' => trim((string) ($payload['source_entity_type'] ?? '')) ?: '',
+            'source_entity_id' => trim((string) ($payload['source_entity_id'] ?? '')) ?: '',
+            'fiscal_status' => trim((string) ($payload['fiscal_status'] ?? '')) ?: '',
             'line_count' => is_numeric($payload['line_count'] ?? null)
                 ? max(0, (int) $payload['line_count'])
                 : null,
@@ -2035,6 +2053,7 @@ final class ChatAgent
             $this->commandBus->register(new EntitySearchCommandHandler());
             $this->commandBus->register(new POSCommandHandler());
             $this->commandBus->register(new PurchasesCommandHandler());
+            $this->commandBus->register(new FiscalEngineCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
                 ['AuthLogin', 'AuthCreateUser'],
                 function (array $command, array $context): array {

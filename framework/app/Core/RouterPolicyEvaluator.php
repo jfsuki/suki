@@ -918,6 +918,75 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'CreateFiscalDocument':
+                foreach (['source_module', 'source_entity_type', 'source_entity_id', 'document_type'] as $key) {
+                    if (trim((string) ($command[$key] ?? '')) === '') {
+                        return [false, 'missing_' . $key];
+                    }
+                }
+                if (array_key_exists('status', $command) && $command['status'] !== null && $command['status'] !== '' && !is_string($command['status'])) {
+                    return [false, 'invalid_status'];
+                }
+                if (array_key_exists('lines', $command) && !is_array($command['lines'])) {
+                    return [false, 'invalid_lines'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetFiscalDocument':
+                if (trim((string) ($command['fiscal_document_id'] ?? $command['document_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_fiscal_document_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'ListFiscalDocuments':
+                if (array_key_exists('limit', $command) && (!is_numeric($command['limit']) || (int) $command['limit'] < 1)) {
+                    return [false, 'invalid_limit'];
+                }
+                foreach (['source_module', 'source_entity_type', 'source_entity_id', 'document_type', 'status', 'document_number', 'external_provider', 'external_reference', 'date_from', 'date_to'] as $key) {
+                    if (array_key_exists($key, $command) && $command[$key] !== null && $command[$key] !== '' && !is_string($command[$key])) {
+                        return [false, 'invalid_' . $key];
+                    }
+                }
+                return [true, 'schema_valid'];
+
+            case 'GetFiscalDocumentBySource':
+                foreach (['source_module', 'source_entity_type', 'source_entity_id'] as $key) {
+                    if (trim((string) ($command[$key] ?? '')) === '') {
+                        return [false, 'missing_' . $key];
+                    }
+                }
+                if (array_key_exists('document_type', $command) && $command['document_type'] !== null && $command['document_type'] !== '' && !is_string($command['document_type'])) {
+                    return [false, 'invalid_document_type'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'RecordFiscalEvent':
+                if (trim((string) ($command['fiscal_document_id'] ?? $command['document_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_fiscal_document_id'];
+                }
+                if (trim((string) ($command['event_type'] ?? '')) === '') {
+                    return [false, 'missing_event_type'];
+                }
+                if (array_key_exists('event_status', $command) && $command['event_status'] !== null && $command['event_status'] !== '' && !is_string($command['event_status'])) {
+                    return [false, 'invalid_event_status'];
+                }
+                if (array_key_exists('payload', $command) && $command['payload'] !== null && !is_array($command['payload'])) {
+                    return [false, 'invalid_payload'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'UpdateFiscalDocumentStatus':
+                if (trim((string) ($command['fiscal_document_id'] ?? $command['document_id'] ?? $command['id'] ?? '')) === '') {
+                    return [false, 'missing_fiscal_document_id'];
+                }
+                if (trim((string) ($command['status'] ?? '')) === '') {
+                    return [false, 'missing_status'];
+                }
+                if (array_key_exists('reason', $command) && $command['reason'] !== null && $command['reason'] !== '' && !is_string($command['reason'])) {
+                    return [false, 'invalid_reason'];
+                }
+                return [true, 'schema_valid'];
+
             case 'CreateEntity':
                 if ($entity === '') {
                     return [false, 'missing_entity'];

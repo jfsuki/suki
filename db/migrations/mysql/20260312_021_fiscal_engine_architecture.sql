@@ -1,0 +1,60 @@
+CREATE TABLE IF NOT EXISTS fiscal_documents (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    tenant_id VARCHAR(120) NOT NULL,
+    app_id VARCHAR(120) NULL,
+    source_module VARCHAR(64) NOT NULL,
+    source_entity_type VARCHAR(64) NOT NULL,
+    source_entity_id VARCHAR(190) NOT NULL,
+    document_type VARCHAR(64) NOT NULL,
+    document_number VARCHAR(190) NULL,
+    status VARCHAR(32) NOT NULL,
+    issuer_party_id VARCHAR(190) NULL,
+    receiver_party_id VARCHAR(190) NULL,
+    issue_date DATETIME NULL,
+    currency VARCHAR(16) NULL,
+    subtotal DECIMAL(18,4) NULL,
+    tax_total DECIMAL(18,4) NULL,
+    total DECIMAL(18,4) NULL,
+    external_provider VARCHAR(120) NULL,
+    external_reference VARCHAR(190) NULL,
+    metadata_json JSON NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_fiscal_documents_tenant_source (tenant_id, app_id, source_module, source_entity_type, source_entity_id, created_at),
+    KEY idx_fiscal_documents_tenant_type_status (tenant_id, app_id, document_type, status, created_at),
+    KEY idx_fiscal_documents_tenant_provider (tenant_id, app_id, external_provider, external_reference)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fiscal_document_lines (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    tenant_id VARCHAR(120) NOT NULL,
+    app_id VARCHAR(120) NULL,
+    fiscal_document_id VARCHAR(120) NOT NULL,
+    product_id VARCHAR(190) NULL,
+    description VARCHAR(255) NOT NULL,
+    qty DECIMAL(18,4) NULL,
+    unit_amount DECIMAL(18,4) NULL,
+    tax_rate DECIMAL(10,4) NULL,
+    line_total DECIMAL(18,4) NULL,
+    metadata_json JSON NULL,
+    created_at DATETIME NOT NULL,
+    updated_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_fiscal_document_lines_tenant_document (tenant_id, app_id, fiscal_document_id, id),
+    KEY idx_fiscal_document_lines_tenant_product (tenant_id, product_id, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS fiscal_events (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    tenant_id VARCHAR(120) NOT NULL,
+    app_id VARCHAR(120) NULL,
+    fiscal_document_id VARCHAR(120) NOT NULL,
+    event_type VARCHAR(64) NOT NULL,
+    event_status VARCHAR(64) NOT NULL,
+    payload_json JSON NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id),
+    KEY idx_fiscal_events_tenant_document (tenant_id, app_id, fiscal_document_id, created_at),
+    KEY idx_fiscal_events_tenant_type (tenant_id, event_type, created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;

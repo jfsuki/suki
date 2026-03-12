@@ -1635,6 +1635,12 @@ final class IntentRouter
             'GetPurchaseDocument' => 'purchases.get_document',
             'DetachPurchaseDocument' => 'purchases.detach_document',
             'RegisterPurchaseDocumentMetadata' => 'purchases.register_document_metadata',
+            'CreateFiscalDocument' => 'fiscal.create_document',
+            'GetFiscalDocument' => 'fiscal.get_document',
+            'ListFiscalDocuments' => 'fiscal.list_documents',
+            'GetFiscalDocumentBySource' => 'fiscal.get_by_source',
+            'RecordFiscalEvent' => 'fiscal.record_event',
+            'UpdateFiscalDocumentStatus' => 'fiscal.update_status',
             'CreateInvoice' => 'invoice.create',
             'GenerateReport' => 'report.generate',
             'ConfigureFEProvider' => 'settings.configure_fe_provider',
@@ -1665,6 +1671,7 @@ final class IntentRouter
         return str_starts_with($selectedName, 'media_')
             || str_starts_with($selectedName, 'pos_')
             || str_starts_with($selectedName, 'purchases_')
+            || str_starts_with($selectedName, 'fiscal_')
             || in_array($selectedName, ['entity_search', 'entity_resolve'], true);
     }
 

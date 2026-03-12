@@ -57,6 +57,15 @@
   - validate `media_file_id` and purchase/draft ownership before linking documents
   - leave OCR, XML parsing, inventory, AP, fiscal support document issuance and accounting as hooks only
   - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
+- If you add Fiscal behavior:
+  - update `FiscalEngineRepository`, `FiscalEngineService`, `FiscalEngineCommandHandler`, `FiscalEngineMessageParser`
+  - keep the source linkage canonical: `source_module + source_entity_type + source_entity_id`
+  - keep document types limited to the shared internal set until a provider adapter exists
+  - keep statuses lightweight and transitions safe: `draft -> pending|prepared -> submitted -> accepted|rejected|canceled`
+  - treat POS, Purchases and Ecommerce as source hooks only; do not duplicate their lifecycles here
+  - keep totals lightweight: `subtotal`, `tax_total`, `total`, plus metadata hooks for tax breakdown/withholding/exemptions
+  - route provider submission, XML/UBL, signatures, CUFE/CUDE, webhooks and accounting to future extensions only
+  - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
 - If you add AgentOps metrics:
   - keep `docs/contracts/agentops_metrics_contract.json` aligned
   - extend `TelemetryService`, `SqlMetricsRepository` or `Agents/Telemetry`
@@ -88,6 +97,10 @@
   - blocks proposal spam and only marks the candidate as processed
 - Proposal lifecycle
   - `open -> accepted|rejected|implemented`
+- Fiscal lifecycle
+  - `source entity -> fiscal_document(prepared) -> fiscal_event trail -> status updates`
+- Provider lifecycle
+  - stays pending until a future adapter submits and reconciles the document externally
 
 ## Impact hotspots
 - `framework/app/Core/ChatAgent.php`

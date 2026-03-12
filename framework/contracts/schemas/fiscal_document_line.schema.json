@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FiscalDocumentLine",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tenant_id",
+    "fiscal_document_id",
+    "description",
+    "metadata"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "app_id": { "type": ["string", "null"] },
+    "fiscal_document_id": { "type": "string", "minLength": 1 },
+    "product_id": { "type": ["string", "null"] },
+    "description": { "type": "string", "minLength": 1 },
+    "qty": { "type": ["number", "null"], "exclusiveMinimum": 0 },
+    "unit_amount": { "type": ["number", "null"], "minimum": 0 },
+    "tax_rate": { "type": ["number", "null"], "minimum": 0 },
+    "line_total": { "type": ["number", "null"], "minimum": 0 },
+    "metadata": { "type": "object", "additionalProperties": true },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" }
+  }
+}

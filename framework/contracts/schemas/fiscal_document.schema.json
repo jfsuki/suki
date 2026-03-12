@@ -1,0 +1,70 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "FiscalDocument",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tenant_id",
+    "source_module",
+    "source_entity_type",
+    "source_entity_id",
+    "document_type",
+    "status",
+    "metadata",
+    "lines",
+    "events"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "app_id": { "type": ["string", "null"] },
+    "source_module": { "type": "string", "minLength": 1 },
+    "source_entity_type": { "type": "string", "minLength": 1 },
+    "source_entity_id": { "type": "string", "minLength": 1 },
+    "document_type": {
+      "type": "string",
+      "enum": [
+        "sales_invoice",
+        "support_document",
+        "credit_note",
+        "debit_note",
+        "pos_ticket_fiscal_hook",
+        "purchase_fiscal_hook"
+      ]
+    },
+    "document_number": { "type": ["string", "null"] },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "pending",
+        "prepared",
+        "submitted",
+        "accepted",
+        "rejected",
+        "canceled"
+      ]
+    },
+    "issuer_party_id": { "type": ["string", "null"] },
+    "receiver_party_id": { "type": ["string", "null"] },
+    "issue_date": { "type": ["string", "null"] },
+    "currency": { "type": ["string", "null"] },
+    "subtotal": { "type": ["number", "null"], "minimum": 0 },
+    "tax_total": { "type": ["number", "null"], "minimum": 0 },
+    "total": { "type": ["number", "null"], "minimum": 0 },
+    "external_provider": { "type": ["string", "null"] },
+    "external_reference": { "type": ["string", "null"] },
+    "metadata": { "type": "object", "additionalProperties": true },
+    "created_at": { "type": "string" },
+    "updated_at": { "type": "string" },
+    "lines": {
+      "type": "array",
+      "items": { "$ref": "fiscal_document_line.schema.json" }
+    },
+    "events": {
+      "type": "array",
+      "items": { "$ref": "fiscal_event.schema.json" }
+    }
+  }
+}

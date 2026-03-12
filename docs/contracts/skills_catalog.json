@@ -1990,6 +1990,220 @@
       "context_hints": {}
     },
     {
+      "name": "fiscal_create_document",
+      "description": "Create or prepare an internal fiscal document from a source entity without provider submission.",
+      "intent_patterns": [
+        "re:(crea|crear|genera|generar|prepara|preparar).*(documento fiscal|soporte fiscal|documento soporte fiscal)",
+        "re:(documento fiscal|soporte fiscal|documento soporte fiscal).*(crea|crear|genera|generar|prepara|preparar)"
+      ],
+      "keywords": [
+        "crear documento fiscal",
+        "preparar soporte fiscal",
+        "generar documento fiscal"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "fiscal_create_document"
+      ],
+      "priority": 174,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "source_module",
+          "source_entity_type",
+          "source_entity_id",
+          "document_type",
+          "document_number",
+          "status",
+          "issuer_party_id",
+          "receiver_party_id",
+          "issue_date",
+          "currency",
+          "external_provider",
+          "external_reference"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "fiscal_get_document",
+      "description": "Load an internal fiscal document by fiscal_document_id.",
+      "intent_patterns": [
+        "re:(ver|mostrar|muestra|consulta|abre|abrir).*(documento fiscal|registro fiscal)",
+        "re:(documento fiscal|registro fiscal).*(ver|mostrar|muestra|consulta|abre|abrir)"
+      ],
+      "keywords": [
+        "ver documento fiscal",
+        "abrir registro fiscal",
+        "consultar documento fiscal"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "fiscal_get_document"
+      ],
+      "priority": 173,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "fiscal_document_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "fiscal_list_documents",
+      "description": "List internal fiscal documents with lightweight source, type or status filters.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(documentos fiscales|registros fiscales)",
+        "re:(documentos fiscales|registros fiscales).*(lista|listar|muestra|mostrar|ver|consulta)"
+      ],
+      "keywords": [
+        "listar documentos fiscales",
+        "ver registros fiscales",
+        "mostrar documentos fiscales"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "fiscal_list_documents"
+      ],
+      "priority": 172,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "source_module",
+          "source_entity_type",
+          "source_entity_id",
+          "document_type",
+          "status",
+          "document_number",
+          "date_from",
+          "date_to",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "fiscal_get_by_source",
+      "description": "Resolve one internal fiscal document from its source module and source entity reference.",
+      "intent_patterns": [
+        "re:(busca|buscar|consulta|ver|mostrar).*(documento fiscal).*(origen|source|venta|compra|pedido)",
+        "re:(origen|source|venta|compra|pedido).*(documento fiscal).*(busca|buscar|consulta|ver|mostrar)"
+      ],
+      "keywords": [
+        "documento fiscal por origen",
+        "buscar documento fiscal de venta",
+        "consultar fiscal por compra"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "fiscal_get_by_source"
+      ],
+      "priority": 171,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "source_module",
+          "source_entity_type",
+          "source_entity_id",
+          "document_type",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "fiscal_record_event",
+      "description": "Record a lifecycle event for an internal fiscal document.",
+      "intent_patterns": [
+        "re:(registra|registrar|anota|anotar|guarda|guardar).*(evento fiscal|evento del documento fiscal)",
+        "re:(evento fiscal|evento del documento fiscal).*(registra|registrar|anota|anotar|guarda|guardar)"
+      ],
+      "keywords": [
+        "registrar evento fiscal",
+        "anotar evento fiscal",
+        "guardar evento documento fiscal"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "fiscal_record_event"
+      ],
+      "priority": 170,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "fiscal_document_id",
+          "event_type",
+          "event_status",
+          "payload"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "fiscal_update_status",
+      "description": "Update the lifecycle status of an internal fiscal document safely.",
+      "intent_patterns": [
+        "re:(actualiza|actualizar|cambia|cambiar).*(estado fiscal|estado del documento fiscal)",
+        "re:(estado fiscal|estado del documento fiscal).*(actualiza|actualizar|cambia|cambiar)"
+      ],
+      "keywords": [
+        "actualizar estado fiscal",
+        "cambiar estado fiscal",
+        "estado documento fiscal"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "fiscal_update_status"
+      ],
+      "priority": 169,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "fiscal_document_id",
+          "status",
+          "reason"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
       "name": "read_document",
       "description": "Handle document-reading requests before free-form fallback.",
       "intent_patterns": [
