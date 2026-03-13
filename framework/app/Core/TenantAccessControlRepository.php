@@ -161,6 +161,19 @@ final class TenantAccessControlRepository
         return $this->findTenantUserByUserId($tenantId, $userId);
     }
 
+    public function countTenantUsers(string $tenantId, array $filters = []): int
+    {
+        $qb = $this->tenantUserQuery($tenantId);
+        foreach (['role_key', 'status', 'user_id'] as $key) {
+            $value = trim((string) ($filters[$key] ?? ''));
+            if ($value !== '') {
+                $qb->where($key, '=', $value);
+            }
+        }
+
+        return $qb->count();
+    }
+
     /**
      * @return array<int, array<string, mixed>>
      */

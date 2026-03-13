@@ -1407,6 +1407,40 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'TenantAssignPlan':
+                if (trim((string) ($command['plan_key'] ?? '')) === '') {
+                    return [false, 'missing_tenant_plan_key'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'TenantGetPlan':
+            case 'TenantListPlans':
+            case 'TenantGetEnabledModules':
+                return [true, 'schema_valid'];
+
+            case 'TenantSetPlanLimits':
+                if (trim((string) ($command['plan_key'] ?? '')) === '') {
+                    return [false, 'missing_tenant_plan_key'];
+                }
+                if (!is_array($command['limits'] ?? null) || $command['limits'] === []) {
+                    return [false, 'missing_plan_limits'];
+                }
+                foreach ((array) $command['limits'] as $limit) {
+                    if (!is_array($limit)) {
+                        return [false, 'invalid_plan_limit_item'];
+                    }
+                    if (trim((string) ($limit['limit_key'] ?? '')) === '' || !array_key_exists('limit_value', $limit)) {
+                        return [false, 'missing_plan_limit_fields'];
+                    }
+                }
+                return [true, 'schema_valid'];
+
+            case 'TenantCheckPlanLimit':
+                if (trim((string) ($command['limit_key'] ?? '')) === '') {
+                    return [false, 'missing_plan_limit_key'];
+                }
+                return [true, 'schema_valid'];
+
             default:
                 // Backward-compatible fallback for commands not yet fully modeled.
                 if ($entity === '' && empty($data) && $id === null) {

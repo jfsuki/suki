@@ -1,6 +1,6 @@
 {
   "contract_id": "action_catalog",
-  "version": "1.6.6",
+  "version": "1.6.7",
   "effective_date": "2026-03-13",
   "addenda_of": null,
   "status": "canonical_draft",
@@ -2136,6 +2136,120 @@
       "allowed_tools": [
         "CommandBus",
         "tenant_check_permission"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "saas.assign_plan",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "tenant_assign_plan"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "high",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "saas.get_plan",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "tenant_get_plan"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "saas.list_plans",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "tenant_list_plans"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "saas.set_plan_limits",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "tenant_set_plan_limits"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "high",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "saas.check_plan_limit",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "tenant_check_plan_limit"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "saas.get_enabled_modules",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "tenant_get_enabled_modules"
       ],
       "rag_required": false,
       "json_schema_required": true,

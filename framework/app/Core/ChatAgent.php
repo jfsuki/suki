@@ -1727,6 +1727,7 @@ final class ChatAgent
             'fiscal_action' => $runtimeObservability['fiscal_action'],
             'ecommerce_action' => $runtimeObservability['ecommerce_action'],
             'access_control_action' => $runtimeObservability['access_control_action'],
+            'saas_plan_action' => $runtimeObservability['saas_plan_action'],
             'skill_group' => $runtimeObservability['skill_group'],
             'draft_id' => $runtimeObservability['draft_id'],
             'purchase_draft_id' => $runtimeObservability['purchase_draft_id'],
@@ -1768,6 +1769,8 @@ final class ChatAgent
             'role_key' => $runtimeObservability['role_key'],
             'permission_checked' => $runtimeObservability['permission_checked'],
             'decision' => $runtimeObservability['decision'],
+            'plan_key' => $runtimeObservability['plan_key'],
+            'limit_key' => $runtimeObservability['limit_key'],
             'duplicate_blocked' => $runtimeObservability['duplicate_blocked'],
             'line_count' => $runtimeObservability['line_count'],
             'total' => $runtimeObservability['total'],
@@ -1872,6 +1875,7 @@ final class ChatAgent
             'fiscal_action' => trim((string) ($runtimeContext['fiscal_action'] ?? $routeTelemetry['fiscal_action'] ?? '')) ?: 'none',
             'ecommerce_action' => trim((string) ($runtimeContext['ecommerce_action'] ?? $routeTelemetry['ecommerce_action'] ?? '')) ?: 'none',
             'access_control_action' => trim((string) ($runtimeContext['access_control_action'] ?? $routeTelemetry['access_control_action'] ?? '')) ?: 'none',
+            'saas_plan_action' => trim((string) ($runtimeContext['saas_plan_action'] ?? $routeTelemetry['saas_plan_action'] ?? '')) ?: 'none',
             'skill_group' => $this->preferRuntimeOrRouteString($runtimeContext, $routeTelemetry, 'skill_group', 'unknown'),
             'draft_id' => trim((string) ($runtimeContext['draft_id'] ?? $routeTelemetry['draft_id'] ?? '')),
             'purchase_draft_id' => trim((string) ($runtimeContext['purchase_draft_id'] ?? $routeTelemetry['purchase_draft_id'] ?? '')),
@@ -1915,6 +1919,8 @@ final class ChatAgent
             'role_key' => trim((string) ($runtimeContext['role_key'] ?? $routeTelemetry['role_key'] ?? '')),
             'permission_checked' => trim((string) ($runtimeContext['permission_checked'] ?? $routeTelemetry['permission_checked'] ?? '')),
             'decision' => trim((string) ($runtimeContext['decision'] ?? $routeTelemetry['decision'] ?? '')),
+            'plan_key' => trim((string) ($runtimeContext['plan_key'] ?? $routeTelemetry['plan_key'] ?? '')),
+            'limit_key' => trim((string) ($runtimeContext['limit_key'] ?? $routeTelemetry['limit_key'] ?? '')),
             'duplicate_blocked' => (($runtimeContext['duplicate_blocked'] ?? $routeTelemetry['duplicate_blocked'] ?? false) === true),
             'line_count' => is_numeric($runtimeContext['line_count'] ?? $routeTelemetry['line_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['line_count'] ?? $routeTelemetry['line_count']))
@@ -2070,6 +2076,7 @@ final class ChatAgent
             'fiscal_action' => trim((string) ($payload['fiscal_action'] ?? '')) ?: 'none',
             'ecommerce_action' => trim((string) ($payload['ecommerce_action'] ?? '')) ?: 'none',
             'access_control_action' => trim((string) ($payload['access_control_action'] ?? '')) ?: 'none',
+            'saas_plan_action' => trim((string) ($payload['saas_plan_action'] ?? '')) ?: 'none',
             'skill_group' => trim((string) ($payload['skill_group'] ?? '')) ?: '',
             'draft_id' => trim((string) ($payload['draft_id'] ?? '')) ?: '',
             'purchase_draft_id' => trim((string) ($payload['purchase_draft_id'] ?? '')) ?: '',
@@ -2113,6 +2120,8 @@ final class ChatAgent
             'role_key' => trim((string) ($payload['role_key'] ?? '')) ?: '',
             'permission_checked' => trim((string) ($payload['permission_checked'] ?? '')) ?: '',
             'decision' => trim((string) ($payload['decision'] ?? '')) ?: '',
+            'plan_key' => trim((string) ($payload['plan_key'] ?? '')) ?: '',
+            'limit_key' => trim((string) ($payload['limit_key'] ?? '')) ?: '',
             'duplicate_blocked' => (($payload['duplicate_blocked'] ?? false) === true),
             'line_count' => is_numeric($payload['line_count'] ?? null)
                 ? max(0, (int) $payload['line_count'])
@@ -2167,6 +2176,7 @@ final class ChatAgent
             $this->commandBus->register(new FiscalEngineCommandHandler());
             $this->commandBus->register(new EcommerceHubCommandHandler());
             $this->commandBus->register(new TenantAccessControlCommandHandler());
+            $this->commandBus->register(new TenantPlanCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
                 ['AuthLogin', 'AuthCreateUser'],
                 function (array $command, array $context): array {

@@ -1,6 +1,6 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.7.7",
+  "version": "1.7.8",
   "effective_date": "2026-03-13",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
@@ -3478,6 +3478,194 @@
           "action_key",
           "permission"
         ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "tenant_assign_plan",
+      "description": "Assign one SaaS plan to the current tenant with pricing metadata hooks.",
+      "intent_patterns": [
+        "re:(asigna|asignar|cambia|cambiar|define|definir).*(plan|saas|suscripcion|suscripción)",
+        "re:(plan|saas|suscripcion|suscripción).*(asigna|asignar|cambia|cambiar|define|definir)"
+      ],
+      "keywords": [
+        "asignar plan",
+        "cambiar plan saas",
+        "plan starter",
+        "plan growth"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "tenant_assign_plan"
+      ],
+      "priority": 152,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "plan_key",
+          "status",
+          "included_users",
+          "extra_user_price"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "tenant_get_plan",
+      "description": "Return the current SaaS plan assigned to the active tenant.",
+      "intent_patterns": [
+        "re:(cual|cuál|que|qué).*(plan).*(tenant|empresa|actual|saas)",
+        "re:(muestrame|mu[eé]strame|ver|mostrar|consulta).*(plan).*(tenant|empresa|saas)"
+      ],
+      "keywords": [
+        "cual es mi plan",
+        "ver plan del tenant",
+        "plan actual saas"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "tenant_get_plan"
+      ],
+      "priority": 151,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": []
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "tenant_list_plans",
+      "description": "List the SaaS plans available for assignment.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(planes|planes saas|planes disponibles)",
+        "re:(planes|planes saas|planes disponibles).*(lista|listar|muestra|mostrar|ver|consulta)"
+      ],
+      "keywords": [
+        "lista planes",
+        "planes disponibles",
+        "catalogo de planes"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "tenant_list_plans"
+      ],
+      "priority": 150,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": []
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "tenant_set_plan_limits",
+      "description": "Update one plan limit definition without enforcing runtime blocking yet.",
+      "intent_patterns": [
+        "re:(actualiza|actualizar|define|definir|cambia|cambiar|configura|configurar).*(limite|límite).*(plan|saas)",
+        "re:(limite|límite).*(plan|saas).*(actualiza|actualizar|define|definir|cambia|cambiar|configura|configurar)"
+      ],
+      "keywords": [
+        "actualizar limite del plan",
+        "configurar limite saas",
+        "limit_key"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "tenant_set_plan_limits"
+      ],
+      "priority": 149,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "plan_key",
+          "limit_key",
+          "limit_value",
+          "limit_type"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "tenant_check_plan_limit",
+      "description": "Check one plan limit with optional usage value for the active tenant.",
+      "intent_patterns": [
+        "re:(revisa|revisar|verifica|verificar|consulta|valida|valida).*(limite|límite).*(plan|saas)",
+        "re:(limite|límite).*(plan|saas).*(revisa|revisar|verifica|verificar|consulta|valida)"
+      ],
+      "keywords": [
+        "revisar limite del plan",
+        "validar limite saas",
+        "check plan limit"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "tenant_check_plan_limit"
+      ],
+      "priority": 148,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "limit_key",
+          "usage_value"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "tenant_get_enabled_modules",
+      "description": "Resolve enabled modules from the current tenant plan safely.",
+      "intent_patterns": [
+        "re:(que|qué|cuales|cuáles|muestra|mostrar|ver|consulta).*(modulos|módulos|features).*(plan|saas|habilitados)",
+        "re:(modulos|módulos|features).*(plan|saas|habilitados).*(que|qué|muestra|mostrar|ver|consulta)"
+      ],
+      "keywords": [
+        "modulos habilitados",
+        "features del plan",
+        "que puede usar mi plan"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "tenant_get_enabled_modules"
+      ],
+      "priority": 147,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": []
       },
       "channel_capabilities": [
         "chat"

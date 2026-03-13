@@ -97,6 +97,14 @@
   - keep permissions normalized as `module_key + action_key + effect` with wildcard support and tenant-specific overrides ready for future use
   - sync tenant role changes back to `ProjectRegistry` / `auth_users` only as incremental metadata updates; do not rewrite auth flows here
   - wire `tenant_add_user`, `tenant_list_users`, `tenant_get_user_role`, `tenant_update_user_role`, `tenant_deactivate_user`, `tenant_check_permission` through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator`, `ChatAgent` and tests together
+- If you add SaaS Plan behavior:
+  - update `TenantPlanRepository`, `TenantPlanService`, `TenantPlanCommandHandler`, `TenantPlanMessageParser`
+  - keep the canonical layer minimal: `tenant_plan + plan_limit` only
+  - represent pricing as metadata/hooks only: `base_price`, `currency`, `included_users`, `extra_user_price`, `billing_period`
+  - keep limits generic and extensible: `users`, `stores`, `pos_registers`, `ecommerce_channels`, `ai_requests_month`, `sync_jobs_month`, `storage_mb`, `active_modules`, plus `module:*` feature flags
+  - resolve enabled modules from plan limits instead of duplicating module toggles elsewhere
+  - integrate with `TenantAccessControlService` and `ProjectRegistry` only for usage metadata such as active users; do not introduce hard blocking outside explicit plan checks yet
+  - wire `tenant_assign_plan`, `tenant_get_plan`, `tenant_list_plans`, `tenant_set_plan_limits`, `tenant_check_plan_limit`, `tenant_get_enabled_modules` through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator`, `ChatAgent` and tests together
 - If you add AgentOps metrics:
   - keep `docs/contracts/agentops_metrics_contract.json` aligned
   - extend `TelemetryService`, `SqlMetricsRepository` or `Agents/Telemetry`
@@ -145,6 +153,8 @@
 - Access control lifecycle
   - `auth user known -> tenant_user attached -> role synced -> permission checked -> allow|deny traced`
   - deactivation blocks future tenant-scoped execution without deleting auth identity rows
+- SaaS plan lifecycle
+  - `tenant assigned to plan -> default limits resolved -> tenant overrides applied -> included vs extra users calculated -> future quota/billing enforcement hook ready`
 
 ## Impact hotspots
 - `framework/app/Core/ChatAgent.php`

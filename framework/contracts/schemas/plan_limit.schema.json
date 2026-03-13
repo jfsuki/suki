@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "PlanLimit",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "limit_key",
+    "limit_value",
+    "limit_type",
+    "metadata"
+  ],
+  "properties": {
+    "id": { "type": ["string", "null"] },
+    "plan_key": {
+      "type": ["string", "null"],
+      "enum": ["starter", "growth", "pro", "custom", null]
+    },
+    "limit_key": { "type": "string", "minLength": 1 },
+    "limit_value": {
+      "type": ["string", "number", "integer", "boolean", "null"]
+    },
+    "limit_type": {
+      "type": "string",
+      "enum": ["hard", "soft", "feature"]
+    },
+    "metadata": { "type": "object", "additionalProperties": true }
+  }
+}

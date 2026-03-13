@@ -103,6 +103,15 @@ final class TenantAccessControlService
         return array_map([$this, 'decorateTenantUser'], $rows);
     }
 
+    public function countTenantUsers(string $tenantId, array $filters = []): int
+    {
+        return $this->repository->countTenantUsers($this->requireString($tenantId, 'tenant_id'), [
+            'role_key' => $this->nullableString($filters['role_key'] ?? null),
+            'status' => $this->nullableString($filters['status'] ?? null),
+            'user_id' => $this->nullableString($filters['user_id'] ?? null),
+        ]);
+    }
+
     /**
      * @return array<string, mixed>
      */

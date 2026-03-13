@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TenantPlan",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tenant_id",
+    "plan_key",
+    "status",
+    "metadata",
+    "created_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "plan_key": {
+      "type": "string",
+      "enum": ["starter", "growth", "pro", "custom"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["active", "paused", "canceled"]
+    },
+    "base_price": { "type": ["number", "null"] },
+    "currency": { "type": ["string", "null"], "minLength": 1 },
+    "included_users": { "type": ["integer", "null"] },
+    "extra_user_price": { "type": ["number", "null"] },
+    "billing_period": {
+      "type": ["string", "null"],
+      "enum": ["monthly", "yearly", "custom", null]
+    },
+    "metadata": { "type": "object", "additionalProperties": true },
+    "enabled_modules": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1 }
+    },
+    "module_flags": {
+      "type": "object",
+      "additionalProperties": { "type": "boolean" }
+    },
+    "limits": {
+      "type": "array",
+      "items": { "$ref": "./plan_limit.schema.json" }
+    },
+    "created_at": { "type": "string" }
+  }
+}

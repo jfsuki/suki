@@ -1,6 +1,6 @@
 {
   "contract_id": "agentops_metrics_contract",
-  "version": "1.4.5",
+  "version": "1.4.6",
   "effective_date": "2026-03-13",
   "addenda_of": null,
   "status": "canonical_draft",
@@ -33,6 +33,7 @@
     "needs_memory_hygiene",
     "module_used",
     "access_control_action",
+    "saas_plan_action",
     "skill_group",
     "alert_action",
     "task_action",
@@ -55,6 +56,8 @@
     "role_key",
     "permission_checked",
     "decision",
+    "plan_key",
+    "limit_key",
     "ambiguity_detected",
     "versions",
     "latency_ms"
@@ -83,6 +86,7 @@
     "request_mode",
     "module_used",
     "access_control_action",
+    "saas_plan_action",
     "skill_group",
     "alert_action",
     "task_action",
@@ -105,6 +109,8 @@
     "role_key",
     "permission_checked",
     "decision",
+    "plan_key",
+    "limit_key",
     "ambiguity_detected",
     "metrics_delta",
     "supervisor"
