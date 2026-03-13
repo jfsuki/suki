@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "TenantUser",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tenant_id",
+    "user_id",
+    "role_key",
+    "status",
+    "metadata",
+    "created_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "user_id": { "type": "string", "minLength": 1 },
+    "user_label": { "type": ["string", "null"] },
+    "role_key": {
+      "type": "string",
+      "enum": ["owner", "admin", "manager", "operator", "viewer"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["invited", "active", "inactive"]
+    },
+    "invited_at": { "type": ["string", "null"] },
+    "activated_at": { "type": ["string", "null"] },
+    "metadata": { "type": "object", "additionalProperties": true },
+    "created_at": { "type": "string" }
+  }
+}

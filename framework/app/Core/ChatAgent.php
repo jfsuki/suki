@@ -158,6 +158,28 @@ final class ChatAgent
         $registry->touchUser($userId, $role, $mode === 'builder' ? 'creator' : 'app', $tenantId);
         $registry->assignUserToProject($projectId, $userId, $role);
         $registry->touchSession($sessionId, $userId, $projectId, $tenantId, $channel);
+        $roleBeforeAccessControl = $role;
+        if ($isAuthenticated && $authUserId !== '' && $authTenantId !== '') {
+            try {
+                $accessControl = new TenantAccessControlService();
+                $tenantUser = $accessControl->resolveTenantUser($authTenantId, $authUserId);
+                if (is_array($tenantUser)) {
+                    $tenantStatus = trim((string) ($tenantUser['status'] ?? ''));
+                    $tenantRole = trim((string) ($tenantUser['role_key'] ?? ''));
+                    if ($tenantStatus === 'active' && $tenantRole !== '') {
+                        $role = $tenantRole;
+                    } elseif ($tenantStatus === 'inactive') {
+                        $role = 'guest';
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Keep legacy role fallback when access-control storage is unavailable.
+            }
+        }
+        if ($role !== $roleBeforeAccessControl) {
+            $registry->touchUser($userId, $role, $mode === 'builder' ? 'creator' : 'app', $tenantId);
+            $registry->assignUserToProject($projectId, $userId, $role);
+        }
         \App\Core\RoleContext::setRole($role);
         \App\Core\RoleContext::setUserId($userId);
         \App\Core\RoleContext::setUserLabel((string) ($payload['user_label'] ?? ''));
@@ -1704,6 +1726,7 @@ final class ChatAgent
             'purchases_action' => $runtimeObservability['purchases_action'],
             'fiscal_action' => $runtimeObservability['fiscal_action'],
             'ecommerce_action' => $runtimeObservability['ecommerce_action'],
+            'access_control_action' => $runtimeObservability['access_control_action'],
             'skill_group' => $runtimeObservability['skill_group'],
             'draft_id' => $runtimeObservability['draft_id'],
             'purchase_draft_id' => $runtimeObservability['purchase_draft_id'],
@@ -1740,6 +1763,11 @@ final class ChatAgent
             'external_product_id' => $runtimeObservability['external_product_id'],
             'sync_status' => $runtimeObservability['sync_status'],
             'sync_direction' => $runtimeObservability['sync_direction'],
+            'target_user_id' => $runtimeObservability['target_user_id'],
+            'actor_user_id' => $runtimeObservability['actor_user_id'],
+            'role_key' => $runtimeObservability['role_key'],
+            'permission_checked' => $runtimeObservability['permission_checked'],
+            'decision' => $runtimeObservability['decision'],
             'duplicate_blocked' => $runtimeObservability['duplicate_blocked'],
             'line_count' => $runtimeObservability['line_count'],
             'total' => $runtimeObservability['total'],
@@ -1843,6 +1871,7 @@ final class ChatAgent
             'purchases_action' => trim((string) ($runtimeContext['purchases_action'] ?? $routeTelemetry['purchases_action'] ?? '')) ?: 'none',
             'fiscal_action' => trim((string) ($runtimeContext['fiscal_action'] ?? $routeTelemetry['fiscal_action'] ?? '')) ?: 'none',
             'ecommerce_action' => trim((string) ($runtimeContext['ecommerce_action'] ?? $routeTelemetry['ecommerce_action'] ?? '')) ?: 'none',
+            'access_control_action' => trim((string) ($runtimeContext['access_control_action'] ?? $routeTelemetry['access_control_action'] ?? '')) ?: 'none',
             'skill_group' => $this->preferRuntimeOrRouteString($runtimeContext, $routeTelemetry, 'skill_group', 'unknown'),
             'draft_id' => trim((string) ($runtimeContext['draft_id'] ?? $routeTelemetry['draft_id'] ?? '')),
             'purchase_draft_id' => trim((string) ($runtimeContext['purchase_draft_id'] ?? $routeTelemetry['purchase_draft_id'] ?? '')),
@@ -1881,6 +1910,11 @@ final class ChatAgent
             'external_product_id' => trim((string) ($runtimeContext['external_product_id'] ?? $routeTelemetry['external_product_id'] ?? '')),
             'sync_status' => trim((string) ($runtimeContext['sync_status'] ?? $routeTelemetry['sync_status'] ?? '')),
             'sync_direction' => trim((string) ($runtimeContext['sync_direction'] ?? $routeTelemetry['sync_direction'] ?? '')),
+            'target_user_id' => trim((string) ($runtimeContext['target_user_id'] ?? $routeTelemetry['target_user_id'] ?? '')),
+            'actor_user_id' => trim((string) ($runtimeContext['actor_user_id'] ?? $routeTelemetry['actor_user_id'] ?? '')),
+            'role_key' => trim((string) ($runtimeContext['role_key'] ?? $routeTelemetry['role_key'] ?? '')),
+            'permission_checked' => trim((string) ($runtimeContext['permission_checked'] ?? $routeTelemetry['permission_checked'] ?? '')),
+            'decision' => trim((string) ($runtimeContext['decision'] ?? $routeTelemetry['decision'] ?? '')),
             'duplicate_blocked' => (($runtimeContext['duplicate_blocked'] ?? $routeTelemetry['duplicate_blocked'] ?? false) === true),
             'line_count' => is_numeric($runtimeContext['line_count'] ?? $routeTelemetry['line_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['line_count'] ?? $routeTelemetry['line_count']))
@@ -2035,6 +2069,7 @@ final class ChatAgent
             'purchases_action' => trim((string) ($payload['purchases_action'] ?? '')) ?: 'none',
             'fiscal_action' => trim((string) ($payload['fiscal_action'] ?? '')) ?: 'none',
             'ecommerce_action' => trim((string) ($payload['ecommerce_action'] ?? '')) ?: 'none',
+            'access_control_action' => trim((string) ($payload['access_control_action'] ?? '')) ?: 'none',
             'skill_group' => trim((string) ($payload['skill_group'] ?? '')) ?: '',
             'draft_id' => trim((string) ($payload['draft_id'] ?? '')) ?: '',
             'purchase_draft_id' => trim((string) ($payload['purchase_draft_id'] ?? '')) ?: '',
@@ -2073,6 +2108,11 @@ final class ChatAgent
             'external_product_id' => trim((string) ($payload['external_product_id'] ?? '')) ?: '',
             'sync_status' => trim((string) ($payload['sync_status'] ?? '')) ?: '',
             'sync_direction' => trim((string) ($payload['sync_direction'] ?? '')) ?: '',
+            'target_user_id' => trim((string) ($payload['target_user_id'] ?? '')) ?: '',
+            'actor_user_id' => trim((string) ($payload['actor_user_id'] ?? '')) ?: '',
+            'role_key' => trim((string) ($payload['role_key'] ?? '')) ?: '',
+            'permission_checked' => trim((string) ($payload['permission_checked'] ?? '')) ?: '',
+            'decision' => trim((string) ($payload['decision'] ?? '')) ?: '',
             'duplicate_blocked' => (($payload['duplicate_blocked'] ?? false) === true),
             'line_count' => is_numeric($payload['line_count'] ?? null)
                 ? max(0, (int) $payload['line_count'])
@@ -2126,6 +2166,7 @@ final class ChatAgent
             $this->commandBus->register(new PurchasesCommandHandler());
             $this->commandBus->register(new FiscalEngineCommandHandler());
             $this->commandBus->register(new EcommerceHubCommandHandler());
+            $this->commandBus->register(new TenantAccessControlCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
                 ['AuthLogin', 'AuthCreateUser'],
                 function (array $command, array $context): array {

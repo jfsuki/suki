@@ -1673,6 +1673,12 @@ final class IntentRouter
             'PrepareEcommerceProductPushPayload' => 'ecommerce.prepare_product_push_payload',
             'RegisterEcommerceProductPullSnapshot' => 'ecommerce.register_product_pull_snapshot',
             'MarkEcommerceProductSyncStatus' => 'ecommerce.mark_product_sync_status',
+            'TenantAddUser' => 'users.add_user',
+            'TenantListUsers' => 'users.list',
+            'TenantGetUserRole' => 'users.get_role',
+            'TenantUpdateUserRole' => 'users.update_role',
+            'TenantDeactivateUser' => 'users.deactivate',
+            'TenantCheckPermission' => 'users.check_permission',
             'CreateInvoice' => 'invoice.create',
             'GenerateReport' => 'report.generate',
             'ConfigureFEProvider' => 'settings.configure_fe_provider',
@@ -1705,6 +1711,7 @@ final class IntentRouter
             || str_starts_with($selectedName, 'purchases_')
             || str_starts_with($selectedName, 'fiscal_')
             || str_starts_with($selectedName, 'ecommerce_')
+            || str_starts_with($selectedName, 'tenant_')
             || in_array($selectedName, ['entity_search', 'entity_resolve'], true);
     }
 

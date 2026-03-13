@@ -1,7 +1,7 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.7.6",
-  "effective_date": "2026-03-12",
+  "version": "1.7.7",
+  "effective_date": "2026-03-13",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
   "contract_location": "docs/contracts",
@@ -188,20 +188,21 @@
       "name": "product_lookup",
       "description": "Classify product lookup requests before fallback.",
       "intent_patterns": [
-        "re:(busca|buscar|consulta|lookup|muestra|mostrar).*(producto|sku|item|referencia)",
-        "re:(producto|sku|item|referencia).*(busca|buscar|consulta|lookup|muestra|mostrar)"
+        "re:(?!.*\\bpos\\b)(busca|buscar|consulta|lookup|muestra|mostrar).*(producto|sku|item|referencia)",
+        "re:(?!.*\\bpos\\b)(producto|sku|item|referencia).*(busca|buscar|consulta|lookup|muestra|mostrar)",
+        "re:(?!.*\\bpos\\b)(buscar|busca).*(producto).*(sku|codigo|código|referencia|barcode)"
       ],
       "keywords": [
-        "producto",
-        "sku",
-        "item",
-        "referencia"
+        "buscar producto",
+        "buscar sku",
+        "producto por sku",
+        "producto por referencia"
       ],
       "execution_mode": "tool",
       "allowed_tools": [
         "product_query"
       ],
-      "priority": 128,
+      "priority": 150,
       "memory_type": null,
       "input_schema": {
         "required": [
@@ -221,19 +222,21 @@
       "name": "customer_lookup",
       "description": "Classify customer lookup requests before fallback.",
       "intent_patterns": [
-        "re:(busca|buscar|consulta|lookup|muestra|mostrar).*(cliente|customer|tercero)",
-        "re:(cliente|customer|tercero).*(busca|buscar|consulta|lookup|muestra|mostrar)"
+        "re:(?!.*\\bpos\\b)(busca|buscar|consulta|lookup|muestra|mostrar).*(cliente|customer|tercero)",
+        "re:(?!.*\\bpos\\b)(cliente|customer|tercero).*(busca|buscar|consulta|lookup|muestra|mostrar)",
+        "re:(?!.*\\bpos\\b)(buscar|busca).*(cliente|customer|tercero).*(documento|nit|cedula|cédula)"
       ],
       "keywords": [
-        "cliente",
-        "customer",
-        "tercero"
+        "buscar cliente",
+        "cliente por documento",
+        "buscar customer",
+        "buscar tercero"
       ],
       "execution_mode": "tool",
       "allowed_tools": [
         "customer_query"
       ],
-      "priority": 126,
+      "priority": 149,
       "memory_type": null,
       "input_schema": {
         "required": [
@@ -885,6 +888,7 @@
       ],
       "keywords": [
         "buscar producto pos",
+        "producto pos",
         "resolver producto pos",
         "buscar barcode pos"
       ],
@@ -3280,6 +3284,199 @@
           "link_id",
           "sync_status",
           "sync_direction"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "tenant_add_user",
+      "description": "Attach an existing user to the current tenant with a controlled role.",
+      "intent_patterns": [
+        "re:(agrega|agregar|anade|añade|asigna|asignar|vincula|vincular).*(usuario|miembro|user_id|user).*(tenant|empresa|rol|role_key)",
+        "re:(usuario|miembro|user_id|user).*(agrega|agregar|anade|añade|asigna|asignar).*(tenant|empresa|rol|role_key)"
+      ],
+      "keywords": [
+        "agregar usuario al tenant",
+        "asignar usuario a empresa",
+        "vincular miembro",
+        "role_key"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "tenant_add_user"
+      ],
+      "priority": 153,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "user_id",
+          "role_key",
+          "status"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "tenant_list_users",
+      "description": "List users attached to the current tenant without leaking other tenants.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(usuarios|miembros|equipo).*(tenant|empresa)?",
+        "re:(usuarios|miembros|equipo).*(lista|listar|muestra|mostrar|ver|consulta)"
+      ],
+      "keywords": [
+        "lista usuarios del tenant",
+        "miembros de la empresa",
+        "equipo del tenant"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "tenant_list_users"
+      ],
+      "priority": 152,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "role_key",
+          "status",
+          "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "tenant_get_user_role",
+      "description": "Return the role and effective permissions for one tenant user safely.",
+      "intent_patterns": [
+        "re:(que|qué|cual|cuál).*(rol).*(usuario|mi rol|miembro)",
+        "re:(rol).*(usuario|mi rol|miembro).*(que|qué|cual|cuál|ver|consulta)"
+      ],
+      "keywords": [
+        "que rol tiene",
+        "mi rol",
+        "rol del usuario"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "tenant_get_user_role"
+      ],
+      "priority": 151,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "user_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "tenant_update_user_role",
+      "description": "Change the role of one tenant user under explicit authorization.",
+      "intent_patterns": [
+        "re:(cambia|cambiar|actualiza|actualizar|edita|editar).*(rol).*(usuario|miembro)",
+        "re:(rol).*(usuario|miembro).*(cambia|cambiar|actualiza|actualizar|edita|editar)"
+      ],
+      "keywords": [
+        "cambiar rol de usuario",
+        "actualizar rol del miembro"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "tenant_update_user_role"
+      ],
+      "priority": 150,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "user_id",
+          "role_key"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "tenant_deactivate_user",
+      "description": "Deactivate one tenant user without deleting cross-tenant identity data.",
+      "intent_patterns": [
+        "re:(desactiva|desactivar|bloquea|bloquear|inhabilita|inhabilitar).*(usuario|miembro)",
+        "re:(usuario|miembro).*(desactiva|desactivar|bloquea|bloquear|inhabilita|inhabilitar)"
+      ],
+      "keywords": [
+        "desactivar usuario",
+        "bloquear miembro del tenant"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "tenant_deactivate_user"
+      ],
+      "priority": 149,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "user_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "tenant_check_permission",
+      "description": "Check whether a tenant user can execute a module/action pair safely.",
+      "intent_patterns": [
+        "re:(puede|puedo|tiene|tengo|revisa|verifica|valida).*(permiso|puede ejecutar|acceso)",
+        "re:(permiso|acceso).*(usuario|miembro|puede|puedo|ejecutar)"
+      ],
+      "keywords": [
+        "puede ejecutar",
+        "revisar permiso",
+        "validar acceso"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "tenant_check_permission"
+      ],
+      "priority": 148,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "user_id",
+          "module_key",
+          "action_key",
+          "permission"
         ]
       },
       "channel_capabilities": [

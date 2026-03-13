@@ -1,7 +1,7 @@
 {
   "contract_id": "action_catalog",
-  "version": "1.6.5",
-  "effective_date": "2026-03-12",
+  "version": "1.6.6",
+  "effective_date": "2026-03-13",
   "addenda_of": null,
   "status": "canonical_draft",
   "contract_location": "docs/contracts",
@@ -2026,6 +2026,120 @@
       "rag_required": false,
       "json_schema_required": true,
       "risk_level": "medium",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "users.add_user",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "tenant_add_user"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "high",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "users.list",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "tenant_list_users"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "users.get_role",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "tenant_get_user_role"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "users.update_role",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "tenant_update_user_role"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "high",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "users.deactivate",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "tenant_deactivate_user"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "high",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "users.check_permission",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "tenant_check_permission"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
       "gates_required": [
         "mode_guard",
         "role_guard",

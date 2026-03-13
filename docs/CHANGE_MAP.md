@@ -89,6 +89,14 @@
   - wire order sync actions (`link_order`, `get_order_link`, `list_order_links`, `register_order_pull_snapshot`, `normalize_external_order`, `mark_order_sync_status`, `get_order_snapshot`) through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator` and tests together
   - wire product sync actions (`link_product`, `unlink_product`, `list_product_links`, `get_product_link`, `prepare_product_push_payload`, `register_product_pull_snapshot`, `mark_product_sync_status`) through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator` and tests together
   - wire `SkillExecutor`, `IntentRouter`, `ChatAgent`, API routes and tests together
+- If you add Access Control behavior:
+  - update `TenantAccessControlRepository`, `TenantAccessControlService`, `TenantAccessControlCommandHandler`, `TenantAccessControlMessageParser`
+  - keep the canonical layer minimal: `tenant_user + role_permission` only
+  - keep tenant membership authoritative for multiuser runtime checks; do not trust raw `role` payloads when a tenant-user binding exists
+  - preserve legacy auth fallback when access-control storage is unavailable so existing modules do not break
+  - keep permissions normalized as `module_key + action_key + effect` with wildcard support and tenant-specific overrides ready for future use
+  - sync tenant role changes back to `ProjectRegistry` / `auth_users` only as incremental metadata updates; do not rewrite auth flows here
+  - wire `tenant_add_user`, `tenant_list_users`, `tenant_get_user_role`, `tenant_update_user_role`, `tenant_deactivate_user`, `tenant_check_permission` through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator`, `ChatAgent` and tests together
 - If you add AgentOps metrics:
   - keep `docs/contracts/agentops_metrics_contract.json` aligned
   - extend `TelemetryService`, `SqlMetricsRepository` or `Agents/Telemetry`
@@ -134,6 +142,9 @@
   - `product link created -> push payload prepared | pull snapshot registered -> sync_status recorded -> future remote sync`
   - order sync foundation lifecycle
   - `order link created | external order normalized -> pull snapshot registered -> sync_status recorded -> future sale|fiscal|inventory|customer|payment linkage`
+- Access control lifecycle
+  - `auth user known -> tenant_user attached -> role synced -> permission checked -> allow|deny traced`
+  - deactivation blocks future tenant-scoped execution without deleting auth identity rows
 
 ## Impact hotspots
 - `framework/app/Core/ChatAgent.php`

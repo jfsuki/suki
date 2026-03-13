@@ -69,7 +69,7 @@ final class RouterPolicyEvaluator
 
         $authGateRequired = $action === 'execute_command'
             && ($mode !== 'off' || in_array('role_guard', $gatesRequired, true) || in_array('auth_guard', $gatesRequired, true));
-        [$authPassed, $authReason] = $this->validateAuthRbac($context, $actionCatalogEntry);
+        [$authPassed, $authReason] = $this->validateAuthRbac($context + ['catalog_action_name' => $catalogAction], $actionCatalogEntry);
         $authGate = $this->gateResult('auth_rbac_gate', $authGateRequired, !$authGateRequired || $authPassed, $authReason);
         $gateResults[] = $authGate;
         if ($authGateRequired && !$authGate['passed']) {
@@ -1368,6 +1368,45 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'TenantAddUser':
+                $tenantUserId = trim((string) ($command['user_id'] ?? ''));
+                $tenantRole = trim((string) ($command['role_key'] ?? ''));
+                if ($tenantUserId === '' || $tenantRole === '') {
+                    return [false, 'missing_tenant_user_fields'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'TenantListUsers':
+                return [true, 'schema_valid'];
+
+            case 'TenantGetUserRole':
+                if (trim((string) ($command['user_id'] ?? '')) === '') {
+                    return [false, 'missing_tenant_user_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'TenantUpdateUserRole':
+                if (trim((string) ($command['user_id'] ?? '')) === '' || trim((string) ($command['role_key'] ?? '')) === '') {
+                    return [false, 'missing_tenant_role_update_fields'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'TenantDeactivateUser':
+                if (trim((string) ($command['user_id'] ?? '')) === '') {
+                    return [false, 'missing_tenant_user_id'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'TenantCheckPermission':
+                if (
+                    trim((string) ($command['user_id'] ?? '')) === ''
+                    || trim((string) ($command['module_key'] ?? '')) === ''
+                    || trim((string) ($command['action_key'] ?? '')) === ''
+                ) {
+                    return [false, 'missing_permission_check_fields'];
+                }
+                return [true, 'schema_valid'];
+
             default:
                 // Backward-compatible fallback for commands not yet fully modeled.
                 if ($entity === '' && empty($data) && $id === null) {
@@ -1400,7 +1439,46 @@ final class RouterPolicyEvaluator
         if ($role === '') {
             $role = 'guest';
         }
-        if ($role === 'admin' || $role === $requiredRole) {
+
+        $catalogAction = trim((string) ($context['catalog_action_name'] ?? ''));
+        $tenantId = trim((string) ($context['auth_tenant_id'] ?? $context['tenant_id'] ?? ''));
+        $userId = trim((string) ($context['auth_user_id'] ?? $context['user_id'] ?? ''));
+        if ($tenantId !== '' && $userId !== '' && $catalogAction !== '') {
+            try {
+                $service = $this->tenantAccessControlService($context);
+                if ($service !== null) {
+                    $permission = $service->checkPermission(
+                        $tenantId,
+                        $userId,
+                        $this->moduleKeyFromCatalogAction($catalogAction),
+                        $this->actionKeyFromCatalogAction($catalogAction),
+                        [
+                            'required_role' => $requiredRole,
+                            'fallback_role' => $role,
+                            'allow_legacy_fallback' => true,
+                        ]
+                    );
+
+                    if (($permission['allowed'] ?? false) === true) {
+                        return [true, 'permission_allowed:' . (string) ($permission['permission_source'] ?? 'unknown')];
+                    }
+
+                    return [
+                        false,
+                        'permission_denied:'
+                        . (string) ($permission['permission_checked'] ?? $catalogAction)
+                        . ',role:'
+                        . (string) ($permission['role_key'] ?? $role)
+                        . ',source:'
+                        . (string) ($permission['permission_source'] ?? 'unknown'),
+                    ];
+                }
+            } catch (\Throwable $e) {
+                // Preserve legacy fallback when access-control storage is unavailable.
+            }
+        }
+
+        if ($this->roleSatisfies($role, $requiredRole)) {
             return [true, 'role_allowed'];
         }
 
@@ -1664,6 +1742,81 @@ final class RouterPolicyEvaluator
     private function hardGateNames(): array
     {
         return ['allowlist_gate', 'schema_gate', 'auth_rbac_gate', 'tenant_scope_gate'];
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     */
+    private function tenantAccessControlService(array $context): ?TenantAccessControlService
+    {
+        $service = $context['tenant_access_control_service'] ?? null;
+        if ($service instanceof TenantAccessControlService) {
+            return $service;
+        }
+
+        try {
+            return new TenantAccessControlService();
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    private function moduleKeyFromCatalogAction(string $catalogAction): string
+    {
+        $catalogAction = strtolower(trim($catalogAction));
+        if ($catalogAction === '') {
+            return 'unknown';
+        }
+        if (!str_contains($catalogAction, '.')) {
+            return $catalogAction;
+        }
+
+        return trim((string) explode('.', $catalogAction, 2)[0]) ?: 'unknown';
+    }
+
+    private function actionKeyFromCatalogAction(string $catalogAction): string
+    {
+        $catalogAction = strtolower(trim($catalogAction));
+        if ($catalogAction === '') {
+            return '*';
+        }
+        if (!str_contains($catalogAction, '.')) {
+            return '*';
+        }
+
+        return trim((string) explode('.', $catalogAction, 2)[1]) ?: '*';
+    }
+
+    private function roleSatisfies(string $actualRole, string $requiredRole): bool
+    {
+        $actual = $this->normalizeRoleForComparison($actualRole);
+        $required = $this->normalizeRoleForComparison($requiredRole);
+        $order = [
+            'viewer' => 1,
+            'operator' => 2,
+            'manager' => 3,
+            'admin' => 4,
+            'owner' => 5,
+        ];
+
+        if (!isset($order[$actual]) || !isset($order[$required])) {
+            return $actual === $required;
+        }
+
+        return $order[$actual] >= $order[$required];
+    }
+
+    private function normalizeRoleForComparison(string $role): string
+    {
+        $role = strtolower(trim($role));
+        return match ($role) {
+            'administrador' => 'admin',
+            'owner', 'dueno', 'dueño', 'propietario' => 'owner',
+            'manager', 'gerente' => 'manager',
+            'operator', 'operador', 'seller', 'vendedor', 'vendedora', 'accountant', 'contador', 'contadora' => 'operator',
+            'viewer', 'lector', 'consulta', 'guest' => 'viewer',
+            default => $role,
+        };
     }
 
     /**

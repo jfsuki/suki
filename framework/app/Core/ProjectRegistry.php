@@ -275,6 +275,21 @@ final class ProjectRegistry
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 
+    public function getUser(string $userId): ?array
+    {
+        if ($userId === '') {
+            return null;
+        }
+
+        $stmt = $this->db->prepare('SELECT id, label, type, role, tenant_id, created_at, last_seen
+            FROM users
+            WHERE id = :id
+            LIMIT 1');
+        $stmt->execute([':id' => $userId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row ?: null;
+    }
+
     public function listProjects(): array
     {
         $stmt = $this->db->query('SELECT id, name, status, tenant_mode, storage_model, owner_user_id, updated_at FROM projects ORDER BY updated_at DESC');
@@ -350,6 +365,23 @@ final class ProjectRegistry
         $stmt->execute([':id' => $userId, ':project' => $projectId]);
         $user = $stmt->fetch(PDO::FETCH_ASSOC);
         return $user ?: null;
+    }
+
+    public function syncAuthUserContext(string $projectId, string $userId, string $role, string $tenantId): void
+    {
+        if ($projectId === '' || $userId === '') {
+            return;
+        }
+
+        $stmt = $this->db->prepare('UPDATE auth_users
+            SET role = :role, tenant_id = :tenant
+            WHERE id = :id AND project_id = :project');
+        $stmt->execute([
+            ':role' => $role,
+            ':tenant' => $tenantId,
+            ':id' => $userId,
+            ':project' => $projectId,
+        ]);
     }
 
     public function listAuthUsers(string $projectId): array
