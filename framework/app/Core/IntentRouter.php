@@ -885,6 +885,10 @@ final class IntentRouter
             'skill_execution_ms' => 0,
             'skill_result_status' => 'not_detected',
             'skill_fallback_reason' => 'none',
+            'parser_collision_detected' => false,
+            'low_confidence_module_match' => false,
+            'fallback_to_generic_assistant' => false,
+            'project_status_route_preserved' => false,
         ];
     }
 
@@ -906,8 +910,8 @@ final class IntentRouter
 
         $query = $this->extractRetrievalQuery($gatewayResult, $context);
         $resolved = $this->skillResolver->resolve($query, $skillsRegistry, $context);
+        $selectedName = strtolower(trim((string) (($resolved['selected']['name'] ?? '') ?: '')));
         if ($action !== 'send_to_llm') {
-            $selectedName = strtolower(trim((string) (($resolved['selected']['name'] ?? '') ?: '')));
             if (!(bool) ($resolved['detected'] ?? false) || !$this->isDeterministicPreLlmSkill($selectedName)) {
                 return [];
             }
@@ -923,6 +927,28 @@ final class IntentRouter
                     'skill_execution_ms' => 0,
                     'skill_result_status' => (string) ($resolved['reason'] ?? 'not_detected'),
                     'skill_fallback_reason' => 'no_skill_match',
+                ],
+            ];
+        }
+
+        $preservedRoute = $this->shouldPreserveGatewayLocalRoute($action, $gatewayResult, $context);
+        if ((bool) ($preservedRoute['preserve'] ?? false)) {
+            return [
+                'telemetry' => [
+                    'skill_detected' => true,
+                    'skill_selected' => $selectedName !== '' ? $selectedName : 'none',
+                    'skill_executed' => false,
+                    'skill_failed' => false,
+                    'skill_execution_mode' => 'none',
+                    'skill_execution_ms' => 0,
+                    'skill_result_status' => 'gateway_route_preserved',
+                    'skill_fallback_reason' => (string) ($preservedRoute['reason'] ?? 'gateway_route_preserved'),
+                    'skill_match_reason' => (string) ($resolved['reason'] ?? 'skill_match'),
+                    'matched_skills' => is_array($resolved['matched_skills'] ?? null) ? (array) $resolved['matched_skills'] : [],
+                    'parser_collision_detected' => true,
+                    'low_confidence_module_match' => true,
+                    'fallback_to_generic_assistant' => (bool) ($preservedRoute['fallback_to_generic_assistant'] ?? false),
+                    'project_status_route_preserved' => (bool) ($preservedRoute['project_status_route_preserved'] ?? false),
                 ],
             ];
         }
@@ -952,6 +978,76 @@ final class IntentRouter
         return array_merge($execution, [
             'telemetry' => $telemetry,
         ]);
+    }
+
+    /**
+     * @param array<string,mixed> $gatewayResult
+     * @param array<string,mixed> $context
+     * @return array<string,mixed>
+     */
+    private function shouldPreserveGatewayLocalRoute(string $action, array $gatewayResult, array $context): array
+    {
+        if (!in_array($action, ['respond_local', 'ask_user'], true)) {
+            return ['preserve' => false];
+        }
+
+        $telemetry = is_array($gatewayResult['telemetry'] ?? null) ? (array) $gatewayResult['telemetry'] : [];
+        if (($telemetry['resolved_locally'] ?? false) !== true || ($telemetry['rules_hit'] ?? false) !== true) {
+            return ['preserve' => false];
+        }
+
+        $mode = strtolower(trim((string) ($context['mode'] ?? 'app')));
+        $classification = strtolower(trim((string) ($telemetry['classification'] ?? '')));
+        $intent = strtoupper(trim((string) ($telemetry['intent'] ?? $gatewayResult['intent'] ?? '')));
+        $reply = $this->normalizeRouteGuardText((string) ($gatewayResult['reply'] ?? ''));
+        $messageText = $this->normalizeRouteGuardText((string) ($context['message_text'] ?? ''));
+
+        if (
+            $intent === 'PROJECT_STATUS'
+            || str_starts_with($reply, 'estado del proyecto:')
+            || (
+                str_starts_with($reply, 'en esta app puedes trabajar con:')
+                && $this->isProjectStatusPrompt($messageText)
+            )
+        ) {
+            return [
+                'preserve' => true,
+                'reason' => 'project_status_route_preserved',
+                'fallback_to_generic_assistant' => false,
+                'project_status_route_preserved' => true,
+            ];
+        }
+
+        if ($mode === 'builder' && in_array($classification, ['builder_onboarding', 'training'], true)) {
+            return [
+                'preserve' => true,
+                'reason' => 'fallback_to_generic_assistant',
+                'fallback_to_generic_assistant' => true,
+                'project_status_route_preserved' => false,
+            ];
+        }
+
+        return ['preserve' => false];
+    }
+
+    private function normalizeRouteGuardText(string $value): string
+    {
+        $value = mb_strtolower(trim($value), 'UTF-8');
+        $value = preg_replace('/\s+/u', ' ', $value) ?? $value;
+
+        return trim($value);
+    }
+
+    private function isProjectStatusPrompt(string $messageText): bool
+    {
+        if ($messageText === '') {
+            return false;
+        }
+
+        return preg_match(
+            '/\b(estado|status|resumen)\b.*\b(proyecto|app|aplicacion)\b|\b(proyecto|app|aplicacion)\b.*\b(estado|status|resumen)\b/u',
+            $messageText
+        ) === 1;
     }
 
     /**

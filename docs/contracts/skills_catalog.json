@@ -581,8 +581,8 @@
       "name": "entity_search",
       "description": "Search entities safely across modules inside the current tenant.",
       "intent_patterns": [
-        "re:(busca|buscar|encuentra|encontrar|localiza|consulta).*(producto|venta|compra|factura|cliente|proveedor|pedido|archivo|documento|imagen|adjunto|sku|barcode|codigo|referencia)",
-        "re:(busca|buscar|encuentra|encontrar|localiza|consulta)\\s+(?!como\\b|que\\b|por\\b|porque\\b|quien\\b|cuando\\b|donde\\b)[a-z0-9][a-z0-9 _-]{2,80}$"
+        "re:(?:^|\\b)(busca|buscar|encuentra|encontrar|localiza|consulta)(?:$|\\b).*(?:^|\\b)(producto|venta|compra|factura|cliente|proveedor|pedido|archivo|documento|imagen|adjunto|sku|barcode|codigo|referencia)(?:$|\\b)",
+        "re:(?:^|\\b)(busca|buscar|encuentra|encontrar|localiza|consulta)(?:$|\\b)\\s+(?!como\\b|que\\b|por\\b|porque\\b|quien\\b|cuando\\b|donde\\b)[a-z0-9][a-z0-9 _-]{2,80}$"
       ],
       "keywords": [
         "buscar sku",
@@ -618,8 +618,8 @@
       "description": "Resolve ambiguous references deterministically before acting.",
       "intent_patterns": [
         "re:(vende|vender|corrige|corregir|abre|abrir|mira|ver|muestra|mostrar|mu[eé]strame).*(ese|esa|este|esta|ultimo|ultima|ayer|hoy|producto|venta|compra|factura|cliente|proveedor|pedido|archivo|documento|imagen)",
-        "re:(ultimo|ultima|ayer|hoy).*(venta|compra|factura|pedido|cliente|proveedor|archivo|documento)",
-        "re:(ese|esa|este|esta).*[a-z0-9][a-z0-9 _-]{2,80}$"
+        "re:(?:^|\\b)(ultimo|ultima|ayer|hoy)(?:$|\\b).*(venta|compra|factura|pedido|cliente|proveedor|archivo|documento)",
+        "re:^\\s*(ese|esa|este|esta)\\b\\s+[a-z0-9][a-z0-9 _-]{2,80}$"
       ],
       "keywords": [
         "ultima venta",
@@ -1447,8 +1447,8 @@
       "name": "pos_list_cash_sessions",
       "description": "List POS cash register sessions with open or closed filters.",
       "intent_patterns": [
-        "re:(lista|listar|muestra|mostrar|ver|consulta).*(sesiones|cajas|cash sessions|cash registers).*(pos)?",
-        "re:(cajas|cash sessions|cash registers).*(abiertas|cerradas|open|closed).*(pos)?"
+        "re:(?:^|\\b)(lista|listar|muestra|mostrar|ver|consulta)(?:$|\\b).*(?:^|\\b)(sesiones|cajas|cash sessions|cash registers)(?:$|\\b).*(?:^|\\b)(pos|punto de venta|cash)(?:$|\\b)",
+        "re:(?:^|\\b)(cajas|cash sessions|cash registers)(?:$|\\b).*(?:^|\\b)(abiertas|cerradas|open|closed)(?:$|\\b).*(?:^|\\b)(pos|punto de venta|cash)(?:$|\\b)"
       ],
       "keywords": [
         "listar cajas pos",
