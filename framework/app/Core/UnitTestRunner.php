@@ -108,6 +108,8 @@ final class UnitTestRunner
         $tests[] = $this->wrap('ecommerce_product_sync_foundation', fn() => $this->checkEcommerceProductSyncFoundation());
         $tests[] = $this->wrap('ecommerce_order_sync_foundation', fn() => $this->checkEcommerceOrderSyncFoundation());
         $tests[] = $this->wrap('ecommerce_agent_skills', fn() => $this->checkEcommerceAgentSkills());
+        $tests[] = $this->wrap('agent_tools_integration_foundation', fn() => $this->checkAgentToolsIntegrationFoundation());
+        $tests[] = $this->wrap('agent_tools_integration_skills', fn() => $this->checkAgentToolsIntegrationSkills());
         $tests[] = $this->wrap('project_memory_system', fn() => $this->checkProjectMemorySystem());
         $tests[] = $this->wrap('learning_promotion_pipeline', fn() => $this->checkLearningPromotionPipeline());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
@@ -1534,6 +1536,16 @@ final class UnitTestRunner
     private function checkEcommerceAgentSkills(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/ecommerce_agent_skills_test.php');
+    }
+
+    private function checkAgentToolsIntegrationFoundation(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/agent_tools_integration_foundation_test.php');
+    }
+
+    private function checkAgentToolsIntegrationSkills(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/agent_tools_integration_skills_test.php');
     }
 
     private function checkProjectMemorySystem(): void

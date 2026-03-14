@@ -1690,6 +1690,11 @@ final class IntentRouter
             'UsageCheckLimit' => 'usage.check_limit',
             'UsageListMetrics' => 'usage.list_metrics',
             'UsageGetHistory' => 'usage.get_history',
+            'AgentListToolGroups' => 'agent_tools.list_tool_groups',
+            'AgentGetModuleCapabilities' => 'agent_tools.get_module_capabilities',
+            'AgentResolveToolForRequest' => 'agent_tools.resolve_tool_for_request',
+            'AgentCheckModuleEnabled' => 'agent_tools.check_module_enabled',
+            'AgentCheckActionAllowed' => 'agent_tools.check_action_allowed',
             'CreateInvoice' => 'invoice.create',
             'GenerateReport' => 'report.generate',
             'ConfigureFEProvider' => 'settings.configure_fe_provider',
@@ -1724,6 +1729,7 @@ final class IntentRouter
             || str_starts_with($selectedName, 'ecommerce_')
             || str_starts_with($selectedName, 'tenant_')
             || str_starts_with($selectedName, 'usage_')
+            || str_starts_with($selectedName, 'agent_')
             || in_array($selectedName, ['entity_search', 'entity_resolve'], true);
     }
 

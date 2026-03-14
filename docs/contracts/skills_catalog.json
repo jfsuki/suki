@@ -1,6 +1,6 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.7.9",
+  "version": "1.8.0",
   "effective_date": "2026-03-14",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
@@ -3826,6 +3826,178 @@
           "metric_key",
           "period_key",
           "limit"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "agent_list_tool_groups",
+      "description": "List the agent tool groups available for the active tenant and user.",
+      "intent_patterns": [
+        "re:(que|cuales|lista|listar|muestra|mostrar).*(herramientas|tools|modulos|capacidades).*(tenant|empresa|puede usar|disponibles)",
+        "re:(herramientas|tools|modulos|capacidades).*(tenant|empresa).*(que|cuales|lista|mostrar|disponibles)"
+      ],
+      "keywords": [
+        "que herramientas puede usar",
+        "herramientas puede usar",
+        "herramientas disponibles",
+        "modulos del tenant",
+        "tools available",
+        "capability discovery"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "agent_list_tool_groups"
+      ],
+      "priority": 147,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "tenant_id",
+          "project_id"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "agent_get_module_capabilities",
+      "description": "Return capability details for one module without inventing disabled or denied actions.",
+      "intent_patterns": [
+        "re:(que|cuales|muestra|mostrar|ver).*(herramientas|acciones|capacidades).*(para|de).*(media|entity search|entity_search|pos|purchases|compras|fiscal|ecommerce|usuarios|access control|plan saas|saas|usage|consumo)",
+        "re:(media|entity search|entity_search|pos|purchases|compras|fiscal|ecommerce|usuarios|access control|plan saas|saas|usage|consumo).*(que|cuales|herramientas|acciones|capacidades)"
+      ],
+      "keywords": [
+        "herramientas para ecommerce",
+        "acciones del modulo",
+        "capabilities for pos",
+        "tools for fiscal"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "agent_get_module_capabilities"
+      ],
+      "priority": 146,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "module_key",
+          "requested_module"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "agent_resolve_tool_for_request",
+      "description": "Resolve the safest module/tool group for one business request and return clarification when needed.",
+      "intent_patterns": [
+        "re:(que modulo uso|que herramienta uso|resuelve herramienta|resuelve modulo|a que modulo va|que tool uso)",
+        "re:(modulo correcto|herramienta correcta|ruta correcta).*(para|segun la solicitud|segun el caso)"
+      ],
+      "keywords": [
+        "que modulo uso",
+        "que modulo uso para",
+        "que modulo uso",
+        "resuelve herramienta",
+        "modulo correcto",
+        "tool routing"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "agent_resolve_tool_for_request"
+      ],
+      "priority": 145,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "requested_module",
+          "module_key",
+          "request_text"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "agent_check_module_enabled",
+      "description": "Check whether one module is enabled for the current tenant plan.",
+      "intent_patterns": [
+        "re:(esta|habilitado|activo|disponible|enabled).*(media|entity search|entity_search|pos|purchases|compras|fiscal|ecommerce|usuarios|access control|plan saas|saas|usage|consumo)",
+        "re:(modulo|media|entity search|entity_search|pos|purchases|compras|fiscal|ecommerce|usuarios|access control|plan saas|saas|usage|consumo).*(habilitado|activo|disponible|enabled)"
+      ],
+      "keywords": [
+        "esta habilitado ecommerce",
+        "ecommerce para este tenant",
+        "modulo habilitado",
+        "ecommerce enabled",
+        "esta activo pos",
+        "modulo disponible"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "agent_check_module_enabled"
+      ],
+      "priority": 144,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "module_key",
+          "requested_module"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "agent_check_action_allowed",
+      "description": "Check whether the current user is allowed to execute one module action.",
+      "intent_patterns": [
+        "re:(puedo|puede|permitido|allowed|autorizado).*(ejecutar|usar|hacer).*(module_key|action_key|accion|action)",
+        "re:(permiso|autorizacion|allowed).*(module_key|action_key|accion|action)"
+      ],
+      "keywords": [
+        "puedo ejecutar",
+        "accion permitida",
+        "check action allowed",
+        "module_key"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "agent_check_action_allowed"
+      ],
+      "priority": 143,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "module_key",
+          "action_key"
         ]
       },
       "channel_capabilities": [

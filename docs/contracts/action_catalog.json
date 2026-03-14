@@ -1,6 +1,6 @@
 {
   "contract_id": "action_catalog",
-  "version": "1.6.8",
+  "version": "1.6.9",
   "effective_date": "2026-03-14",
   "addenda_of": null,
   "status": "canonical_draft",
@@ -2345,6 +2345,101 @@
       "allowed_tools": [
         "CommandBus",
         "usage_get_history"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "agent_tools.list_tool_groups",
+      "type": "EXECUTABLE",
+      "required_role": "viewer",
+      "allowed_tools": [
+        "CommandBus",
+        "agent_list_tool_groups"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "agent_tools.get_module_capabilities",
+      "type": "EXECUTABLE",
+      "required_role": "viewer",
+      "allowed_tools": [
+        "CommandBus",
+        "agent_get_module_capabilities"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "agent_tools.resolve_tool_for_request",
+      "type": "EXECUTABLE",
+      "required_role": "viewer",
+      "allowed_tools": [
+        "CommandBus",
+        "agent_resolve_tool_for_request"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "agent_tools.check_module_enabled",
+      "type": "EXECUTABLE",
+      "required_role": "viewer",
+      "allowed_tools": [
+        "CommandBus",
+        "agent_check_module_enabled"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "agent_tools.check_action_allowed",
+      "type": "EXECUTABLE",
+      "required_role": "viewer",
+      "allowed_tools": [
+        "CommandBus",
+        "agent_check_action_allowed"
       ],
       "rag_required": false,
       "json_schema_required": true,

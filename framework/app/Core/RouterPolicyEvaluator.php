@@ -1464,6 +1464,31 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'AgentListToolGroups':
+                return [true, 'schema_valid'];
+
+            case 'AgentGetModuleCapabilities':
+            case 'AgentCheckModuleEnabled':
+                if (trim((string) ($command['module_key'] ?? '')) === '') {
+                    return [false, 'missing_agent_tools_module_key'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'AgentResolveToolForRequest':
+                if (trim((string) ($command['message_text'] ?? $command['request_text'] ?? '')) === '') {
+                    return [false, 'missing_agent_tools_request_text'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'AgentCheckActionAllowed':
+                if (
+                    trim((string) ($command['module_key'] ?? '')) === ''
+                    || trim((string) ($command['action_key'] ?? '')) === ''
+                ) {
+                    return [false, 'missing_agent_tools_action_fields'];
+                }
+                return [true, 'schema_valid'];
+
             default:
                 // Backward-compatible fallback for commands not yet fully modeled.
                 if ($entity === '' && empty($data) && $id === null) {

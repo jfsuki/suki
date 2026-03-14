@@ -113,6 +113,14 @@
   - prefer live snapshot metrics for `users`, `ecommerce_channels` and `active_stores`; keep media/sales/purchases/sync hooks as best-effort event aggregation
   - do not hard-block runtime actions from this layer yet; future enforcement must stay explicit and separately wired
   - wire `usage_record_event`, `usage_get_summary`, `usage_check_limit`, `usage_list_metrics`, `usage_get_history` through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator`, `ChatAgent` and tests together
+- If you add Agent Tools Integration behavior:
+  - update `AgentToolsIntegrationService`, `AgentToolsIntegrationCommandHandler`, `AgentToolsIntegrationMessageParser`
+  - keep capability discovery catalog-driven: resolve modules and actions from `docs/contracts/action_catalog.json` + `docs/contracts/skills_catalog.json`
+  - keep `enabled` vs `allowed` separate: plan state comes first, permission state comes second
+  - return clarification when more than one module fits; do not guess the module or action
+  - do not leak action inventories for modules that are disabled by plan or denied by permission
+  - reuse existing module parsers only as deterministic hints for missing data and ambiguity; do not duplicate module business logic here
+  - wire `agent_list_tool_groups`, `agent_get_module_capabilities`, `agent_resolve_tool_for_request`, `agent_check_module_enabled`, `agent_check_action_allowed` through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator`, `ChatAgent` and tests together
 - If you add AgentOps metrics:
   - keep `docs/contracts/agentops_metrics_contract.json` aligned
   - extend `TelemetryService`, `SqlMetricsRepository` or `Agents/Telemetry`
@@ -165,6 +173,8 @@
   - `tenant assigned to plan -> default limits resolved -> tenant overrides applied -> included vs extra users calculated -> future quota/billing enforcement hook ready`
 - Usage metering lifecycle
   - `usage event recorded | live snapshot refreshed -> usage meter updated -> plan comparison evaluated -> near_limit|over_limit signal emitted -> future enforcement hook ready`
+- Agent tools integration lifecycle
+  - `request classified -> module group resolved | clarification returned -> module enabled check -> action allowed check -> capability summary emitted -> future module execution handoff`
 
 ## Impact hotspots
 - `framework/app/Core/ChatAgent.php`

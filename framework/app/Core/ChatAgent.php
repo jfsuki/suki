@@ -1729,6 +1729,7 @@ final class ChatAgent
             'access_control_action' => $runtimeObservability['access_control_action'],
             'saas_plan_action' => $runtimeObservability['saas_plan_action'],
             'usage_metering_action' => $runtimeObservability['usage_metering_action'],
+            'agent_tools_action' => $runtimeObservability['agent_tools_action'],
             'skill_group' => $runtimeObservability['skill_group'],
             'draft_id' => $runtimeObservability['draft_id'],
             'purchase_draft_id' => $runtimeObservability['purchase_draft_id'],
@@ -1777,6 +1778,11 @@ final class ChatAgent
             'usage_value' => $runtimeObservability['usage_value'],
             'limit_value' => $runtimeObservability['limit_value'],
             'over_limit' => $runtimeObservability['over_limit'],
+            'requested_module' => $runtimeObservability['requested_module'],
+            'resolved_module' => $runtimeObservability['resolved_module'],
+            'enabled' => $runtimeObservability['enabled'],
+            'allowed' => $runtimeObservability['allowed'],
+            'denial_reason' => $runtimeObservability['denial_reason'],
             'duplicate_blocked' => $runtimeObservability['duplicate_blocked'],
             'line_count' => $runtimeObservability['line_count'],
             'total' => $runtimeObservability['total'],
@@ -1883,6 +1889,7 @@ final class ChatAgent
             'access_control_action' => trim((string) ($runtimeContext['access_control_action'] ?? $routeTelemetry['access_control_action'] ?? '')) ?: 'none',
             'saas_plan_action' => trim((string) ($runtimeContext['saas_plan_action'] ?? $routeTelemetry['saas_plan_action'] ?? '')) ?: 'none',
             'usage_metering_action' => trim((string) ($runtimeContext['usage_metering_action'] ?? $routeTelemetry['usage_metering_action'] ?? '')) ?: 'none',
+            'agent_tools_action' => trim((string) ($runtimeContext['agent_tools_action'] ?? $routeTelemetry['agent_tools_action'] ?? '')) ?: 'none',
             'skill_group' => $this->preferRuntimeOrRouteString($runtimeContext, $routeTelemetry, 'skill_group', 'unknown'),
             'draft_id' => trim((string) ($runtimeContext['draft_id'] ?? $routeTelemetry['draft_id'] ?? '')),
             'purchase_draft_id' => trim((string) ($runtimeContext['purchase_draft_id'] ?? $routeTelemetry['purchase_draft_id'] ?? '')),
@@ -1939,6 +1946,15 @@ final class ChatAgent
                 ? (float) ($runtimeContext['limit_value'] ?? $routeTelemetry['limit_value'])
                 : null,
             'over_limit' => (($runtimeContext['over_limit'] ?? $routeTelemetry['over_limit'] ?? false) === true),
+            'requested_module' => trim((string) ($runtimeContext['requested_module'] ?? $routeTelemetry['requested_module'] ?? '')),
+            'resolved_module' => trim((string) ($runtimeContext['resolved_module'] ?? $routeTelemetry['resolved_module'] ?? '')),
+            'enabled' => array_key_exists('enabled', $runtimeContext) || array_key_exists('enabled', $routeTelemetry)
+                ? (($runtimeContext['enabled'] ?? $routeTelemetry['enabled'] ?? false) === true)
+                : null,
+            'allowed' => array_key_exists('allowed', $runtimeContext) || array_key_exists('allowed', $routeTelemetry)
+                ? (($runtimeContext['allowed'] ?? $routeTelemetry['allowed'] ?? false) === true)
+                : null,
+            'denial_reason' => trim((string) ($runtimeContext['denial_reason'] ?? $routeTelemetry['denial_reason'] ?? '')),
             'duplicate_blocked' => (($runtimeContext['duplicate_blocked'] ?? $routeTelemetry['duplicate_blocked'] ?? false) === true),
             'line_count' => is_numeric($runtimeContext['line_count'] ?? $routeTelemetry['line_count'] ?? null)
                 ? max(0, (int) ($runtimeContext['line_count'] ?? $routeTelemetry['line_count']))
@@ -2096,6 +2112,7 @@ final class ChatAgent
             'access_control_action' => trim((string) ($payload['access_control_action'] ?? '')) ?: 'none',
             'saas_plan_action' => trim((string) ($payload['saas_plan_action'] ?? '')) ?: 'none',
             'usage_metering_action' => trim((string) ($payload['usage_metering_action'] ?? '')) ?: 'none',
+            'agent_tools_action' => trim((string) ($payload['agent_tools_action'] ?? '')) ?: 'none',
             'skill_group' => trim((string) ($payload['skill_group'] ?? '')) ?: '',
             'draft_id' => trim((string) ($payload['draft_id'] ?? '')) ?: '',
             'purchase_draft_id' => trim((string) ($payload['purchase_draft_id'] ?? '')) ?: '',
@@ -2152,6 +2169,15 @@ final class ChatAgent
                 ? (float) $payload['limit_value']
                 : null,
             'over_limit' => (($payload['over_limit'] ?? false) === true),
+            'requested_module' => trim((string) ($payload['requested_module'] ?? '')) ?: '',
+            'resolved_module' => trim((string) ($payload['resolved_module'] ?? '')) ?: '',
+            'enabled' => array_key_exists('enabled', $payload)
+                ? (($payload['enabled'] ?? false) === true)
+                : null,
+            'allowed' => array_key_exists('allowed', $payload)
+                ? (($payload['allowed'] ?? false) === true)
+                : null,
+            'denial_reason' => trim((string) ($payload['denial_reason'] ?? '')) ?: '',
             'duplicate_blocked' => (($payload['duplicate_blocked'] ?? false) === true),
             'line_count' => is_numeric($payload['line_count'] ?? null)
                 ? max(0, (int) $payload['line_count'])
@@ -2208,6 +2234,7 @@ final class ChatAgent
             $this->commandBus->register(new TenantAccessControlCommandHandler());
             $this->commandBus->register(new TenantPlanCommandHandler());
             $this->commandBus->register(new UsageMeteringCommandHandler());
+            $this->commandBus->register(new AgentToolsIntegrationCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
                 ['AuthLogin', 'AuthCreateUser'],
                 function (array $command, array $context): array {

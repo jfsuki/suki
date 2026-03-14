@@ -376,7 +376,7 @@ final class TenantAccessControlRepository
             ['role_key' => 'admin', 'module_key' => '*', 'action_key' => '*', 'effect' => 'allow'],
         ];
 
-        foreach (['pos', 'purchases', 'fiscal', 'ecommerce', 'media', 'reports', 'entity', 'ops'] as $moduleKey) {
+        foreach (['pos', 'purchases', 'fiscal', 'ecommerce', 'media', 'reports', 'entity', 'ops', 'agent_tools'] as $moduleKey) {
             $permissions[] = ['role_key' => 'manager', 'module_key' => $moduleKey, 'action_key' => '*', 'effect' => 'allow'];
             $permissions[] = ['role_key' => 'operator', 'module_key' => $moduleKey, 'action_key' => '*', 'effect' => 'allow'];
         }
@@ -397,6 +397,7 @@ final class TenantAccessControlRepository
             ['module_key' => 'ecommerce', 'action_key' => 'list_order_links'],
             ['module_key' => 'ecommerce', 'action_key' => 'get_order_link'],
             ['module_key' => 'ecommerce', 'action_key' => 'get_order_snapshot'],
+            ['module_key' => 'agent_tools', 'action_key' => '*'],
         ] as $permission) {
             $permissions[] = ['role_key' => 'viewer'] + $permission + ['effect' => 'allow'];
         }
