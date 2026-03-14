@@ -88,7 +88,15 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
                 'PingEcommerceStore' => $this->respondPing($reply, $channel, $sessionId, $userId, $service->pingStore($tenantId, trim((string) ($command['store_id'] ?? '')), $appId !== '' ? $appId : null)),
                 'ListEcommerceStores' => $this->respondStoreList($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'GetEcommerceStore' => $this->respondStore($reply, $channel, $sessionId, $userId, 'Tienda ecommerce cargada.', 'get_store', $service->getStore($tenantId, trim((string) ($command['store_id'] ?? '')), $appId !== '' ? $appId : null)),
-                'CreateEcommerceSyncJob' => $this->respondSyncJob($reply, $channel, $sessionId, $userId, $service->createSyncJob($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null])),
+                'CreateEcommerceSyncJob' => $this->respondSyncJob(
+                    $reply,
+                    $channel,
+                    $sessionId,
+                    $userId,
+                    $tenantId,
+                    $appId,
+                    $service->createSyncJob($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null])
+                ),
                 'ListEcommerceSyncJobs' => $this->respondSyncJobList($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'ListEcommerceOrderRefs' => $this->respondOrderRefList($service, $tenantId, $appId, $command, $reply, $channel, $sessionId, $userId),
                 'LinkEcommerceOrder' => $this->respondOrderLink($reply, $channel, $sessionId, $userId, 'Pedido ecommerce vinculado.', 'link_order', $service->linkOrder($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null])),
@@ -306,8 +314,20 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
      * @param array<string, mixed> $job
      * @return array<string, mixed>
      */
-    private function respondSyncJob(callable $reply, string $channel, string $sessionId, string $userId, array $job): array
+    private function respondSyncJob(callable $reply, string $channel, string $sessionId, string $userId, string $tenantId, string $appId, array $job): array
     {
+        $this->recordUsageEvent([
+            'tenant_id' => $tenantId,
+            'project_id' => $appId !== '' ? $appId : null,
+            'metric_key' => 'sync_jobs_month',
+            'delta_value' => 1,
+            'unit' => 'count',
+            'source_module' => 'ecommerce',
+            'source_action' => 'create_sync_job',
+            'source_ref' => (string) ($job['id'] ?? ''),
+            'metadata' => ['store_id' => (string) ($job['store_id'] ?? '')],
+        ]);
+
         return $this->withReplyText($reply('Sync job ecommerce creado.', $channel, $sessionId, $userId, 'success', $this->moduleData([
             'ecommerce_action' => 'create_sync_job',
             'sync_job' => $job,
@@ -731,6 +751,18 @@ final class EcommerceHubCommandHandler implements CommandHandlerInterface
         }
 
         return $payload;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function recordUsageEvent(array $payload): void
+    {
+        try {
+            (new UsageMeteringService())->recordUsageEvent($payload);
+        } catch (\Throwable $e) {
+            // Usage metering is best effort and must not block ecommerce operations.
+        }
     }
 
     private function humanizeError(string $error): string

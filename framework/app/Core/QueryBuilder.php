@@ -127,6 +127,18 @@ class QueryBuilder
         return $rows[0] ?? null;
     }
 
+    public function count(): int
+    {
+        $sql = "SELECT COUNT(*) AS aggregate_count FROM {$this->table}" . $this->buildWhereSql();
+        $stmt = $this->db->prepare($sql);
+        foreach ($this->bindings as $key => $value) {
+            $stmt->bindValue(':' . $key, $value);
+        }
+        $stmt->execute();
+
+        return (int) ($stmt->fetchColumn() ?: 0);
+    }
+
     public function insert(array $data): int
     {
         $data = $this->filterAllowed($data);

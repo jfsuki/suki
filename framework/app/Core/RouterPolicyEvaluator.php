@@ -1441,6 +1441,29 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'UsageRecordEvent':
+                if (trim((string) ($command['metric_key'] ?? '')) === '') {
+                    return [false, 'missing_usage_metric_key'];
+                }
+                if (!array_key_exists('delta_value', $command) || !is_numeric($command['delta_value'])) {
+                    return [false, 'missing_or_invalid_usage_delta'];
+                }
+                if (trim((string) ($command['source_module'] ?? '')) === '') {
+                    return [false, 'missing_usage_source_module'];
+                }
+                return [true, 'schema_valid'];
+
+            case 'UsageGetSummary':
+            case 'UsageListMetrics':
+                return [true, 'schema_valid'];
+
+            case 'UsageCheckLimit':
+            case 'UsageGetHistory':
+                if (trim((string) ($command['metric_key'] ?? '')) === '') {
+                    return [false, 'missing_usage_metric_key'];
+                }
+                return [true, 'schema_valid'];
+
             default:
                 // Backward-compatible fallback for commands not yet fully modeled.
                 if ($entity === '' && empty($data) && $id === null) {

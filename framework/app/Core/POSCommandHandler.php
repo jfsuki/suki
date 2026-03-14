@@ -574,6 +574,16 @@ final class POSCommandHandler implements CommandHandlerInterface
         ]);
         $sale = is_array($result['sale'] ?? null) ? (array) $result['sale'] : [];
         $draft = is_array($result['draft'] ?? null) ? (array) $result['draft'] : [];
+        $this->recordUsageEvent([
+            'tenant_id' => $tenantId,
+            'project_id' => $appId !== '' ? $appId : null,
+            'metric_key' => 'sales_created',
+            'delta_value' => 1,
+            'unit' => 'count',
+            'source_module' => 'pos',
+            'source_action' => 'finalize_sale',
+            'source_ref' => (string) ($sale['id'] ?? ''),
+        ]);
 
         return $this->withReplyText($reply(
             'Venta POS finalizada: sale_number=' . (string) ($sale['sale_number'] ?? '') . '.',
@@ -1259,6 +1269,18 @@ final class POSCommandHandler implements CommandHandlerInterface
         }
 
         return $response;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function recordUsageEvent(array $payload): void
+    {
+        try {
+            (new UsageMeteringService())->recordUsageEvent($payload);
+        } catch (\Throwable $e) {
+            // Usage metering is best effort and must not block POS operations.
+        }
     }
 
     /**

@@ -83,6 +83,29 @@ final class MediaCommandHandler implements CommandHandlerInterface
             'app_id' => $appId !== '' ? $appId : null,
             'uploaded_by_user_id' => $userId,
         ]);
+        $this->recordUsageEvent([
+            'tenant_id' => $tenantId,
+            'project_id' => $appId !== '' ? $appId : null,
+            'metric_key' => 'documents_uploaded',
+            'delta_value' => 1,
+            'unit' => 'count',
+            'source_module' => 'media',
+            'source_action' => 'upload',
+            'source_ref' => (string) ($media['id'] ?? ''),
+        ]);
+        if (is_numeric($media['file_size'] ?? null) && (float) $media['file_size'] > 0) {
+            $this->recordUsageEvent([
+                'tenant_id' => $tenantId,
+                'project_id' => $appId !== '' ? $appId : null,
+                'metric_key' => 'storage_mb',
+                'delta_value' => round(((float) $media['file_size']) / 1048576, 4),
+                'unit' => 'mb',
+                'source_module' => 'media',
+                'source_action' => 'upload',
+                'source_ref' => (string) ($media['id'] ?? ''),
+                'metadata' => ['file_size' => (int) $media['file_size']],
+            ]);
+        }
 
         return $this->withReplyText($reply(
             'Archivo subido: ' . (string) ($media['original_name'] ?? ('media ' . ($media['id'] ?? ''))) . '.',
@@ -253,6 +276,18 @@ final class MediaCommandHandler implements CommandHandlerInterface
             $response['reply'] = (string) (($response['data']['reply'] ?? $response['message'] ?? ''));
         }
         return $response;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function recordUsageEvent(array $payload): void
+    {
+        try {
+            (new UsageMeteringService())->recordUsageEvent($payload);
+        } catch (\Throwable $e) {
+            // Usage metering is best effort and must not block media operations.
+        }
     }
 
     /**

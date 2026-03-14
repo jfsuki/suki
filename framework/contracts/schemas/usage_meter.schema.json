@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UsageMeter",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tenant_id",
+    "metric_key",
+    "period_key",
+    "usage_value",
+    "unit",
+    "metadata",
+    "updated_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "metric_key": {
+      "type": "string",
+      "enum": [
+        "users",
+        "ai_requests_month",
+        "storage_mb",
+        "ecommerce_channels",
+        "sync_jobs_month",
+        "pos_registers",
+        "active_stores",
+        "documents_uploaded",
+        "sales_created",
+        "purchases_created"
+      ]
+    },
+    "period_key": { "type": "string", "minLength": 1 },
+    "usage_value": { "type": ["number", "integer"] },
+    "unit": { "type": "string", "minLength": 1 },
+    "metadata": { "type": "object", "additionalProperties": true },
+    "updated_at": { "type": "string" }
+  }
+}

@@ -1,7 +1,7 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.7.8",
-  "effective_date": "2026-03-13",
+  "version": "1.7.9",
+  "effective_date": "2026-03-14",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
   "contract_location": "docs/contracts",
@@ -3666,6 +3666,167 @@
           "message_text"
         ],
         "optional": []
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "usage_record_event",
+      "description": "Record one usage event for the current tenant without enabling hard blocking.",
+      "intent_patterns": [
+        "re:(registra|registrar|anota|anotar|suma|sumar).*(evento|uso|consumo)",
+        "re:(uso|consumo).*(registra|registrar|anota|anotar|suma|sumar)"
+      ],
+      "keywords": [
+        "registrar evento de uso",
+        "sumar consumo",
+        "delta_value"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "usage_record_event"
+      ],
+      "priority": 146,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "metric_key",
+          "delta_value",
+          "period_key",
+          "source_module"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "usage_get_summary",
+      "description": "Return the tenant usage summary with near-limit and over-limit signals.",
+      "intent_patterns": [
+        "re:(resumen|resumir|revisa|revisar|muestra|mostrar|consulta).*(uso|consumo|metricas|m[eé]tricas)",
+        "re:(uso|consumo|metricas|m[eé]tricas).*(resumen|revisa|mostrar|consulta)"
+      ],
+      "keywords": [
+        "resumen de uso",
+        "consumo del tenant",
+        "metricas de uso"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "usage_get_summary"
+      ],
+      "priority": 145,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "metric_key",
+          "period_key"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "usage_check_limit",
+      "description": "Compare one usage metric against the current tenant plan limit safely.",
+      "intent_patterns": [
+        "re:(revisa|revisar|valida|validar|verifica|verificar|consulta).*(limite|l[ií]mite).*(uso|consumo)",
+        "re:(limite|l[ií]mite).*(uso|consumo).*(revisa|revisar|valida|validar|verifica|verificar|consulta)"
+      ],
+      "keywords": [
+        "revisa limite de uso",
+        "revisar limite de uso",
+        "validar consumo",
+        "check usage limit"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "usage_check_limit"
+      ],
+      "priority": 146,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "metric_key",
+          "period_key"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "usage_list_metrics",
+      "description": "List the supported usage metrics exposed by the runtime.",
+      "intent_patterns": [
+        "re:(lista|listar|muestra|mostrar|ver|consulta).*(metricas|m[eé]tricas).*(uso|consumo)",
+        "re:(metricas|m[eé]tricas).*(uso|consumo).*(lista|listar|muestra|mostrar|ver|consulta)"
+      ],
+      "keywords": [
+        "lista metricas de uso",
+        "metricas soportadas de consumo",
+        "usage metrics"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "usage_list_metrics"
+      ],
+      "priority": 143,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": []
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "usage_get_history",
+      "description": "Return the usage event history for one tenant metric.",
+      "intent_patterns": [
+        "re:(historial|hist[oó]rico|timeline|eventos).*(uso|consumo)",
+        "re:(uso|consumo).*(historial|hist[oó]rico|eventos)"
+      ],
+      "keywords": [
+        "historial de uso",
+        "eventos de consumo",
+        "usage history"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "usage_get_history"
+      ],
+      "priority": 142,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "metric_key",
+          "period_key",
+          "limit"
+        ]
       },
       "channel_capabilities": [
         "chat"

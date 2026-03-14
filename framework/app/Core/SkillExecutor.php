@@ -166,6 +166,20 @@ final class SkillExecutor
                     $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
                     break;
                 }
+                if ($this->isUsageMeteringSkill($name)) {
+                    $toolOutcome = $this->executeUsageMeteringSkill($name, $context);
+                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
+                    $reply = (string) ($toolOutcome['reply'] ?? '');
+                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
+                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
+                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
+                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
+                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
+                        ? (array) $toolOutcome['routing_hint_steps']
+                        : ['cache', 'rules', 'skills'];
+                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    break;
+                }
                 [$action, $reply, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps] = $this->executeToolSkill($skill, $context);
                 break;
 
@@ -800,6 +814,52 @@ final class SkillExecutor
             'command' => [],
             'skill_result_status' => 'needs_input',
             'skill_fallback_reason' => 'missing_saas_plan_payload',
+            'skill_failed' => false,
+            'routing_hint_steps' => ['cache', 'rules', 'skills'],
+            'telemetry' => $telemetry,
+        ];
+    }
+
+    private function isUsageMeteringSkill(string $name): bool
+    {
+        return in_array($name, [
+            'usage_record_event',
+            'usage_get_summary',
+            'usage_check_limit',
+            'usage_list_metrics',
+            'usage_get_history',
+        ], true);
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
+    private function executeUsageMeteringSkill(string $name, array $context): array
+    {
+        $parser = new UsageMeteringMessageParser();
+        $parsed = $parser->parse($name, $context);
+        $telemetry = is_array($parsed['telemetry'] ?? null) ? (array) $parsed['telemetry'] : [];
+
+        if ((string) ($parsed['kind'] ?? '') === 'command') {
+            return [
+                'action' => 'execute_command',
+                'reply' => '',
+                'command' => is_array($parsed['command'] ?? null) ? (array) $parsed['command'] : [],
+                'skill_result_status' => 'command_ready',
+                'skill_fallback_reason' => 'none',
+                'skill_failed' => false,
+                'routing_hint_steps' => ['cache', 'rules', 'skills'],
+                'telemetry' => $telemetry,
+            ];
+        }
+
+        return [
+            'action' => 'ask_user',
+            'reply' => (string) ($parsed['reply'] ?? 'Necesito un dato adicional para continuar con usage metering.'),
+            'command' => [],
+            'skill_result_status' => 'needs_input',
+            'skill_fallback_reason' => 'missing_usage_metering_payload',
             'skill_failed' => false,
             'routing_hint_steps' => ['cache', 'rules', 'skills'],
             'telemetry' => $telemetry,

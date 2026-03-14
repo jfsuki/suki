@@ -1685,6 +1685,11 @@ final class IntentRouter
             'TenantSetPlanLimits' => 'saas.set_plan_limits',
             'TenantCheckPlanLimit' => 'saas.check_plan_limit',
             'TenantGetEnabledModules' => 'saas.get_enabled_modules',
+            'UsageRecordEvent' => 'usage.record_event',
+            'UsageGetSummary' => 'usage.get_summary',
+            'UsageCheckLimit' => 'usage.check_limit',
+            'UsageListMetrics' => 'usage.list_metrics',
+            'UsageGetHistory' => 'usage.get_history',
             'CreateInvoice' => 'invoice.create',
             'GenerateReport' => 'report.generate',
             'ConfigureFEProvider' => 'settings.configure_fe_provider',
@@ -1718,6 +1723,7 @@ final class IntentRouter
             || str_starts_with($selectedName, 'fiscal_')
             || str_starts_with($selectedName, 'ecommerce_')
             || str_starts_with($selectedName, 'tenant_')
+            || str_starts_with($selectedName, 'usage_')
             || in_array($selectedName, ['entity_search', 'entity_resolve'], true);
     }
 

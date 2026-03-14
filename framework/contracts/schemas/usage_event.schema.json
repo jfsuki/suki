@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "UsageEvent",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "tenant_id",
+    "metric_key",
+    "delta_value",
+    "unit",
+    "source_module",
+    "metadata",
+    "created_at"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "tenant_id": { "type": "string", "minLength": 1 },
+    "metric_key": {
+      "type": "string",
+      "enum": [
+        "users",
+        "ai_requests_month",
+        "storage_mb",
+        "ecommerce_channels",
+        "sync_jobs_month",
+        "pos_registers",
+        "active_stores",
+        "documents_uploaded",
+        "sales_created",
+        "purchases_created"
+      ]
+    },
+    "delta_value": { "type": ["number", "integer"] },
+    "unit": { "type": "string", "minLength": 1 },
+    "source_module": { "type": "string", "minLength": 1 },
+    "source_action": { "type": ["string", "null"], "minLength": 1 },
+    "source_ref": { "type": ["string", "null"], "minLength": 1 },
+    "metadata": { "type": "object", "additionalProperties": true },
+    "created_at": { "type": "string" }
+  }
+}

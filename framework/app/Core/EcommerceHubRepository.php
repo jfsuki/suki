@@ -142,6 +142,20 @@ final class EcommerceHubRepository
         return array_map([$this, 'normalizeStoreRow'], $qb->get());
     }
 
+    public function countStores(string $tenantId, array $filters = []): int
+    {
+        $qb = $this->storeQuery($tenantId, $this->nullableString($filters['app_id'] ?? null));
+
+        foreach (['platform', 'status', 'connection_status'] as $key) {
+            $value = $this->nullableString($filters[$key] ?? null);
+            if ($value !== null) {
+                $qb->where($key, '=', $value);
+            }
+        }
+
+        return $qb->count();
+    }
+
     /**
      * @param array<string, mixed> $record
      * @return array<string, mixed>

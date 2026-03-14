@@ -105,6 +105,14 @@
   - resolve enabled modules from plan limits instead of duplicating module toggles elsewhere
   - integrate with `TenantAccessControlService` and `ProjectRegistry` only for usage metadata such as active users; do not introduce hard blocking outside explicit plan checks yet
   - wire `tenant_assign_plan`, `tenant_get_plan`, `tenant_list_plans`, `tenant_set_plan_limits`, `tenant_check_plan_limit`, `tenant_get_enabled_modules` through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator`, `ChatAgent` and tests together
+- If you add Usage Metering behavior:
+  - update `UsageMeteringRepository`, `UsageMeteringService`, `UsageMeteringCommandHandler`, `UsageMeteringMessageParser`
+  - keep the canonical layer minimal: `usage_meter + usage_event` only
+  - keep metrics generic and extensible: `users`, `ai_requests_month`, `storage_mb`, `ecommerce_channels`, `sync_jobs_month`, `pos_registers`, `active_stores`, `documents_uploaded`, `sales_created`, `purchases_created`
+  - resolve plan comparison through `TenantPlanService` and return soft signals first: `near_limit`, `over_limit`, `limit_not_defined`, `plan_not_assigned`
+  - prefer live snapshot metrics for `users`, `ecommerce_channels` and `active_stores`; keep media/sales/purchases/sync hooks as best-effort event aggregation
+  - do not hard-block runtime actions from this layer yet; future enforcement must stay explicit and separately wired
+  - wire `usage_record_event`, `usage_get_summary`, `usage_check_limit`, `usage_list_metrics`, `usage_get_history` through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator`, `ChatAgent` and tests together
 - If you add AgentOps metrics:
   - keep `docs/contracts/agentops_metrics_contract.json` aligned
   - extend `TelemetryService`, `SqlMetricsRepository` or `Agents/Telemetry`
@@ -155,6 +163,8 @@
   - deactivation blocks future tenant-scoped execution without deleting auth identity rows
 - SaaS plan lifecycle
   - `tenant assigned to plan -> default limits resolved -> tenant overrides applied -> included vs extra users calculated -> future quota/billing enforcement hook ready`
+- Usage metering lifecycle
+  - `usage event recorded | live snapshot refreshed -> usage meter updated -> plan comparison evaluated -> near_limit|over_limit signal emitted -> future enforcement hook ready`
 
 ## Impact hotspots
 - `framework/app/Core/ChatAgent.php`

@@ -147,6 +147,16 @@ final class PurchasesCommandHandler implements CommandHandlerInterface
     {
         $result = $service->finalizeDraft($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null]);
         $purchase = is_array($result['purchase'] ?? null) ? (array) $result['purchase'] : [];
+        $this->recordUsageEvent([
+            'tenant_id' => $tenantId,
+            'project_id' => $appId !== '' ? $appId : null,
+            'metric_key' => 'purchases_created',
+            'delta_value' => 1,
+            'unit' => 'count',
+            'source_module' => 'purchases',
+            'source_action' => 'finalize',
+            'source_ref' => (string) ($purchase['id'] ?? ''),
+        ]);
 
         return $this->withReplyText($reply(
             'Compra registrada: purchase_number=' . (string) ($purchase['purchase_number'] ?? '') . '.',
@@ -428,6 +438,18 @@ final class PurchasesCommandHandler implements CommandHandlerInterface
         $response['text'] = (string) ($response['reply'] ?? '');
 
         return $response;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function recordUsageEvent(array $payload): void
+    {
+        try {
+            (new UsageMeteringService())->recordUsageEvent($payload);
+        } catch (\Throwable $e) {
+            // Usage metering is best effort and must not block purchase operations.
+        }
     }
 
     /**
