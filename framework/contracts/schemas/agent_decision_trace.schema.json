@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "agent_decision_trace",
+  "version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "tenant_id",
+    "session_id",
+    "route_path",
+    "selected_module",
+    "selected_action",
+    "evidence_source",
+    "ambiguity_detected",
+    "fallback_llm",
+    "latency_ms",
+    "result_status",
+    "created_at"
+  ],
+  "properties": {
+    "id": {
+      "type": "string"
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string"
+    },
+    "session_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "route_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "selected_module": {
+      "type": "string",
+      "minLength": 1
+    },
+    "selected_action": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence_source": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ambiguity_detected": {
+      "type": "boolean"
+    },
+    "fallback_llm": {
+      "type": "boolean"
+    },
+    "latency_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "result_status": {
+      "type": "string",
+      "minLength": 1
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

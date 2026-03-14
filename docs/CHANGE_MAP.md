@@ -124,6 +124,9 @@
 - If you add AgentOps metrics:
   - keep `docs/contracts/agentops_metrics_contract.json` aligned
   - extend `TelemetryService`, `SqlMetricsRepository` or `Agents/Telemetry`
+  - if you add persisted observability traces, keep `agent_decision_traces + tool_execution_traces` tenant-scoped and low-overhead
+  - reuse the existing runtime envelope from `ChatAgent` before inventing parallel trace formats
+  - wire `agentops_get_metrics_summary`, `agentops_list_recent_decisions`, `agentops_list_tool_executions`, `agentops_get_anomaly_flags` through `SkillExecutor`, `IntentRouter`, `RouterPolicyEvaluator`, `ChatAgent` and tests together
   - add regression tests for minimum required fields
 - If you add learning promotion logic:
   - update `ImprovementMemoryRepository.php` schema methods and formal migration

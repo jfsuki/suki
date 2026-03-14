@@ -109,6 +109,41 @@ CREATE TABLE IF NOT EXISTS chat_log (
     PRIMARY KEY (id)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
+CREATE TABLE IF NOT EXISTS agent_decision_traces (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    tenant_id VARCHAR(120) NOT NULL,
+    project_id VARCHAR(190) NOT NULL,
+    session_id VARCHAR(190) NOT NULL DEFAULT '',
+    route_path VARCHAR(255) NOT NULL,
+    selected_module VARCHAR(120) NOT NULL,
+    selected_action VARCHAR(190) NOT NULL,
+    evidence_source VARCHAR(120) NOT NULL,
+    ambiguity_detected TINYINT(1) NOT NULL DEFAULT 0,
+    fallback_llm TINYINT(1) NOT NULL DEFAULT 0,
+    latency_ms INT NOT NULL DEFAULT 0,
+    result_status VARCHAR(64) NOT NULL,
+    metadata_json JSON NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS tool_execution_traces (
+    id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    tenant_id VARCHAR(120) NOT NULL,
+    project_id VARCHAR(190) NOT NULL,
+    module_key VARCHAR(120) NOT NULL,
+    action_key VARCHAR(190) NOT NULL,
+    input_schema_valid TINYINT(1) NOT NULL DEFAULT 0,
+    permission_check VARCHAR(64) NOT NULL,
+    plan_check VARCHAR(64) NOT NULL,
+    execution_latency INT NOT NULL DEFAULT 0,
+    success TINYINT(1) NOT NULL DEFAULT 0,
+    error_code VARCHAR(128) NULL,
+    metadata_json JSON NULL,
+    created_at DATETIME NOT NULL,
+    PRIMARY KEY (id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
 SET @db_name := DATABASE();
 
 SET @idx_exists := (
@@ -261,6 +296,72 @@ SET @idx_exists := (
 SET @sql := IF(
     @idx_exists = 0,
     'ALTER TABLE chat_log ADD KEY idx_chat_user (tenant_id, user_id, created_at)',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx_exists := (
+    SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = @db_name AND table_name = 'agent_decision_traces' AND index_name = 'idx_agent_decision_scope'
+);
+SET @sql := IF(
+    @idx_exists = 0,
+    'ALTER TABLE agent_decision_traces ADD KEY idx_agent_decision_scope (tenant_id, project_id, created_at)',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx_exists := (
+    SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = @db_name AND table_name = 'agent_decision_traces' AND index_name = 'idx_agent_decision_session'
+);
+SET @sql := IF(
+    @idx_exists = 0,
+    'ALTER TABLE agent_decision_traces ADD KEY idx_agent_decision_session (tenant_id, project_id, session_id, created_at)',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx_exists := (
+    SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = @db_name AND table_name = 'agent_decision_traces' AND index_name = 'idx_agent_decision_module'
+);
+SET @sql := IF(
+    @idx_exists = 0,
+    'ALTER TABLE agent_decision_traces ADD KEY idx_agent_decision_module (tenant_id, project_id, selected_module, created_at)',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx_exists := (
+    SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = @db_name AND table_name = 'tool_execution_traces' AND index_name = 'idx_tool_execution_scope'
+);
+SET @sql := IF(
+    @idx_exists = 0,
+    'ALTER TABLE tool_execution_traces ADD KEY idx_tool_execution_scope (tenant_id, project_id, created_at)',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx_exists := (
+    SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = @db_name AND table_name = 'tool_execution_traces' AND index_name = 'idx_tool_execution_module'
+);
+SET @sql := IF(
+    @idx_exists = 0,
+    'ALTER TABLE tool_execution_traces ADD KEY idx_tool_execution_module (tenant_id, project_id, module_key, created_at)',
+    'SELECT 1'
+);
+PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;
+
+SET @idx_exists := (
+    SELECT COUNT(*) FROM information_schema.statistics
+    WHERE table_schema = @db_name AND table_name = 'tool_execution_traces' AND index_name = 'idx_tool_execution_status'
+);
+SET @sql := IF(
+    @idx_exists = 0,
+    'ALTER TABLE tool_execution_traces ADD KEY idx_tool_execution_status (tenant_id, project_id, success, created_at)',
     'SELECT 1'
 );
 PREPARE stmt FROM @sql; EXECUTE stmt; DEALLOCATE PREPARE stmt;

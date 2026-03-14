@@ -124,6 +124,61 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
         ]);
     }
 
+    public function saveDecisionTrace(array $trace): void
+    {
+        $stmt = $this->db->prepare(
+            'INSERT INTO agent_decision_traces (
+                tenant_id, project_id, session_id, route_path, selected_module, selected_action, evidence_source,
+                ambiguity_detected, fallback_llm, latency_ms, result_status, metadata_json, created_at
+             ) VALUES (
+                :tenant_id, :project_id, :session_id, :route_path, :selected_module, :selected_action, :evidence_source,
+                :ambiguity_detected, :fallback_llm, :latency_ms, :result_status, :metadata_json, :created_at
+             )'
+        );
+        $stmt->execute([
+            ':tenant_id' => $this->normTenant($trace['tenant_id'] ?? ''),
+            ':project_id' => $this->normProject($trace['project_id'] ?? ''),
+            ':session_id' => $this->normSession($trace['session_id'] ?? ''),
+            ':route_path' => $this->normText($trace['route_path'] ?? 'unknown'),
+            ':selected_module' => $this->normText($trace['selected_module'] ?? 'none'),
+            ':selected_action' => $this->normText($trace['selected_action'] ?? 'none'),
+            ':evidence_source' => $this->normText($trace['evidence_source'] ?? 'none'),
+            ':ambiguity_detected' => (($trace['ambiguity_detected'] ?? false) === true) ? 1 : 0,
+            ':fallback_llm' => (($trace['fallback_llm'] ?? false) === true) ? 1 : 0,
+            ':latency_ms' => $this->intValue($trace['latency_ms'] ?? 0),
+            ':result_status' => $this->normText($trace['result_status'] ?? 'unknown'),
+            ':metadata_json' => $this->encodeJson($trace['metadata_json'] ?? $trace['metadata'] ?? []),
+            ':created_at' => $this->createdAt($trace['created_at'] ?? null),
+        ]);
+    }
+
+    public function saveToolExecutionTrace(array $trace): void
+    {
+        $stmt = $this->db->prepare(
+            'INSERT INTO tool_execution_traces (
+                tenant_id, project_id, module_key, action_key, input_schema_valid, permission_check, plan_check,
+                execution_latency, success, error_code, metadata_json, created_at
+             ) VALUES (
+                :tenant_id, :project_id, :module_key, :action_key, :input_schema_valid, :permission_check, :plan_check,
+                :execution_latency, :success, :error_code, :metadata_json, :created_at
+             )'
+        );
+        $stmt->execute([
+            ':tenant_id' => $this->normTenant($trace['tenant_id'] ?? ''),
+            ':project_id' => $this->normProject($trace['project_id'] ?? ''),
+            ':module_key' => $this->normText($trace['module_key'] ?? 'none'),
+            ':action_key' => $this->normText($trace['action_key'] ?? 'none'),
+            ':input_schema_valid' => (($trace['input_schema_valid'] ?? false) === true) ? 1 : 0,
+            ':permission_check' => $this->normText($trace['permission_check'] ?? 'not_checked'),
+            ':plan_check' => $this->normText($trace['plan_check'] ?? 'not_checked'),
+            ':execution_latency' => $this->intValue($trace['execution_latency'] ?? 0),
+            ':success' => (($trace['success'] ?? false) === true) ? 1 : 0,
+            ':error_code' => $this->nullableText($trace['error_code'] ?? null),
+            ':metadata_json' => $this->encodeJson($trace['metadata_json'] ?? $trace['metadata'] ?? []),
+            ':created_at' => $this->createdAt($trace['created_at'] ?? null),
+        ]);
+    }
+
     public function summary(string $tenantId, string $projectId, int $days = 7): array
     {
         $tenantId = $this->normTenant($tenantId);
@@ -212,6 +267,161 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
         ];
     }
 
+    public function listDecisionTraces(string $tenantId, string $projectId, array $filters = [], int $limit = 25): array
+    {
+        $tenantId = $this->normTenant($tenantId);
+        $projectId = $this->normProject($projectId);
+        $limit = max(1, min(200, $limit));
+        $sql = 'SELECT id, tenant_id, project_id, session_id, route_path, selected_module, selected_action, evidence_source,
+                ambiguity_detected, fallback_llm, latency_ms, result_status, metadata_json, created_at
+            FROM agent_decision_traces
+            WHERE tenant_id = :tenant AND project_id = :project';
+        $params = [
+            ':tenant' => $tenantId,
+            ':project' => $projectId,
+        ];
+
+        $resultStatus = trim((string) ($filters['result_status'] ?? ''));
+        if ($resultStatus !== '') {
+            $sql .= ' AND result_status = :result_status';
+            $params[':result_status'] = $resultStatus;
+        }
+
+        $selectedModule = trim((string) ($filters['selected_module'] ?? ''));
+        if ($selectedModule !== '') {
+            $sql .= ' AND selected_module = :selected_module';
+            $params[':selected_module'] = $selectedModule;
+        }
+
+        $since = trim((string) ($filters['since'] ?? ''));
+        if ($since !== '') {
+            $sql .= ' AND created_at >= :since';
+            $params[':since'] = $since;
+        }
+
+        $sql .= ' ORDER BY created_at DESC, id DESC LIMIT ' . $limit;
+
+        return array_map([$this, 'normalizeDecisionTraceRow'], $this->selectRows($sql, $params));
+    }
+
+    public function listToolExecutionTraces(string $tenantId, string $projectId, array $filters = [], int $limit = 25): array
+    {
+        $tenantId = $this->normTenant($tenantId);
+        $projectId = $this->normProject($projectId);
+        $limit = max(1, min(200, $limit));
+        $sql = 'SELECT id, tenant_id, project_id, module_key, action_key, input_schema_valid, permission_check, plan_check,
+                execution_latency, success, error_code, metadata_json, created_at
+            FROM tool_execution_traces
+            WHERE tenant_id = :tenant AND project_id = :project';
+        $params = [
+            ':tenant' => $tenantId,
+            ':project' => $projectId,
+        ];
+
+        $moduleKey = trim((string) ($filters['module_key'] ?? ''));
+        if ($moduleKey !== '') {
+            $sql .= ' AND module_key = :module_key';
+            $params[':module_key'] = $moduleKey;
+        }
+
+        $success = $filters['success'] ?? null;
+        if ($success !== null && $success !== '') {
+            $sql .= ' AND success = :success';
+            $params[':success'] = (($success ?? false) === true || (string) $success === '1') ? 1 : 0;
+        }
+
+        $since = trim((string) ($filters['since'] ?? ''));
+        if ($since !== '') {
+            $sql .= ' AND created_at >= :since';
+            $params[':since'] = $since;
+        }
+
+        $sql .= ' ORDER BY created_at DESC, id DESC LIMIT ' . $limit;
+
+        return array_map([$this, 'normalizeToolExecutionTraceRow'], $this->selectRows($sql, $params));
+    }
+
+    public function observabilitySummary(string $tenantId, string $projectId, int $days = 7): array
+    {
+        $tenantId = $this->normTenant($tenantId);
+        $projectId = $this->normProject($projectId);
+        $days = max(1, min(90, $days));
+        $since = date('Y-m-d H:i:s', time() - ($days * 86400));
+
+        $decisionRows = $this->listDecisionTraces($tenantId, $projectId, ['since' => $since], 1000);
+        $toolRows = $this->listToolExecutionTraces($tenantId, $projectId, ['since' => $since], 1000);
+
+        $moduleUsage = [];
+        $decisionLatency = [];
+        $fallbackCount = 0;
+        $ambiguityCount = 0;
+        $decisionErrors = 0;
+        foreach ($decisionRows as $row) {
+            $moduleKey = trim((string) ($row['selected_module'] ?? '')) ?: 'none';
+            $moduleUsage[$moduleKey] = ($moduleUsage[$moduleKey] ?? 0) + 1;
+            $decisionLatency[] = (int) ($row['latency_ms'] ?? 0);
+            if (($row['fallback_llm'] ?? false) === true) {
+                $fallbackCount++;
+            }
+            if (($row['ambiguity_detected'] ?? false) === true) {
+                $ambiguityCount++;
+            }
+            if ($this->isDecisionErrorStatus((string) ($row['result_status'] ?? ''))) {
+                $decisionErrors++;
+            }
+        }
+
+        $toolLatency = [];
+        $toolFailures = 0;
+        $permissionDenials = 0;
+        $planLimitWarnings = 0;
+        $errorsByModule = [];
+        foreach ($toolRows as $row) {
+            $toolLatency[] = (int) ($row['execution_latency'] ?? 0);
+            $moduleKey = trim((string) ($row['module_key'] ?? '')) ?: 'none';
+            $permissionCheck = strtolower(trim((string) ($row['permission_check'] ?? '')));
+            $planCheck = strtolower(trim((string) ($row['plan_check'] ?? '')));
+            $success = (($row['success'] ?? false) === true);
+            if (!$success) {
+                $toolFailures++;
+                $errorsByModule[$moduleKey] = ($errorsByModule[$moduleKey] ?? 0) + 1;
+            }
+            if (str_starts_with($permissionCheck, 'deny')) {
+                $permissionDenials++;
+            }
+            if (str_contains($planCheck, 'warn') || str_contains($planCheck, 'over_limit') || str_contains($planCheck, 'disabled')) {
+                $planLimitWarnings++;
+            }
+        }
+
+        arsort($moduleUsage);
+        arsort($errorsByModule);
+        $decisionCount = count($decisionRows);
+        $toolCount = count($toolRows);
+        $avgLatency = $decisionCount > 0 ? (float) round(array_sum($decisionLatency) / $decisionCount, 4) : 0.0;
+
+        return [
+            'decision_traces' => [
+                'count' => $decisionCount,
+                'average_latency_ms' => $avgLatency,
+                'fallback_llm_rate' => $decisionCount > 0 ? round($fallbackCount / $decisionCount, 6) : 0.0,
+                'ambiguity_rate' => $decisionCount > 0 ? round($ambiguityCount / $decisionCount, 6) : 0.0,
+                'error_rate' => $decisionCount > 0 ? round($decisionErrors / $decisionCount, 6) : 0.0,
+                'module_usage' => $this->exportCounts($moduleUsage, 'module_key', 'usage_count'),
+                'p95_latency_ms' => $this->percentile($decisionLatency, 95),
+            ],
+            'tool_execution' => [
+                'count' => $toolCount,
+                'average_latency_ms' => $toolCount > 0 ? (float) round(array_sum($toolLatency) / $toolCount, 4) : 0.0,
+                'error_rate' => $toolCount > 0 ? round($toolFailures / $toolCount, 6) : 0.0,
+                'permission_denials' => $permissionDenials,
+                'plan_limit_warnings' => $planLimitWarnings,
+                'errors_by_module' => $this->exportCounts($errorsByModule, 'module_key', 'error_count'),
+                'p95_latency_ms' => $this->percentile($toolLatency, 95),
+            ],
+        ];
+    }
+
     private function ensureSchema(): void
     {
         $this->db->exec(
@@ -285,6 +495,49 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ops_command_session ON ops_command_metrics (tenant_id, project_id, session_id, created_at)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ops_guardrail_session ON ops_guardrail_events (tenant_id, project_id, session_id, created_at)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_ops_tokens_session ON ops_token_usage (tenant_id, project_id, session_id, created_at)');
+
+        $this->db->exec(
+            'CREATE TABLE IF NOT EXISTS agent_decision_traces (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                session_id TEXT NOT NULL DEFAULT \'\',
+                route_path TEXT NOT NULL,
+                selected_module TEXT NOT NULL,
+                selected_action TEXT NOT NULL,
+                evidence_source TEXT NOT NULL,
+                ambiguity_detected INTEGER NOT NULL DEFAULT 0,
+                fallback_llm INTEGER NOT NULL DEFAULT 0,
+                latency_ms INTEGER NOT NULL DEFAULT 0,
+                result_status TEXT NOT NULL,
+                metadata_json TEXT NOT NULL DEFAULT \'{}\',
+                created_at TEXT NOT NULL
+            )'
+        );
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_agent_decision_scope ON agent_decision_traces (tenant_id, project_id, created_at)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_agent_decision_session ON agent_decision_traces (tenant_id, project_id, session_id, created_at)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_agent_decision_module ON agent_decision_traces (tenant_id, project_id, selected_module, created_at)');
+
+        $this->db->exec(
+            'CREATE TABLE IF NOT EXISTS tool_execution_traces (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT NOT NULL,
+                project_id TEXT NOT NULL,
+                module_key TEXT NOT NULL,
+                action_key TEXT NOT NULL,
+                input_schema_valid INTEGER NOT NULL DEFAULT 0,
+                permission_check TEXT NOT NULL,
+                plan_check TEXT NOT NULL,
+                execution_latency INTEGER NOT NULL DEFAULT 0,
+                success INTEGER NOT NULL DEFAULT 0,
+                error_code TEXT NULL,
+                metadata_json TEXT NOT NULL DEFAULT \'{}\',
+                created_at TEXT NOT NULL
+            )'
+        );
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_tool_execution_scope ON tool_execution_traces (tenant_id, project_id, created_at)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_tool_execution_module ON tool_execution_traces (tenant_id, project_id, module_key, created_at)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_tool_execution_status ON tool_execution_traces (tenant_id, project_id, success, created_at)');
     }
 
     private function defaultPath(): string
@@ -351,6 +604,12 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
         return trim((string) $value);
     }
 
+    private function nullableText($value): ?string
+    {
+        $value = trim((string) $value);
+        return $value !== '' ? $value : null;
+    }
+
     private function intValue($value): int
     {
         return (int) max(0, (int) $value);
@@ -395,6 +654,76 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
     }
 
     /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function normalizeDecisionTraceRow(array $row): array
+    {
+        return [
+            'id' => (string) ($row['id'] ?? ''),
+            'tenant_id' => $this->normTenant($row['tenant_id'] ?? ''),
+            'project_id' => $this->normProject($row['project_id'] ?? ''),
+            'session_id' => $this->normSession($row['session_id'] ?? ''),
+            'route_path' => $this->normText($row['route_path'] ?? 'unknown'),
+            'selected_module' => $this->normText($row['selected_module'] ?? 'none'),
+            'selected_action' => $this->normText($row['selected_action'] ?? 'none'),
+            'evidence_source' => $this->normText($row['evidence_source'] ?? 'none'),
+            'ambiguity_detected' => ((int) ($row['ambiguity_detected'] ?? 0)) === 1,
+            'fallback_llm' => ((int) ($row['fallback_llm'] ?? 0)) === 1,
+            'latency_ms' => (int) ($row['latency_ms'] ?? 0),
+            'result_status' => $this->normText($row['result_status'] ?? 'unknown'),
+            'metadata' => $this->decodeJson($row['metadata_json'] ?? null),
+            'created_at' => $this->createdAt($row['created_at'] ?? null),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @return array<string, mixed>
+     */
+    private function normalizeToolExecutionTraceRow(array $row): array
+    {
+        return [
+            'id' => (string) ($row['id'] ?? ''),
+            'tenant_id' => $this->normTenant($row['tenant_id'] ?? ''),
+            'project_id' => $this->normProject($row['project_id'] ?? ''),
+            'module_key' => $this->normText($row['module_key'] ?? 'none'),
+            'action_key' => $this->normText($row['action_key'] ?? 'none'),
+            'input_schema_valid' => ((int) ($row['input_schema_valid'] ?? 0)) === 1,
+            'permission_check' => $this->normText($row['permission_check'] ?? 'not_checked'),
+            'plan_check' => $this->normText($row['plan_check'] ?? 'not_checked'),
+            'execution_latency' => (int) ($row['execution_latency'] ?? 0),
+            'success' => ((int) ($row['success'] ?? 0)) === 1,
+            'error_code' => $this->nullableText($row['error_code'] ?? null),
+            'metadata' => $this->decodeJson($row['metadata_json'] ?? null),
+            'created_at' => $this->createdAt($row['created_at'] ?? null),
+        ];
+    }
+
+    /**
+     * @param array<string, int> $counts
+     * @return array<int, array<string, mixed>>
+     */
+    private function exportCounts(array $counts, string $keyName, string $valueName): array
+    {
+        $items = [];
+        foreach ($counts as $key => $value) {
+            $items[] = [
+                $keyName => (string) $key,
+                $valueName => (int) $value,
+            ];
+        }
+
+        return $items;
+    }
+
+    private function isDecisionErrorStatus(string $status): bool
+    {
+        $status = strtolower(trim($status));
+        return in_array($status, ['error', 'failed', 'blocked', 'unresolved'], true);
+    }
+
+    /**
      * @return array<int, string>
      */
     private function requiredTables(): array
@@ -404,6 +733,8 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
             'ops_command_metrics',
             'ops_guardrail_events',
             'ops_token_usage',
+            'agent_decision_traces',
+            'tool_execution_traces',
         ];
     }
 
@@ -417,6 +748,8 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
             'ops_command_metrics' => ['idx_ops_command_scope', 'idx_ops_command_session'],
             'ops_guardrail_events' => ['idx_ops_guardrail_scope', 'idx_ops_guardrail_session'],
             'ops_token_usage' => ['idx_ops_tokens_scope', 'idx_ops_tokens_session'],
+            'agent_decision_traces' => ['idx_agent_decision_scope', 'idx_agent_decision_session', 'idx_agent_decision_module'],
+            'tool_execution_traces' => ['idx_tool_execution_scope', 'idx_tool_execution_module', 'idx_tool_execution_status'],
         ];
     }
 
@@ -443,5 +776,32 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
             }
         }
         return false;
+    }
+
+    /**
+     * @param mixed $value
+     * @return array<string, mixed>
+     */
+    private function decodeJson($value): array
+    {
+        if (!is_string($value) || trim($value) === '') {
+            return [];
+        }
+
+        $decoded = json_decode($value, true);
+        return is_array($decoded) ? $decoded : [];
+    }
+
+    /**
+     * @param mixed $value
+     */
+    private function encodeJson($value): string
+    {
+        $encoded = json_encode(
+            is_array($value) ? $value : [],
+            JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+        );
+
+        return is_string($encoded) ? $encoded : '{}';
     }
 }

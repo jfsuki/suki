@@ -1,6 +1,6 @@
 {
   "contract_id": "skills_catalog",
-  "version": "1.8.0",
+  "version": "1.8.1",
   "effective_date": "2026-03-14",
   "addenda_of": "1.0.0",
   "status": "canonical_draft",
@@ -3998,6 +3998,134 @@
         "optional": [
           "module_key",
           "action_key"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "agentops_get_metrics_summary",
+      "description": "Return the AgentOps summary for module usage, fallback rate, latency and errors.",
+      "intent_patterns": [
+        "re:(agentops|observabilidad|telemetria).*(resumen|metricas|metrics|summary)",
+        "re:(resumen|metricas|metrics|summary).*(agentops|observabilidad|telemetria)"
+      ],
+      "keywords": [
+        "resumen agentops",
+        "metricas agentops",
+        "observabilidad del agente",
+        "agentops summary"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "agentops_get_metrics_summary"
+      ],
+      "priority": 142,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "days",
+          "metric_key"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "agentops_list_recent_decisions",
+      "description": "List recent agent decision traces for one tenant without leaking other tenants.",
+      "intent_patterns": [
+        "re:(agentops|observabilidad|telemetria).*(decisiones|trazas|trace|rutas)",
+        "re:(decisiones|trazas|trace|rutas).*(agentops|observabilidad|telemetria|agente)"
+      ],
+      "keywords": [
+        "decisiones recientes del agente",
+        "trazas agentops",
+        "decision trace"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "agentops_list_recent_decisions"
+      ],
+      "priority": 141,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "limit",
+          "result_status"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "agentops_list_tool_executions",
+      "description": "List recent tool execution traces including schema, permission and plan checks.",
+      "intent_patterns": [
+        "re:(agentops|observabilidad|telemetria).*(tools|herramientas|ejecuciones)",
+        "re:(tools|herramientas|ejecuciones).*(agentops|observabilidad|telemetria)"
+      ],
+      "keywords": [
+        "ejecuciones de herramientas",
+        "tool executions agentops",
+        "trazas de herramientas"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "agentops_list_tool_executions"
+      ],
+      "priority": 140,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "limit",
+          "module_key"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "agentops_get_anomaly_flags",
+      "description": "Return current anomaly flags for AgentOps fallback, latency and repeated failures.",
+      "intent_patterns": [
+        "re:(agentops|observabilidad|telemetria).*(anomalias|anomalias|banderas|flags|fallback|latencia)",
+        "re:(anomalias|anomalias|banderas|flags|fallback|latencia).*(agentops|observabilidad|telemetria)"
+      ],
+      "keywords": [
+        "anomalias agentops",
+        "banderas de observabilidad",
+        "agentops anomaly flags"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "agentops_get_anomaly_flags"
+      ],
+      "priority": 139,
+      "memory_type": null,
+      "input_schema": {
+        "required": [
+          "message_text"
+        ],
+        "optional": [
+          "days"
         ]
       },
       "channel_capabilities": [

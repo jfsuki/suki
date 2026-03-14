@@ -21,6 +21,7 @@ final class ChatAgent
     private ?Telemetry $telemetry = null;
     private ?TelemetryService $telemetryService = null;
     private ?AgentOpsSupervisor $agentOpsSupervisor = null;
+    private ?AgentOpsObservabilityService $agentOpsObservabilityService = null;
     private ?IntentRouter $intentRouter = null;
     private ?CommandBus $commandBus = null;
     private FormWizard $wizard;
@@ -251,6 +252,14 @@ final class ChatAgent
                 'fallback_reason' => 'security_block',
                 'error_type' => 'security_block',
             ]);
+            if ($route->isCommand()) {
+                $this->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $blockedTelemetry, [
+                    'success' => false,
+                    'execution_latency' => 0,
+                    'error_code' => 'security_block',
+                    'result_status' => 'blocked',
+                ]);
+            }
             $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $blockedTelemetry, $this->latencyMs($requestStartedAt), [
                 'llm_called' => false,
                 'error_flag' => true,
@@ -305,6 +314,13 @@ final class ChatAgent
         }
 
         if ($route->isLocalResponse()) {
+            if ($this->shouldTraceBlockedToolExecution($telemetry)) {
+                $this->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $telemetry, [
+                    'success' => false,
+                    'execution_latency' => 0,
+                    'result_status' => (string) ($telemetry['result_status'] ?? 'blocked'),
+                ]);
+            }
             $localResponseData = $this->extractOperationalTelemetryMarkers($telemetry);
             if (trim((string) ($localResponseData['session_id'] ?? '')) === '') {
                 unset($localResponseData['session_id']);
@@ -455,6 +471,13 @@ final class ChatAgent
             } catch (\Throwable $e) {
                 // observability must not block chat response
             }
+            $this->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $commandTelemetry, [
+                'success' => !$commandErrorFlag,
+                'execution_latency' => $this->latencyMs($commandStartedAt),
+                'error_code' => $commandErrorFlag ? $commandErrorType : null,
+                'result_status' => $commandStatus,
+                'command_name' => $commandName,
+            ]);
             $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
                 'llm_called' => false,
                 'error_flag' => $commandErrorFlag,
@@ -1610,6 +1633,15 @@ final class ChatAgent
         return $this->telemetryService;
     }
 
+    private function agentOpsObservabilityService(): AgentOpsObservabilityService
+    {
+        if (!$this->agentOpsObservabilityService) {
+            $this->agentOpsObservabilityService = new AgentOpsObservabilityService(new SqlMetricsRepository());
+        }
+
+        return $this->agentOpsObservabilityService;
+    }
+
     private function agentOpsSupervisor(): AgentOpsSupervisor
     {
         if (!$this->agentOpsSupervisor) {
@@ -1730,6 +1762,7 @@ final class ChatAgent
             'saas_plan_action' => $runtimeObservability['saas_plan_action'],
             'usage_metering_action' => $runtimeObservability['usage_metering_action'],
             'agent_tools_action' => $runtimeObservability['agent_tools_action'],
+            'agentops_action' => $runtimeObservability['agentops_action'],
             'skill_group' => $runtimeObservability['skill_group'],
             'draft_id' => $runtimeObservability['draft_id'],
             'purchase_draft_id' => $runtimeObservability['purchase_draft_id'],
@@ -1890,6 +1923,7 @@ final class ChatAgent
             'saas_plan_action' => trim((string) ($runtimeContext['saas_plan_action'] ?? $routeTelemetry['saas_plan_action'] ?? '')) ?: 'none',
             'usage_metering_action' => trim((string) ($runtimeContext['usage_metering_action'] ?? $routeTelemetry['usage_metering_action'] ?? '')) ?: 'none',
             'agent_tools_action' => trim((string) ($runtimeContext['agent_tools_action'] ?? $routeTelemetry['agent_tools_action'] ?? '')) ?: 'none',
+            'agentops_action' => trim((string) ($runtimeContext['agentops_action'] ?? $routeTelemetry['agentops_action'] ?? '')) ?: 'none',
             'skill_group' => $this->preferRuntimeOrRouteString($runtimeContext, $routeTelemetry, 'skill_group', 'unknown'),
             'draft_id' => trim((string) ($runtimeContext['draft_id'] ?? $routeTelemetry['draft_id'] ?? '')),
             'purchase_draft_id' => trim((string) ($runtimeContext['purchase_draft_id'] ?? $routeTelemetry['purchase_draft_id'] ?? '')),
@@ -2029,17 +2063,388 @@ final class ChatAgent
         int $latencyMs,
         array $runtimeContext = []
     ): void {
+        $runtimeObservability = $this->buildAgentOpsRuntimeObservability($routeTelemetry, $latencyMs, $runtimeContext);
+
         try {
             $this->gateway()->rememberAgentOpsTrace(
                 $tenantId,
                 $userId,
                 $projectId,
                 $mode,
-                $this->buildAgentOpsRuntimeObservability($routeTelemetry, $latencyMs, $runtimeContext)
+                $runtimeObservability
             );
         } catch (\Throwable $ignored) {
             // agentops trace persistence must not block chat response
         }
+
+        try {
+            $this->agentOpsObservabilityService()->recordDecisionTrace([
+                'tenant_id' => $tenantId,
+                'project_id' => $projectId,
+                'session_id' => trim((string) ($runtimeObservability['session_id'] ?? '')),
+                'route_path' => (string) ($runtimeObservability['route_path'] ?? 'unknown'),
+                'selected_module' => $this->resolveDecisionSelectedModule($runtimeObservability),
+                'selected_action' => $this->resolveDecisionSelectedAction($runtimeObservability),
+                'evidence_source' => $this->resolveDecisionEvidenceSource($runtimeObservability),
+                'ambiguity_detected' => (($runtimeObservability['ambiguity_detected'] ?? false) === true),
+                'fallback_llm' => (($runtimeObservability['llm_called'] ?? false) === true),
+                'latency_ms' => $latencyMs,
+                'result_status' => $this->resolveDecisionResultStatus($runtimeObservability),
+                'metadata_json' => [
+                    'gate_decision' => (string) ($runtimeObservability['gate_decision'] ?? 'unknown'),
+                    'module_used' => (string) ($runtimeObservability['module_used'] ?? 'none'),
+                    'denial_reason' => (string) ($runtimeObservability['denial_reason'] ?? ''),
+                    'permission_checked' => (string) ($runtimeObservability['permission_checked'] ?? ''),
+                    'decision' => (string) ($runtimeObservability['decision'] ?? ''),
+                    'error_type' => (string) ($runtimeObservability['error_type'] ?? 'none'),
+                    'tool_calls_count' => (int) ($runtimeObservability['tool_calls_count'] ?? 0),
+                ],
+            ]);
+        } catch (\Throwable $ignored) {
+            // decision trace persistence must not block chat response
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $runtimeObservability
+     */
+    private function resolveDecisionSelectedModule(array $runtimeObservability): string
+    {
+        foreach (['resolved_module', 'module_used', 'requested_module'] as $field) {
+            $value = trim((string) ($runtimeObservability[$field] ?? ''));
+            if ($value !== '' && $value !== 'none') {
+                return $value;
+            }
+        }
+
+        return 'none';
+    }
+
+    /**
+     * @param array<string, mixed> $runtimeObservability
+     */
+    private function resolveDecisionSelectedAction(array $runtimeObservability): string
+    {
+        foreach ([
+            'agentops_action',
+            'agent_tools_action',
+            'usage_metering_action',
+            'saas_plan_action',
+            'access_control_action',
+            'ecommerce_action',
+            'fiscal_action',
+            'purchases_action',
+            'pos_action',
+            'entity_search_action',
+            'media_action',
+            'alert_action',
+            'task_action',
+            'reminder_action',
+        ] as $field) {
+            $value = trim((string) ($runtimeObservability[$field] ?? ''));
+            if ($value !== '' && $value !== 'none') {
+                return $value;
+            }
+        }
+
+        $contractAction = trim((string) ($runtimeObservability['action_contract'] ?? ''));
+        if ($contractAction !== '' && $contractAction !== 'none') {
+            return $contractAction;
+        }
+
+        return trim((string) ($runtimeObservability['skill_selected'] ?? '')) ?: 'none';
+    }
+
+    /**
+     * @param array<string, mixed> $runtimeObservability
+     */
+    private function resolveDecisionEvidenceSource(array $runtimeObservability): string
+    {
+        if (($runtimeObservability['rag_used'] ?? false) === true) {
+            return 'rag';
+        }
+        if (($runtimeObservability['skill_detected'] ?? false) === true) {
+            return 'skills';
+        }
+        if (($runtimeObservability['llm_called'] ?? false) === true) {
+            return 'llm';
+        }
+        if (str_contains((string) ($runtimeObservability['route_path'] ?? ''), 'cache')) {
+            return 'cache';
+        }
+
+        return 'rules';
+    }
+
+    /**
+     * @param array<string, mixed> $runtimeObservability
+     */
+    private function resolveDecisionResultStatus(array $runtimeObservability): string
+    {
+        if (($runtimeObservability['error_flag'] ?? false) === true) {
+            return 'error';
+        }
+
+        return trim((string) ($runtimeObservability['result_status'] ?? '')) ?: 'unknown';
+    }
+
+    /**
+     * @param array<string, mixed> $routeTelemetry
+     * @param array<string, mixed> $runtimeContext
+     */
+    private function recordToolExecutionTrace(
+        string $tenantId,
+        string $projectId,
+        string $sessionId,
+        array $routeTelemetry,
+        array $runtimeContext = []
+    ): void {
+        try {
+            $success = (($runtimeContext['success'] ?? false) === true);
+            $this->agentOpsObservabilityService()->recordToolExecutionTrace([
+                'tenant_id' => $tenantId,
+                'project_id' => $projectId,
+                'module_key' => $this->resolveTraceModuleKey($routeTelemetry, $runtimeContext),
+                'action_key' => $this->resolveTraceActionKey($routeTelemetry, $runtimeContext),
+                'input_schema_valid' => $this->resolveSchemaGatePassed($routeTelemetry),
+                'permission_check' => $this->resolvePermissionTraceStatus($routeTelemetry, $runtimeContext),
+                'plan_check' => $this->resolvePlanTraceStatus($routeTelemetry, $runtimeContext),
+                'execution_latency' => max(0, (int) ($runtimeContext['execution_latency'] ?? 0)),
+                'success' => $success,
+                'error_code' => $this->resolveToolTraceErrorCode($routeTelemetry, $runtimeContext),
+                'metadata_json' => [
+                    'session_id' => $sessionId,
+                    'route_path' => (string) ($routeTelemetry['route_path'] ?? ''),
+                    'gate_decision' => (string) ($routeTelemetry['gate_decision'] ?? ''),
+                    'result_status' => (string) ($runtimeContext['result_status'] ?? $routeTelemetry['result_status'] ?? ''),
+                    'permission_checked' => (string) ($routeTelemetry['permission_checked'] ?? ''),
+                    'denial_reason' => (string) ($routeTelemetry['denial_reason'] ?? ''),
+                    'requested_module' => (string) ($routeTelemetry['requested_module'] ?? ''),
+                    'resolved_module' => (string) ($routeTelemetry['resolved_module'] ?? ''),
+                    'command_name' => (string) ($runtimeContext['command_name'] ?? ''),
+                ],
+            ]);
+        } catch (\Throwable $ignored) {
+            // tool execution trace persistence must not block chat response
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $routeTelemetry
+     */
+    private function shouldTraceBlockedToolExecution(array $routeTelemetry): bool
+    {
+        $actionContract = trim((string) ($routeTelemetry['action_contract'] ?? ''));
+        $gateDecision = trim((string) ($routeTelemetry['gate_decision'] ?? ''));
+
+        return $actionContract !== '' && $actionContract !== 'none' && $gateDecision === 'blocked';
+    }
+
+    /**
+     * @param array<string, mixed> $routeTelemetry
+     * @param array<string, mixed> $runtimeContext
+     */
+    private function resolveTraceModuleKey(array $routeTelemetry, array $runtimeContext = []): string
+    {
+        foreach (['resolved_module', 'requested_module', 'module_used'] as $field) {
+            $value = trim((string) ($runtimeContext[$field] ?? $routeTelemetry[$field] ?? ''));
+            if ($value !== '' && $value !== 'none') {
+                return $value;
+            }
+        }
+
+        $actionContract = trim((string) ($routeTelemetry['action_contract'] ?? ''));
+        if ($actionContract !== '' && $actionContract !== 'none' && str_contains($actionContract, '.')) {
+            return trim((string) strstr($actionContract, '.', true)) ?: 'none';
+        }
+
+        return 'none';
+    }
+
+    /**
+     * @param array<string, mixed> $routeTelemetry
+     * @param array<string, mixed> $runtimeContext
+     */
+    private function resolveTraceActionKey(array $routeTelemetry, array $runtimeContext = []): string
+    {
+        foreach ([
+            'agentops_action',
+            'agent_tools_action',
+            'usage_metering_action',
+            'saas_plan_action',
+            'access_control_action',
+            'ecommerce_action',
+            'fiscal_action',
+            'purchases_action',
+            'pos_action',
+            'entity_search_action',
+            'media_action',
+            'alert_action',
+            'task_action',
+            'reminder_action',
+        ] as $field) {
+            $value = trim((string) ($runtimeContext[$field] ?? $routeTelemetry[$field] ?? ''));
+            if ($value !== '' && $value !== 'none') {
+                return $value;
+            }
+        }
+
+        $actionContract = trim((string) ($routeTelemetry['action_contract'] ?? ''));
+        if ($actionContract !== '' && $actionContract !== 'none' && str_contains($actionContract, '.')) {
+            $parts = explode('.', $actionContract, 2);
+            return trim((string) ($parts[1] ?? '')) ?: 'none';
+        }
+
+        return trim((string) ($runtimeContext['command_name'] ?? '')) ?: 'none';
+    }
+
+    /**
+     * @param array<string, mixed> $routeTelemetry
+     */
+    private function resolveSchemaGatePassed(array $routeTelemetry): bool
+    {
+        $gateResult = $this->gateResultPassed($routeTelemetry, 'schema_gate');
+        if ($gateResult !== null) {
+            return $gateResult;
+        }
+
+        foreach ((array) ($routeTelemetry['contract_violations'] ?? []) as $violation) {
+            if (str_starts_with((string) $violation, 'gate_schema_invalid:')) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param array<string, mixed> $routeTelemetry
+     * @param array<string, mixed> $runtimeContext
+     */
+    private function resolvePermissionTraceStatus(array $routeTelemetry, array $runtimeContext = []): string
+    {
+        $explicit = trim((string) ($runtimeContext['permission_check'] ?? ''));
+        if ($explicit !== '') {
+            return $explicit;
+        }
+
+        $decision = strtolower(trim((string) ($routeTelemetry['decision'] ?? '')));
+        if ($decision === 'allow') {
+            return 'allow';
+        }
+        if ($decision === 'deny') {
+            return 'deny';
+        }
+
+        $authGate = $this->gateResultPassed($routeTelemetry, 'auth_rbac_gate');
+        if ($authGate === false) {
+            return 'deny';
+        }
+        if ($authGate === true && trim((string) ($routeTelemetry['permission_checked'] ?? '')) !== '') {
+            return 'allow';
+        }
+
+        foreach ((array) ($routeTelemetry['contract_violations'] ?? []) as $violation) {
+            if (str_starts_with((string) $violation, 'gate_auth_rbac_failed:')) {
+                return 'deny';
+            }
+        }
+
+        return 'not_checked';
+    }
+
+    /**
+     * @param array<string, mixed> $routeTelemetry
+     * @param array<string, mixed> $runtimeContext
+     */
+    private function resolvePlanTraceStatus(array $routeTelemetry, array $runtimeContext = []): string
+    {
+        $explicit = trim((string) ($runtimeContext['plan_check'] ?? ''));
+        if ($explicit !== '') {
+            return $explicit;
+        }
+
+        if (($routeTelemetry['over_limit'] ?? false) === true) {
+            return 'warn:over_limit';
+        }
+
+        $denialReason = trim((string) ($routeTelemetry['denial_reason'] ?? ''));
+        if ($denialReason === 'module_disabled_by_plan' || $denialReason === 'plan_not_assigned') {
+            return 'disabled';
+        }
+
+        if (array_key_exists('enabled', $routeTelemetry)) {
+            return (($routeTelemetry['enabled'] ?? false) === true) ? 'enabled' : 'disabled';
+        }
+
+        if (trim((string) ($routeTelemetry['limit_key'] ?? '')) !== '') {
+            return 'checked';
+        }
+
+        return 'not_checked';
+    }
+
+    /**
+     * @param array<string, mixed> $routeTelemetry
+     * @param array<string, mixed> $runtimeContext
+     */
+    private function resolveToolTraceErrorCode(array $routeTelemetry, array $runtimeContext = []): ?string
+    {
+        $explicit = trim((string) ($runtimeContext['error_code'] ?? ''));
+        if ($explicit !== '') {
+            return $explicit;
+        }
+
+        if (($runtimeContext['success'] ?? false) === true) {
+            return null;
+        }
+
+        $denialReason = trim((string) ($routeTelemetry['denial_reason'] ?? ''));
+        if ($denialReason !== '') {
+            return $denialReason;
+        }
+
+        $errorType = trim((string) ($runtimeContext['error_type'] ?? $routeTelemetry['error_type'] ?? ''));
+        if ($errorType !== '' && $errorType !== 'none') {
+            return $errorType;
+        }
+
+        foreach ((array) ($routeTelemetry['contract_violations'] ?? []) as $violation) {
+            $violation = (string) $violation;
+            if (str_starts_with($violation, 'gate_auth_rbac_failed:')) {
+                return 'permission_denied';
+            }
+            if (str_starts_with($violation, 'gate_tenant_scope_failed:')) {
+                return 'tenant_scope_denied';
+            }
+            if (str_starts_with($violation, 'gate_schema_invalid:')) {
+                return 'schema_invalid';
+            }
+            if (str_starts_with($violation, 'minimum_evidence_missing:')) {
+                return 'minimum_evidence_missing';
+            }
+        }
+
+        return 'execution_failed';
+    }
+
+    /**
+     * @param array<string, mixed> $routeTelemetry
+     */
+    private function gateResultPassed(array $routeTelemetry, string $gateName): ?bool
+    {
+        $gateResults = is_array($routeTelemetry['gate_results'] ?? null) ? (array) $routeTelemetry['gate_results'] : [];
+        foreach ($gateResults as $gateResult) {
+            if (!is_array($gateResult)) {
+                continue;
+            }
+            if ((string) ($gateResult['gate'] ?? '') !== $gateName) {
+                continue;
+            }
+            return (($gateResult['passed'] ?? false) === true);
+        }
+
+        return null;
     }
 
     /**
@@ -2113,6 +2518,7 @@ final class ChatAgent
             'saas_plan_action' => trim((string) ($payload['saas_plan_action'] ?? '')) ?: 'none',
             'usage_metering_action' => trim((string) ($payload['usage_metering_action'] ?? '')) ?: 'none',
             'agent_tools_action' => trim((string) ($payload['agent_tools_action'] ?? '')) ?: 'none',
+            'agentops_action' => trim((string) ($payload['agentops_action'] ?? '')) ?: 'none',
             'skill_group' => trim((string) ($payload['skill_group'] ?? '')) ?: '',
             'draft_id' => trim((string) ($payload['draft_id'] ?? '')) ?: '',
             'purchase_draft_id' => trim((string) ($payload['purchase_draft_id'] ?? '')) ?: '',
@@ -2235,6 +2641,7 @@ final class ChatAgent
             $this->commandBus->register(new TenantPlanCommandHandler());
             $this->commandBus->register(new UsageMeteringCommandHandler());
             $this->commandBus->register(new AgentToolsIntegrationCommandHandler());
+            $this->commandBus->register(new AgentOpsObservabilityCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
                 ['AuthLogin', 'AuthCreateUser'],
                 function (array $command, array $context): array {

@@ -1695,6 +1695,10 @@ final class IntentRouter
             'AgentResolveToolForRequest' => 'agent_tools.resolve_tool_for_request',
             'AgentCheckModuleEnabled' => 'agent_tools.check_module_enabled',
             'AgentCheckActionAllowed' => 'agent_tools.check_action_allowed',
+            'AgentOpsGetMetricsSummary' => 'agentops.get_metrics_summary',
+            'AgentOpsListRecentDecisions' => 'agentops.list_recent_decisions',
+            'AgentOpsListToolExecutions' => 'agentops.list_tool_executions',
+            'AgentOpsGetAnomalyFlags' => 'agentops.get_anomaly_flags',
             'CreateInvoice' => 'invoice.create',
             'GenerateReport' => 'report.generate',
             'ConfigureFEProvider' => 'settings.configure_fe_provider',
@@ -1730,6 +1734,7 @@ final class IntentRouter
             || str_starts_with($selectedName, 'tenant_')
             || str_starts_with($selectedName, 'usage_')
             || str_starts_with($selectedName, 'agent_')
+            || str_starts_with($selectedName, 'agentops_')
             || in_array($selectedName, ['entity_search', 'entity_resolve'], true);
     }
 

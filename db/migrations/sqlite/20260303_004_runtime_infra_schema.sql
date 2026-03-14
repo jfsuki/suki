@@ -161,6 +161,51 @@ CREATE INDEX IF NOT EXISTS idx_ops_tokens_scope
 CREATE INDEX IF NOT EXISTS idx_ops_tokens_session
     ON ops_token_usage (tenant_id, project_id, session_id, created_at);
 
+CREATE TABLE IF NOT EXISTS agent_decision_traces (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    session_id TEXT NOT NULL DEFAULT '',
+    route_path TEXT NOT NULL,
+    selected_module TEXT NOT NULL,
+    selected_action TEXT NOT NULL,
+    evidence_source TEXT NOT NULL,
+    ambiguity_detected INTEGER NOT NULL DEFAULT 0,
+    fallback_llm INTEGER NOT NULL DEFAULT 0,
+    latency_ms INTEGER NOT NULL DEFAULT 0,
+    result_status TEXT NOT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_agent_decision_scope
+    ON agent_decision_traces (tenant_id, project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_agent_decision_session
+    ON agent_decision_traces (tenant_id, project_id, session_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_agent_decision_module
+    ON agent_decision_traces (tenant_id, project_id, selected_module, created_at);
+
+CREATE TABLE IF NOT EXISTS tool_execution_traces (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tenant_id TEXT NOT NULL,
+    project_id TEXT NOT NULL,
+    module_key TEXT NOT NULL,
+    action_key TEXT NOT NULL,
+    input_schema_valid INTEGER NOT NULL DEFAULT 0,
+    permission_check TEXT NOT NULL,
+    plan_check TEXT NOT NULL,
+    execution_latency INTEGER NOT NULL DEFAULT 0,
+    success INTEGER NOT NULL DEFAULT 0,
+    error_code TEXT NULL,
+    metadata_json TEXT NOT NULL DEFAULT '{}',
+    created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tool_execution_scope
+    ON tool_execution_traces (tenant_id, project_id, created_at);
+CREATE INDEX IF NOT EXISTS idx_tool_execution_module
+    ON tool_execution_traces (tenant_id, project_id, module_key, created_at);
+CREATE INDEX IF NOT EXISTS idx_tool_execution_status
+    ON tool_execution_traces (tenant_id, project_id, success, created_at);
+
 CREATE TABLE IF NOT EXISTS mem_global (
     category TEXT NOT NULL,
     key_name TEXT NOT NULL,

@@ -1,6 +1,6 @@
 {
   "contract_id": "action_catalog",
-  "version": "1.6.9",
+  "version": "1.6.10",
   "effective_date": "2026-03-14",
   "addenda_of": null,
   "status": "canonical_draft",
@@ -2440,6 +2440,82 @@
       "allowed_tools": [
         "CommandBus",
         "agent_check_action_allowed"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "agentops.get_metrics_summary",
+      "type": "EXECUTABLE",
+      "required_role": "manager",
+      "allowed_tools": [
+        "CommandBus",
+        "agentops_get_metrics_summary"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "agentops.list_recent_decisions",
+      "type": "EXECUTABLE",
+      "required_role": "manager",
+      "allowed_tools": [
+        "CommandBus",
+        "agentops_list_recent_decisions"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "agentops.list_tool_executions",
+      "type": "EXECUTABLE",
+      "required_role": "manager",
+      "allowed_tools": [
+        "CommandBus",
+        "agentops_list_tool_executions"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ]
+    },
+    {
+      "name": "agentops.get_anomaly_flags",
+      "type": "EXECUTABLE",
+      "required_role": "manager",
+      "allowed_tools": [
+        "CommandBus",
+        "agentops_get_anomaly_flags"
       ],
       "rag_required": false,
       "json_schema_required": true,

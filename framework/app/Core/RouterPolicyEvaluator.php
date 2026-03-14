@@ -1489,6 +1489,14 @@ final class RouterPolicyEvaluator
                 }
                 return [true, 'schema_valid'];
 
+            case 'AgentOpsGetMetricsSummary':
+            case 'AgentOpsGetAnomalyFlags':
+                return [true, 'schema_valid'];
+
+            case 'AgentOpsListRecentDecisions':
+            case 'AgentOpsListToolExecutions':
+                return [true, 'schema_valid'];
+
             default:
                 // Backward-compatible fallback for commands not yet fully modeled.
                 if ($entity === '' && empty($data) && $id === null) {

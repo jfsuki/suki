@@ -1,6 +1,6 @@
 {
   "contract_id": "agentops_metrics_contract",
-  "version": "1.4.8",
+  "version": "1.4.9",
   "effective_date": "2026-03-14",
   "addenda_of": null,
   "status": "canonical_draft",
@@ -33,6 +33,7 @@
     "needs_memory_hygiene",
     "module_used",
     "agent_tools_action",
+    "agentops_action",
     "access_control_action",
     "saas_plan_action",
     "usage_metering_action",
@@ -98,6 +99,7 @@
     "request_mode",
     "module_used",
     "agent_tools_action",
+    "agentops_action",
     "access_control_action",
     "saas_plan_action",
     "usage_metering_action",

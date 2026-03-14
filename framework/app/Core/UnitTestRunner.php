@@ -110,6 +110,8 @@ final class UnitTestRunner
         $tests[] = $this->wrap('ecommerce_agent_skills', fn() => $this->checkEcommerceAgentSkills());
         $tests[] = $this->wrap('agent_tools_integration_foundation', fn() => $this->checkAgentToolsIntegrationFoundation());
         $tests[] = $this->wrap('agent_tools_integration_skills', fn() => $this->checkAgentToolsIntegrationSkills());
+        $tests[] = $this->wrap('agentops_observability_foundation', fn() => $this->checkAgentOpsObservabilityFoundation());
+        $tests[] = $this->wrap('agentops_observability_skills', fn() => $this->checkAgentOpsObservabilitySkills());
         $tests[] = $this->wrap('project_memory_system', fn() => $this->checkProjectMemorySystem());
         $tests[] = $this->wrap('learning_promotion_pipeline', fn() => $this->checkLearningPromotionPipeline());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
@@ -1546,6 +1548,16 @@ final class UnitTestRunner
     private function checkAgentToolsIntegrationSkills(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/agent_tools_integration_skills_test.php');
+    }
+
+    private function checkAgentOpsObservabilityFoundation(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/agentops_observability_foundation_test.php');
+    }
+
+    private function checkAgentOpsObservabilitySkills(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/agentops_observability_skills_test.php');
     }
 
     private function checkProjectMemorySystem(): void

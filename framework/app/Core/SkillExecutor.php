@@ -194,6 +194,20 @@ final class SkillExecutor
                     $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
                     break;
                 }
+                if ($this->isAgentOpsObservabilitySkill($name)) {
+                    $toolOutcome = $this->executeAgentOpsObservabilitySkill($name, $context);
+                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
+                    $reply = (string) ($toolOutcome['reply'] ?? '');
+                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
+                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
+                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
+                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
+                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
+                        ? (array) $toolOutcome['routing_hint_steps']
+                        : ['cache', 'rules', 'skills'];
+                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    break;
+                }
                 [$action, $reply, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps] = $this->executeToolSkill($skill, $context);
                 break;
 
@@ -922,6 +936,51 @@ final class SkillExecutor
             'skill_fallback_reason' => (($telemetry['ambiguity_detected'] ?? false) === true)
                 ? 'ambiguous_agent_tools_request'
                 : 'missing_agent_tools_payload',
+            'skill_failed' => false,
+            'routing_hint_steps' => ['cache', 'rules', 'skills'],
+            'telemetry' => $telemetry,
+        ];
+    }
+
+    private function isAgentOpsObservabilitySkill(string $name): bool
+    {
+        return in_array($name, [
+            'agentops_get_metrics_summary',
+            'agentops_list_recent_decisions',
+            'agentops_list_tool_executions',
+            'agentops_get_anomaly_flags',
+        ], true);
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
+    private function executeAgentOpsObservabilitySkill(string $name, array $context): array
+    {
+        $parser = new AgentOpsObservabilityMessageParser();
+        $parsed = $parser->parse($name, $context);
+        $telemetry = is_array($parsed['telemetry'] ?? null) ? (array) $parsed['telemetry'] : [];
+
+        if ((string) ($parsed['kind'] ?? '') === 'command') {
+            return [
+                'action' => 'execute_command',
+                'reply' => '',
+                'command' => is_array($parsed['command'] ?? null) ? (array) $parsed['command'] : [],
+                'skill_result_status' => 'command_ready',
+                'skill_fallback_reason' => 'none',
+                'skill_failed' => false,
+                'routing_hint_steps' => ['cache', 'rules', 'skills'],
+                'telemetry' => $telemetry,
+            ];
+        }
+
+        return [
+            'action' => 'ask_user',
+            'reply' => (string) ($parsed['reply'] ?? 'Necesito un dato adicional para consultar AgentOps.'),
+            'command' => [],
+            'skill_result_status' => 'needs_input',
+            'skill_fallback_reason' => 'missing_agentops_payload',
             'skill_failed' => false,
             'routing_hint_steps' => ['cache', 'rules', 'skills'],
             'telemetry' => $telemetry,

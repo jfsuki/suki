@@ -111,6 +111,7 @@ if (is_array($matchedEvent)) {
         'needs_regression_case',
         'needs_memory_hygiene',
         'needs_training_gap_review',
+        'agentops_action',
         'agentops_runtime',
     ];
     foreach ($requiredFields as $field) {
@@ -262,6 +263,7 @@ if (is_array($matchedEvent)) {
             'retry_count',
             'loop_guard_triggered',
             'request_mode',
+            'agentops_action',
             'metrics_delta',
             'latency_ms',
             'error_flag',
