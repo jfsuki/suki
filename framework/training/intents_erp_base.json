@@ -1,0 +1,517 @@
+{
+  "batch_id": "intents_erp_base",
+  "dataset_type": "intent_dataset",
+  "language": "es-419",
+  "dataset_version": "1.0.0",
+  "source_type": "agent_training",
+  "memory_type": "agent_training",
+  "source_metadata": {
+    "type": "intent_dataset",
+    "dataset": "intents_erp_base",
+    "domain": "erp",
+    "collection": "agent_training",
+    "embedding_model": "gemini-embedding-001",
+    "embedding_dimension": 768,
+    "skills_referenced": [
+      "pos_create_draft",
+      "pos_add_line_by_reference",
+      "pos_attach_customer",
+      "pos_finalize_sale",
+      "pos_list_sales",
+      "pos_cancel_sale",
+      "pos_create_return",
+      "pos_open_cash_register",
+      "pos_close_cash_register",
+      "pos_build_cash_summary",
+      "purchases_create_draft",
+      "purchases_add_draft_line",
+      "purchases_attach_supplier",
+      "purchases_finalize",
+      "purchases_list",
+      "purchases_attach_document",
+      "inventory_check",
+      "product_lookup",
+      "customer_lookup",
+      "entity_search",
+      "create_invoice",
+      "send_invoice",
+      "register_expense",
+      "accounting_post",
+      "fiscal_create_credit_note",
+      "generate_report"
+    ]
+  },
+  "publication": {
+    "status": "draft"
+  },
+  "entries": [
+    {
+      "intent": "erp_sales_start_ticket",
+      "utterances": [
+        "abrir una venta",
+        "crear venta nueva",
+        "iniciar ticket",
+        "empezar cobro",
+        "nueva cuenta de venta",
+        "abre una venta rápida",
+        "arranca una venta",
+        "quiero registrar una venta",
+        "haz un ticket nuevo",
+        "start sale"
+      ],
+      "skill": "pos_create_draft",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_sales_add_product",
+      "utterances": [
+        "agrega este producto",
+        "suma una camisa al ticket",
+        "mete 2 aguas",
+        "añade el código 1002",
+        "pon un café en la venta",
+        "cargar referencia A45",
+        "agrega una unidad más",
+        "incluye este SKU",
+        "add this item",
+        "coloca ese artículo"
+      ],
+      "skill": "pos_add_line_by_reference",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_sales_assign_customer",
+      "utterances": [
+        "pon el cliente juan",
+        "asigna cliente a la venta",
+        "esta venta es para maría",
+        "vincula cliente al ticket",
+        "factura a nombre de acme",
+        "usa el cliente 900123456",
+        "deja esta compra a crédito de carlos",
+        "relaciona comprador en la venta",
+        "attach customer",
+        "registra quién compra"
+      ],
+      "skill": "pos_attach_customer",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_sales_checkout",
+      "utterances": [
+        "cobra la venta",
+        "finaliza esta venta",
+        "cerrar ticket",
+        "termina la compra",
+        "completa el cobro",
+        "ya pagó el cliente",
+        "procesa el checkout",
+        "cerrar la cuenta",
+        "confirma esta venta",
+        "pasa la venta"
+      ],
+      "skill": "pos_finalize_sale",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_sales_list_recent",
+      "utterances": [
+        "ver ventas de hoy",
+        "muéstrame ventas recientes",
+        "lista las ventas del día",
+        "qué vendimos hoy",
+        "enséñame las últimas ventas",
+        "ver historial de ventas",
+        "dame ventas de esta semana",
+        "show sales today",
+        "consulta ventas cerradas",
+        "revisa mis ventas"
+      ],
+      "skill": "pos_list_sales",
+      "confidence": "medium",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_sales_cancel",
+      "utterances": [
+        "anula esta venta",
+        "cancelar la venta 102",
+        "reversa esa factura de mostrador",
+        "elimina la venta reciente",
+        "tumba ese cobro",
+        "deshaz esa venta",
+        "cancela el ticket 55",
+        "no va esa venta",
+        "void sale",
+        "anular cobro hecho"
+      ],
+      "skill": "pos_cancel_sale",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_sales_return",
+      "utterances": [
+        "registrar devolución",
+        "devolver 1 producto",
+        "crear una devolución",
+        "el cliente trajo un cambio",
+        "hacer retorno de la venta",
+        "procesa esta devolución",
+        "devuelve la referencia 300",
+        "return this sale",
+        "registrar mercancía devuelta",
+        "genera nota de devolución"
+      ],
+      "skill": "pos_create_return",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_cash_open_register",
+      "utterances": [
+        "abrir caja",
+        "iniciar caja hoy",
+        "abre turno de caja",
+        "apertura de caja",
+        "arrancar caja con base",
+        "habilita la caja",
+        "open register",
+        "empieza arqueo inicial",
+        "deja abierta la caja",
+        "abrir punto de caja"
+      ],
+      "skill": "pos_open_cash_register",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_cash_close_register",
+      "utterances": [
+        "cerrar caja",
+        "termina la caja de hoy",
+        "cierra turno",
+        "arqueo final",
+        "hacer cierre de caja",
+        "close register",
+        "salir de caja",
+        "totaliza y cierra caja",
+        "cerrar punto de venta",
+        "finaliza la sesión de caja"
+      ],
+      "skill": "pos_close_cash_register",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_cash_summary",
+      "utterances": [
+        "dame arqueo de caja",
+        "resumen de caja",
+        "ver cierre de caja",
+        "cuánto quedó en caja",
+        "prepara resumen del turno",
+        "cash summary",
+        "muéstrame el arqueo",
+        "total de efectivo del turno",
+        "reporte rápido de caja",
+        "arma el cuadre de caja"
+      ],
+      "skill": "pos_build_cash_summary",
+      "confidence": "medium",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_purchase_start_draft",
+      "utterances": [
+        "crear compra nueva",
+        "abrir compra",
+        "iniciar orden de compra",
+        "registrar compra proveedor",
+        "nueva compra",
+        "arranca una compra",
+        "haz un borrador de compra",
+        "empezar ingreso de compra",
+        "new purchase",
+        "crea recepción de compra"
+      ],
+      "skill": "purchases_create_draft",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_purchase_add_line",
+      "utterances": [
+        "agrega ese insumo a la compra",
+        "pon 5 cajas en la compra",
+        "añade referencia P20",
+        "suma este repuesto a la orden",
+        "incluir producto del proveedor",
+        "mete 10 unidades compradas",
+        "add purchase item",
+        "carga ese material",
+        "agrega línea a la compra",
+        "coloca ese artículo comprado"
+      ],
+      "skill": "purchases_add_draft_line",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_purchase_attach_supplier",
+      "utterances": [
+        "esta compra es de proveedor alfa",
+        "asigna proveedor a la compra",
+        "vincula el proveedor 901200",
+        "poner proveedor en la orden",
+        "compra a nombre de distribuciones luna",
+        "attach supplier",
+        "usa el proveedor central",
+        "relaciona vendedor de esta compra",
+        "deja el proveedor en el borrador",
+        "registra quién nos vende"
+      ],
+      "skill": "purchases_attach_supplier",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_purchase_finalize",
+      "utterances": [
+        "confirma la compra",
+        "finaliza este ingreso",
+        "cerrar compra",
+        "registra la compra completa",
+        "termina esta orden de compra",
+        "procesa la compra",
+        "ingresa la compra hoy",
+        "finalize purchase",
+        "deja contabilizada la compra",
+        "guarda la compra final"
+      ],
+      "skill": "purchases_finalize",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_purchase_list",
+      "utterances": [
+        "ver compras de hoy",
+        "lista mis compras",
+        "muéstrame compras recientes",
+        "qué hemos comprado",
+        "consulta compras del mes",
+        "revisa últimas compras",
+        "show purchases",
+        "historial de compras",
+        "enséñame compras abiertas y cerradas",
+        "dame compras registradas"
+      ],
+      "skill": "purchases_list",
+      "confidence": "medium",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_purchase_attach_document",
+      "utterances": [
+        "adjunta la factura del proveedor",
+        "sube soporte de esta compra",
+        "anexa el PDF de la compra",
+        "agrega documento a la compra",
+        "cargar factura escaneada",
+        "linkea el archivo de proveedor",
+        "adjuntar soporte compra",
+        "upload supplier invoice",
+        "pon el comprobante en la compra",
+        "guarda el archivo de esta compra"
+      ],
+      "skill": "purchases_attach_document",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_inventory_check_stock",
+      "utterances": [
+        "cuánto stock hay",
+        "revisa existencia de arroz",
+        "hay unidades del código 77",
+        "consulta inventario actual",
+        "stock de la referencia azul",
+        "cuánto queda en bodega",
+        "check inventory",
+        "disponibilidad de este producto",
+        "mira las existencias",
+        "tengo saldo de ese item"
+      ],
+      "skill": "inventory_check",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_product_lookup",
+      "utterances": [
+        "busca el producto jabón",
+        "encuentra la referencia 5001",
+        "cuál es el producto A12",
+        "ubica este SKU",
+        "ver datos del producto leche",
+        "product lookup",
+        "dame la ficha del artículo 900",
+        "identifica ese código de barras",
+        "qué producto es este",
+        "localizar referencia del catálogo"
+      ],
+      "skill": "product_lookup",
+      "confidence": "medium",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_customer_lookup",
+      "utterances": [
+        "busca cliente roberto",
+        "encuentra al cliente 1020",
+        "datos del cliente ana",
+        "ver ficha de cliente",
+        "customer lookup",
+        "ubica el NIT 900888777",
+        "quién es este cliente",
+        "consulta cliente empresa sol",
+        "dame información del comprador",
+        "localizar cliente por nombre"
+      ],
+      "skill": "customer_lookup",
+      "confidence": "medium",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_supplier_lookup",
+      "utterances": [
+        "busca proveedor omega",
+        "encuentra proveedor 80044",
+        "ver proveedor de tornillos",
+        "quién nos vende este repuesto",
+        "supplier lookup",
+        "ubica el proveedor central",
+        "consulta proveedor por NIT",
+        "dame datos del proveedor norte",
+        "localizar proveedor en sistema",
+        "revisa este tercero proveedor"
+      ],
+      "skill": "entity_search",
+      "confidence": "medium",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_invoice_create",
+      "utterances": [
+        "crear factura",
+        "genera factura de venta",
+        "emitir factura al cliente",
+        "necesito una factura",
+        "haz la factura de hoy",
+        "invoice now",
+        "facturar esta venta",
+        "saca factura para esta cuenta",
+        "arma la factura de contado",
+        "prepara factura electrónica"
+      ],
+      "skill": "create_invoice",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_invoice_send",
+      "utterances": [
+        "envía la factura",
+        "manda la factura al cliente",
+        "comparte la factura por whatsapp",
+        "enviar comprobante al correo",
+        "remite la factura 1005",
+        "send invoice",
+        "pásale la factura al comprador",
+        "manda PDF de la factura",
+        "reenvía esa factura",
+        "comparte el documento de cobro"
+      ],
+      "skill": "send_invoice",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_expense_register",
+      "utterances": [
+        "registrar gasto",
+        "anota un gasto de caja",
+        "pagué internet hoy",
+        "mete gasto de transporte",
+        "registra egreso de papelería",
+        "cargar gasto menor",
+        "add expense",
+        "guarda gasto de combustible",
+        "pon un gasto administrativo",
+        "reporta pago de servicios"
+      ],
+      "skill": "register_expense",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_accounting_post",
+      "utterances": [
+        "registrar asiento contable",
+        "contabiliza este movimiento",
+        "hacer póliza manual",
+        "pasa esto al diario",
+        "crea asiento de ajuste",
+        "journal entry",
+        "necesito contabilizar este pago",
+        "registra débito y crédito",
+        "deja el asiento listo",
+        "llevar esto a contabilidad"
+      ],
+      "skill": "accounting_post",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_tax_credit_note",
+      "utterances": [
+        "crear nota crédito",
+        "genera nota crédito por devolución",
+        "anular con nota crédito",
+        "necesito una NC",
+        "haz crédito fiscal",
+        "credit note",
+        "emitir nota de ajuste",
+        "prepara nota crédito del cliente",
+        "sacar nota por devolución",
+        "registra nota crédito electrónica"
+      ],
+      "skill": "fiscal_create_credit_note",
+      "confidence": "high",
+      "domain": "erp"
+    },
+    {
+      "intent": "erp_report_generate",
+      "utterances": [
+        "ver reporte de ventas",
+        "dame reporte de inventario",
+        "necesito un informe mensual",
+        "sácame reporte de caja",
+        "generar reporte de compras",
+        "report please",
+        "arma un informe de cartera",
+        "ver resumen del negocio",
+        "quiero un reporte rápido",
+        "prepara reporte del día"
+      ],
+      "skill": "generate_report",
+      "confidence": "medium",
+      "domain": "erp"
+    }
+  ]
+}

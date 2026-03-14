@@ -122,6 +122,21 @@ if (!is_array($dataset)) {
     ], 2);
 }
 
+if (isIntentDatasetPayload($dataset)) {
+    vectorizeIntentDataset(
+        $dataset,
+        $inputPath,
+        $tenantId,
+        $appId,
+        $sourceType,
+        $memoryType,
+        $maxChunkChars,
+        $maxChunks,
+        $dryRun,
+        $publicationCheck
+    );
+}
+
 try {
     $datasetSourceType = trim((string) ($dataset['source_type'] ?? ''));
     if ($datasetSourceType !== '') {
@@ -838,6 +853,274 @@ function writeAndExit(array $payload, int $exitCode): void
     exit($exitCode);
 }
 
+/**
+ * @param array<string,mixed> $dataset
+ */
+function isIntentDatasetPayload(array $dataset): bool
+{
+    if (($dataset['dataset_type'] ?? null) === 'intent_dataset') {
+        return true;
+    }
+
+    $sourceMetadata = is_array($dataset['source_metadata'] ?? null) ? $dataset['source_metadata'] : [];
+    if (($sourceMetadata['type'] ?? null) === 'intent_dataset') {
+        return true;
+    }
+
+    return is_array($dataset['entries'] ?? null);
+}
+
+/**
+ * @param array<string,mixed> $dataset
+ * @param array<string,mixed> $publicationCheck
+ */
+function vectorizeIntentDataset(
+    array $dataset,
+    string $inputPath,
+    string $tenantId,
+    ?string $appId,
+    string $fallbackSourceType,
+    string $fallbackMemoryType,
+    int $maxChunkChars,
+    int $maxChunks,
+    bool $dryRun,
+    array $publicationCheck
+): void {
+    try {
+        $sourceType = trim((string) ($dataset['source_type'] ?? $fallbackSourceType));
+        if ($sourceType === '') {
+            $sourceType = 'agent_training';
+        }
+
+        $memoryType = trim((string) ($dataset['memory_type'] ?? $fallbackMemoryType));
+        if ($memoryType === '') {
+            $memoryType = 'agent_training';
+        }
+        $memoryType = QdrantVectorStore::assertMemoryType($memoryType);
+    } catch (Throwable $e) {
+        writeAndExit([
+            'ok' => false,
+            'action' => 'blocked',
+            'input' => realpath($inputPath) ?: $inputPath,
+            'error' => 'Metadata discovery/intents invalida: ' . $e->getMessage(),
+        ], 2);
+    }
+
+    $sourceMetadata = is_array($dataset['source_metadata'] ?? null) ? $dataset['source_metadata'] : [];
+    $batchId = safeId((string) ($dataset['batch_id'] ?? 'intents_dataset'));
+    $datasetVersion = trim((string) ($dataset['dataset_version'] ?? '1.0.0'));
+    if ($datasetVersion === '') {
+        $datasetVersion = '1.0.0';
+    }
+    $publishedAt = trim((string) ($dataset['publication']['published_at'] ?? date('c')));
+    if ($publishedAt === '') {
+        $publishedAt = date('c');
+    }
+    $globalQuality = 1.0;
+    if (is_numeric($dataset['quality_score'] ?? null)) {
+        $globalQuality = max(0.0, min(1.0, (float) $dataset['quality_score']));
+    }
+
+    $datasetName = trim((string) ($sourceMetadata['dataset'] ?? 'intent_dataset'));
+    $datasetDomain = trim((string) ($sourceMetadata['domain'] ?? 'erp'));
+    $skillsReferenced = stringList($sourceMetadata['skills_referenced'] ?? []);
+    $commonChunkMetadata = array_filter([
+        'batch_id' => (string) ($dataset['batch_id'] ?? ''),
+        'source_type' => $sourceType,
+        'type' => (string) ($sourceMetadata['type'] ?? 'intent_dataset'),
+        'dataset' => $datasetName,
+        'domain' => $datasetDomain,
+        'collection' => (string) ($sourceMetadata['collection'] ?? 'agent_training'),
+        'embedding_model' => (string) ($sourceMetadata['embedding_model'] ?? 'gemini-embedding-001'),
+        'embedding_dimension' => (int) ($sourceMetadata['embedding_dimension'] ?? 768),
+        'skills_referenced' => $skillsReferenced !== [] ? $skillsReferenced : null,
+    ], static fn($value): bool => $value !== null && $value !== '' && $value !== []);
+
+    $trace = [
+        'records_scanned' => 0,
+        'chunks_prepared' => 0,
+        'chunks_omitted' => 0,
+        'omit_reasons' => [],
+        'layers' => [
+            'intent_dataset' => [
+                'vectorize_enabled' => true,
+                'records' => 0,
+                'chunks' => 0,
+                'omitted' => 0,
+            ],
+        ],
+    ];
+
+    $chunks = [];
+    $seenChunks = [];
+
+    $appendChunk = static function (array $chunk) use (&$chunks, &$seenChunks, &$trace, $maxChunks): bool {
+        if ($maxChunks > 0 && count($chunks) >= $maxChunks) {
+            addReason($trace, 'max_chunks_reached');
+            return false;
+        }
+
+        $normalizedText = normalizeText((string) ($chunk['content'] ?? ''));
+        if ($normalizedText === '') {
+            addReason($trace, 'empty_text');
+            return false;
+        }
+
+        $dedupeKey = sha1(
+            implode('|', [
+                (string) ($chunk['memory_type'] ?? ''),
+                (string) ($chunk['source_id'] ?? ''),
+                (string) ($chunk['type'] ?? ''),
+                function_exists('mb_strtolower')
+                    ? mb_strtolower($normalizedText, 'UTF-8')
+                    : strtolower($normalizedText),
+            ])
+        );
+        if (isset($seenChunks[$dedupeKey])) {
+            addReason($trace, 'duplicate_chunk');
+            return false;
+        }
+
+        $seenChunks[$dedupeKey] = true;
+        $chunks[] = $chunk;
+        $trace['chunks_prepared']++;
+        return true;
+    };
+
+    $entries = is_array($dataset['entries'] ?? null) ? $dataset['entries'] : [];
+    foreach ($entries as $index => $entry) {
+        $trace['records_scanned']++;
+        $trace['layers']['intent_dataset']['records']++;
+
+        if (!is_array($entry)) {
+            $trace['layers']['intent_dataset']['omitted']++;
+            addReason($trace, 'invalid_intent_dataset_entry');
+            continue;
+        }
+
+        $intent = safeTag((string) ($entry['intent'] ?? 'intent_' . $index));
+        $skill = safeTag((string) ($entry['skill'] ?? 'unknown_skill'));
+        $confidence = safeTag((string) ($entry['confidence'] ?? 'high'));
+        $domain = safeTag((string) ($entry['domain'] ?? $datasetDomain));
+        $utterances = stringList($entry['utterances'] ?? []);
+        if ($utterances === []) {
+            $trace['layers']['intent_dataset']['omitted']++;
+            addReason($trace, 'intent_dataset_empty_utterances');
+            continue;
+        }
+
+        $tags = mergeTags([
+            'layer:intent_dataset',
+            'batch:' . $batchId,
+            'dataset:' . safeTag($datasetName),
+            'intent:' . $intent,
+            'skill:' . $skill,
+            'confidence:' . $confidence,
+            'domain:' . $domain,
+            'source_type:' . safeTag($sourceType),
+        ], []);
+
+        foreach ($utterances as $utteranceIndex => $utterance) {
+            foreach (splitText($utterance, $maxChunkChars) as $partIndex => $part) {
+                $sourceId = $batchId . ':intent_dataset:' . $intent;
+                $chunk = [
+                    'memory_type' => $memoryType,
+                    'tenant_id' => $tenantId,
+                    'app_id' => $appId,
+                    'agent_role' => null,
+                    'sector' => normalizeNullableField($datasetDomain),
+                    'source_type' => $sourceType,
+                    'source_id' => $sourceId,
+                    'source' => $sourceId,
+                    'chunk_id' => $intent . '_u_' . $utteranceIndex . '_p' . $partIndex,
+                    'type' => 'intent_dataset_utterance',
+                    'tags' => $tags,
+                    'version' => $datasetVersion,
+                    'quality_score' => $globalQuality,
+                    'created_at' => $publishedAt,
+                    'updated_at' => $publishedAt,
+                    'metadata' => array_merge($commonChunkMetadata, [
+                        'layer' => 'intent_dataset',
+                        'intent' => $intent,
+                        'skill' => $skill,
+                        'confidence' => $confidence,
+                    ]),
+                    'content' => $part,
+                ];
+
+                if ($appendChunk($chunk)) {
+                    $trace['layers']['intent_dataset']['chunks']++;
+                } else {
+                    $trace['layers']['intent_dataset']['omitted']++;
+                }
+            }
+        }
+    }
+
+    $trace['chunks_omitted'] = array_sum($trace['omit_reasons']);
+    if ($chunks === []) {
+        writeAndExit([
+            'ok' => false,
+            'action' => 'blocked',
+            'error' => 'No se generaron chunks vectorizables desde intent dataset publicado.',
+            'input' => realpath($inputPath) ?: $inputPath,
+            'flow' => 'published_intent_dataset->normalize_chunk->embedding(768)->upsert_qdrant',
+            'trace' => $trace,
+            'publication_check' => $publicationCheck,
+        ], 1);
+    }
+
+    $baseReport = [
+        'ok' => true,
+        'action' => $dryRun ? 'dry_run' : 'vectorized',
+        'input' => realpath($inputPath) ?: $inputPath,
+        'flow' => 'published_intent_dataset->normalize_chunk->embedding(768)->upsert_qdrant',
+        'tenant_id' => $tenantId,
+        'app_id' => $appId,
+        'memory_type' => $memoryType,
+        'vectorization_policy' => [
+            'default_layers' => ['intent_dataset'],
+            'enabled_layers' => ['intent_dataset'],
+            'excluded_by_default' => [],
+        ],
+        'dataset' => [
+            'batch_id' => (string) ($dataset['batch_id'] ?? ''),
+            'dataset_version' => $datasetVersion,
+            'source_type' => $sourceType,
+            'memory_type' => $memoryType,
+            'dataset' => $datasetName,
+            'domain' => $datasetDomain,
+            'publication_status' => (string) ($dataset['publication']['status'] ?? ''),
+            'published_at' => $publishedAt,
+        ],
+        'publication_check' => $publicationCheck,
+        'trace' => $trace,
+        'contract_sample' => $chunks !== [] ? SemanticChunkContract::buildPayload($chunks[0]) : null,
+    ];
+
+    if ($dryRun) {
+        $baseReport['chunks_vectorized'] = 0;
+        writeAndExit($baseReport, 0);
+    }
+
+    try {
+        $semantic = new SemanticMemoryService(
+            null,
+            new QdrantVectorStore(null, null, null, null, null, null, null, $memoryType)
+        );
+        $ingest = $semantic->ingest($chunks, ['wait' => true]);
+    } catch (Throwable $e) {
+        $baseReport['ok'] = false;
+        $baseReport['action'] = 'failed';
+        $baseReport['error'] = 'Fallo vectorizacion: ' . $e->getMessage();
+        writeAndExit($baseReport, 2);
+    }
+
+    $baseReport['semantic_memory'] = $ingest;
+    $baseReport['chunks_vectorized'] = (int) ($ingest['upserted'] ?? 0);
+    writeAndExit($baseReport, 0);
+}
+
 function printHelp(): void
 {
     echo "Usage:\n";
@@ -848,6 +1131,7 @@ function printHelp(): void
     echo "Rules:\n";
     echo "  - Dataset must be published (publication gate check is mandatory).\n";
     echo "  - Default layers: knowledge_stable + support_faq.\n";
+    echo "  - intent_dataset payloads vectorize to agent_training automatically.\n";
     echo "  - intents_expansion is excluded by default (enable explicitly by flag).\n";
     echo "  - Canonical flow: published -> normalize/chunk -> embedding(768) -> upsert Qdrant.\n";
 }

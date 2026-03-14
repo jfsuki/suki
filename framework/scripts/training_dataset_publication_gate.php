@@ -6,6 +6,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/autoload.php';
 
+use App\Core\IntentDatasetValidator;
 use App\Core\TrainingDatasetValidator;
 
 const DEFAULT_MIN_QUALITY_SCORE = 0.75;
@@ -116,6 +117,10 @@ if ($requirePublished) {
 
 $standardContract = readJsonFile($contractPath);
 $thresholds = resolveThresholds($standardContract, $thresholdOverrides);
+
+if (IntentDatasetValidator::supports($payload)) {
+    publishIntentDataset($payload, $inputPath, $outputPath, $thresholds, $failOnWarnings);
+}
 
 $validationOptions = [
     'min_explicit' => $thresholds['min_explicit'],
@@ -344,4 +349,136 @@ function printHelp(): void
     echo "Modes:\n";
     echo "  default            Validate + enforce publication gate, publish when PASS.\n";
     echo "  --require-published  Check published status before vectorization/RAG ingest.\n";
+}
+
+/**
+ * @param array<string,mixed> $payload
+ * @param array<string,int|float> $thresholds
+ */
+function publishIntentDataset(
+    array $payload,
+    string $inputPath,
+    string $outputPath,
+    array $thresholds,
+    bool $failOnWarnings
+): void {
+    try {
+        $report = IntentDatasetValidator::validate($payload);
+    } catch (Throwable $e) {
+        writeReportAndExit([
+            'ok' => false,
+            'action' => 'blocked',
+            'input' => realpath($inputPath) ?: $inputPath,
+            'error' => 'Validation runtime error: ' . $e->getMessage(),
+        ], 2);
+    }
+
+    $errors = is_array($report['errors'] ?? null) ? $report['errors'] : [];
+    $warnings = is_array($report['warnings'] ?? null) ? $report['warnings'] : [];
+    $stats = is_array($report['stats'] ?? null) ? $report['stats'] : [];
+
+    $qualityScore = (float) ($stats['quality_score'] ?? 0.0);
+    $coverageRatio = (float) ($stats['coverage_ratio'] ?? 0.0);
+
+    $noiseWarnings = array_values(array_filter($warnings, static function ($warning): bool {
+        if (!is_array($warning)) {
+            return false;
+        }
+        $message = strtolower((string) ($warning['message'] ?? ''));
+        $path = strtolower((string) ($warning['path'] ?? ''));
+        $noiseSignals = ['ruido', 'noise', 'placeholder', 'channel', 'canal'];
+        foreach ($noiseSignals as $signal) {
+            if (str_contains($message, $signal) || str_contains($path, $signal)) {
+                return true;
+            }
+        }
+        return false;
+    }));
+
+    $blockingReasons = [];
+    if (($report['ok'] ?? false) !== true) {
+        $blockingReasons[] = 'validator_errors';
+    }
+    if ($qualityScore < (float) ($thresholds['min_quality_score'] ?? DEFAULT_MIN_QUALITY_SCORE)) {
+        $blockingReasons[] = 'quality_score_below_min';
+    }
+    if ($coverageRatio < (float) ($thresholds['min_coverage_ratio'] ?? DEFAULT_MIN_COVERAGE_RATIO)) {
+        $blockingReasons[] = 'coverage_ratio_below_min';
+    }
+    if ($noiseWarnings !== []) {
+        $blockingReasons[] = 'noise_detected';
+    }
+    if ($failOnWarnings && $warnings !== []) {
+        $blockingReasons[] = 'warnings_blocked';
+    }
+
+    $blockingReasons = array_values(array_unique($blockingReasons));
+    $ok = ($blockingReasons === []);
+
+    if ($ok) {
+        $publication = is_array($payload['publication'] ?? null) ? $payload['publication'] : [];
+        $publication['status'] = 'published';
+        $publication['published_at'] = gmdate('c');
+        $payload['publication'] = $publication;
+
+        $encoded = json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        if (!is_string($encoded)) {
+            writeReportAndExit([
+                'ok' => false,
+                'action' => 'blocked',
+                'input' => realpath($inputPath) ?: $inputPath,
+                'error' => 'No se pudo serializar intent dataset publicado.',
+            ], 2);
+        }
+
+        if (file_put_contents($outputPath, $encoded . PHP_EOL) === false) {
+            writeReportAndExit([
+                'ok' => false,
+                'action' => 'blocked',
+                'input' => realpath($inputPath) ?: $inputPath,
+                'output' => $outputPath,
+                'error' => 'No se pudo escribir intent dataset publicado.',
+            ], 2);
+        }
+    }
+
+    $finalStatus = (string) ((is_array($payload['publication'] ?? null) ? ($payload['publication']['status'] ?? '') : ''));
+    $result = [
+        'ok' => $ok,
+        'action' => $ok ? 'published' : 'blocked',
+        'dataset_kind' => 'intent_dataset',
+        'input' => realpath($inputPath) ?: $inputPath,
+        'output' => $ok ? (realpath($outputPath) ?: $outputPath) : null,
+        'contract' => [
+            'path' => FRAMEWORK_ROOT . '/contracts/schemas/intent_dataset.schema.json',
+            'loaded' => true,
+            'version' => '1.0.0',
+        ],
+        'thresholds' => $thresholds,
+        'validation' => [
+            'ok' => ($report['ok'] ?? false) === true,
+            'errors_count' => count($errors),
+            'warnings_count' => count($warnings),
+        ],
+        'noise_warnings_count' => count($noiseWarnings),
+        'quality_score' => $qualityScore,
+        'coverage_ratio' => $coverageRatio,
+        'coverage_checks' => [
+            'entries' => [
+                'actual' => (int) ($stats['entries'] ?? 0),
+                'min_required' => 25,
+                'ok' => (int) ($stats['entries'] ?? 0) >= 25,
+            ],
+            'utterances_total' => [
+                'actual' => (int) ($stats['utterances_total'] ?? 0),
+                'min_required' => 250,
+                'ok' => (int) ($stats['utterances_total'] ?? 0) >= 250,
+            ],
+        ],
+        'publication_status' => $finalStatus !== '' ? $finalStatus : 'missing',
+        'eligible_for_vectorization' => $ok && $finalStatus === 'published',
+        'blocking_reasons' => $blockingReasons,
+    ];
+
+    writeReportAndExit($result, $ok ? 0 : 1);
 }

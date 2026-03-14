@@ -1,0 +1,165 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Intent Dataset",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "batch_id",
+    "dataset_type",
+    "language",
+    "source_type",
+    "memory_type",
+    "source_metadata",
+    "publication",
+    "entries"
+  ],
+  "properties": {
+    "batch_id": {
+      "type": "string",
+      "minLength": 3
+    },
+    "dataset_type": {
+      "type": "string",
+      "enum": [
+        "intent_dataset"
+      ]
+    },
+    "language": {
+      "type": "string",
+      "minLength": 2
+    },
+    "dataset_version": {
+      "type": "string",
+      "minLength": 3
+    },
+    "source_type": {
+      "type": "string",
+      "minLength": 2
+    },
+    "memory_type": {
+      "type": "string",
+      "enum": [
+        "agent_training"
+      ]
+    },
+    "source_metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "type",
+        "dataset",
+        "domain",
+        "collection",
+        "embedding_model",
+        "embedding_dimension"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "intent_dataset"
+          ]
+        },
+        "dataset": {
+          "type": "string",
+          "minLength": 3
+        },
+        "domain": {
+          "type": "string",
+          "enum": [
+            "erp"
+          ]
+        },
+        "collection": {
+          "type": "string",
+          "minLength": 3
+        },
+        "embedding_model": {
+          "type": "string",
+          "minLength": 3
+        },
+        "embedding_dimension": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "skills_referenced": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 3
+          }
+        }
+      }
+    },
+    "publication": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "status"
+      ],
+      "properties": {
+        "status": {
+          "type": "string",
+          "enum": [
+            "draft",
+            "validated",
+            "published",
+            "deprecated"
+          ]
+        },
+        "published_at": {
+          "type": "string",
+          "minLength": 10
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 25,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intent",
+          "utterances",
+          "skill",
+          "confidence",
+          "domain"
+        ],
+        "properties": {
+          "intent": {
+            "type": "string",
+            "minLength": 3
+          },
+          "utterances": {
+            "type": "array",
+            "minItems": 10,
+            "maxItems": 15,
+            "items": {
+              "type": "string",
+              "minLength": 2,
+              "maxLength": 120
+            }
+          },
+          "skill": {
+            "type": "string",
+            "minLength": 3
+          },
+          "confidence": {
+            "type": "string",
+            "enum": [
+              "high",
+              "medium"
+            ]
+          },
+          "domain": {
+            "type": "string",
+            "enum": [
+              "erp"
+            ]
+          }
+        }
+      }
+    }
+  }
+}
