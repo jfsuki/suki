@@ -267,6 +267,34 @@ Aplicar limpieza extendida (incluye estado runtime + contratos workflow generado
 php framework/scripts/cleanup_runtime_artifacts.php --apply --include-runtime-state --include-generated-contracts
 ```
 
+## 14.1) Limpieza automatica de `framework/tests/tmp`
+- `framework/tests/run.php` ejecuta limpieza automatica de artefactos generados en `framework/tests/tmp` antes y despues del suite principal.
+- El cleanup usa `APP_ENV` desde `project/.env` y acepta overrides `TEST_TMP_*`.
+- El prune post-suite tambien corre si el runner devuelve error, para evitar acumulacion tras fallos.
+- La limpieza automatica solo toca artefactos claramente generados:
+  - directorios temporales con sufijo timestamp,
+  - reportes `*_result.json` / `*_report.json`,
+  - sqlite temporales conocidos del suite.
+- No toca `README.md` ni scripts/debug `.php` dejados manualmente en esa carpeta.
+
+Ejecucion manual:
+```
+php framework/scripts/cleanup_test_tmp.php --check
+php framework/scripts/cleanup_test_tmp.php --apply
+```
+
+Defaults por entorno:
+- `dev/test/local`: conservar 120 artefactos recientes y maximo 24 horas
+- `staging`: 240 artefactos y 48 horas
+- `prod/production`: 480 artefactos y 72 horas
+
+Overrides opcionales:
+```
+TEST_TMP_KEEP_RECENT=
+TEST_TMP_MINIMUM_KEEP=
+TEST_TMP_RETENTION_HOURS=
+```
+
 ## 15) KPI gate de precision conversacional (pre-release)
 KPI gate dedicado:
 ```
