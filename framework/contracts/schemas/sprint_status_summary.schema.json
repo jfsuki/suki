@@ -1,0 +1,148 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "sprint_status_summary",
+  "version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "tenant_id",
+    "project_id",
+    "app_id",
+    "run_id",
+    "sprint_id",
+    "summary_id",
+    "sprint_status",
+    "files_modified",
+    "risks_detected",
+    "temporaries_created",
+    "backups_created",
+    "incidents_detected",
+    "next_steps",
+    "counts",
+    "generated_at"
+  ],
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "const": "sprint_status_summary"
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sprint_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "summary_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sprint_status": {
+      "type": "string",
+      "enum": ["CLOSED", "CONTINUE", "BLOCKED", "NEEDS_REVIEW"]
+    },
+    "files_modified": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "risks_detected": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "temporaries_created": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "backups_created": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "incidents_detected": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "next_steps": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "counts": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "files_modified",
+        "risks_detected",
+        "temporaries_created",
+        "backups_created",
+        "incidents_detected",
+        "next_steps"
+      ],
+      "properties": {
+        "files_modified": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "risks_detected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "temporaries_created": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "backups_created": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "incidents_detected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "next_steps": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "generated_at": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

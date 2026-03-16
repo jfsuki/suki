@@ -1,0 +1,122 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "control_tower_run",
+  "version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "tenant_id",
+    "project_id",
+    "app_id",
+    "run_id",
+    "sprint_id",
+    "task_title",
+    "priority",
+    "impact_level",
+    "status",
+    "architectural_assessment",
+    "created_at"
+  ],
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "const": "control_tower_run"
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sprint_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_title": {
+      "type": "string",
+      "minLength": 1
+    },
+    "task_description": {
+      "type": "string"
+    },
+    "priority": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"]
+    },
+    "impact_level": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"]
+    },
+    "status": {
+      "type": "string",
+      "enum": ["created", "validated", "blocked", "active", "closed"]
+    },
+    "assigned_agents": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "detected_canon_drift": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "architectural_assessment": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "llm_boundary_ok",
+        "multitenant_ok",
+        "router_monitoring_required",
+        "schema_governance_ok",
+        "blocked_reasons"
+      ],
+      "properties": {
+        "llm_boundary_ok": {
+          "type": "boolean"
+        },
+        "multitenant_ok": {
+          "type": "boolean"
+        },
+        "router_monitoring_required": {
+          "type": "boolean"
+        },
+        "schema_governance_ok": {
+          "type": "boolean"
+        },
+        "blocked_reasons": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        }
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

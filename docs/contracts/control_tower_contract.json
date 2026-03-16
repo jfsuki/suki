@@ -1,0 +1,93 @@
+{
+  "contract_id": "control_tower_contract",
+  "version": "1.0.0",
+  "effective_date": "2026-03-16",
+  "addenda_of": null,
+  "status": "canonical_draft",
+  "contract_location": "docs/contracts",
+  "scope": "Machine-readable governance contract for SUKI Control Tower architecture, artifacts, and supervision boundaries.",
+  "required_scope_fields": [
+    "tenant_id",
+    "project_id",
+    "app_id",
+    "run_id",
+    "sprint_id"
+  ],
+  "laws": {
+    "llm_interprets_php_executes": true,
+    "multitenant_isolation_required": true,
+    "router_monitoring_required": true,
+    "anti_schema_explosion_required": true,
+    "skills_and_commandbus_are_mandatory_for_execution": true
+  },
+  "component_artifacts": {
+    "tower_supervisor": "control_tower_run",
+    "sprint_manager": "sprint_ticket",
+    "multi_coder_orchestrator": "coder_proposal",
+    "reviewer_agent": "review_decision",
+    "file_custodian": "file_registry",
+    "agentops_monitor": "agentops_incident",
+    "production_critic": "production_critic_finding",
+    "checkpoint_engine": "checkpoint_state",
+    "decision_engine": "sprint_decision",
+    "summary": "sprint_status_summary"
+  },
+  "schema_registry": {
+    "control_tower_run": "framework/contracts/schemas/control_tower_run.schema.json",
+    "sprint_ticket": "framework/contracts/schemas/sprint_ticket.schema.json",
+    "coder_proposal": "framework/contracts/schemas/coder_proposal.schema.json",
+    "review_decision": "framework/contracts/schemas/review_decision.schema.json",
+    "file_registry": "framework/contracts/schemas/file_registry.schema.json",
+    "agentops_incident": "framework/contracts/schemas/agentops_incident.schema.json",
+    "production_critic_finding": "framework/contracts/schemas/production_critic_finding.schema.json",
+    "checkpoint_state": "framework/contracts/schemas/checkpoint_state.schema.json",
+    "sprint_decision": "framework/contracts/schemas/sprint_decision.schema.json",
+    "sprint_status_summary": "framework/contracts/schemas/sprint_status_summary.schema.json"
+  },
+  "review_states": [
+    "approve",
+    "reject",
+    "fix_required"
+  ],
+  "sprint_states": [
+    "CLOSED",
+    "CONTINUE",
+    "BLOCKED",
+    "NEEDS_REVIEW"
+  ],
+  "router_monitoring": {
+    "canonical_reference": [
+      "cache",
+      "rules",
+      "rag",
+      "llm"
+    ],
+    "active_policy_reference_file": "docs/contracts/router_policy.json",
+    "runtime_note": "Current active policy/runtime include the governed skills stage before rag."
+  },
+  "file_custodian_policy": {
+    "temporary_ttl_required": true,
+    "temporary_scope_must_be_declared": true,
+    "backup_reference_required_for_risky_changes": true,
+    "snapshots_must_be_traceable": true
+  },
+  "vector_memory_policy": {
+    "allowed_memory_types": [
+      "agent_training",
+      "sector_knowledge",
+      "user_memory"
+    ],
+    "hygiene_gate_required": true,
+    "raw_tenant_data_to_shared_memory_forbidden": true
+  },
+  "detected_canon_drift": [
+    {
+      "drift_id": "router_stage_drift",
+      "description": "ROUTER_CANON.md documents cache->rules->rag->llm while active policy/runtime operate with cache->rules->skills->rag->llm."
+    },
+    {
+      "drift_id": "project_app_scope_drift",
+      "description": "Current runtime is primarily project-scoped, while Control Tower artifacts require both project_id and app_id; app_id may mirror project_id until canonical split is complete."
+    }
+  ]
+}

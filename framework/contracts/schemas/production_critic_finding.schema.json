@@ -1,0 +1,90 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "production_critic_finding",
+  "version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "tenant_id",
+    "project_id",
+    "app_id",
+    "run_id",
+    "sprint_id",
+    "finding_id",
+    "severity",
+    "category",
+    "evidence_refs",
+    "recurrence_count",
+    "recommendation",
+    "status",
+    "detected_at"
+  ],
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "const": "production_critic_finding"
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sprint_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "finding_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"]
+    },
+    "category": {
+      "type": "string",
+      "enum": ["bug_pattern", "bad_response", "regression", "improvement"]
+    },
+    "evidence_refs": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "recurrence_count": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "recommendation": {
+      "type": "string",
+      "minLength": 1
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "triaged", "planned", "dismissed"]
+    },
+    "detected_at": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

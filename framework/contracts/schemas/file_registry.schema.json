@@ -1,0 +1,200 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "file_registry",
+  "version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "tenant_id",
+    "project_id",
+    "app_id",
+    "run_id",
+    "sprint_id",
+    "registry_id",
+    "files_created",
+    "files_modified",
+    "backups",
+    "temporaries",
+    "snapshots",
+    "created_at"
+  ],
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "const": "file_registry"
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sprint_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "registry_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "files_created": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/file_entry"
+      }
+    },
+    "files_modified": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/file_entry"
+      }
+    },
+    "backups": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/backup_entry"
+      }
+    },
+    "temporaries": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/temp_entry"
+      }
+    },
+    "snapshots": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/snapshot_entry"
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    }
+  },
+  "$defs": {
+    "file_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "category",
+        "status"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "enum": ["code", "contract", "doc", "test", "artifact"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["created", "modified", "deleted", "unchanged"]
+        }
+      }
+    },
+    "backup_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "run_id",
+        "created_at"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "run_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "created_at": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "temp_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "category",
+        "ttl_seconds",
+        "created_at",
+        "expires_at",
+        "status"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "category": {
+          "type": "string",
+          "minLength": 1
+        },
+        "ttl_seconds": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "created_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expires_at": {
+          "type": "string",
+          "minLength": 1
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "expired", "cleaned"]
+        }
+      }
+    },
+    "snapshot_entry": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "path",
+        "reason",
+        "created_at"
+      ],
+      "properties": {
+        "path": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 1
+        },
+        "created_at": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,117 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "review_decision",
+  "version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "tenant_id",
+    "project_id",
+    "app_id",
+    "run_id",
+    "sprint_id",
+    "ticket_id",
+    "review_id",
+    "reviewed_proposals",
+    "decision",
+    "compatibility_checks",
+    "reasons",
+    "created_at"
+  ],
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "const": "review_decision"
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sprint_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "ticket_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "review_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "reviewed_proposals": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "decision": {
+      "type": "string",
+      "enum": ["approve", "reject", "fix_required"]
+    },
+    "compatibility_checks": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "incremental_compatibility",
+        "json_contracts_respected",
+        "suki_canon_respected",
+        "no_destructive_rewrite",
+        "multitenant_respected",
+        "router_policy_respected"
+      ],
+      "properties": {
+        "incremental_compatibility": {
+          "type": "boolean"
+        },
+        "json_contracts_respected": {
+          "type": "boolean"
+        },
+        "suki_canon_respected": {
+          "type": "boolean"
+        },
+        "no_destructive_rewrite": {
+          "type": "boolean"
+        },
+        "multitenant_respected": {
+          "type": "boolean"
+        },
+        "router_policy_respected": {
+          "type": "boolean"
+        }
+      }
+    },
+    "reasons": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

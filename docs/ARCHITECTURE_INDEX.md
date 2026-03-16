@@ -43,6 +43,10 @@
   - purpose: traceability, KPIs, runtime supervision, improvement signals
   - main files: `framework/app/Core/AgentOpsSupervisor.php`, `framework/app/Core/Agents/Telemetry.php`, `framework/app/Core/TelemetryService.php`
   - dependencies: `docs/contracts/agentops_metrics_contract.json`, `SqlMetricsRepository`, `ImprovementMemoryService`
+- Control Tower
+  - purpose: supervised sprint orchestration, artifact validation, checkpointing and development governance
+  - main files: `docs/canon/SUKI_CONTROL_TOWER.md`, `docs/contracts/control_tower_contract.json`, `framework/app/Core/ControlTowerArtifactValidator.php`
+  - dependencies: `docs/contracts/agentops_metrics_contract.json`, `docs/contracts/router_policy.json`, `framework/contracts/schemas/control_tower_run.schema.json`, `framework/contracts/schemas/sprint_status_summary.schema.json`
 - Semantic Memory
   - purpose: Qdrant-backed retrieval, training memory, vectorized domain knowledge
   - main files: `framework/app/Core/SemanticMemoryService.php`, `framework/app/Core/QdrantVectorStore.php`

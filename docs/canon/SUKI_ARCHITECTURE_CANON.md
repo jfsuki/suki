@@ -173,6 +173,7 @@ Relationship:
 ### 4.7 SUKI Control Tower
 Purpose:
 - supervise routing quality, agent health, safety signals, execution quality, and operational drift.
+- detailed canon reference: `docs/canon/SUKI_CONTROL_TOWER.md`
 
 Outputs:
 - metrics,

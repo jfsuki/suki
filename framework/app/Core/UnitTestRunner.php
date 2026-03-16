@@ -112,6 +112,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('agent_tools_integration_skills', fn() => $this->checkAgentToolsIntegrationSkills());
         $tests[] = $this->wrap('agentops_observability_foundation', fn() => $this->checkAgentOpsObservabilityFoundation());
         $tests[] = $this->wrap('agentops_observability_skills', fn() => $this->checkAgentOpsObservabilitySkills());
+        $tests[] = $this->wrap('control_tower_contracts', fn() => $this->checkControlTowerContracts());
         $tests[] = $this->wrap('project_memory_system', fn() => $this->checkProjectMemorySystem());
         $tests[] = $this->wrap('learning_promotion_pipeline', fn() => $this->checkLearningPromotionPipeline());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
@@ -1558,6 +1559,11 @@ final class UnitTestRunner
     private function checkAgentOpsObservabilitySkills(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/agentops_observability_skills_test.php');
+    }
+
+    private function checkControlTowerContracts(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/control_tower_contracts_test.php');
     }
 
     private function checkProjectMemorySystem(): void

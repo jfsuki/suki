@@ -1,0 +1,124 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "contract_id": "agentops_incident",
+  "version": "1.0.0",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "tenant_id",
+    "project_id",
+    "app_id",
+    "run_id",
+    "sprint_id",
+    "incident_id",
+    "source_component",
+    "severity",
+    "category",
+    "route_path",
+    "gate_decision",
+    "symptoms",
+    "recommended_actions",
+    "status",
+    "detected_at"
+  ],
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "const": "agentops_incident"
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "project_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "sprint_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "incident_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "source_component": {
+      "type": "string",
+      "minLength": 1
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "critical"]
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "error",
+        "latency",
+        "token_cost",
+        "loop",
+        "recurrent_failure",
+        "router_drift",
+        "tenant_scope_violation"
+      ]
+    },
+    "route_path": {
+      "type": "string",
+      "minLength": 1
+    },
+    "gate_decision": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tool_calls_count": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "latency_ms": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "token_cost_estimate": {
+      "type": "number",
+      "minimum": 0
+    },
+    "symptoms": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "recommended_actions": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "status": {
+      "type": "string",
+      "enum": ["open", "acked", "resolved", "ignored"]
+    },
+    "detected_at": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}
