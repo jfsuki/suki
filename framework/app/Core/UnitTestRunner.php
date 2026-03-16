@@ -88,6 +88,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('canonical_storage_new_project', fn() => $this->checkCanonicalStorageNewProject());
         $tests[] = $this->wrap('llm_router_failover', fn() => $this->checkLlmRouterFailover());
         $tests[] = $this->wrap('training_dataset_validator', fn() => $this->checkTrainingDatasetValidator());
+        $tests[] = $this->wrap('erp_training_dataset_pipeline', fn() => $this->checkErpTrainingDatasetPipeline());
         $tests[] = $this->wrap('training_dataset_publication_gate', fn() => $this->checkTrainingDatasetPublicationGate());
         $tests[] = $this->wrap('training_dataset_vectorize_command', fn() => $this->checkTrainingDatasetVectorizeCommand());
         $tests[] = $this->wrap('business_discovery_template', fn() => $this->checkBusinessDiscoveryTemplate());
@@ -1439,6 +1440,11 @@ final class UnitTestRunner
     private function checkTrainingDatasetValidator(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/training_dataset_validator_test.php');
+    }
+
+    private function checkErpTrainingDatasetPipeline(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/erp_training_dataset_pipeline_test.php');
     }
 
     private function checkTrainingDatasetPublicationGate(): void

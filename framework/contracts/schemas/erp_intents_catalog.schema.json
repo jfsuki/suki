@@ -1,0 +1,248 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ERP Intents Catalog",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "metadata",
+    "entries",
+    "hygiene_summary"
+  ],
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "const": "erp_intents_catalog"
+    },
+    "schema_version": {
+      "type": "string",
+      "minLength": 3
+    },
+    "metadata": {
+      "$ref": "#/definitions/metadata"
+    },
+    "entries": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "intent_key",
+          "intent_name",
+          "target_skill",
+          "skill_type",
+          "risk_level",
+          "needs_clarification",
+          "ambiguity_flags",
+          "domain",
+          "subdomain",
+          "locale",
+          "sample_count",
+          "hard_case_count"
+        ],
+        "properties": {
+          "intent_key": {
+            "type": "string",
+            "minLength": 3
+          },
+          "intent_name": {
+            "type": "string",
+            "minLength": 3
+          },
+          "description": {
+            "type": "string",
+            "minLength": 3
+          },
+          "target_skill": {
+            "type": "string",
+            "minLength": 3
+          },
+          "skill_type": {
+            "type": "string",
+            "enum": [
+              "tool",
+              "deterministic",
+              "hybrid",
+              "rag"
+            ]
+          },
+          "required_action": {
+            "type": "string",
+            "minLength": 3
+          },
+          "risk_level": {
+            "type": "string",
+            "enum": [
+              "low",
+              "medium",
+              "high",
+              "critical"
+            ]
+          },
+          "needs_clarification": {
+            "type": "boolean"
+          },
+          "ambiguity_flags": {
+            "$ref": "#/definitions/ambiguity_flags"
+          },
+          "domain": {
+            "type": "string",
+            "minLength": 2
+          },
+          "subdomain": {
+            "type": "string",
+            "minLength": 2
+          },
+          "locale": {
+            "type": "string",
+            "minLength": 2
+          },
+          "sample_count": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "hard_case_count": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      }
+    },
+    "hygiene_summary": {
+      "$ref": "#/definitions/hygiene_summary"
+    }
+  },
+  "definitions": {
+    "metadata": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "dataset_id",
+        "dataset_version",
+        "domain",
+        "subdomain",
+        "locale",
+        "recommended_memory_type",
+        "generated_at",
+        "skills_catalog_version",
+        "action_catalog_version",
+        "tenant_data_allowed",
+        "dataset_scope"
+      ],
+      "properties": {
+        "dataset_id": {
+          "type": "string",
+          "minLength": 3
+        },
+        "dataset_version": {
+          "type": "string",
+          "minLength": 3
+        },
+        "domain": {
+          "type": "string",
+          "const": "erp"
+        },
+        "subdomain": {
+          "type": "string",
+          "minLength": 2
+        },
+        "locale": {
+          "type": "string",
+          "minLength": 2
+        },
+        "recommended_memory_type": {
+          "type": "string",
+          "enum": [
+            "agent_training",
+            "sector_knowledge",
+            "user_memory"
+          ]
+        },
+        "generated_at": {
+          "type": "string",
+          "minLength": 20
+        },
+        "skills_catalog_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "action_catalog_version": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tenant_data_allowed": {
+          "type": "boolean",
+          "const": false
+        },
+        "dataset_scope": {
+          "type": "string",
+          "minLength": 3
+        }
+      }
+    },
+    "ambiguity_flags": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "entity_reference",
+          "document_reference",
+          "intent_overlap",
+          "missing_scope",
+          "customer_reference",
+          "product_reference",
+          "inventory_reference",
+          "numeric_reference",
+          "time_reference",
+          "payment_terms",
+          "channel_reference"
+        ]
+      },
+      "uniqueItems": true
+    },
+    "hygiene_summary": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "source_entries",
+        "exported_entries",
+        "exact_duplicates_removed",
+        "near_duplicates_flagged",
+        "suspicious_repetition_flagged",
+        "garbage_rejected",
+        "warnings_count"
+      ],
+      "properties": {
+        "source_entries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exported_entries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "exact_duplicates_removed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "near_duplicates_flagged": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "suspicious_repetition_flagged": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "garbage_rejected": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "warnings_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    }
+  }
+}
