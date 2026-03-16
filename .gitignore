@@ -15,6 +15,7 @@ credentials/
 
 /vendor/
 /framework/tests/tmp/
+/framework/training/output/
 /framework/tests/*_result.json
 /project/storage/backups/
 /project/storage/tenants/*/working_memory/

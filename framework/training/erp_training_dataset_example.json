@@ -1,0 +1,97 @@
+{
+  "metadata": {
+    "dataset_id": "erp_training_dataset_example",
+    "dataset_version": "1.0.0",
+    "domain": "erp",
+    "subdomain": "sales",
+    "locale": "es-CO",
+    "recommended_memory_type": "agent_training"
+  },
+  "BLOQUE_A_intents_catalog": [
+    {
+      "intent_key": "sales.create_invoice",
+      "intent_name": "Crear factura",
+      "description": "Crear factura de venta",
+      "target_skill": "create_invoice",
+      "skill_type": "tool",
+      "required_action": "invoice.create",
+      "risk_level": "high"
+    },
+    {
+      "intent_key": "sales.customer_lookup",
+      "intent_name": "Buscar cliente",
+      "description": "Resolver referencia de cliente",
+      "target_skill": "customer_lookup",
+      "skill_type": "tool",
+      "risk_level": "low"
+    }
+  ],
+  "BLOQUE_B_training_samples": [
+    {
+      "intent_key": "sales.create_invoice",
+      "utterance": "Crear factura para ACME por 5 baterias",
+      "target_skill": "create_invoice",
+      "skill_type": "tool",
+      "required_action": "invoice.create",
+      "numeric_hints": {
+        "quantity": 5
+      }
+    },
+    {
+      "intent_key": "sales.create_invoice",
+      "utterance": "Facturar venta a BETA por 2 baterias",
+      "target_skill": "create_invoice",
+      "skill_type": "tool",
+      "required_action": "invoice.create",
+      "numeric_hints": {
+        "quantity": 2
+      }
+    },
+    {
+      "intent_key": "sales.customer_lookup",
+      "utterance": "Buscar cliente ACME",
+      "target_skill": "customer_lookup",
+      "skill_type": "tool",
+      "risk_level": "low"
+    }
+  ],
+  "BLOQUE_C_hard_cases": [
+    {
+      "intent_key": "sales.create_invoice",
+      "utterance": "Vende 5 baterias a ACME y factura neto 30",
+      "target_skill": "create_invoice",
+      "skill_type": "tool",
+      "required_action": "invoice.create",
+      "expected_resolution": "resolve",
+      "expected_route_stage": "skills",
+      "expected_supervisor_flags": [],
+      "regression_tags": [
+        "router",
+        "sales"
+      ],
+      "numeric_hints": {
+        "quantity": 5
+      }
+    },
+    {
+      "intent_key": "sales.create_invoice",
+      "utterance": "Facturale eso a ACME",
+      "target_skill": "create_invoice",
+      "skill_type": "tool",
+      "required_action": "invoice.create",
+      "needs_clarification": true,
+      "ambiguity_flags": [
+        "missing_scope",
+        "customer_reference"
+      ],
+      "expected_resolution": "clarify",
+      "expected_route_stage": "skills",
+      "expected_supervisor_flags": [
+        "insufficient_evidence"
+      ],
+      "regression_tags": [
+        "clarification"
+      ]
+    }
+  ]
+}

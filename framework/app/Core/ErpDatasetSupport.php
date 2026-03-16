@@ -4,7 +4,10 @@ declare(strict_types=1);
 
 namespace App\Core;
 
+use RecursiveDirectoryIterator;
+use RecursiveIteratorIterator;
 use RuntimeException;
+use FilesystemIterator;
 
 final class ErpDatasetSupport
 {
@@ -491,5 +494,185 @@ final class ErpDatasetSupport
         if (file_put_contents($path, $encoded . PHP_EOL) === false) {
             throw new RuntimeException('No se pudo escribir archivo JSON: ' . $path);
         }
+    }
+
+    public static function repoRoot(): string
+    {
+        return dirname(FRAMEWORK_ROOT);
+    }
+
+    public static function defaultExampleInputPath(): string
+    {
+        return FRAMEWORK_ROOT . '/training/erp_training_dataset_example.json';
+    }
+
+    public static function legacyIntentDatasetPath(): string
+    {
+        return FRAMEWORK_ROOT . '/training/intents_erp_base.json';
+    }
+
+    public static function defaultOutputDirForInput(string $inputPath): string
+    {
+        $inputPath = self::normalizeCliPath($inputPath);
+        $baseName = pathinfo($inputPath, PATHINFO_FILENAME);
+        $trainingDir = self::normalizeCliPath(FRAMEWORK_ROOT . '/training');
+        $inputDir = self::normalizeCliPath(dirname($inputPath));
+
+        if ($inputDir === $trainingDir) {
+            return $trainingDir . DIRECTORY_SEPARATOR . 'output' . DIRECTORY_SEPARATOR . $baseName;
+        }
+
+        return $inputDir . DIRECTORY_SEPARATOR . 'output' . DIRECTORY_SEPARATOR . $baseName;
+    }
+
+    public static function normalizeCliPath(string $path): string
+    {
+        $path = trim($path, " \t\n\r\0\x0B\"'");
+        $path = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $path);
+        return rtrim($path, DIRECTORY_SEPARATOR);
+    }
+
+    public static function absoluteCliPath(string $path): string
+    {
+        $path = self::normalizeCliPath($path);
+        if ($path === '') {
+            return '';
+        }
+        if (preg_match('/^[A-Za-z]:' . preg_quote(DIRECTORY_SEPARATOR, '/') . '/', $path) === 1) {
+            return $path;
+        }
+        if (str_starts_with($path, DIRECTORY_SEPARATOR)) {
+            return $path;
+        }
+
+        $cwd = getcwd() ?: self::repoRoot();
+        return self::normalizeCliPath($cwd . DIRECTORY_SEPARATOR . $path);
+    }
+
+    public static function relativeToRepo(string $path): string
+    {
+        $path = self::normalizeCliPath($path);
+        $repo = self::normalizeCliPath(self::repoRoot());
+        $pathLower = strtolower($path);
+        $repoLower = strtolower($repo);
+
+        if ($pathLower === $repoLower) {
+            return '.';
+        }
+        if (str_starts_with($pathLower, $repoLower . DIRECTORY_SEPARATOR)) {
+            return str_replace(DIRECTORY_SEPARATOR, '/', substr($path, strlen($repo) + 1));
+        }
+
+        return str_replace(DIRECTORY_SEPARATOR, '/', $path);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public static function suggestJsonCandidates(int $limit = 8): array
+    {
+        $candidates = [];
+        foreach ([self::defaultExampleInputPath(), self::legacyIntentDatasetPath()] as $priorityPath) {
+            if (is_file($priorityPath)) {
+                $candidates[] = self::relativeToRepo($priorityPath);
+            }
+        }
+
+        $roots = [
+            FRAMEWORK_ROOT . '/training',
+            self::repoRoot() . '/training',
+            PROJECT_ROOT . '/contracts/knowledge',
+        ];
+
+        foreach ($roots as $root) {
+            if (!is_dir($root)) {
+                continue;
+            }
+            $iterator = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS)
+            );
+            foreach ($iterator as $fileInfo) {
+                if (!$fileInfo->isFile()) {
+                    continue;
+                }
+                if (strtolower($fileInfo->getExtension()) !== 'json') {
+                    continue;
+                }
+                $path = self::relativeToRepo($fileInfo->getPathname());
+                if (!in_array($path, $candidates, true)) {
+                    $candidates[] = $path;
+                }
+                if (count($candidates) >= $limit) {
+                    break 2;
+                }
+            }
+        }
+
+        return array_slice($candidates, 0, $limit);
+    }
+
+    /**
+     * @return array{ok: bool, error?: string}
+     */
+    public static function validateCliInputPath(?string $inputPath): array
+    {
+        if ($inputPath === null || trim($inputPath) === '') {
+            return ['ok' => false, 'error' => 'Dataset file not provided.'];
+        }
+
+        $inputPath = self::normalizeCliPath($inputPath);
+        if (strtolower(pathinfo($inputPath, PATHINFO_EXTENSION)) !== 'json') {
+            return ['ok' => false, 'error' => 'Input path must point to a .json file: ' . $inputPath];
+        }
+
+        if (!is_file($inputPath)) {
+            return ['ok' => false, 'error' => 'Dataset file not found: ' . $inputPath];
+        }
+
+        return ['ok' => true];
+    }
+
+    /**
+     * @return array{ok: bool, error?: string}
+     */
+    public static function validateCliOutputDir(string $outputDir): array
+    {
+        $outputDir = self::normalizeCliPath($outputDir);
+        if ($outputDir === '') {
+            return ['ok' => false, 'error' => 'Output directory is empty.'];
+        }
+
+        if (strtolower(pathinfo($outputDir, PATHINFO_EXTENSION)) === 'json') {
+            return ['ok' => false, 'error' => 'Output path must be a directory, not a .json file: ' . $outputDir];
+        }
+
+        if (is_file($outputDir)) {
+            return ['ok' => false, 'error' => 'Output path already exists as file: ' . $outputDir];
+        }
+
+        $absoluteOutput = strtolower(self::absoluteCliPath($outputDir));
+        $protected = [
+            self::repoRoot(),
+            FRAMEWORK_ROOT,
+            FRAMEWORK_ROOT . '/app',
+            FRAMEWORK_ROOT . '/docs',
+            FRAMEWORK_ROOT . '/contracts',
+            PROJECT_ROOT,
+            PROJECT_ROOT . '/contracts',
+            PROJECT_ROOT . '/storage',
+            self::repoRoot() . '/docs',
+        ];
+        foreach ($protected as $candidate) {
+            $normalizedCandidate = strtolower(self::absoluteCliPath($candidate));
+            if ($absoluteOutput === $normalizedCandidate) {
+                return [
+                    'ok' => false,
+                    'error' => 'Suspicious output directory blocked: ' . $outputDir
+                        . '. Use a dedicated folder like ' . self::relativeToRepo(self::defaultOutputDirForInput(self::defaultExampleInputPath())) . '.',
+                ];
+            }
+        }
+
+        return ['ok' => true];
     }
 }

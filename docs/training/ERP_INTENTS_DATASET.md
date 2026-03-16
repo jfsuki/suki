@@ -3,6 +3,15 @@
 ## Purpose
 `framework/training/intents_erp_base.json` entrena mapeo de lenguaje natural ERP hacia skills reales ya publicadas en `skills_catalog.json`, sin tocar router ni runtime.
 
+## Scope Note
+Este archivo es un `intent_dataset` legacy para el flujo de validacion/publicacion/vectorizacion de intents.
+
+No es el input del pipeline ERP source dataset por bloques.
+
+Para el pipeline:
+- input ejemplo: `framework/training/erp_training_dataset_example.json`
+- guia: `framework/docs/ERP_TRAINING_DATASET_PIPELINE.md`
+
 ## Structure
 El dataset usa un formato ligero `intent_dataset` para `agent_training`.
 

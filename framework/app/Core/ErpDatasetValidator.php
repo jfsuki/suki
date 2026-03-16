@@ -20,11 +20,27 @@ final class ErpDatasetValidator
         $errors = [];
         $warnings = [];
         $rawMetadata = is_array($payload['metadata'] ?? null) ? $payload['metadata'] : [];
+        $datasetShape = self::detectDatasetShape($payload);
 
         $metadata = ErpDatasetSupport::resolveMetadata($payload);
         $intents = ErpDatasetSupport::resolveBlock($payload, 'intents_catalog');
         $samples = ErpDatasetSupport::resolveBlock($payload, 'training_samples');
         $hardCases = ErpDatasetSupport::resolveBlock($payload, 'hard_cases');
+
+        if ($datasetShape === 'legacy_intent_dataset') {
+            self::addError(
+                $errors,
+                '$',
+                'El archivo parece un intent_dataset legacy. Este pipeline ERP espera metadata + BLOQUE_A_intents_catalog + BLOQUE_B_training_samples + BLOQUE_C_hard_cases.'
+            );
+        }
+        if ($datasetShape === 'prepared_erp_artifact') {
+            self::addError(
+                $errors,
+                '$',
+                'El archivo parece un artefacto ERP ya preparado. Usa el dataset fuente original con metadata + BLOQUE_A/B/C, no erp_training_samples.json ni erp_hard_cases.json.'
+            );
+        }
 
         if ($rawMetadata === []) {
             self::addError($errors, '$.metadata', 'metadata es obligatorio.');
@@ -126,6 +142,7 @@ final class ErpDatasetValidator
             'errors' => $errors,
             'warnings' => $warnings,
             'stats' => [
+                'dataset_shape' => $datasetShape,
                 'dataset_id' => $metadata['dataset_id'],
                 'dataset_version' => $metadata['dataset_version'],
                 'intents_catalog' => count($intents),
@@ -488,5 +505,34 @@ final class ErpDatasetValidator
     private static function addWarning(array &$warnings, string $path, string $message): void
     {
         $warnings[] = ['path' => $path, 'message' => $message];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private static function detectDatasetShape(array $payload): string
+    {
+        if (is_string($payload['artifact_type'] ?? null)) {
+            return 'prepared_erp_artifact';
+        }
+
+        if (
+            ($payload['dataset_type'] ?? null) === 'intent_dataset'
+            || ($payload['source_type'] ?? null) === 'agent_training'
+            || is_array($payload['entries'] ?? null)
+        ) {
+            return 'legacy_intent_dataset';
+        }
+
+        if (
+            is_array($payload['metadata'] ?? null)
+            && is_array($payload['BLOQUE_A_intents_catalog'] ?? null)
+            && is_array($payload['BLOQUE_B_training_samples'] ?? null)
+            && is_array($payload['BLOQUE_C_hard_cases'] ?? null)
+        ) {
+            return 'erp_source_dataset';
+        }
+
+        return 'unknown';
     }
 }
