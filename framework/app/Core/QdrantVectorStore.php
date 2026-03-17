@@ -112,6 +112,47 @@ final class QdrantVectorStore
         ];
     }
 
+    /**
+     * @return array{ok:bool,exists:bool,collection:string,memory_type:string,size:int|null,distance:string|null,canonical:bool,payload_schema:array<string,mixed>}
+     */
+    public function inspectCollection(): array
+    {
+        $collectionInfo = $this->describeCollection(true);
+        if ($collectionInfo === null) {
+            return [
+                'ok' => true,
+                'exists' => false,
+                'collection' => $this->collection,
+                'memory_type' => $this->memoryType !== '' ? $this->memoryType : 'unspecified',
+                'size' => null,
+                'distance' => null,
+                'canonical' => false,
+                'payload_schema' => [],
+            ];
+        }
+
+        $vectors = $this->extractVectorConfig($collectionInfo);
+        $payloadSchema = is_array($collectionInfo['result']['payload_schema'] ?? null)
+            ? (array) $collectionInfo['result']['payload_schema']
+            : [];
+        $size = isset($vectors['size']) ? (int) $vectors['size'] : null;
+        $distance = isset($vectors['distance']) ? (string) $vectors['distance'] : null;
+        $canonical = $size === $this->vectorSize
+            && is_string($distance)
+            && strcasecmp($distance, $this->distance) === 0;
+
+        return [
+            'ok' => true,
+            'exists' => true,
+            'collection' => $this->collection,
+            'memory_type' => $this->memoryType !== '' ? $this->memoryType : 'unspecified',
+            'size' => $size,
+            'distance' => $distance,
+            'canonical' => $canonical,
+            'payload_schema' => $payloadSchema,
+        ];
+    }
+
     public function forMemoryType(string $memoryType): self
     {
         $memoryType = self::assertMemoryType($memoryType);
@@ -401,6 +442,16 @@ final class QdrantVectorStore
         if (is_array($vectors) && isset($vectors['default']) && is_array($vectors['default'])) {
             return (array) $vectors['default'];
         }
+        if (is_array($vectors) && isset($vectors['']) && is_array($vectors[''])) {
+            return (array) $vectors[''];
+        }
+        if (is_array($vectors)) {
+            foreach ($vectors as $candidate) {
+                if (is_array($candidate) && array_key_exists('size', $candidate)) {
+                    return (array) $candidate;
+                }
+            }
+        }
 
         return [];
     }
@@ -430,6 +481,14 @@ final class QdrantVectorStore
             ],
             [
                 'field_name' => 'agent_role',
+                'field_schema' => 'keyword',
+            ],
+            [
+                'field_name' => 'source_id',
+                'field_schema' => 'keyword',
+            ],
+            [
+                'field_name' => 'dataset_id',
                 'field_schema' => 'keyword',
             ],
         ];

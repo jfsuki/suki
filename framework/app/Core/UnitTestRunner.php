@@ -91,6 +91,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('erp_training_dataset_pipeline', fn() => $this->checkErpTrainingDatasetPipeline());
         $tests[] = $this->wrap('generate_erp_training_dataset', fn() => $this->checkGenerateErpTrainingDataset());
         $tests[] = $this->wrap('erp_training_dataset_cli_guardrails', fn() => $this->checkErpTrainingDatasetCliGuardrails());
+        $tests[] = $this->wrap('erp_training_dataset_vectorization', fn() => $this->checkErpTrainingDatasetVectorization());
         $tests[] = $this->wrap('training_dataset_publication_gate', fn() => $this->checkTrainingDatasetPublicationGate());
         $tests[] = $this->wrap('training_dataset_vectorize_command', fn() => $this->checkTrainingDatasetVectorizeCommand());
         $tests[] = $this->wrap('business_discovery_template', fn() => $this->checkBusinessDiscoveryTemplate());
@@ -1457,6 +1458,11 @@ final class UnitTestRunner
     private function checkErpTrainingDatasetCliGuardrails(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/erp_training_dataset_cli_guardrails_test.php');
+    }
+
+    private function checkErpTrainingDatasetVectorization(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/erp_training_dataset_vectorization_test.php');
     }
 
     private function checkTrainingDatasetPublicationGate(): void

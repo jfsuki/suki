@@ -71,6 +71,18 @@ Los artefactos bajo `framework/training/output/` son generados y no deben versio
   - `user_memory`
 - este pipeline no upsertea vectores ni cambia colecciones
 
+## Vectorizacion real
+Script:
+- `php framework/scripts/vectorize_erp_training_dataset.php framework/training/output/erp_training_dataset_mass/erp_vectorization_prep.json --dry-run --strict`
+- `php framework/scripts/vectorize_erp_training_dataset.php framework/training/output/erp_training_dataset_mass/erp_vectorization_prep.json --limit=25 --batch-size=10 --top-k=5 --strict`
+
+Reglas:
+- solo escribe en `agent_training`
+- bloquea `tenant_data_allowed=true`
+- exige embedding real `gemini-embedding-001` con `768`
+- exige que la coleccion `agent_training` ya exista y sea canonica (`768` + `Cosine`)
+- usa scope compartido no operacional via `AGENT_TRAINING_SHARED_TENANT_ID`
+
 ## UX CLI y guardrails
 - `--help` imprime uso exacto y ejemplo real del repo.
 - Si el input no existe o no es `.json`, el CLI falla con mensaje guiado y candidatos detectados.

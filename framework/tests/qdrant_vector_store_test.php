@@ -124,11 +124,15 @@ try {
 
     $firstEnsure = $store->ensureCollection();
     $secondEnsure = $store->ensureCollection();
+    $inspection = $store->inspectCollection();
     if (!(bool) ($firstEnsure['created'] ?? false)) {
         $failures[] = 'ensureCollection debe crear la coleccion cuando no existe.';
     }
     if ((bool) ($secondEnsure['created'] ?? true)) {
         $failures[] = 'ensureCollection debe ser idempotente cuando la coleccion ya existe.';
+    }
+    if (($inspection['exists'] ?? false) !== true || ($inspection['canonical'] ?? false) !== true) {
+        $failures[] = 'inspectCollection debe reportar coleccion canonica existente.';
     }
 
     $firstIndexes = $store->ensurePayloadIndexes();
@@ -175,6 +179,31 @@ try {
 
     if (count($result) !== 1) {
         $failures[] = 'Query debe devolver 1 resultado mock.';
+    }
+
+    $collections['agent_training'] = [
+        'vectors' => [
+            '' => [
+                'size' => 768,
+                'distance' => 'Cosine',
+            ],
+        ],
+        'payload_schema' => [],
+        'points' => [],
+    ];
+    $cloudStyleStore = new QdrantVectorStore(
+        'http://localhost:6333',
+        'qdrant_key',
+        null,
+        768,
+        'Cosine',
+        5,
+        $transport,
+        'agent_training'
+    );
+    $cloudInspection = $cloudStyleStore->inspectCollection();
+    if (($cloudInspection['canonical'] ?? false) !== true || (int) ($cloudInspection['size'] ?? 0) !== 768) {
+        $failures[] = 'inspectCollection debe aceptar config Qdrant Cloud con clave vacia en vectors.';
     }
 } catch (\Throwable $e) {
     $failures[] = 'QdrantVectorStore no debe fallar en flujo mock: ' . $e->getMessage();
