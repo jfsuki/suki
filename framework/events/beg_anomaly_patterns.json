@@ -1,0 +1,77 @@
+{
+  "artifact_type": "beg_anomaly_patterns",
+  "schema_version": "1.0.0",
+  "graph_id": "beg",
+  "beg_version": "1.0.0",
+  "gbo_dependency": "1.0.0",
+  "scope": "global",
+  "extends": [],
+  "compatibility": "backward_compatible",
+  "status": "active",
+  "anomaly_patterns": [
+    {
+      "pattern_id": "orphan_event",
+      "description": "Event recorded without meaningful links, parents, or related business references.",
+      "severity": "medium",
+      "applies_to_event_types": ["customer_creation", "quote_created", "quote_accepted", "sale_event", "purchase_event", "inventory_adjustment", "collection_event", "payment_event", "refund_event", "service_completion", "lead_created", "opportunity_won", "task_completed", "alert_triggered", "invoice_cancelled"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "pattern_id": "cross_tenant_link",
+      "description": "Event payload references entities, documents, or parents outside the current tenant scope.",
+      "severity": "critical",
+      "applies_to_event_types": ["customer_creation", "quote_created", "quote_accepted", "sale_event", "purchase_event", "inventory_adjustment", "collection_event", "payment_event", "refund_event", "service_completion", "lead_created", "opportunity_won", "task_completed", "alert_triggered", "invoice_cancelled"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "pattern_id": "contradictory_reversal",
+      "description": "A reversal or cancellation event contradicts the original causal state.",
+      "severity": "high",
+      "applies_to_event_types": ["refund_event", "invoice_cancelled"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "pattern_id": "payment_without_invoice",
+      "description": "Payment event is present without a supporting invoice reference or causal source.",
+      "severity": "high",
+      "applies_to_event_types": ["payment_event"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "pattern_id": "collection_without_receivable",
+      "description": "Collection event is present without a receivable context or related invoice.",
+      "severity": "high",
+      "applies_to_event_types": ["collection_event"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "pattern_id": "inventory_deduction_without_sale",
+      "description": "Inventory reduction appears without a supporting sale or justified adjustment path.",
+      "severity": "high",
+      "applies_to_event_types": ["inventory_adjustment", "sale_event"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "pattern_id": "invalid_event_type",
+      "description": "Recorded event type is not part of the approved business event catalog.",
+      "severity": "critical",
+      "applies_to_event_types": ["customer_creation", "quote_created", "quote_accepted", "sale_event", "purchase_event", "inventory_adjustment", "collection_event", "payment_event", "refund_event", "service_completion", "lead_created", "opportunity_won", "task_completed", "alert_triggered", "invoice_cancelled"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "pattern_id": "cyclic_causality_attempt",
+      "description": "An event tries to create a cycle by pointing causally to itself or its own dependent chain.",
+      "severity": "critical",
+      "applies_to_event_types": ["customer_creation", "quote_created", "quote_accepted", "sale_event", "purchase_event", "inventory_adjustment", "collection_event", "payment_event", "refund_event", "service_completion", "lead_created", "opportunity_won", "task_completed", "alert_triggered", "invoice_cancelled"],
+      "version": "1.0.0",
+      "status": "active"
+    }
+  ]
+}

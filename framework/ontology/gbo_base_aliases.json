@@ -1,0 +1,202 @@
+{
+  "artifact_type": "gbo_base_aliases",
+  "schema_version": "1.0.0",
+  "ontology_id": "gbo",
+  "ontology_version": "1.0.0",
+  "scope": "global",
+  "extends": [],
+  "compatibility": "backward_compatible",
+  "status": "active",
+  "aliases": [
+    {
+      "alias_id": "alias_cliente_customer",
+      "alias": "cliente",
+      "canonical_target": "customer",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_proveedor_supplier",
+      "alias": "proveedor",
+      "canonical_target": "supplier",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_producto_inventory_item",
+      "alias": "producto",
+      "canonical_target": "inventory_item",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_servicio_service",
+      "alias": "servicio",
+      "canonical_target": "service",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_bodega_warehouse",
+      "alias": "bodega",
+      "canonical_target": "warehouse",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_cotizacion_quote",
+      "alias": "cotizacion",
+      "canonical_target": "quote",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_orden_compra_purchase_order",
+      "alias": "orden de compra",
+      "canonical_target": "purchase_order",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_factura_invoice",
+      "alias": "factura",
+      "canonical_target": "invoice",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_comprobante_invoice",
+      "alias": "comprobante",
+      "canonical_target": "invoice",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_gasto_expense",
+      "alias": "gasto",
+      "canonical_target": "expense",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_pago_payment",
+      "alias": "pago",
+      "canonical_target": "payment",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_recaudo_collection",
+      "alias": "recaudo",
+      "canonical_target": "collection",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_cartera_receivable",
+      "alias": "cartera",
+      "canonical_target": "receivable",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_impuesto_tax",
+      "alias": "impuesto",
+      "canonical_target": "tax",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_reporte_report",
+      "alias": "reporte",
+      "canonical_target": "report",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_tarea_task",
+      "alias": "tarea",
+      "canonical_target": "task",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_alerta_alert",
+      "alias": "alerta",
+      "canonical_target": "alert",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_prospecto_lead",
+      "alias": "prospecto",
+      "canonical_target": "lead",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "alias_id": "alias_oportunidad_opportunity",
+      "alias": "oportunidad",
+      "canonical_target": "opportunity",
+      "target_type": "concept",
+      "language": "es",
+      "source_scope": "global",
+      "version": "1.0.0",
+      "status": "active"
+    }
+  ]
+}

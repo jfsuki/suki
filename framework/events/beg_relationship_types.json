@@ -1,0 +1,69 @@
+{
+  "artifact_type": "beg_relationship_types",
+  "schema_version": "1.0.0",
+  "graph_id": "beg",
+  "beg_version": "1.0.0",
+  "gbo_dependency": "1.0.0",
+  "scope": "global",
+  "extends": [],
+  "compatibility": "backward_compatible",
+  "status": "active",
+  "relationship_types": [
+    {
+      "relationship_type": "causes",
+      "description": "An event directly causes another event in the causal chain.",
+      "directionality": "directed",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "relationship_type": "precedes",
+      "description": "An event happens before another event in business sequence.",
+      "directionality": "directed",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "relationship_type": "settles",
+      "description": "An event settles the economic state created by another event.",
+      "directionality": "directed",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "relationship_type": "reverses",
+      "description": "An event reverses the effect of another event.",
+      "directionality": "directed",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "relationship_type": "affects",
+      "description": "An event affects the state of another node or event without full settlement.",
+      "directionality": "directed",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "relationship_type": "originates_from",
+      "description": "An event derives from a previous operational or commercial source event.",
+      "directionality": "directed",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "relationship_type": "linked_to",
+      "description": "An event is associated with another event without strict causality.",
+      "directionality": "undirected",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "relationship_type": "escalates_to",
+      "description": "An event escalates into a higher-risk or higher-priority follow-up event.",
+      "directionality": "directed",
+      "version": "1.0.0",
+      "status": "active"
+    }
+  ]
+}

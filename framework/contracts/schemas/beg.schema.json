@@ -1,0 +1,356 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "contract_id": "business_event_graph",
+  "version": "1.0.0",
+  "title": "BusinessEventGraphArtifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "graph_id",
+    "beg_version",
+    "gbo_dependency",
+    "scope",
+    "extends",
+    "compatibility",
+    "status"
+  ],
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "enum": [
+        "beg_event_types",
+        "beg_relationship_types",
+        "beg_anomaly_patterns",
+        "beg_projection_rules"
+      ]
+    },
+    "schema_version": {
+      "$ref": "#/definitions/semver"
+    },
+    "graph_id": {
+      "type": "string",
+      "const": "beg"
+    },
+    "beg_version": {
+      "$ref": "#/definitions/semver"
+    },
+    "gbo_dependency": {
+      "$ref": "#/definitions/semver"
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "global"
+      ]
+    },
+    "extends": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "compatibility": {
+      "type": "string",
+      "enum": [
+        "backward_compatible",
+        "requires_migration",
+        "forbidden_release"
+      ]
+    },
+    "status": {
+      "$ref": "#/definitions/status"
+    },
+    "event_types": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/event_type"
+      }
+    },
+    "relationship_types": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/relationship_type"
+      }
+    },
+    "anomaly_patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/anomaly_pattern"
+      }
+    },
+    "projection_rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/projection_rule"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "beg_event_types"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "event_types"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "beg_relationship_types"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "relationship_types"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "beg_anomaly_patterns"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "anomaly_patterns"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "beg_projection_rules"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "projection_rules"
+        ]
+      }
+    }
+  ],
+  "definitions": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    },
+    "event_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_type",
+        "canonical_name",
+        "gbo_event_type",
+        "description",
+        "required_scope_fields",
+        "version",
+        "status"
+      ],
+      "properties": {
+        "event_type": {
+          "$ref": "#/definitions/identifier"
+        },
+        "canonical_name": {
+          "$ref": "#/definitions/identifier"
+        },
+        "gbo_event_type": {
+          "$ref": "#/definitions/identifier"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "required_scope_fields": {
+          "type": "array",
+          "minItems": 3,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "version": {
+          "$ref": "#/definitions/semver"
+        },
+        "status": {
+          "$ref": "#/definitions/status"
+        }
+      }
+    },
+    "relationship_type": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relationship_type",
+        "description",
+        "directionality",
+        "version",
+        "status"
+      ],
+      "properties": {
+        "relationship_type": {
+          "$ref": "#/definitions/identifier"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "directionality": {
+          "type": "string",
+          "enum": [
+            "directed",
+            "undirected"
+          ]
+        },
+        "version": {
+          "$ref": "#/definitions/semver"
+        },
+        "status": {
+          "$ref": "#/definitions/status"
+        }
+      }
+    },
+    "anomaly_pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pattern_id",
+        "description",
+        "severity",
+        "applies_to_event_types",
+        "version",
+        "status"
+      ],
+      "properties": {
+        "pattern_id": {
+          "$ref": "#/definitions/identifier"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "severity": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high",
+            "critical"
+          ]
+        },
+        "applies_to_event_types": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/identifier"
+          }
+        },
+        "version": {
+          "$ref": "#/definitions/semver"
+        },
+        "status": {
+          "$ref": "#/definitions/status"
+        }
+      }
+    },
+    "projection_rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "projection_target",
+        "supported_event_types",
+        "supported_relationship_types",
+        "output_shape",
+        "description",
+        "version",
+        "status"
+      ],
+      "properties": {
+        "rule_id": {
+          "$ref": "#/definitions/identifier"
+        },
+        "projection_target": {
+          "type": "string",
+          "enum": [
+            "timeline",
+            "causal_graph",
+            "audit_queue",
+            "anomaly_feed",
+            "kpi_rollup"
+          ]
+        },
+        "supported_event_types": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/identifier"
+          }
+        },
+        "supported_relationship_types": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/identifier"
+          }
+        },
+        "output_shape": {
+          "type": "string",
+          "enum": [
+            "list",
+            "graph",
+            "queue",
+            "summary"
+          ]
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "$ref": "#/definitions/semver"
+        },
+        "status": {
+          "$ref": "#/definitions/status"
+        }
+      }
+    }
+  }
+}

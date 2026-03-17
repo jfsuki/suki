@@ -1,0 +1,132 @@
+{
+  "artifact_type": "gbo_business_events",
+  "schema_version": "1.0.0",
+  "ontology_id": "gbo",
+  "ontology_version": "1.0.0",
+  "scope": "global",
+  "extends": [],
+  "compatibility": "backward_compatible",
+  "status": "active",
+  "events": [
+    {
+      "event_type": "customer_creation",
+      "canonical_name": "customer_creation",
+      "description": "A new customer is registered and becomes addressable by the business.",
+      "related_concepts": ["customer"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "quote_created",
+      "canonical_name": "quote_created",
+      "description": "A quote is issued to frame commercial intent and proposed terms.",
+      "related_concepts": ["quote", "customer"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "quote_accepted",
+      "canonical_name": "quote_accepted",
+      "description": "A customer accepts a quote, converting it into an executable commercial commitment.",
+      "related_concepts": ["quote", "opportunity", "customer"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "sale_event",
+      "canonical_name": "sale_event",
+      "description": "A sale is recognized with business impact on billing, tax, and inventory.",
+      "related_concepts": ["customer", "invoice", "inventory_item", "tax"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "purchase_event",
+      "canonical_name": "purchase_event",
+      "description": "A purchase is recognized with impact on supplier obligations and stock.",
+      "related_concepts": ["supplier", "purchase_order", "inventory_item", "expense"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "inventory_adjustment",
+      "canonical_name": "inventory_adjustment",
+      "description": "Stock quantity or value is corrected due to count, loss, or reconciliation.",
+      "related_concepts": ["inventory_item", "warehouse"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "collection_event",
+      "canonical_name": "collection_event",
+      "description": "Money is collected against a customer balance or invoice exposure.",
+      "related_concepts": ["collection", "customer", "receivable", "invoice"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "payment_event",
+      "canonical_name": "payment_event",
+      "description": "Money is paid out against a supplier obligation or recognized expense.",
+      "related_concepts": ["payment", "supplier", "invoice", "expense"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "refund_event",
+      "canonical_name": "refund_event",
+      "description": "Previously settled value is returned, reversing a prior financial effect.",
+      "related_concepts": ["payment", "collection", "invoice"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "service_completion",
+      "canonical_name": "service_completion",
+      "description": "A service task finishes and becomes eligible for billing or closing actions.",
+      "related_concepts": ["service", "task", "customer"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "lead_created",
+      "canonical_name": "lead_created",
+      "description": "A new lead enters the commercial funnel.",
+      "related_concepts": ["lead"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "opportunity_won",
+      "canonical_name": "opportunity_won",
+      "description": "A qualified opportunity becomes a won commercial outcome.",
+      "related_concepts": ["opportunity", "customer"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "task_completed",
+      "canonical_name": "task_completed",
+      "description": "An assigned task reaches completion.",
+      "related_concepts": ["task"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "alert_triggered",
+      "canonical_name": "alert_triggered",
+      "description": "A business alert is raised because a condition crossed a monitoring rule.",
+      "related_concepts": ["alert", "task"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "invoice_cancelled",
+      "canonical_name": "invoice_cancelled",
+      "description": "An invoice is formally cancelled and should be treated as reversed or voided.",
+      "related_concepts": ["invoice", "tax"],
+      "version": "1.0.0",
+      "status": "active"
+    }
+  ]
+}

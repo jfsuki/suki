@@ -1,0 +1,43 @@
+{
+  "artifact_type": "beg_projection_rules",
+  "schema_version": "1.0.0",
+  "graph_id": "beg",
+  "beg_version": "1.0.0",
+  "gbo_dependency": "1.0.0",
+  "scope": "global",
+  "extends": [],
+  "compatibility": "backward_compatible",
+  "status": "active",
+  "projection_rules": [
+    {
+      "rule_id": "timeline_projection",
+      "projection_target": "timeline",
+      "supported_event_types": ["customer_creation", "quote_created", "quote_accepted", "sale_event", "purchase_event", "inventory_adjustment", "collection_event", "payment_event", "refund_event", "service_completion", "lead_created", "opportunity_won", "task_completed", "alert_triggered", "invoice_cancelled"],
+      "supported_relationship_types": ["precedes", "linked_to", "originates_from"],
+      "output_shape": "list",
+      "description": "Projects business events as an ordered operational timeline for audit and support.",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "rule_id": "causal_graph_projection",
+      "projection_target": "causal_graph",
+      "supported_event_types": ["quote_created", "quote_accepted", "sale_event", "purchase_event", "collection_event", "payment_event", "refund_event", "inventory_adjustment", "invoice_cancelled"],
+      "supported_relationship_types": ["causes", "settles", "reverses", "affects", "originates_from", "linked_to"],
+      "output_shape": "graph",
+      "description": "Projects causal chains to explain why a business outcome happened.",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "rule_id": "anomaly_audit_projection",
+      "projection_target": "anomaly_feed",
+      "supported_event_types": ["customer_creation", "quote_created", "quote_accepted", "sale_event", "purchase_event", "inventory_adjustment", "collection_event", "payment_event", "refund_event", "service_completion", "lead_created", "opportunity_won", "task_completed", "alert_triggered", "invoice_cancelled"],
+      "supported_relationship_types": ["causes", "settles", "reverses", "affects", "linked_to", "escalates_to"],
+      "output_shape": "queue",
+      "description": "Projects graph evidence into anomaly review queues without replacing ERP execution.",
+      "version": "1.0.0",
+      "status": "active"
+    }
+  ]
+}

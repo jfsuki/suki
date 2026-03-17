@@ -13,6 +13,9 @@ final class UnitTestRunner
 
         $tests = [];
         $tests[] = $this->wrap('manifest', fn() => ManifestValidator::validateOrFail());
+        $tests[] = $this->wrap('gbo_contracts', fn() => $this->checkGboContracts());
+        $tests[] = $this->wrap('beg_contracts', fn() => $this->checkBegContracts());
+        $tests[] = $this->wrap('gbo_beg_cli', fn() => $this->checkGboBegCli());
         $tests[] = $this->wrap('workflow_contract', fn() => $this->checkWorkflowContract());
         $tests[] = $this->wrap('workflow_executor', fn() => $this->checkWorkflowExecutor());
         $tests[] = $this->wrap('workflow_compiler', fn() => $this->checkWorkflowCompiler());
@@ -220,6 +223,21 @@ final class UnitTestRunner
         }
 
         throw new \RuntimeException('WorkflowValidator debe bloquear schema y semantica invalida.');
+    }
+
+    private function checkGboContracts(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/gbo_contracts_test.php');
+    }
+
+    private function checkBegContracts(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/beg_contracts_test.php');
+    }
+
+    private function checkGboBegCli(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/gbo_beg_cli_test.php');
     }
 
     private function checkWorkflowExecutor(): void

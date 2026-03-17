@@ -1,0 +1,174 @@
+{
+  "artifact_type": "gbo_universal_concepts",
+  "schema_version": "1.0.0",
+  "ontology_id": "gbo",
+  "ontology_version": "1.0.0",
+  "scope": "global",
+  "extends": [],
+  "compatibility": "backward_compatible",
+  "status": "active",
+  "concepts": [
+    {
+      "concept_id": "customer",
+      "canonical_name": "customer",
+      "domain": "crm",
+      "description": "Party that receives value, invoices, services, or deliveries from the business.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "supplier",
+      "canonical_name": "supplier",
+      "domain": "procurement",
+      "description": "Party that provides goods or services to the business.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "inventory_item",
+      "canonical_name": "inventory_item",
+      "domain": "inventory",
+      "description": "Stocked item or material whose quantity and cost can change over time.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "service",
+      "canonical_name": "service",
+      "domain": "operations",
+      "description": "Non-stock commercial unit delivered as work, labor, or managed execution.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "warehouse",
+      "canonical_name": "warehouse",
+      "domain": "inventory",
+      "description": "Physical or logical location where inventory is stored or adjusted.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "quote",
+      "canonical_name": "quote",
+      "domain": "sales",
+      "description": "Commercial proposal that defines terms, price, and scope before execution.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "purchase_order",
+      "canonical_name": "purchase_order",
+      "domain": "procurement",
+      "description": "Authorized request to buy goods or services from a supplier.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "invoice",
+      "canonical_name": "invoice",
+      "domain": "finance",
+      "description": "Billing document that formalizes an economic transaction.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "expense",
+      "canonical_name": "expense",
+      "domain": "finance",
+      "description": "Economic outflow or recognized cost associated with business operation.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "payment",
+      "canonical_name": "payment",
+      "domain": "finance",
+      "description": "Cash outflow or settlement action performed by the business.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "collection",
+      "canonical_name": "collection",
+      "domain": "finance",
+      "description": "Cash inflow or settlement action received by the business.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "receivable",
+      "canonical_name": "receivable",
+      "domain": "finance",
+      "description": "Amount pending collection from a customer or counterparty.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "tax",
+      "canonical_name": "tax",
+      "domain": "finance",
+      "description": "Fiscal obligation calculated from taxable business transactions.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "report",
+      "canonical_name": "report",
+      "domain": "analytics",
+      "description": "Structured business output used to explain status, performance, or compliance.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "task",
+      "canonical_name": "task",
+      "domain": "operations",
+      "description": "Trackable unit of work assigned to complete an operational objective.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "alert",
+      "canonical_name": "alert",
+      "domain": "governance",
+      "description": "Signal that a condition, threshold, or integrity rule requires attention.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "lead",
+      "canonical_name": "lead",
+      "domain": "crm",
+      "description": "Early commercial contact with potential to become a customer opportunity.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    },
+    {
+      "concept_id": "opportunity",
+      "canonical_name": "opportunity",
+      "domain": "crm",
+      "description": "Qualified commercial possibility with explicit revenue potential.",
+      "version": "1.0.0",
+      "allowed_alias_sources": ["global_alias", "language_pack", "country_pack", "sector_pack"],
+      "status": "active"
+    }
+  ]
+}

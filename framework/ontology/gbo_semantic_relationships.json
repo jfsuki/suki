@@ -1,0 +1,66 @@
+{
+  "artifact_type": "gbo_semantic_relationships",
+  "schema_version": "1.0.0",
+  "ontology_id": "gbo",
+  "ontology_version": "1.0.0",
+  "scope": "global",
+  "extends": [],
+  "compatibility": "backward_compatible",
+  "status": "active",
+  "relationships": [
+    {
+      "relationship_id": "customer_receives_invoice",
+      "source_type": "customer",
+      "relation": "receives",
+      "target_type": "invoice",
+      "description": "A customer is the intended receiver of an issued invoice.",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "relationship_id": "payment_settles_invoice",
+      "source_type": "payment",
+      "relation": "settles",
+      "target_type": "invoice",
+      "description": "A payment settles part or all of the obligation represented by an invoice.",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "relationship_id": "collection_settles_receivable",
+      "source_type": "collection",
+      "relation": "settles",
+      "target_type": "receivable",
+      "description": "A collection reduces or settles an open receivable balance.",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "relationship_id": "sale_event_deducts_inventory_item",
+      "source_type": "sale_event",
+      "relation": "deducts",
+      "target_type": "inventory_item",
+      "description": "A sale event can reduce the available stock of an inventory item.",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "relationship_id": "purchase_event_increases_inventory_item",
+      "source_type": "purchase_event",
+      "relation": "increases",
+      "target_type": "inventory_item",
+      "description": "A purchase event can increase the available stock of an inventory item.",
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "relationship_id": "invoice_generates_tax",
+      "source_type": "invoice",
+      "relation": "generates",
+      "target_type": "tax",
+      "description": "An invoice can originate one or more tax obligations.",
+      "version": "1.0.0",
+      "status": "active"
+    }
+  ]
+}

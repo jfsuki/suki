@@ -1,0 +1,148 @@
+{
+  "artifact_type": "beg_event_types",
+  "schema_version": "1.0.0",
+  "graph_id": "beg",
+  "beg_version": "1.0.0",
+  "gbo_dependency": "1.0.0",
+  "scope": "global",
+  "extends": [],
+  "compatibility": "backward_compatible",
+  "status": "active",
+  "event_types": [
+    {
+      "event_type": "customer_creation",
+      "canonical_name": "customer_creation",
+      "gbo_event_type": "customer_creation",
+      "description": "Customer onboarding event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "quote_created",
+      "canonical_name": "quote_created",
+      "gbo_event_type": "quote_created",
+      "description": "Commercial quote creation event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "quote_accepted",
+      "canonical_name": "quote_accepted",
+      "gbo_event_type": "quote_accepted",
+      "description": "Quote acceptance event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "sale_event",
+      "canonical_name": "sale_event",
+      "gbo_event_type": "sale_event",
+      "description": "Sale recognition event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "purchase_event",
+      "canonical_name": "purchase_event",
+      "gbo_event_type": "purchase_event",
+      "description": "Purchase recognition event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "inventory_adjustment",
+      "canonical_name": "inventory_adjustment",
+      "gbo_event_type": "inventory_adjustment",
+      "description": "Inventory correction event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "collection_event",
+      "canonical_name": "collection_event",
+      "gbo_event_type": "collection_event",
+      "description": "Collection event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "payment_event",
+      "canonical_name": "payment_event",
+      "gbo_event_type": "payment_event",
+      "description": "Payment event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "refund_event",
+      "canonical_name": "refund_event",
+      "gbo_event_type": "refund_event",
+      "description": "Refund event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "service_completion",
+      "canonical_name": "service_completion",
+      "gbo_event_type": "service_completion",
+      "description": "Service completion event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "lead_created",
+      "canonical_name": "lead_created",
+      "gbo_event_type": "lead_created",
+      "description": "Lead generation event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "opportunity_won",
+      "canonical_name": "opportunity_won",
+      "gbo_event_type": "opportunity_won",
+      "description": "Opportunity won event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "task_completed",
+      "canonical_name": "task_completed",
+      "gbo_event_type": "task_completed",
+      "description": "Task completion event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "alert_triggered",
+      "canonical_name": "alert_triggered",
+      "gbo_event_type": "alert_triggered",
+      "description": "Alert trigger event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "event_type": "invoice_cancelled",
+      "canonical_name": "invoice_cancelled",
+      "gbo_event_type": "invoice_cancelled",
+      "description": "Invoice cancellation event node in the business graph.",
+      "required_scope_fields": ["tenant_id", "app_id", "occurred_at"],
+      "version": "1.0.0",
+      "status": "active"
+    }
+  ]
+}

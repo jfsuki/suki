@@ -1,0 +1,345 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "contract_id": "global_business_ontology",
+  "version": "1.0.0",
+  "title": "GlobalBusinessOntologyArtifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "ontology_id",
+    "ontology_version",
+    "scope",
+    "extends",
+    "compatibility",
+    "status"
+  ],
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "enum": [
+        "gbo_universal_concepts",
+        "gbo_business_events",
+        "gbo_semantic_relationships",
+        "gbo_base_aliases"
+      ]
+    },
+    "schema_version": {
+      "$ref": "#/definitions/semver"
+    },
+    "ontology_id": {
+      "type": "string",
+      "const": "gbo"
+    },
+    "ontology_version": {
+      "$ref": "#/definitions/semver"
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "global"
+      ]
+    },
+    "extends": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "compatibility": {
+      "type": "string",
+      "enum": [
+        "backward_compatible",
+        "requires_migration",
+        "forbidden_release"
+      ]
+    },
+    "status": {
+      "$ref": "#/definitions/status"
+    },
+    "concepts": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/concept"
+      }
+    },
+    "events": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/event"
+      }
+    },
+    "relationships": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/relationship"
+      }
+    },
+    "aliases": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/alias"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "gbo_universal_concepts"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "concepts"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "gbo_business_events"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "events"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "gbo_semantic_relationships"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "relationships"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "gbo_base_aliases"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "aliases"
+        ]
+      }
+    }
+  ],
+  "definitions": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    },
+    "concept": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "concept_id",
+        "canonical_name",
+        "domain",
+        "description",
+        "version",
+        "allowed_alias_sources",
+        "status"
+      ],
+      "properties": {
+        "concept_id": {
+          "$ref": "#/definitions/identifier"
+        },
+        "canonical_name": {
+          "$ref": "#/definitions/identifier"
+        },
+        "domain": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "$ref": "#/definitions/semver"
+        },
+        "allowed_alias_sources": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "global_alias",
+              "language_pack",
+              "country_pack",
+              "sector_pack",
+              "human_review"
+            ]
+          }
+        },
+        "status": {
+          "$ref": "#/definitions/status"
+        }
+      }
+    },
+    "event": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_type",
+        "canonical_name",
+        "description",
+        "related_concepts",
+        "version",
+        "status"
+      ],
+      "properties": {
+        "event_type": {
+          "$ref": "#/definitions/identifier"
+        },
+        "canonical_name": {
+          "$ref": "#/definitions/identifier"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "related_concepts": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/identifier"
+          }
+        },
+        "version": {
+          "$ref": "#/definitions/semver"
+        },
+        "status": {
+          "$ref": "#/definitions/status"
+        }
+      }
+    },
+    "relationship": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "relationship_id",
+        "source_type",
+        "relation",
+        "target_type",
+        "description",
+        "version",
+        "status"
+      ],
+      "properties": {
+        "relationship_id": {
+          "$ref": "#/definitions/identifier"
+        },
+        "source_type": {
+          "$ref": "#/definitions/identifier"
+        },
+        "relation": {
+          "$ref": "#/definitions/identifier"
+        },
+        "target_type": {
+          "$ref": "#/definitions/identifier"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "$ref": "#/definitions/semver"
+        },
+        "status": {
+          "$ref": "#/definitions/status"
+        }
+      }
+    },
+    "alias": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "alias_id",
+        "alias",
+        "canonical_target",
+        "target_type",
+        "language",
+        "source_scope",
+        "version",
+        "status"
+      ],
+      "properties": {
+        "alias_id": {
+          "$ref": "#/definitions/identifier"
+        },
+        "alias": {
+          "type": "string",
+          "minLength": 1
+        },
+        "canonical_target": {
+          "$ref": "#/definitions/identifier"
+        },
+        "target_type": {
+          "type": "string",
+          "enum": [
+            "concept",
+            "event"
+          ]
+        },
+        "language": {
+          "type": "string",
+          "pattern": "^(universal|[a-z]{2}(?:-[A-Z]{2})?)$"
+        },
+        "source_scope": {
+          "type": "string",
+          "enum": [
+            "global",
+            "language_pack",
+            "country_pack",
+            "sector_pack"
+          ]
+        },
+        "version": {
+          "$ref": "#/definitions/semver"
+        },
+        "status": {
+          "$ref": "#/definitions/status"
+        }
+      }
+    }
+  }
+}

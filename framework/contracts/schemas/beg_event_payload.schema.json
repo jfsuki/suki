@@ -1,0 +1,175 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "contract_id": "beg_event_payload",
+  "version": "1.0.0",
+  "title": "BusinessEventGraphPayload",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "event_id",
+    "event_type",
+    "occurred_at",
+    "tenant_id",
+    "app_id",
+    "related_entities",
+    "related_documents",
+    "source_skill",
+    "source_module",
+    "status",
+    "causal_parent_ids",
+    "metadata"
+  ],
+  "properties": {
+    "event_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_\\-.]+$"
+    },
+    "event_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "occurred_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "related_entities": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "entity_type",
+          "entity_id"
+        ],
+        "properties": {
+          "entity_type": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "entity_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tenant_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "app_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "related_documents": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "document_type",
+          "document_id"
+        ],
+        "properties": {
+          "document_type": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "document_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tenant_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "app_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "role": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "source_skill": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "source_module": {
+      "anyOf": [
+        {
+          "type": "string",
+          "minLength": 1
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "recorded",
+        "projected",
+        "reversed",
+        "cancelled",
+        "flagged"
+      ]
+    },
+    "causal_parent_ids": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "metadata": {
+      "type": "object"
+    },
+    "event_relationships": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "relationship_type",
+          "target_event_id"
+        ],
+        "properties": {
+          "relationship_type": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9_]*$"
+          },
+          "target_event_id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}
