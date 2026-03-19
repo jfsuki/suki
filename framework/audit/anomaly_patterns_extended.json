@@ -1,0 +1,141 @@
+{
+  "artifact_type": "anomaly_patterns_extended",
+  "schema_version": "1.0.0",
+  "audit_domain": "business_integrity",
+  "audit_version": "1.0.0",
+  "gbo_dependency": "1.0.0",
+  "beg_dependency": "1.0.0",
+  "scope": "global",
+  "extends": [
+    "framework/events/beg_anomaly_patterns.json"
+  ],
+  "compatibility": "backward_compatible",
+  "status": "active",
+  "fraud_patterns": [
+    {
+      "pattern_id": "duplicate_collection_signal",
+      "description": "Multiple collection traces appear for the same settlement context without a valid split rationale.",
+      "related_event_types": [
+        "collection_event",
+        "payment_event"
+      ],
+      "detection_type": "deterministic",
+      "risk_weight": 0.86,
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "pattern_id": "refund_after_settled_collection",
+      "description": "A refund is issued after a receivable has already been settled with no approved compensating chain.",
+      "related_event_types": [
+        "refund_event",
+        "collection_event"
+      ],
+      "detection_type": "deterministic",
+      "risk_weight": 0.91,
+      "version": "1.0.0",
+      "status": "active"
+    }
+  ],
+  "data_quality_patterns": [
+    {
+      "pattern_id": "invoice_without_customer_reference",
+      "description": "Commercial documents lose their customer anchor and degrade traceability.",
+      "related_event_types": [
+        "sale_event"
+      ],
+      "detection_type": "deterministic",
+      "risk_weight": 0.68,
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "pattern_id": "orphan_master_data_reference",
+      "description": "Operational events reference master data that is incomplete, stale or not governed.",
+      "related_event_types": [
+        "customer_creation",
+        "purchase_event"
+      ],
+      "detection_type": "deterministic",
+      "risk_weight": 0.55,
+      "version": "1.0.0",
+      "status": "active"
+    }
+  ],
+  "beg_patterns": [
+    {
+      "pattern_id": "payment_without_invoice",
+      "description": "Payment event is present without a supporting invoice reference or causal source.",
+      "related_event_types": [
+        "payment_event"
+      ],
+      "detection_type": "beg_causal",
+      "risk_weight": 0.93,
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "pattern_id": "collection_without_receivable",
+      "description": "Collection event is present without a receivable context or related invoice.",
+      "related_event_types": [
+        "collection_event"
+      ],
+      "detection_type": "beg_causal",
+      "risk_weight": 0.9,
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "pattern_id": "inventory_deduction_without_sale",
+      "description": "Inventory reduction appears without a supporting sale or justified adjustment path.",
+      "related_event_types": [
+        "inventory_adjustment",
+        "sale_event"
+      ],
+      "detection_type": "beg_causal",
+      "risk_weight": 0.88,
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "pattern_id": "cross_tenant_link",
+      "description": "Event payload references entities, documents, or parents outside the current tenant scope.",
+      "related_event_types": [
+        "sale_event",
+        "payment_event",
+        "collection_event",
+        "alert_triggered"
+      ],
+      "detection_type": "beg_causal",
+      "risk_weight": 1,
+      "version": "1.0.0",
+      "status": "active"
+    }
+  ],
+  "behavioral_patterns": [
+    {
+      "pattern_id": "lead_stagnation_without_followup",
+      "description": "Lead creation happens without timely operational follow-up activity.",
+      "related_event_types": [
+        "lead_created",
+        "task_completed"
+      ],
+      "detection_type": "behavioral",
+      "risk_weight": 0.61,
+      "version": "1.0.0",
+      "status": "active"
+    },
+    {
+      "pattern_id": "revenue_drop_without_pipeline_shift",
+      "description": "Revenue drops materially while the upstream pipeline remains stable, suggesting hidden operational leakage.",
+      "related_event_types": [
+        "opportunity_won",
+        "sale_event"
+      ],
+      "detection_type": "kpi_threshold",
+      "risk_weight": 0.66,
+      "version": "1.0.0",
+      "status": "active"
+    }
+  ]
+}

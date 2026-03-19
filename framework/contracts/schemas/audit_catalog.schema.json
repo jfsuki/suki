@@ -1,0 +1,294 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "contract_id": "business_audit_catalog",
+  "version": "1.0.0",
+  "title": "BusinessAuditCatalogArtifact",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "artifact_type",
+    "schema_version",
+    "audit_domain",
+    "audit_version",
+    "gbo_dependency",
+    "beg_dependency",
+    "scope",
+    "extends",
+    "compatibility",
+    "status"
+  ],
+  "properties": {
+    "artifact_type": {
+      "type": "string",
+      "enum": [
+        "audit_rules",
+        "anomaly_patterns_extended"
+      ]
+    },
+    "schema_version": {
+      "$ref": "#/definitions/semver"
+    },
+    "audit_domain": {
+      "type": "string",
+      "const": "business_integrity"
+    },
+    "audit_version": {
+      "$ref": "#/definitions/semver"
+    },
+    "gbo_dependency": {
+      "$ref": "#/definitions/semver"
+    },
+    "beg_dependency": {
+      "$ref": "#/definitions/semver"
+    },
+    "scope": {
+      "type": "string",
+      "enum": [
+        "global"
+      ]
+    },
+    "extends": {
+      "type": "array",
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "compatibility": {
+      "type": "string",
+      "enum": [
+        "backward_compatible",
+        "requires_migration",
+        "forbidden_release"
+      ]
+    },
+    "status": {
+      "$ref": "#/definitions/status"
+    },
+    "deterministic_rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/rule"
+      }
+    },
+    "beg_rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/rule"
+      }
+    },
+    "kpi_rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/rule"
+      }
+    },
+    "crm_rules": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/rule"
+      }
+    },
+    "fraud_patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/pattern"
+      }
+    },
+    "data_quality_patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/pattern"
+      }
+    },
+    "beg_patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/pattern"
+      }
+    },
+    "behavioral_patterns": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/definitions/pattern"
+      }
+    }
+  },
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "audit_rules"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "deterministic_rules",
+          "beg_rules",
+          "kpi_rules",
+          "crm_rules"
+        ]
+      }
+    },
+    {
+      "if": {
+        "properties": {
+          "artifact_type": {
+            "const": "anomaly_patterns_extended"
+          }
+        }
+      },
+      "then": {
+        "required": [
+          "fraud_patterns",
+          "data_quality_patterns",
+          "beg_patterns",
+          "behavioral_patterns"
+        ]
+      }
+    }
+  ],
+  "definitions": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    },
+    "status": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "active",
+        "deprecated"
+      ]
+    },
+    "rule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "rule_id",
+        "name",
+        "description",
+        "anomaly_type",
+        "severity_default",
+        "required_evidence",
+        "evaluation_logic_ref",
+        "version",
+        "enabled"
+      ],
+      "properties": {
+        "rule_id": {
+          "$ref": "#/definitions/identifier"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "anomaly_type": {
+          "$ref": "#/definitions/identifier"
+        },
+        "severity_default": {
+          "type": "string",
+          "enum": [
+            "info",
+            "warning",
+            "critical"
+          ]
+        },
+        "required_evidence": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "enum": [
+              "beg_trace",
+              "sql_refs",
+              "metrics_refs",
+              "related_events",
+              "related_entities"
+            ]
+          }
+        },
+        "evaluation_logic_ref": {
+          "type": "string",
+          "minLength": 1
+        },
+        "version": {
+          "$ref": "#/definitions/semver"
+        },
+        "enabled": {
+          "type": "boolean"
+        }
+      }
+    },
+    "pattern": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "pattern_id",
+        "description",
+        "related_event_types",
+        "detection_type",
+        "risk_weight",
+        "version",
+        "status"
+      ],
+      "properties": {
+        "pattern_id": {
+          "$ref": "#/definitions/identifier"
+        },
+        "description": {
+          "type": "string",
+          "minLength": 1
+        },
+        "related_event_types": {
+          "type": "array",
+          "minItems": 1,
+          "uniqueItems": true,
+          "items": {
+            "$ref": "#/definitions/identifier"
+          }
+        },
+        "detection_type": {
+          "type": "string",
+          "enum": [
+            "deterministic",
+            "beg_causal",
+            "kpi_threshold",
+            "behavioral"
+          ]
+        },
+        "risk_weight": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "version": {
+          "$ref": "#/definitions/semver"
+        },
+        "status": {
+          "$ref": "#/definitions/status"
+        }
+      }
+    }
+  }
+}

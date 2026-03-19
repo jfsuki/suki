@@ -16,6 +16,8 @@ final class UnitTestRunner
         $tests[] = $this->wrap('gbo_contracts', fn() => $this->checkGboContracts());
         $tests[] = $this->wrap('beg_contracts', fn() => $this->checkBegContracts());
         $tests[] = $this->wrap('gbo_beg_cli', fn() => $this->checkGboBegCli());
+        $tests[] = $this->wrap('audit_contracts', fn() => $this->checkAuditContracts());
+        $tests[] = $this->wrap('audit_cli', fn() => $this->checkAuditCli());
         $tests[] = $this->wrap('workflow_contract', fn() => $this->checkWorkflowContract());
         $tests[] = $this->wrap('workflow_executor', fn() => $this->checkWorkflowExecutor());
         $tests[] = $this->wrap('workflow_compiler', fn() => $this->checkWorkflowCompiler());
@@ -238,6 +240,16 @@ final class UnitTestRunner
     private function checkGboBegCli(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/gbo_beg_cli_test.php');
+    }
+
+    private function checkAuditContracts(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/audit_contracts_test.php');
+    }
+
+    private function checkAuditCli(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/audit_cli_test.php');
     }
 
     private function checkWorkflowExecutor(): void

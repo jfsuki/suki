@@ -1,0 +1,274 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "contract_id": "business_audit_alert",
+  "version": "1.0.0",
+  "title": "BusinessAuditAlert",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "alert_id",
+    "tenant_id",
+    "severity",
+    "anomaly_type",
+    "description",
+    "evidence",
+    "related_events",
+    "related_entities",
+    "confidence_score",
+    "suggested_actions",
+    "created_at"
+  ],
+  "properties": {
+    "alert_id": {
+      "type": "string",
+      "pattern": "^[a-zA-Z0-9_\\-.]+$"
+    },
+    "tenant_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "app_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "severity": {
+      "type": "string",
+      "enum": [
+        "info",
+        "warning",
+        "critical"
+      ]
+    },
+    "anomaly_type": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "description": {
+      "type": "string",
+      "minLength": 1
+    },
+    "evidence": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "beg_trace",
+        "sql_refs",
+        "metrics_refs"
+      ],
+      "properties": {
+        "beg_trace": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/event_ref"
+          }
+        },
+        "sql_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/sql_ref"
+          }
+        },
+        "metrics_refs": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/metric_ref"
+          }
+        }
+      }
+    },
+    "related_events": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/event_ref"
+      }
+    },
+    "related_entities": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/entity_ref"
+      }
+    },
+    "confidence_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "suggested_actions": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/suggested_action"
+      }
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    }
+  },
+  "definitions": {
+    "event_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "event_id",
+        "event_type"
+      ],
+      "properties": {
+        "event_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "event_type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "tenant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "app_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "relation": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "entity_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "entity_type",
+        "entity_id"
+      ],
+      "properties": {
+        "entity_type": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_]*$"
+        },
+        "entity_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "tenant_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "app_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "sql_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "query_id",
+        "table_name",
+        "reference_type"
+      ],
+      "properties": {
+        "query_id": {
+          "type": "string",
+          "minLength": 1
+        },
+        "table_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "reference_type": {
+          "type": "string",
+          "enum": [
+            "query",
+            "row_snapshot",
+            "aggregate_check"
+          ]
+        },
+        "row_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "metric_ref": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "metric_name",
+        "metric_scope",
+        "metric_ref"
+      ],
+      "properties": {
+        "metric_name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "metric_scope": {
+          "type": "string",
+          "enum": [
+            "tenant_app",
+            "tenant",
+            "app",
+            "global"
+          ]
+        },
+        "metric_ref": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "suggested_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "action_id",
+        "skill_id",
+        "priority",
+        "reason_code",
+        "proposal_mode"
+      ],
+      "properties": {
+        "action_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_\\-.]*$"
+        },
+        "skill_id": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9_\\-.]*$"
+        },
+        "priority": {
+          "type": "string",
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ]
+        },
+        "reason_code": {
+          "type": "string",
+          "enum": [
+            "investigate_evidence",
+            "open_followup_task",
+            "generate_management_report",
+            "review_causal_trace",
+            "validate_master_data"
+          ]
+        },
+        "proposal_mode": {
+          "type": "string",
+          "enum": [
+            "proposed_only",
+            "requires_confirmation"
+          ]
+        }
+      }
+    }
+  }
+}

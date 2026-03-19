@@ -1,0 +1,138 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "contract_id": "business_audit_agent_config",
+  "version": "1.0.0",
+  "title": "BusinessAuditAgentConfig",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "agent_id",
+    "version",
+    "enabled",
+    "thresholds",
+    "allowed_anomaly_types",
+    "evaluation_modes",
+    "schedule"
+  ],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_\\-.]*$"
+    },
+    "version": {
+      "$ref": "#/definitions/semver"
+    },
+    "enabled": {
+      "type": "boolean"
+    },
+    "thresholds": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "min_confidence",
+        "anomaly_score_threshold"
+      ],
+      "properties": {
+        "min_confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "anomaly_score_threshold": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      }
+    },
+    "allowed_anomaly_types": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/definitions/identifier"
+      }
+    },
+    "evaluation_modes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "type": "string",
+        "enum": [
+          "rule_based",
+          "beg_based",
+          "hybrid"
+        ]
+      }
+    },
+    "schedule": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "mode"
+      ],
+      "properties": {
+        "mode": {
+          "type": "string",
+          "enum": [
+            "cron",
+            "interval"
+          ]
+        },
+        "cron": {
+          "type": "string",
+          "minLength": 1
+        },
+        "interval_seconds": {
+          "type": "integer",
+          "minimum": 60
+        },
+        "timezone": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "cron"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "cron"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "mode": {
+                "const": "interval"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "interval_seconds"
+            ]
+          }
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "identifier": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]*$"
+    },
+    "semver": {
+      "type": "string",
+      "pattern": "^\\d+\\.\\d+\\.\\d+$"
+    }
+  }
+}

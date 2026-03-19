@@ -1,0 +1,119 @@
+{
+  "artifact_type": "audit_rules",
+  "schema_version": "1.0.0",
+  "audit_domain": "business_integrity",
+  "audit_version": "1.0.0",
+  "gbo_dependency": "1.0.0",
+  "beg_dependency": "1.0.0",
+  "scope": "global",
+  "extends": [],
+  "compatibility": "backward_compatible",
+  "status": "active",
+  "deterministic_rules": [
+    {
+      "rule_id": "duplicate_collection_signal_rule",
+      "name": "Duplicate collection signal",
+      "description": "Flag repeated collection evidence for the same commercial settlement window.",
+      "anomaly_type": "duplicate_collection_signal",
+      "severity_default": "warning",
+      "required_evidence": [
+        "sql_refs",
+        "related_events"
+      ],
+      "evaluation_logic_ref": "audit.deterministic.duplicate_collection_signal.v1",
+      "version": "1.0.0",
+      "enabled": true
+    },
+    {
+      "rule_id": "invoice_without_customer_reference_rule",
+      "name": "Invoice without customer reference",
+      "description": "Detect commercial postings that do not preserve a valid customer anchor.",
+      "anomaly_type": "invoice_without_customer_reference",
+      "severity_default": "warning",
+      "required_evidence": [
+        "sql_refs",
+        "related_entities"
+      ],
+      "evaluation_logic_ref": "audit.deterministic.invoice_without_customer_reference.v1",
+      "version": "1.0.0",
+      "enabled": true
+    }
+  ],
+  "beg_rules": [
+    {
+      "rule_id": "payment_without_invoice_rule",
+      "name": "Payment without invoice",
+      "description": "Flag inbound or outbound payments that are not causally linked to an invoice context.",
+      "anomaly_type": "payment_without_invoice",
+      "severity_default": "critical",
+      "required_evidence": [
+        "beg_trace",
+        "related_events",
+        "sql_refs"
+      ],
+      "evaluation_logic_ref": "audit.beg.payment_without_invoice.v1",
+      "version": "1.0.0",
+      "enabled": true
+    },
+    {
+      "rule_id": "cross_tenant_link_rule",
+      "name": "Cross tenant link",
+      "description": "Flag causal traces or related references that cross tenant boundaries.",
+      "anomaly_type": "cross_tenant_link",
+      "severity_default": "critical",
+      "required_evidence": [
+        "beg_trace",
+        "related_entities"
+      ],
+      "evaluation_logic_ref": "audit.beg.cross_tenant_link.v1",
+      "version": "1.0.0",
+      "enabled": true
+    },
+    {
+      "rule_id": "inventory_deduction_without_sale_rule",
+      "name": "Inventory deduction without sale",
+      "description": "Flag negative inventory movements that have no compatible sale or justified adjustment chain.",
+      "anomaly_type": "inventory_deduction_without_sale",
+      "severity_default": "critical",
+      "required_evidence": [
+        "beg_trace",
+        "related_events"
+      ],
+      "evaluation_logic_ref": "audit.beg.inventory_deduction_without_sale.v1",
+      "version": "1.0.0",
+      "enabled": true
+    }
+  ],
+  "kpi_rules": [
+    {
+      "rule_id": "revenue_drop_without_pipeline_shift_rule",
+      "name": "Revenue drop without pipeline shift",
+      "description": "Flag a material revenue decline when the opportunity pipeline does not explain the change.",
+      "anomaly_type": "revenue_drop_without_pipeline_shift",
+      "severity_default": "warning",
+      "required_evidence": [
+        "metrics_refs",
+        "beg_trace"
+      ],
+      "evaluation_logic_ref": "audit.kpi.revenue_drop_without_pipeline_shift.v1",
+      "version": "1.0.0",
+      "enabled": true
+    }
+  ],
+  "crm_rules": [
+    {
+      "rule_id": "lead_stagnation_without_followup_rule",
+      "name": "Lead stagnation without follow-up",
+      "description": "Flag leads that remain idle without a corresponding operational follow-up task.",
+      "anomaly_type": "lead_stagnation_without_followup",
+      "severity_default": "info",
+      "required_evidence": [
+        "metrics_refs",
+        "related_entities"
+      ],
+      "evaluation_logic_ref": "audit.crm.lead_stagnation_without_followup.v1",
+      "version": "1.0.0",
+      "enabled": true
+    }
+  ]
+}
