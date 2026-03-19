@@ -24,6 +24,12 @@ final class ChatAgent
     private ?AgentOpsObservabilityService $agentOpsObservabilityService = null;
     private ?IntentRouter $intentRouter = null;
     private ?CommandBus $commandBus = null;
+    private ?ControlTowerRepository $controlTowerRepository = null;
+    private ?ControlTowerFeedManager $controlTowerFeedManager = null;
+    private ?TaskExecutionManager $taskExecutionManager = null;
+    private ?IncidentManager $incidentManager = null;
+    private bool $controlTowerResolved = false;
+    private bool $controlTowerAvailable = false;
     private FormWizard $wizard;
     private ContractWriter $writer;
     private EntityBuilder $builder;
@@ -194,22 +200,184 @@ final class ChatAgent
         }
 
         $local = $this->parseLocal($text);
+        $messageId = $this->resolveMessageId($payload, $sessionId, $text);
+        $conversationId = $this->resolveConversationId($sessionId, $payload);
+        $gateway = $this->gateway();
+        $ingressValidation = $gateway->validateIngressEnvelope([
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+            'project_id' => $projectId,
+            'mode' => $mode,
+            'message' => $text,
+            'meta' => $payload['meta'] ?? [],
+            'attachments' => $payload['attachments'] ?? [],
+            'is_authenticated' => $isAuthenticated,
+            'auth_tenant_id' => $authTenantId,
+            'chat_exec_auth_required' => $chatExecAuthRequired,
+        ]);
+        $task = $this->createControlTowerTask([
+            'tenant_id' => $tenantId,
+            'project_id' => $projectId,
+            'app_id' => $projectId,
+            'conversation_id' => $conversationId,
+            'session_id' => $sessionId,
+            'user_id' => $userId,
+            'message_id' => $messageId,
+            'intent' => (string) ($local['command'] ?? 'conversation_turn'),
+            'status' => 'pending',
+            'source' => 'chat',
+            'related_entities' => [],
+            'related_events' => [],
+            'idempotency_key' => $messageId,
+            'metadata' => [
+                'channel' => $channel,
+                'mode' => $mode,
+                'is_authenticated' => $isAuthenticated,
+            ],
+        ]);
+        $this->linkControlTowerTask($gateway, $tenantId, $userId, $projectId, $mode, $task);
+
+        if (($ingressValidation['ok'] ?? false) !== true) {
+            return $this->handleIngressValidationFailure(
+                $channel,
+                $sessionId,
+                $userId,
+                $tenantId,
+                $projectId,
+                $conversationId,
+                $messageId,
+                $text,
+                $mode,
+                $payload,
+                $isAuthenticated,
+                $role,
+                $task,
+                $ingressValidation,
+                $requestStartedAt
+            );
+        }
+
+        $result = $gateway->handle($tenantId, $userId, $text, $mode, $projectId);
         if (!empty($local['command']) && in_array($local['command'], ['RunTests', 'LLMUsage'], true)) {
+            $utilityTelemetry = $this->buildLocalUtilityTelemetry(
+                (string) ($local['command'] ?? 'local_utility'),
+                $tenantId,
+                $projectId,
+                $sessionId,
+                $userId,
+                $task,
+                $conversationId
+            );
+            $task = $this->controlTowerRecordRoute($task, $utilityTelemetry, 'local_utility');
+            $task = $this->controlTowerMarkRunning($task, [
+                'route_path' => (string) ($utilityTelemetry['route_path'] ?? ''),
+                'gate_decision' => (string) ($utilityTelemetry['gate_decision'] ?? 'allow'),
+            ]);
             try {
-                return $this->executeLocal($local, $channel, $sessionId, $userId, $mode, $tenantId);
+                $reply = $this->executeLocal($local, $channel, $sessionId, $userId, $mode, $tenantId);
+                $reply = $this->annotateReplyWithControlTower($reply, $task);
+                $task = $this->controlTowerCompleteTask($task, [
+                    'result_status' => (string) ($reply['status'] ?? 'success'),
+                    'response_kind' => 'local_utility',
+                    'response_text' => (string) ($reply['data']['reply'] ?? ''),
+                ]);
+                $reply = $this->annotateReplyWithControlTower($reply, $task);
+                $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $utilityTelemetry, $this->latencyMs($requestStartedAt), [
+                    'llm_called' => false,
+                    'error_flag' => false,
+                    'error_type' => 'none',
+                    'tool_calls_count' => 0,
+                    'retry_count' => 0,
+                    'task_id' => (string) ($task['task_id'] ?? ''),
+                    'conversation_id' => $conversationId,
+                ]);
+                $this->telemetry()->record($tenantId, array_merge($utilityTelemetry, [
+                    'message' => $text,
+                    'resolved_locally' => true,
+                    'action' => 'respond_local',
+                    'mode' => $mode,
+                    'session_id' => $sessionId,
+                    'user_id' => $userId,
+                    'project_id' => $projectId,
+                    'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                    'is_authenticated' => $isAuthenticated,
+                    'effective_role' => $role,
+                ], $this->buildAgentOpsTelemetryBase(
+                    $utilityTelemetry,
+                    $tenantId,
+                    $projectId,
+                    $sessionId,
+                    $messageId,
+                    $this->latencyMs($requestStartedAt),
+                    'response.emitted',
+                    [
+                        'llm_called' => false,
+                        'error_flag' => false,
+                        'error_type' => 'none',
+                        'response_kind' => 'local_utility',
+                        'response_text' => (string) ($reply['data']['reply'] ?? ''),
+                        'task_id' => (string) ($task['task_id'] ?? ''),
+                        'conversation_id' => $conversationId,
+                    ]
+                )));
+                return $reply;
             } catch (\Throwable $e) {
                 $rawError = (string) $e->getMessage();
                 $human = str_contains($rawError, 'SQLSTATE')
                     ? 'No pude conectar la base de datos. El contrato se guarda, pero falta revisar credenciales DB.'
                     : 'No pude ejecutar ese paso. Revisa configuracion o permisos.';
-                return $this->reply($human, $channel, $sessionId, $userId, 'error', [
+                $failure = $this->controlTowerFailTask($task, [
+                    'error_type' => 'local_utility_failure',
+                    'description' => $human,
+                    'created_at' => date('c'),
+                ]);
+                $task = $failure['task'];
+                $reply = $this->reply($human, $channel, $sessionId, $userId, 'error', [
                     'error' => $rawError,
                 ]);
+                $reply = $this->annotateReplyWithControlTower($reply, $task, $failure['incident']);
+                $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $utilityTelemetry, $this->latencyMs($requestStartedAt), [
+                    'llm_called' => false,
+                    'error_flag' => true,
+                    'error_type' => 'local_utility_failure',
+                    'tool_calls_count' => 0,
+                    'retry_count' => 0,
+                    'task_id' => (string) ($task['task_id'] ?? ''),
+                    'conversation_id' => $conversationId,
+                ]);
+                $this->telemetry()->record($tenantId, array_merge($utilityTelemetry, [
+                    'message' => $text,
+                    'resolved_locally' => true,
+                    'action' => 'respond_local',
+                    'mode' => $mode,
+                    'session_id' => $sessionId,
+                    'user_id' => $userId,
+                    'project_id' => $projectId,
+                    'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                    'is_authenticated' => $isAuthenticated,
+                    'effective_role' => $role,
+                    'status' => 'error',
+                ], $this->buildAgentOpsTelemetryBase(
+                    $utilityTelemetry,
+                    $tenantId,
+                    $projectId,
+                    $sessionId,
+                    $messageId,
+                    $this->latencyMs($requestStartedAt),
+                    'response.emitted',
+                    [
+                        'llm_called' => false,
+                        'error_flag' => true,
+                        'error_type' => 'local_utility_failure',
+                        'response_kind' => 'local_utility',
+                        'response_text' => (string) ($reply['data']['reply'] ?? ''),
+                        'task_id' => (string) ($task['task_id'] ?? ''),
+                        'conversation_id' => $conversationId,
+                    ]
+                )));
+                return $reply;
             }
         }
-
-        $gateway = $this->gateway();
-        $result = $gateway->handle($tenantId, $userId, $text, $mode, $projectId);
         $route = $this->intentRouter()->route($result, [
             'tenant_id' => $tenantId,
             'project_id' => $projectId,
@@ -231,8 +399,9 @@ final class ChatAgent
         ]);
         $action = $route->kind();
         $telemetry = $route->telemetry();
+        $telemetry = $this->attachControlTowerTelemetry($telemetry, $task, $conversationId);
         $state = $route->state();
-        $messageId = $this->resolveMessageId($payload, $sessionId, $text);
+        $task = $this->controlTowerRecordRoute($task, $telemetry, (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'));
 
         $securityBlock = $this->enforceExecutableChatSecurity(
             $route,
@@ -252,12 +421,20 @@ final class ChatAgent
                 'fallback_reason' => 'security_block',
                 'error_type' => 'security_block',
             ]);
+            $failure = $this->controlTowerFailTask($task, [
+                'error_type' => 'security_block',
+                'description' => (string) (($securityBlock['data']['reply'] ?? $securityBlock['message'] ?? 'Bloqueado por seguridad.')),
+                'created_at' => date('c'),
+            ]);
+            $task = $failure['task'];
             if ($route->isCommand()) {
                 $this->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $blockedTelemetry, [
                     'success' => false,
                     'execution_latency' => 0,
                     'error_code' => 'security_block',
                     'result_status' => 'blocked',
+                    'task_id' => (string) ($task['task_id'] ?? ''),
+                    'conversation_id' => $conversationId,
                 ]);
             }
             $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $blockedTelemetry, $this->latencyMs($requestStartedAt), [
@@ -266,6 +443,8 @@ final class ChatAgent
                 'error_type' => 'security_block',
                 'tool_calls_count' => 0,
                 'retry_count' => 0,
+                'task_id' => (string) ($task['task_id'] ?? ''),
+                'conversation_id' => $conversationId,
             ]);
             $this->telemetry()->record($tenantId, array_merge($blockedTelemetry, [
                 'message' => $text,
@@ -294,6 +473,8 @@ final class ChatAgent
                     'error_type' => 'security_block',
                     'response_kind' => 'blocked',
                     'response_text' => (string) (($securityBlock['data']['reply'] ?? $securityBlock['message'] ?? '')),
+                    'task_id' => (string) ($task['task_id'] ?? ''),
+                    'conversation_id' => $conversationId,
                 ]
             )));
             try {
@@ -310,16 +491,25 @@ final class ChatAgent
             } catch (\Throwable $e) {
                 // observability must not block chat response
             }
-            return $securityBlock;
+            return $this->annotateReplyWithControlTower($securityBlock, $task, $failure['incident']);
         }
 
         if ($route->isLocalResponse()) {
+            $localFailure = null;
             if ($this->shouldTraceBlockedToolExecution($telemetry)) {
                 $this->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $telemetry, [
                     'success' => false,
                     'execution_latency' => 0,
                     'result_status' => (string) ($telemetry['result_status'] ?? 'blocked'),
+                    'task_id' => (string) ($task['task_id'] ?? ''),
+                    'conversation_id' => $conversationId,
                 ]);
+                $localFailure = $this->controlTowerFailTask($task, [
+                    'error_type' => 'quality_gate_block',
+                    'description' => (string) $route->reply(),
+                    'created_at' => date('c'),
+                ]);
+                $task = $localFailure['task'];
             }
             $localResponseData = $this->extractOperationalTelemetryMarkers($telemetry);
             if (trim((string) ($localResponseData['session_id'] ?? '')) === '') {
@@ -336,12 +526,26 @@ final class ChatAgent
                 'success',
                 $localResponseData
             );
+            if ($localFailure === null) {
+                $task = $this->controlTowerCompleteTask($task, [
+                    'result_status' => 'success',
+                    'response_kind' => $action,
+                    'response_text' => (string) $route->reply(),
+                ]);
+            }
+            $reply = $this->annotateReplyWithControlTower(
+                $reply,
+                $task,
+                is_array($localFailure) ? ($localFailure['incident'] ?? null) : null
+            );
             $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
                 'llm_called' => false,
-                'error_flag' => false,
-                'error_type' => 'none',
+                'error_flag' => $localFailure !== null,
+                'error_type' => $localFailure !== null ? 'quality_gate_block' : 'none',
                 'tool_calls_count' => 0,
                 'retry_count' => 0,
+                'task_id' => (string) ($task['task_id'] ?? ''),
+                'conversation_id' => $conversationId,
             ]);
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
                 'message' => $text,
@@ -365,10 +569,12 @@ final class ChatAgent
                 'response.emitted',
                 [
                     'llm_called' => false,
-                    'error_flag' => false,
-                    'error_type' => 'none',
+                    'error_flag' => $localFailure !== null,
+                    'error_type' => $localFailure !== null ? 'quality_gate_block' : 'none',
                     'response_kind' => $action,
                     'response_text' => (string) $route->reply(),
+                    'task_id' => (string) ($task['task_id'] ?? ''),
+                    'conversation_id' => $conversationId,
                 ]
             )));
             try {
@@ -392,6 +598,93 @@ final class ChatAgent
             $commandStartedAt = microtime(true);
             $commandPayload = $route->command();
             $commandExecutionErrorType = '';
+            $task = $this->controlTowerMarkRunning($task, [
+                'route_path' => (string) ($telemetry['route_path'] ?? ''),
+                'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown'),
+            ]);
+            $qualityGate = $this->evaluateControlTowerQualityGates($telemetry, $commandPayload, $tenantId, $authTenantId, $task);
+            if (($qualityGate['ok'] ?? true) !== true) {
+                $taskManager = $this->taskExecutionManager();
+                if ($taskManager && is_array($task)) {
+                    try {
+                        $task = $taskManager->blockExecution((string) $task['tenant_id'], (string) $task['task_id'], [
+                            'warning_type' => 'quality_gate_block',
+                            'errors' => is_array($qualityGate['errors'] ?? null) ? (array) $qualityGate['errors'] : [],
+                            'checked' => is_array($qualityGate['checked'] ?? null) ? (array) $qualityGate['checked'] : [],
+                            'timestamp' => date('c'),
+                            'source' => 'system',
+                        ]);
+                    } catch (\Throwable $e) {
+                        error_log('[ControlTower] block execution failed: ' . $e->getMessage());
+                    }
+                }
+                $failure = $this->controlTowerFailTask($task, [
+                    'error_type' => 'quality_gate_block',
+                    'description' => 'Bloqueado por Control Tower quality gates.',
+                    'created_at' => date('c'),
+                    'quality_gate' => $qualityGate,
+                ]);
+                $task = $failure['task'];
+                $blockedReply = $this->reply(
+                    'Bloqueado por Control Tower. Falta pasar quality gates antes de ejecutar.',
+                    $channel,
+                    $sessionId,
+                    $userId,
+                    'error',
+                    [
+                        'quality_gate' => $qualityGate,
+                    ]
+                );
+                $blockedReply = $this->annotateReplyWithControlTower($blockedReply, $task, $failure['incident']);
+                $this->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $telemetry, [
+                    'success' => false,
+                    'execution_latency' => 0,
+                    'error_code' => 'quality_gate_block',
+                    'result_status' => 'blocked',
+                    'task_id' => (string) ($task['task_id'] ?? ''),
+                    'conversation_id' => $conversationId,
+                ]);
+                $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+                    'llm_called' => false,
+                    'error_flag' => true,
+                    'error_type' => 'quality_gate_block',
+                    'tool_calls_count' => 0,
+                    'retry_count' => 0,
+                    'task_id' => (string) ($task['task_id'] ?? ''),
+                    'conversation_id' => $conversationId,
+                ]);
+                $this->telemetry()->record($tenantId, array_merge($telemetry, [
+                    'message' => $text,
+                    'resolved_locally' => true,
+                    'action' => 'execute_command',
+                    'mode' => $mode,
+                    'session_id' => $sessionId,
+                    'user_id' => $userId,
+                    'project_id' => $projectId,
+                    'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                    'status' => 'blocked',
+                    'is_authenticated' => $isAuthenticated,
+                    'effective_role' => $role,
+                ], $this->buildAgentOpsTelemetryBase(
+                    $telemetry,
+                    $tenantId,
+                    $projectId,
+                    $sessionId,
+                    $messageId,
+                    $this->latencyMs($requestStartedAt),
+                    'response.blocked',
+                    [
+                        'llm_called' => false,
+                        'error_flag' => true,
+                        'error_type' => 'quality_gate_block',
+                        'response_kind' => 'blocked',
+                        'response_text' => (string) ($blockedReply['data']['reply'] ?? ''),
+                        'task_id' => (string) ($task['task_id'] ?? ''),
+                        'conversation_id' => $conversationId,
+                    ]
+                )));
+                return $blockedReply;
+            }
             try {
                 $reply = $this->dispatchCommandPayload($commandPayload, $channel, $sessionId, $userId, $mode);
                 $commandReply = $this->extractReplyTextFromEnvelope($reply);
@@ -477,13 +770,34 @@ final class ChatAgent
                 'error_code' => $commandErrorFlag ? $commandErrorType : null,
                 'result_status' => $commandStatus,
                 'command_name' => $commandName,
+                'task_id' => (string) ($task['task_id'] ?? ''),
+                'conversation_id' => $conversationId,
             ]);
+            if ($commandErrorFlag) {
+                $failure = $this->controlTowerFailTask($task, [
+                    'error_type' => $commandErrorType,
+                    'description' => $commandReply !== '' ? $commandReply : 'Command execution failed.',
+                    'created_at' => date('c'),
+                ]);
+                $task = $failure['task'];
+                $reply = $this->annotateReplyWithControlTower($reply, $task, $failure['incident']);
+            } else {
+                $task = $this->controlTowerCompleteTask($task, [
+                    'result_status' => $commandStatus,
+                    'response_kind' => $action,
+                    'response_text' => $commandReply,
+                    'command_name' => $commandName,
+                ]);
+                $reply = $this->annotateReplyWithControlTower($reply, $task);
+            }
             $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
                 'llm_called' => false,
                 'error_flag' => $commandErrorFlag,
                 'error_type' => $commandErrorType,
                 'tool_calls_count' => 1,
                 'retry_count' => 0,
+                'task_id' => (string) ($task['task_id'] ?? ''),
+                'conversation_id' => $conversationId,
             ] + $commandMarkers);
             $this->telemetry()->record($tenantId, array_merge($commandTelemetry, [
                 'message' => $text,
@@ -511,6 +825,8 @@ final class ChatAgent
                     'error_type' => $commandErrorType,
                     'response_kind' => $action,
                     'response_text' => $commandReply,
+                    'task_id' => (string) ($task['task_id'] ?? ''),
+                    'conversation_id' => $conversationId,
                 ] + $commandMarkers
             )));
             try {
@@ -531,6 +847,10 @@ final class ChatAgent
         }
 
         if ($route->isLlmRequest()) {
+            $task = $this->controlTowerMarkRunning($task, [
+                'route_path' => (string) ($telemetry['route_path'] ?? ''),
+                'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown'),
+            ]);
             try {
                 $llmResult = $this->llmRouter()->chat($route->llmRequest(), [
                     'mode' => $mode,
@@ -546,7 +866,15 @@ final class ChatAgent
                     'error_type' => 'llm_unavailable',
                     'tool_calls_count' => 0,
                     'retry_count' => 0,
+                    'task_id' => (string) ($task['task_id'] ?? ''),
+                    'conversation_id' => $conversationId,
                 ]);
+                $failure = $this->controlTowerFailTask($task, [
+                    'error_type' => 'llm_unavailable',
+                    'description' => 'IA no disponible. Usa comandos simples.',
+                    'created_at' => date('c'),
+                ]);
+                $task = $failure['task'];
                 $this->telemetry()->record($tenantId, array_merge($telemetry, [
                     'message' => $text,
                     'provider_used' => 'llm',
@@ -576,6 +904,8 @@ final class ChatAgent
                         'error_type' => 'llm_unavailable',
                         'response_kind' => 'respond_local',
                         'response_text' => 'IA no disponible. Usa comandos simples.',
+                        'task_id' => (string) ($task['task_id'] ?? ''),
+                        'conversation_id' => $conversationId,
                     ]
                 )));
                 try {
@@ -592,7 +922,11 @@ final class ChatAgent
                 } catch (\Throwable $ignored) {
                     // observability must not block chat response
                 }
-                return $this->reply('IA no disponible. Usa comandos simples.', $channel, $sessionId, $userId);
+                return $this->annotateReplyWithControlTower(
+                    $this->reply('IA no disponible. Usa comandos simples.', $channel, $sessionId, $userId),
+                    $task,
+                    $failure['incident']
+                );
             }
             $provider = $llmResult['provider'] ?? 'llm';
             $usage = $this->normalizeUsage((array) ($llmResult['usage'] ?? []));
@@ -612,6 +946,13 @@ final class ChatAgent
                 }
                 $reply = $this->reply($responseText, $channel, $sessionId, $userId);
             }
+            $task = $this->controlTowerCompleteTask($task, [
+                'result_status' => 'success',
+                'response_kind' => $responseKind,
+                'response_text' => $responseText,
+                'provider' => (string) $provider,
+            ]);
+            $reply = $this->annotateReplyWithControlTower($reply, $task);
             $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
                 'llm_called' => true,
                 'error_flag' => false,
@@ -620,6 +961,8 @@ final class ChatAgent
                 'retry_count' => 0,
                 'usage' => $usage,
                 'cost_estimate' => $llmResult['cost_estimate'] ?? null,
+                'task_id' => (string) ($task['task_id'] ?? ''),
+                'conversation_id' => $conversationId,
             ]);
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
                 'message' => $text,
@@ -652,6 +995,8 @@ final class ChatAgent
                     'response_text' => $responseText,
                     'usage' => $usage,
                     'cost_estimate' => $llmResult['cost_estimate'] ?? null,
+                    'task_id' => (string) ($task['task_id'] ?? ''),
+                    'conversation_id' => $conversationId,
                 ]
             )));
             try {
@@ -686,7 +1031,15 @@ final class ChatAgent
             'error_type' => 'route_error',
             'tool_calls_count' => 0,
             'retry_count' => 0,
+            'task_id' => (string) ($task['task_id'] ?? ''),
+            'conversation_id' => $conversationId,
         ]);
+        $failure = $this->controlTowerFailTask($task, [
+            'error_type' => 'route_error',
+            'description' => 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123',
+            'created_at' => date('c'),
+        ]);
+        $task = $failure['task'];
         $this->telemetry()->record($tenantId, array_merge($telemetry, [
             'message' => $text,
             'resolved_locally' => true,
@@ -713,6 +1066,8 @@ final class ChatAgent
                 'error_type' => 'route_error',
                 'response_kind' => 'error',
                 'response_text' => 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123',
+                'task_id' => (string) ($task['task_id'] ?? ''),
+                'conversation_id' => $conversationId,
             ]
         )));
         try {
@@ -729,7 +1084,11 @@ final class ChatAgent
         } catch (\Throwable $ignored) {
             // observability must not block chat response
         }
-        return $this->reply('No entendi. Puedes decir: crear cliente nombre=Juan nit=123', $channel, $sessionId, $userId, 'error');
+        return $this->annotateReplyWithControlTower(
+            $this->reply('No entendi. Puedes decir: crear cliente nombre=Juan nit=123', $channel, $sessionId, $userId, 'error'),
+            $task,
+            $failure['incident']
+        );
     }
 
     public function parseLocal(string $text): array
@@ -1658,6 +2017,37 @@ final class ChatAgent
         return $this->intentRouter;
     }
 
+    private function controlTowerAvailable(): bool
+    {
+        if ($this->controlTowerResolved) {
+            return $this->controlTowerAvailable;
+        }
+
+        $this->controlTowerResolved = true;
+        try {
+            $this->controlTowerRepository = new ControlTowerRepository();
+            $this->controlTowerFeedManager = new ControlTowerFeedManager($this->controlTowerRepository);
+            $this->taskExecutionManager = new TaskExecutionManager($this->controlTowerRepository, $this->controlTowerFeedManager);
+            $this->incidentManager = new IncidentManager($this->controlTowerRepository, $this->controlTowerFeedManager);
+            $this->controlTowerAvailable = true;
+        } catch (\Throwable $e) {
+            $this->controlTowerAvailable = false;
+            error_log('[ControlTower] unavailable: ' . $e->getMessage());
+        }
+
+        return $this->controlTowerAvailable;
+    }
+
+    private function taskExecutionManager(): ?TaskExecutionManager
+    {
+        return $this->controlTowerAvailable() ? $this->taskExecutionManager : null;
+    }
+
+    private function incidentManager(): ?IncidentManager
+    {
+        return $this->controlTowerAvailable() ? $this->incidentManager : null;
+    }
+
     private function resolveMessageId(array $payload, string $sessionId, string $message): string
     {
         $messageId = trim((string) ($payload['message_id'] ?? ''));
@@ -1666,6 +2056,457 @@ final class ChatAgent
         }
 
         return $sessionId . ':' . substr(sha1($message), 0, 12);
+    }
+
+    private function resolveConversationId(string $sessionId, array $payload): string
+    {
+        $conversationId = trim((string) ($payload['conversation_id'] ?? ''));
+        if ($conversationId !== '') {
+            return $conversationId;
+        }
+
+        return $sessionId !== '' ? $sessionId : 'conversation_default';
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>|null
+     */
+    private function createControlTowerTask(array $payload): ?array
+    {
+        $manager = $this->taskExecutionManager();
+        if (!$manager) {
+            return null;
+        }
+
+        try {
+            return $manager->createTask($payload);
+        } catch (\Throwable $e) {
+            error_log('[ControlTower] create task failed: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * @param array<string, mixed>|null $task
+     */
+    private function linkControlTowerTask(
+        ConversationGateway $gateway,
+        string $tenantId,
+        string $userId,
+        string $projectId,
+        string $mode,
+        ?array $task
+    ): void {
+        if (!is_array($task)) {
+            return;
+        }
+
+        try {
+            $gateway->linkTaskExecution($tenantId, $userId, $projectId, $mode, $task);
+        } catch (\Throwable $e) {
+            error_log('[ControlTower] link task failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $telemetry
+     * @param array<string, mixed>|null $task
+     * @return array<string, mixed>
+     */
+    private function attachControlTowerTelemetry(array $telemetry, ?array $task, string $conversationId): array
+    {
+        if (is_array($task)) {
+            $telemetry['task_id'] = (string) ($task['task_id'] ?? '');
+            $telemetry['conversation_id'] = (string) ($task['conversation_id'] ?? $conversationId);
+        } else {
+            $telemetry['task_id'] = '';
+            $telemetry['conversation_id'] = $conversationId;
+        }
+
+        return $telemetry;
+    }
+
+    /**
+     * @param array<string, mixed>|null $task
+     * @param array<string, mixed> $telemetry
+     * @return array<string, mixed>|null
+     */
+    private function controlTowerRecordRoute(?array $task, array $telemetry, string $intent): ?array
+    {
+        if (!is_array($task)) {
+            return $task;
+        }
+
+        $manager = $this->taskExecutionManager();
+        if (!$manager) {
+            return $task;
+        }
+
+        try {
+            return $manager->recordRouteTrace((string) $task['tenant_id'], (string) $task['task_id'], [
+                'intent' => $intent,
+                'route_path' => (string) ($telemetry['route_path'] ?? ''),
+                'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown'),
+                'route_reason' => (string) ($telemetry['route_reason'] ?? ''),
+                'evidence_used' => is_array($telemetry['evidence_used'] ?? null) ? (array) $telemetry['evidence_used'] : [],
+                'evidence_status' => is_array($telemetry['evidence_status'] ?? null) ? (array) $telemetry['evidence_status'] : [],
+                'latency_ms' => is_numeric($telemetry['router_latency_ms'] ?? null) ? (int) $telemetry['router_latency_ms'] : 0,
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[ControlTower] record route failed: ' . $e->getMessage());
+            return $task;
+        }
+    }
+
+    /**
+     * @param array<string, mixed>|null $task
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>|null
+     */
+    private function controlTowerMarkRunning(?array $task, array $context = []): ?array
+    {
+        if (!is_array($task)) {
+            return $task;
+        }
+
+        $manager = $this->taskExecutionManager();
+        if (!$manager) {
+            return $task;
+        }
+
+        try {
+            return $manager->updateTask((string) $task['tenant_id'], (string) $task['task_id'], array_merge($context, [
+                'status' => 'running',
+            ]));
+        } catch (\Throwable $e) {
+            error_log('[ControlTower] mark running failed: ' . $e->getMessage());
+            return $task;
+        }
+    }
+
+    /**
+     * @param array<string, mixed>|null $task
+     * @param array<string, mixed> $result
+     * @return array<string, mixed>|null
+     */
+    private function controlTowerCompleteTask(?array $task, array $result = []): ?array
+    {
+        if (!is_array($task)) {
+            return $task;
+        }
+
+        $manager = $this->taskExecutionManager();
+        if (!$manager) {
+            return $task;
+        }
+
+        try {
+            $task = $manager->attachExecutionResult((string) $task['tenant_id'], (string) $task['task_id'], $result);
+            return $manager->updateTask((string) $task['tenant_id'], (string) $task['task_id'], [
+                'status' => 'completed',
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[ControlTower] complete task failed: ' . $e->getMessage());
+            return $task;
+        }
+    }
+
+    /**
+     * @param array<string, mixed>|null $task
+     * @param array<string, mixed> $failure
+     * @return array{task: array<string, mixed>|null, incident: array<string, mixed>|null}
+     */
+    private function controlTowerFailTask(?array $task, array $failure = []): array
+    {
+        if (!is_array($task)) {
+            return ['task' => $task, 'incident' => null];
+        }
+
+        $manager = $this->taskExecutionManager();
+        if (!$manager) {
+            return ['task' => $task, 'incident' => null];
+        }
+
+        try {
+            $task = $manager->attachExecutionResult((string) $task['tenant_id'], (string) $task['task_id'], [
+                'failure' => $failure,
+            ]);
+            $task = $manager->updateTask((string) $task['tenant_id'], (string) $task['task_id'], [
+                'status' => 'failed',
+                'gate_decision' => (string) ($failure['gate_decision'] ?? ($task['gate_decision'] ?? 'unknown')),
+            ]);
+        } catch (\Throwable $e) {
+            error_log('[ControlTower] fail task failed: ' . $e->getMessage());
+        }
+
+        $incident = null;
+        $incidentManager = $this->incidentManager();
+        if ($incidentManager) {
+            try {
+                $incident = $incidentManager->createFromTaskFailure($task, $failure);
+            } catch (\Throwable $e) {
+                error_log('[ControlTower] incident create failed: ' . $e->getMessage());
+            }
+        }
+
+        return ['task' => $task, 'incident' => $incident];
+    }
+
+    /**
+     * @param array<string, mixed> $reply
+     * @param array<string, mixed>|null $task
+     * @param array<string, mixed>|null $incident
+     * @return array<string, mixed>
+     */
+    private function annotateReplyWithControlTower(array $reply, ?array $task, ?array $incident = null): array
+    {
+        $data = is_array($reply['data'] ?? null) ? (array) $reply['data'] : [];
+        if (is_array($task)) {
+            $data['task_id'] = (string) ($task['task_id'] ?? '');
+            $data['conversation_id'] = (string) ($task['conversation_id'] ?? '');
+            $data['task_status'] = (string) ($task['status'] ?? '');
+        }
+        if (is_array($incident)) {
+            $data['incident_id'] = (string) ($incident['incident_id'] ?? '');
+        }
+        $reply['data'] = $data;
+        return $reply;
+    }
+
+    /**
+     * @param array<string, mixed>|null $task
+     * @return array<string, mixed>
+     */
+    private function buildLocalUtilityTelemetry(
+        string $commandName,
+        string $tenantId,
+        string $projectId,
+        string $sessionId,
+        string $userId,
+        ?array $task,
+        string $conversationId
+    ): array {
+        return $this->attachControlTowerTelemetry([
+            'route_path' => 'cache>rules',
+            'gate_decision' => 'allow',
+            'route_reason' => 'control_tower_local_utility',
+            'action_contract' => 'none',
+            'rag_hit' => false,
+            'source_ids' => [],
+            'evidence_ids' => [],
+            'evidence_used' => [],
+            'llm_called' => false,
+            'llm_used' => false,
+            'semantic_enabled' => false,
+            'rag_attempted' => false,
+            'rag_used' => false,
+            'rag_result_count' => 0,
+            'evidence_gate_status' => 'skipped_by_rule',
+            'fallback_reason' => 'none',
+            'skill_detected' => false,
+            'skill_selected' => 'none',
+            'skill_executed' => false,
+            'skill_failed' => false,
+            'skill_execution_ms' => 0,
+            'skill_result_status' => 'not_applicable',
+            'skill_fallback_reason' => 'none',
+            'tool_calls_count' => 0,
+            'retry_count' => 0,
+            'loop_guard_triggered' => false,
+            'request_mode' => 'operation',
+            'module_used' => 'control_tower',
+            'task_action' => 'local_utility',
+            'validation_result' => 'passed',
+            'result_status' => 'success',
+            'tenant_id' => $tenantId,
+            'app_id' => $projectId,
+            'user_id' => $userId,
+            'session_id' => $sessionId,
+            'tool_usage' => [
+                'tool_calls_count' => 0,
+                'module_key' => 'control_tower',
+                'action_key' => $commandName,
+                'skill_selected' => 'none',
+            ],
+            'contract_versions' => $this->resolveExtendedContractVersions(),
+        ], $task, $conversationId);
+    }
+
+    /**
+     * @param array<string, mixed>|null $task
+     * @param array<string, mixed> $validation
+     * @return array<string, mixed>
+     */
+    private function handleIngressValidationFailure(
+        string $channel,
+        string $sessionId,
+        string $userId,
+        string $tenantId,
+        string $projectId,
+        string $conversationId,
+        string $messageId,
+        string $text,
+        string $mode,
+        array $payload,
+        bool $isAuthenticated,
+        string $role,
+        ?array $task,
+        array $validation,
+        float $requestStartedAt
+    ): array {
+        $telemetry = $this->buildLocalUtilityTelemetry(
+            'ingress_validation',
+            $tenantId,
+            $projectId,
+            $sessionId,
+            $userId,
+            $task,
+            $conversationId
+        );
+        $telemetry['gate_decision'] = 'blocked';
+        $telemetry['route_reason'] = 'conversation_gateway_ingress_validation_failed';
+        $telemetry['fallback_reason'] = 'ingress_validation_failed';
+        $telemetry['error_type'] = 'ingress_validation_failed';
+        $failure = $this->controlTowerFailTask($task, [
+            'error_type' => 'ingress_validation_failed',
+            'description' => 'Mensaje bloqueado por validacion de ingreso.',
+            'created_at' => date('c'),
+            'validation' => $validation,
+        ]);
+        $task = $failure['task'];
+        $reply = $this->reply(
+            'Bloqueado por Conversation Gateway. Revisa tenant, autenticacion y forma del mensaje.',
+            $channel,
+            $sessionId,
+            $userId,
+            'error',
+            [
+                'ingress_validation' => $validation,
+            ]
+        );
+        $reply = $this->annotateReplyWithControlTower($reply, $task, $failure['incident']);
+        $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+            'llm_called' => false,
+            'error_flag' => true,
+            'error_type' => 'ingress_validation_failed',
+            'tool_calls_count' => 0,
+            'retry_count' => 0,
+            'task_id' => (string) ($task['task_id'] ?? ''),
+            'conversation_id' => $conversationId,
+        ]);
+        $this->telemetry()->record($tenantId, array_merge($telemetry, [
+            'message' => $text,
+            'resolved_locally' => true,
+            'action' => 'blocked',
+            'mode' => $mode,
+            'session_id' => $sessionId,
+            'user_id' => $userId,
+            'project_id' => $projectId,
+            'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+            'is_authenticated' => $isAuthenticated,
+            'effective_role' => $role,
+            'status' => 'blocked',
+        ], $this->buildAgentOpsTelemetryBase(
+            $telemetry,
+            $tenantId,
+            $projectId,
+            $sessionId,
+            $messageId,
+            $this->latencyMs($requestStartedAt),
+            'response.blocked',
+            [
+                'llm_called' => false,
+                'error_flag' => true,
+                'error_type' => 'ingress_validation_failed',
+                'response_kind' => 'blocked',
+                'response_text' => (string) ($reply['data']['reply'] ?? ''),
+                'task_id' => (string) ($task['task_id'] ?? ''),
+                'conversation_id' => $conversationId,
+            ]
+        )));
+        return $reply;
+    }
+
+    /**
+     * @param array<string, mixed> $telemetry
+     * @param array<string, mixed> $commandPayload
+     * @param array<string, mixed>|null $task
+     * @return array<string, mixed>
+     */
+    private function evaluateControlTowerQualityGates(
+        array $telemetry,
+        array $commandPayload,
+        string $tenantId,
+        string $authTenantId,
+        ?array $task
+    ): array {
+        $manager = $this->taskExecutionManager();
+        if (!$manager) {
+            return [
+                'ok' => true,
+                'errors' => [],
+                'warnings' => [],
+                'checked' => [],
+            ];
+        }
+
+        $gate = $manager->evaluateQualityGates([
+            'tenant_id' => $tenantId,
+            'auth_tenant_id' => $authTenantId,
+            'action' => 'execute_command',
+            'command' => $commandPayload,
+            'route_telemetry' => $telemetry,
+            'action_contract' => (string) ($telemetry['action_contract'] ?? ''),
+        ]);
+        return $gate;
+    }
+
+    /**
+     * @param array<string, mixed> $base
+     * @return array<string, mixed>
+     */
+    private function resolveExtendedContractVersions(array $base = []): array
+    {
+        $versions = $base;
+        $versions['gbo'] = $versions['gbo'] ?? $this->resolveVersionFromJsonArtifact(
+            FRAMEWORK_ROOT . '/ontology/gbo_universal_concepts.json',
+            ['ontology_version', 'schema_version']
+        );
+        $versions['beg'] = $versions['beg'] ?? $this->resolveVersionFromJsonArtifact(
+            FRAMEWORK_ROOT . '/events/beg_event_types.json',
+            ['beg_version', 'schema_version']
+        );
+        $versions['audit'] = $versions['audit'] ?? $this->resolveVersionFromJsonArtifact(
+            FRAMEWORK_ROOT . '/audit/audit_rules.json',
+            ['audit_version', 'schema_version']
+        );
+
+        return $versions;
+    }
+
+    /**
+     * @param array<int, string> $keys
+     */
+    private function resolveVersionFromJsonArtifact(string $path, array $keys): string
+    {
+        if (!is_file($path)) {
+            return 'unknown';
+        }
+
+        $decoded = json_decode((string) file_get_contents($path), true);
+        if (!is_array($decoded)) {
+            return 'unknown';
+        }
+
+        foreach ($keys as $key) {
+            $value = trim((string) ($decoded[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return 'unknown';
     }
 
     private function buildAgentOpsTelemetryBase(
@@ -1678,9 +2519,11 @@ final class ChatAgent
         string $eventName,
         array $runtimeContext = []
     ): array {
-        $contractVersions = is_array($routeTelemetry['contract_versions'] ?? null)
-            ? (array) $routeTelemetry['contract_versions']
-            : [];
+        $contractVersions = $this->resolveExtendedContractVersions(
+            is_array($routeTelemetry['contract_versions'] ?? null)
+                ? (array) $routeTelemetry['contract_versions']
+                : []
+        );
         $versions = is_array($routeTelemetry['versions'] ?? null) ? (array) $routeTelemetry['versions'] : [];
         $enforcementMode = trim((string) ($routeTelemetry['enforcement_mode'] ?? ''));
         $enforcementModeSource = trim((string) ($routeTelemetry['enforcement_mode_source'] ?? ''));
@@ -1699,6 +2542,7 @@ final class ChatAgent
         $runtimeEnvelope = $this->buildAgentOpsRuntimeEnvelope($routeTelemetry, $latencyMs, $runtimeContext);
         $runtimeObservability = $runtimeEnvelope['runtime'];
         $supervisor = $runtimeEnvelope['supervisor'];
+        $toolUsage = is_array($runtimeObservability['tool_usage'] ?? null) ? (array) $runtimeObservability['tool_usage'] : [];
         if (trim((string) ($runtimeObservability['session_id'] ?? '')) === '') {
             $runtimeObservability['session_id'] = $sessionId;
         }
@@ -1721,10 +2565,13 @@ final class ChatAgent
             'message_id' => $messageId,
             'route_path' => $runtimeObservability['route_path'],
             'gate_decision' => $runtimeObservability['gate_decision'],
+            'task_id' => $runtimeObservability['task_id'],
+            'conversation_id' => $runtimeObservability['conversation_id'],
             'action_contract' => $runtimeObservability['action_contract'],
             'rag_hit' => $runtimeObservability['rag_hit'],
             'source_ids' => $runtimeObservability['source_ids'],
             'evidence_ids' => $runtimeObservability['evidence_ids'],
+            'evidence_used' => $runtimeObservability['evidence_used'],
             'llm_called' => $runtimeObservability['llm_called'],
             'llm_used' => $runtimeObservability['llm_used'],
             'route_reason' => $runtimeObservability['route_reason'],
@@ -1748,6 +2595,7 @@ final class ChatAgent
             'app_id' => $runtimeObservability['app_id'],
             'user_id' => $runtimeObservability['user_id'],
             'memory_type' => $runtimeObservability['memory_type'],
+            'tool_usage' => $toolUsage,
             'module_used' => $runtimeObservability['module_used'],
             'alert_action' => $runtimeObservability['alert_action'],
             'task_action' => $runtimeObservability['task_action'],
@@ -1851,6 +2699,9 @@ final class ChatAgent
         $ragHit = (bool) ($routeTelemetry['rag_hit'] ?? false);
         $sourceIds = $this->normalizeStringList($routeTelemetry['source_ids'] ?? []);
         $evidenceIds = $this->normalizeStringList($routeTelemetry['evidence_ids'] ?? []);
+        $evidenceUsed = is_array($routeTelemetry['evidence_used'] ?? null)
+            ? (array) $routeTelemetry['evidence_used']
+            : (is_array($runtimeContext['evidence_used'] ?? null) ? (array) $runtimeContext['evidence_used'] : []);
         $llmCalled = array_key_exists('llm_called', $runtimeContext)
             ? (bool) $runtimeContext['llm_called']
             : (bool) ($routeTelemetry['llm_called'] ?? false);
@@ -1875,15 +2726,26 @@ final class ChatAgent
             'skill_ms' => max(0, (int) ($routeTelemetry['skill_execution_ms'] ?? 0)),
             'rag_ms' => max(0, (int) (($routeTelemetry['retrieval']['retrieval_latency_ms'] ?? $routeTelemetry['retrieval_latency_ms'] ?? 0))),
         ];
+        $taskId = trim((string) ($runtimeContext['task_id'] ?? $routeTelemetry['task_id'] ?? ''));
+        $conversationId = trim((string) ($runtimeContext['conversation_id'] ?? $routeTelemetry['conversation_id'] ?? ''));
+        $toolUsage = [
+            'tool_calls_count' => max(0, (int) ($runtimeContext['tool_calls_count'] ?? $routeTelemetry['tool_calls_count'] ?? 0)),
+            'module_key' => trim((string) ($runtimeContext['module_used'] ?? $routeTelemetry['module_used'] ?? '')) ?: 'none',
+            'action_key' => trim((string) ($runtimeContext['task_action'] ?? $routeTelemetry['task_action'] ?? '')) ?: 'none',
+            'skill_selected' => trim((string) ($routeTelemetry['skill_selected'] ?? '')) ?: 'none',
+        ];
 
         return [
             'route_path' => $routePath !== '' ? $routePath : 'unknown',
             'gate_decision' => $gateDecision !== '' ? $gateDecision : 'unknown',
+            'task_id' => $taskId,
+            'conversation_id' => $conversationId,
             'action_contract' => $actionContract !== '' ? $actionContract : 'none',
             'route_reason' => trim((string) ($routeTelemetry['route_reason'] ?? '')) ?: 'unknown',
             'rag_hit' => $ragHit,
             'source_ids' => $sourceIds,
             'evidence_ids' => $evidenceIds,
+            'evidence_used' => $evidenceUsed,
             'semantic_enabled' => (bool) ($routeTelemetry['semantic_enabled'] ?? false),
             'semantic_memory_status' => trim((string) ($routeTelemetry['semantic_memory_status'] ?? '')) ?: 'unknown',
             'rag_attempted' => (bool) ($routeTelemetry['rag_attempted'] ?? false),
@@ -2009,6 +2871,12 @@ final class ChatAgent
             'latency_ms' => $latencyMs,
             'token_usage' => $tokenUsage,
             'cost_estimate' => $costEstimate,
+            'tool_usage' => $toolUsage,
+            'contract_versions' => $this->resolveExtendedContractVersions(
+                is_array($routeTelemetry['contract_versions'] ?? null)
+                    ? (array) $routeTelemetry['contract_versions']
+                    : []
+            ),
             'metrics_delta' => is_array($routeTelemetry['metrics_delta'] ?? null) ? (array) $routeTelemetry['metrics_delta'] : [],
             'tenant_scope_violation_detected' => (bool) ($routeTelemetry['tenant_scope_violation_detected'] ?? false),
             'route_path_coherent' => (bool) ($routeTelemetry['route_path_coherent'] ?? true),
@@ -2098,6 +2966,15 @@ final class ChatAgent
                     'decision' => (string) ($runtimeObservability['decision'] ?? ''),
                     'error_type' => (string) ($runtimeObservability['error_type'] ?? 'none'),
                     'tool_calls_count' => (int) ($runtimeObservability['tool_calls_count'] ?? 0),
+                    'task_id' => (string) ($runtimeObservability['task_id'] ?? ''),
+                    'conversation_id' => (string) ($runtimeObservability['conversation_id'] ?? ''),
+                    'contract_versions' => is_array($runtimeObservability['contract_versions'] ?? null)
+                        ? (array) $runtimeObservability['contract_versions']
+                        : [],
+                    'tool_usage' => is_array($runtimeObservability['tool_usage'] ?? null)
+                        ? (array) $runtimeObservability['tool_usage']
+                        : [],
+                    'cost_estimate' => $runtimeObservability['cost_estimate'] ?? null,
                 ],
             ]);
         } catch (\Throwable $ignored) {
@@ -2222,6 +3099,8 @@ final class ChatAgent
                     'requested_module' => (string) ($routeTelemetry['requested_module'] ?? ''),
                     'resolved_module' => (string) ($routeTelemetry['resolved_module'] ?? ''),
                     'command_name' => (string) ($runtimeContext['command_name'] ?? ''),
+                    'task_id' => (string) ($runtimeContext['task_id'] ?? $routeTelemetry['task_id'] ?? ''),
+                    'conversation_id' => (string) ($runtimeContext['conversation_id'] ?? $routeTelemetry['conversation_id'] ?? ''),
                 ],
             ]);
         } catch (\Throwable $ignored) {
@@ -2504,6 +3383,8 @@ final class ChatAgent
         }
 
         return [
+            'task_id' => trim((string) ($payload['task_id'] ?? '')) ?: '',
+            'conversation_id' => trim((string) ($payload['conversation_id'] ?? '')) ?: '',
             'module_used' => trim((string) ($payload['module_used'] ?? '')) ?: 'none',
             'alert_action' => trim((string) ($payload['alert_action'] ?? '')) ?: 'none',
             'task_action' => trim((string) ($payload['task_action'] ?? '')) ?: 'none',

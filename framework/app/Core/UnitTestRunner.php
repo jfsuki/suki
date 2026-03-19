@@ -122,6 +122,9 @@ final class UnitTestRunner
         $tests[] = $this->wrap('agentops_observability_foundation', fn() => $this->checkAgentOpsObservabilityFoundation());
         $tests[] = $this->wrap('agentops_observability_skills', fn() => $this->checkAgentOpsObservabilitySkills());
         $tests[] = $this->wrap('control_tower_contracts', fn() => $this->checkControlTowerContracts());
+        $tests[] = $this->wrap('control_tower_task', fn() => $this->checkControlTowerTask());
+        $tests[] = $this->wrap('conversation_gateway_trace', fn() => $this->checkConversationGatewayTrace());
+        $tests[] = $this->wrap('incident_flow', fn() => $this->checkIncidentFlow());
         $tests[] = $this->wrap('project_memory_system', fn() => $this->checkProjectMemorySystem());
         $tests[] = $this->wrap('learning_promotion_pipeline', fn() => $this->checkLearningPromotionPipeline());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
@@ -1618,6 +1621,21 @@ final class UnitTestRunner
     private function checkControlTowerContracts(): void
     {
         $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/control_tower_contracts_test.php');
+    }
+
+    private function checkControlTowerTask(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/control_tower_task_test.php');
+    }
+
+    private function checkConversationGatewayTrace(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/conversation_gateway_trace_test.php');
+    }
+
+    private function checkIncidentFlow(): void
+    {
+        $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/incident_flow_test.php');
     }
 
     private function checkProjectMemorySystem(): void

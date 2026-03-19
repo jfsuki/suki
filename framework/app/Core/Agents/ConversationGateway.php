@@ -120,6 +120,100 @@ final class ConversationGateway
         $this->saveState($tenantId, $userId, $state);
     }
 
+    /**
+     * @param array<string, mixed> $envelope
+     * @return array<string, mixed>
+     */
+    public function validateIngressEnvelope(array $envelope): array
+    {
+        $errors = [];
+        $warnings = [];
+
+        $tenantId = trim((string) ($envelope['tenant_id'] ?? ''));
+        $userId = trim((string) ($envelope['user_id'] ?? ''));
+        $projectId = trim((string) ($envelope['project_id'] ?? ''));
+        $mode = strtolower(trim((string) ($envelope['mode'] ?? 'app')));
+        $message = trim((string) ($envelope['message'] ?? $envelope['text'] ?? ''));
+        $hasAttachment = !empty($envelope['meta']) || !empty($envelope['attachments']);
+        $isAuthenticated = array_key_exists('is_authenticated', $envelope)
+            ? (bool) $envelope['is_authenticated']
+            : true;
+        $authTenantId = trim((string) ($envelope['auth_tenant_id'] ?? ''));
+        $chatExecAuthRequired = (bool) ($envelope['chat_exec_auth_required'] ?? false);
+
+        if ($tenantId === '') {
+            $errors[] = 'tenant_id requerido.';
+        }
+        if ($userId === '') {
+            $errors[] = 'user_id requerido.';
+        }
+        if ($projectId === '') {
+            $errors[] = 'project_id requerido.';
+        }
+        if (!in_array($mode, ['app', 'builder'], true)) {
+            $errors[] = 'mode invalido.';
+        }
+        if ($message === '' && !$hasAttachment) {
+            $errors[] = 'message vacio sin adjuntos.';
+        }
+        if ($authTenantId !== '' && $tenantId !== '' && $authTenantId !== $tenantId) {
+            $errors[] = 'auth_tenant_id no coincide con tenant_id.';
+        }
+        if ($chatExecAuthRequired && !$isAuthenticated) {
+            $warnings[] = 'chat_exec_auth_required activo sin autenticacion.';
+        }
+
+        return [
+            'ok' => $errors === [],
+            'errors' => $errors,
+            'warnings' => $warnings,
+            'normalized' => [
+                'tenant_id' => $tenantId !== '' ? $tenantId : 'default',
+                'user_id' => $userId !== '' ? $userId : 'anon',
+                'project_id' => $projectId !== '' ? $projectId : 'default',
+                'mode' => in_array($mode, ['app', 'builder'], true) ? $mode : 'app',
+                'message' => $message,
+                'is_authenticated' => $isAuthenticated,
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $task
+     */
+    public function linkTaskExecution(
+        string $tenantId,
+        string $userId,
+        string $projectId,
+        string $mode,
+        array $task
+    ): void {
+        $tenantId = $tenantId !== '' ? $tenantId : 'default';
+        $userId = $userId !== '' ? $userId : 'anon';
+        $projectId = $projectId !== '' ? $projectId : 'default';
+        $mode = strtolower(trim($mode)) === 'builder' ? 'builder' : 'app';
+
+        $this->contextProjectId = $projectId;
+        $this->contextMode = $mode;
+        $this->contextProfileUser = $this->profileUserKey($userId);
+
+        $state = $this->loadState($tenantId, $userId, $projectId, $mode);
+        $history = is_array($state['control_tower_task_history'] ?? null)
+            ? (array) $state['control_tower_task_history']
+            : [];
+        $history[] = [
+            'task_id' => trim((string) ($task['task_id'] ?? '')),
+            'conversation_id' => trim((string) ($task['conversation_id'] ?? '')),
+            'status' => trim((string) ($task['status'] ?? 'pending')),
+            'intent' => trim((string) ($task['intent'] ?? 'unknown')),
+            'source' => trim((string) ($task['source'] ?? 'chat')),
+            'updated_at' => trim((string) ($task['updated_at'] ?? date('c'))),
+        ];
+        $state['control_tower_task_history'] = array_values(array_slice($history, -8));
+        $state['control_tower_last_task'] = end($state['control_tower_task_history']) ?: null;
+        $this->saveState($tenantId, $userId, $state);
+    }
+
     public function rememberAgentOpsTrace(
         string $tenantId,
         string $userId,
@@ -141,6 +235,7 @@ final class ConversationGateway
         $history[] = [
             'at' => date('c'),
             'route_path' => trim((string) ($trace['route_path'] ?? '')),
+            'gate_decision' => trim((string) ($trace['gate_decision'] ?? '')),
             'route_reason' => trim((string) ($trace['route_reason'] ?? '')),
             'request_mode' => trim((string) ($trace['request_mode'] ?? 'operation')) ?: 'operation',
             'query_hash' => trim((string) ($trace['query_hash'] ?? '')),
@@ -148,6 +243,7 @@ final class ConversationGateway
             'rag_attempted' => (bool) ($trace['rag_attempted'] ?? false),
             'rag_used' => (bool) ($trace['rag_used'] ?? false),
             'evidence_gate_status' => trim((string) ($trace['evidence_gate_status'] ?? '')),
+            'evidence_used' => is_array($trace['evidence_used'] ?? null) ? (array) $trace['evidence_used'] : [],
             'fallback_reason' => trim((string) ($trace['fallback_reason'] ?? '')),
             'module_used' => trim((string) ($trace['module_used'] ?? '')) ?: 'none',
             'alert_action' => trim((string) ($trace['alert_action'] ?? '')) ?: 'none',
@@ -169,6 +265,11 @@ final class ConversationGateway
             'pending_items_count' => is_numeric($trace['pending_items_count'] ?? null)
                 ? max(0, (int) $trace['pending_items_count'])
                 : null,
+            'latency_ms' => is_numeric($trace['latency_ms'] ?? null)
+                ? max(0, (int) $trace['latency_ms'])
+                : 0,
+            'task_id' => trim((string) ($trace['task_id'] ?? '')),
+            'conversation_id' => trim((string) ($trace['conversation_id'] ?? '')),
             'loop_guard_triggered' => (bool) ($trace['loop_guard_triggered'] ?? false),
             'tool_calls_count' => max(0, (int) ($trace['tool_calls_count'] ?? 0)),
             'retry_count' => max(0, (int) ($trace['retry_count'] ?? 0)),
@@ -8891,6 +8992,16 @@ private function parseEntityFromCrudText(string $text): string
         ), -8));
         if (isset($merged['agentops_last_trace']) && !is_array($merged['agentops_last_trace']) && $merged['agentops_last_trace'] !== null) {
             $merged['agentops_last_trace'] = null;
+        }
+        if (!is_array($merged['control_tower_task_history'] ?? null)) {
+            $merged['control_tower_task_history'] = [];
+        }
+        $merged['control_tower_task_history'] = array_values(array_slice(array_filter(
+            $merged['control_tower_task_history'],
+            static fn($entry): bool => is_array($entry)
+        ), -8));
+        if (isset($merged['control_tower_last_task']) && !is_array($merged['control_tower_last_task']) && $merged['control_tower_last_task'] !== null) {
+            $merged['control_tower_last_task'] = null;
         }
         $merged['unknown_business_force_research'] = (bool) ($merged['unknown_business_force_research'] ?? false);
         $merged['resolution_attempts'] = (int) ($merged['resolution_attempts'] ?? 0);

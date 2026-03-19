@@ -77,10 +77,13 @@ if (is_array($matchedEvent)) {
         'route_path',
         'route_reason',
         'gate_decision',
+        'task_id',
+        'conversation_id',
         'action_contract',
         'rag_hit',
         'source_ids',
         'evidence_ids',
+        'evidence_used',
         'llm_called',
         'llm_used',
         'semantic_enabled',
@@ -100,6 +103,9 @@ if (is_array($matchedEvent)) {
         'retry_count',
         'loop_guard_triggered',
         'request_mode',
+        'tool_usage',
+        'contract_versions',
+        'cost_estimate',
         'metrics_delta',
         'latency_ms',
         'error_flag',
@@ -129,6 +135,12 @@ if (is_array($matchedEvent)) {
     if (!is_string($matchedEvent['gate_decision'] ?? null) || trim((string) $matchedEvent['gate_decision']) === '') {
         $failures[] = 'gate_decision debe ser string no vacio.';
     }
+    if (!is_string($matchedEvent['task_id'] ?? null) || trim((string) ($matchedEvent['task_id'] ?? '')) === '') {
+        $failures[] = 'task_id debe ser string no vacio.';
+    }
+    if (!is_string($matchedEvent['conversation_id'] ?? null) || trim((string) ($matchedEvent['conversation_id'] ?? '')) === '') {
+        $failures[] = 'conversation_id debe ser string no vacio.';
+    }
     if (!is_string($matchedEvent['action_contract'] ?? null)) {
         $failures[] = 'action_contract debe ser string.';
     }
@@ -140,6 +152,9 @@ if (is_array($matchedEvent)) {
     }
     if (!is_array($matchedEvent['evidence_ids'] ?? null)) {
         $failures[] = 'evidence_ids debe ser arreglo.';
+    }
+    if (!is_array($matchedEvent['evidence_used'] ?? null)) {
+        $failures[] = 'evidence_used debe ser arreglo.';
     }
     if (!is_bool($matchedEvent['llm_called'] ?? null)) {
         $failures[] = 'llm_called debe ser booleano.';
@@ -198,6 +213,12 @@ if (is_array($matchedEvent)) {
     if (!is_string($matchedEvent['request_mode'] ?? null) || !in_array((string) ($matchedEvent['request_mode'] ?? ''), ['operation', 'research'], true)) {
         $failures[] = 'request_mode debe ser operation o research.';
     }
+    if (!is_array($matchedEvent['tool_usage'] ?? null)) {
+        $failures[] = 'tool_usage debe ser arreglo.';
+    }
+    if (!is_array($matchedEvent['contract_versions'] ?? null)) {
+        $failures[] = 'contract_versions debe ser arreglo.';
+    }
     if (!is_array($matchedEvent['metrics_delta'] ?? null)) {
         $failures[] = 'metrics_delta debe ser arreglo.';
     }
@@ -240,10 +261,13 @@ if (is_array($matchedEvent)) {
             'route_path',
             'route_reason',
             'gate_decision',
+            'task_id',
+            'conversation_id',
             'action_contract',
             'rag_hit',
             'source_ids',
             'evidence_ids',
+            'evidence_used',
             'llm_called',
             'llm_used',
             'semantic_enabled',
@@ -264,6 +288,9 @@ if (is_array($matchedEvent)) {
             'loop_guard_triggered',
             'request_mode',
             'agentops_action',
+            'tool_usage',
+            'contract_versions',
+            'cost_estimate',
             'metrics_delta',
             'latency_ms',
             'error_flag',
