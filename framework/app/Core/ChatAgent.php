@@ -956,12 +956,108 @@ final class ChatAgent
                     'user_id' => $userId,
                 ]);
             } catch (\Throwable $e) {
+                $llmFailure = $this->extractLlmFailureDetails($e);
+                $semanticFailureReply = $this->buildSemanticLlmFailureReply($route, $telemetry);
+                if ($semanticFailureReply !== '') {
+                    $task = $this->controlTowerCompleteTask($task, [
+                        'result_status' => 'success',
+                        'response_kind' => 'respond_local',
+                        'response_text' => $semanticFailureReply,
+                        'provider' => 'semantic_memory',
+                    ]);
+                    $semanticReply = $this->reply($semanticFailureReply, $channel, $sessionId, $userId, 'success', [
+                        'provider_used' => 'semantic_memory',
+                        'memory_type' => (string) ($telemetry['memory_type'] ?? ''),
+                        'source_ids' => is_array($telemetry['source_ids'] ?? null) ? (array) $telemetry['source_ids'] : [],
+                        'evidence_gate_status' => (string) ($telemetry['evidence_gate_status'] ?? ''),
+                    ]);
+                    $semanticReply = $this->annotateReplyWithControlTower($semanticReply, $task);
+                    $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+                        'llm_called' => true,
+                        'error_flag' => false,
+                        'error_type' => 'llm_unavailable',
+                        'tool_calls_count' => 0,
+                        'retry_count' => 0,
+                        'provider_used' => 'semantic_memory',
+                        'llm_provider_attempted' => 'llm',
+                        'llm_error' => $llmFailure['message'],
+                        'provider_errors' => $llmFailure['provider_errors'],
+                        'semantic_fallback_used' => true,
+                        'task_id' => (string) ($task['task_id'] ?? ''),
+                        'conversation_id' => $conversationId,
+                    ]);
+                    $this->telemetry()->record($tenantId, array_merge($telemetry, [
+                        'message' => $text,
+                        'provider_used' => 'semantic_memory',
+                        'resolved_locally' => true,
+                        'action' => 'respond_local',
+                        'mode' => $mode,
+                        'llm_request_count' => 1,
+                        'session_id' => $sessionId,
+                        'user_id' => $userId,
+                        'project_id' => $projectId,
+                        'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                        'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
+                        'status' => 'success',
+                        'is_authenticated' => $isAuthenticated,
+                        'effective_role' => $role,
+                    ], $this->buildAgentOpsTelemetryBase(
+                        $telemetry,
+                        $tenantId,
+                        $projectId,
+                        $sessionId,
+                        $messageId,
+                        $this->latencyMs($requestStartedAt),
+                        'response.emitted',
+                        [
+                            'llm_called' => true,
+                            'error_flag' => false,
+                            'error_type' => 'llm_unavailable',
+                            'response_kind' => 'respond_local',
+                            'response_text' => $semanticFailureReply,
+                            'provider_used' => 'semantic_memory',
+                            'llm_provider_attempted' => 'llm',
+                            'llm_error' => $llmFailure['message'],
+                            'provider_errors' => $llmFailure['provider_errors'],
+                            'semantic_fallback_used' => true,
+                            'task_id' => (string) ($task['task_id'] ?? ''),
+                            'conversation_id' => $conversationId,
+                        ]
+                    )));
+                    try {
+                        $this->telemetryService()->recordIntentMetric([
+                            'tenant_id' => $tenantId,
+                            'project_id' => $projectId,
+                            'session_id' => $sessionId,
+                            'mode' => $mode,
+                            'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
+                            'action' => 'respond_local',
+                            'latency_ms' => $this->latencyMs($requestStartedAt),
+                            'status' => 'success',
+                        ]);
+                    } catch (\Throwable $ignored) {
+                        // observability must not block chat response
+                    }
+                    return $this->attachTestInfo($semanticReply, $testMode, $telemetry, [
+                        'action' => 'respond_local',
+                        'resolved_locally' => true,
+                        'llm_called' => true,
+                        'provider_used' => 'semantic_memory',
+                        'llm_provider_attempted' => 'llm',
+                        'llm_error' => $llmFailure['message'],
+                        'provider_errors' => $llmFailure['provider_errors'],
+                        'semantic_fallback_used' => true,
+                    ]);
+                }
                 $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
                     'llm_called' => true,
                     'error_flag' => true,
                     'error_type' => 'llm_unavailable',
                     'tool_calls_count' => 0,
                     'retry_count' => 0,
+                    'llm_provider_attempted' => 'llm',
+                    'llm_error' => $llmFailure['message'],
+                    'provider_errors' => $llmFailure['provider_errors'],
                     'task_id' => (string) ($task['task_id'] ?? ''),
                     'conversation_id' => $conversationId,
                 ]);
@@ -986,6 +1082,8 @@ final class ChatAgent
                     'status' => 'error',
                     'is_authenticated' => $isAuthenticated,
                     'effective_role' => $role,
+                    'llm_error' => $llmFailure['message'],
+                    'provider_errors' => $llmFailure['provider_errors'],
                 ], $this->buildAgentOpsTelemetryBase(
                     $telemetry,
                     $tenantId,
@@ -1000,6 +1098,9 @@ final class ChatAgent
                         'error_type' => 'llm_unavailable',
                         'response_kind' => 'respond_local',
                         'response_text' => 'IA no disponible. Usa comandos simples.',
+                        'llm_provider_attempted' => 'llm',
+                        'llm_error' => $llmFailure['message'],
+                        'provider_errors' => $llmFailure['provider_errors'],
                         'task_id' => (string) ($task['task_id'] ?? ''),
                         'conversation_id' => $conversationId,
                     ]
@@ -1028,6 +1129,9 @@ final class ChatAgent
                     'resolved_locally' => true,
                     'llm_called' => true,
                     'provider_used' => 'llm',
+                    'llm_provider_attempted' => 'llm',
+                    'llm_error' => $llmFailure['message'],
+                    'provider_errors' => $llmFailure['provider_errors'],
                 ]);
             }
             $provider = $llmResult['provider'] ?? 'llm';
@@ -1205,6 +1309,23 @@ final class ChatAgent
             return '';
         }
 
+        return $this->buildSemanticReplyFromRoute($route);
+    }
+
+    private function buildSemanticLlmFailureReply(IntentRouteResult $route, array $telemetry): string
+    {
+        $hasSemanticEvidence = (bool) ($telemetry['rag_used'] ?? false)
+            || trim((string) ($telemetry['evidence_gate_status'] ?? '')) === 'passed'
+            || (int) ($telemetry['rag_result_count'] ?? 0) > 0;
+        if (!$hasSemanticEvidence) {
+            return '';
+        }
+
+        return $this->buildSemanticReplyFromRoute($route);
+    }
+
+    private function buildSemanticReplyFromRoute(IntentRouteResult $route): string
+    {
         $llmRequest = $route->llmRequest();
         $semanticContext = is_array($llmRequest['semantic_context'] ?? null) ? (array) $llmRequest['semantic_context'] : [];
         $chunks = is_array($semanticContext['chunks'] ?? null) ? (array) $semanticContext['chunks'] : [];
@@ -1241,6 +1362,38 @@ final class ChatAgent
         }
 
         return trim($reply);
+    }
+
+    /**
+     * @return array{message:string,provider_errors:array<string,string>}
+     */
+    private function extractLlmFailureDetails(\Throwable $error): array
+    {
+        $message = trim($error->getMessage());
+        $providerErrors = [];
+        if (preg_match('/^(.*?)\s*\|\s*provider_errors=(\{.*\})$/su', $message, $matches) === 1) {
+            $message = trim((string) ($matches[1] ?? $message));
+            $decoded = json_decode((string) ($matches[2] ?? ''), true);
+            if (is_array($decoded)) {
+                foreach ($decoded as $provider => $providerMessage) {
+                    $providerName = trim((string) $provider);
+                    $text = trim((string) $providerMessage);
+                    if ($providerName === '' || $text === '') {
+                        continue;
+                    }
+                    $providerErrors[$providerName] = $text;
+                }
+            }
+        }
+
+        if ($message === '') {
+            $message = 'No hay proveedores LLM disponibles.';
+        }
+
+        return [
+            'message' => $message,
+            'provider_errors' => $providerErrors,
+        ];
     }
 
     private function semanticChunkToReplySnippet(string $content): string
@@ -2061,6 +2214,10 @@ final class ChatAgent
         }
         $providerUsed = trim((string) ($runtime['provider_used'] ?? $telemetry['provider_used'] ?? ''));
         $llmCalled = (bool) ($runtime['llm_called'] ?? $telemetry['llm_called'] ?? false);
+        $llmProvider = trim((string) ($runtime['llm_provider_attempted'] ?? ''));
+        if ($llmProvider === '' && $llmCalled) {
+            $llmProvider = $providerUsed !== '' ? $providerUsed : 'llm';
+        }
         $llmModel = $llmCalled
             ? $this->resolveTestModeLlmModel(
                 is_array($runtime['llm_result'] ?? null) ? (array) $runtime['llm_result'] : [],
@@ -2086,8 +2243,11 @@ final class ChatAgent
             'top_score' => is_numeric($telemetry['retrieval_top_score'] ?? $telemetry['semantic_intent_similarity_score'] ?? null)
                 ? (float) ($telemetry['retrieval_top_score'] ?? $telemetry['semantic_intent_similarity_score'])
                 : 0.0,
-            'llm_provider' => $llmCalled ? ($providerUsed !== '' ? $providerUsed : 'llm') : 'none',
+            'llm_provider' => $llmCalled ? ($llmProvider !== '' ? $llmProvider : 'llm') : 'none',
             'llm_model' => $llmModel,
+            'llm_error' => trim((string) ($runtime['llm_error'] ?? '')),
+            'provider_errors' => is_array($runtime['provider_errors'] ?? null) ? (array) $runtime['provider_errors'] : [],
+            'semantic_fallback_used' => (bool) ($runtime['semantic_fallback_used'] ?? false),
             'agents_used' => $this->collectTestModeAgentsUsed($telemetry, $runtime, $providerUsed, $llmCalled),
         ];
     }
