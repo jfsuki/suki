@@ -46,7 +46,7 @@ $correctionSteps = [
     [
         'mode' => 'builder',
         'message' => 'no soy una ferreteria, fabrico bolsos, mas parecido a modisteria',
-        'contains_any' => ['Entendi tu negocio', 'No tengo plantilla exacta', 'dime en una frase que vendes o fabricas', 'He investigado tu negocio', 'Paso 4: que documentos necesitas usar?'],
+        'contains_any' => ['Entendi tu negocio', 'No tengo plantilla exacta', 'dime en una frase que vendes o fabricas', 'He investigado tu negocio', 'Paso 4: que documentos necesitas usar?', 'A que se dedica tu negocio?'],
         'not_contains' => 'Negocio: Ferreteria',
     ],
 ];

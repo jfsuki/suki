@@ -53,6 +53,59 @@ trait ConversationGatewayHandlePipelineTrait
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('greeting', true));
         }
 
+        if ($mode === 'builder' && $this->isFarewell($normalizedBase)) {
+            $this->clearBuilderPendingCommand($state);
+            $state['builder_calc_prompt'] = null;
+            $state['active_task'] = null;
+            $state['missing'] = [];
+            $state['requested_slot'] = null;
+            $reply = 'Listo. Cuando quieras seguimos.';
+            $state = $this->updateState($state, $raw, $reply, 'farewell', null, [], null);
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('farewell', true));
+        }
+
+        if ($mode === 'builder' && $this->isBuilderContextResetHint($normalizedBase)) {
+            $existingBusinessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
+            $normalizedResetText = $this->normalizeBuilderIntentText($normalizedBase);
+            $mustClearBusinessProfile = $this->isBusinessTypeRejectedByUser($normalizedBase, $existingBusinessType)
+                || preg_match('/\bno\s+te\s+he\s+dicho\b/u', $normalizedResetText) === 1;
+
+            $state = $this->resetBuilderInferenceState($state);
+            $state['builder_plan'] = null;
+            if ($mustClearBusinessProfile) {
+                $profile = $this->resetBuilderBusinessProfile($profile);
+                $this->saveProfile($tenantId, $this->profileUserKey($userId), $profile);
+            }
+
+            $reply = 'Entendido. A que se dedica tu negocio?';
+            $state = $this->updateState($state, $raw, $reply, 'builder_context_reset', null, [], 'builder_onboarding');
+            $this->saveState($tenantId, $userId, $state);
+            $telemetry = $this->telemetry('builder_context_reset', true);
+            $telemetry['builder_context_reset'] = true;
+            $telemetry['builder_context_profile_cleared'] = $mustClearBusinessProfile;
+            return $this->result('ask_user', $reply, null, null, $state, $telemetry);
+        }
+
+        if ($mode === 'builder' && $this->isAmbiguousBuilderCreateRequest($normalizedBase)) {
+            if (
+                !empty($state['builder_pending_command'])
+                || in_array((string) ($state['active_task'] ?? ''), ['create_table', 'create_form', 'crud'], true)
+            ) {
+                $state = $this->resetBuilderInferenceState($state);
+            } else {
+                $this->clearBuilderPendingCommand($state);
+                $state['missing'] = [];
+                $state['requested_slot'] = null;
+            }
+            $reply = $this->buildBuilderAmbiguityReply($normalizedBase, $profile);
+            $state = $this->updateState($state, $raw, $reply, 'builder_clarify', null, [], $state['active_task'] ?? null);
+            $this->saveState($tenantId, $userId, $state);
+            $telemetry = $this->telemetry('builder_clarify', true);
+            $telemetry['builder_ambiguity_guard'] = true;
+            return $this->result('ask_user', $reply, null, null, $state, $telemetry);
+        }
+
         if ($mode === 'builder' && $this->shouldRestartBuilderOnboarding($normalizedBase, $state)) {
             $this->clearBuilderPendingCommand($state);
             $state['active_task'] = 'builder_onboarding';

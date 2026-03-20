@@ -118,6 +118,15 @@ foreach ([
     if (strpos($contents, 'test_info') === false) {
         $failures[] = $file . ' debe leer test_info del backend.';
     }
+    if (strpos($contents, 'id="testInspector"') === false) {
+        $failures[] = $file . ' debe incluir el inspector tecnico separado.';
+    }
+    if (strpos($contents, 'updateTestInspector') === false) {
+        $failures[] = $file . ' debe actualizar el inspector tecnico en modo test.';
+    }
+    if (strpos($contents, 'card.appendChild(renderTestInfo') !== false) {
+        $failures[] = $file . ' no debe mezclar test info dentro del flujo conversacional.';
+    }
 }
 
 $ok = $failures === [];

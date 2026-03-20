@@ -1452,6 +1452,7 @@ final class ConversationGateway
 
     private function parseBuild(string $text, array $state, array $profile = []): array
     {
+        $text = $this->normalizeBuilderIntentText($text);
         $playbookInstall = $this->parseInstallPlaybookRequest($text);
         if (!empty($playbookInstall['matched'])) {
             if (!empty($playbookInstall['list_only'])) {
@@ -1557,14 +1558,10 @@ final class ConversationGateway
         if ($hasCreate && !$hasTable && !$hasForm) {
             if (preg_match('/\b(programa|app|aplicacion|sistema)\b/u', $text) === 1 && !$this->hasFieldPairs($text)) {
                 
-        
-
         return [];
             }
             if (($state['active_task'] ?? '') !== 'create_table' && $this->isQuestionLike($text) && !$this->hasFieldPairs($text)) {
                 
-        
-
         return [];
             }
             $entity = $this->parseEntityFromCrudText($text);
@@ -1645,9 +1642,6 @@ final class ConversationGateway
             }
             return ['command' => ['command' => 'CreateForm', 'entity' => $entity], 'entity' => $entity, 'collected' => []];
         }
-
-        
-        
 
         return [];
     }
@@ -1925,6 +1919,136 @@ final class ConversationGateway
             }
         }
         return false;
+    }
+
+    private function normalizeBuilderIntentText(string $text): string
+    {
+        $text = $this->normalize($text);
+        $replacements = [
+            '/\bayduas\b/u' => 'ayudas',
+            '/\baiudame\b/u' => 'ayudame',
+            '/\bayudaame\b/u' => 'ayudame',
+            '/\bap\b/u' => 'app',
+            '/\bpp\b/u' => 'app',
+        ];
+        foreach ($replacements as $pattern => $replace) {
+            $text = preg_replace($pattern, $replace, $text) ?? $text;
+        }
+
+        return preg_replace('/\s+/', ' ', trim($text)) ?? trim($text);
+    }
+
+    private function isAmbiguousBuilderCreateRequest(string $text): bool
+    {
+        $normalized = $this->normalizeBuilderIntentText($text);
+        if ($normalized === '' || $this->hasFieldPairs($normalized)) {
+            return false;
+        }
+        $businessHint = $this->normalizeBusinessType($this->detectBusinessType($normalized));
+        $unknownCandidate = trim($this->detectUnknownBusinessCandidate($normalized, $businessHint));
+        $meaningfulUnknownCandidate = array_values(array_filter(
+            preg_split('/[^a-z0-9]+/u', $this->normalize($unknownCandidate)) ?: [],
+            fn(string $token): bool => strlen($token) >= 5 && !in_array($token, $this->builderEntityNoiseTokens(), true)
+        ));
+        if ($businessHint !== '' || $meaningfulUnknownCandidate !== []) {
+            return false;
+        }
+
+        $explicitOnboarding = [
+            '/^quiero\s+crear\s+una?\s+app\b/u',
+            '/^quiero\s+crear\s+app\b/u',
+            '/^crear\s+una?\s+app\b/u',
+            '/^crear\s+app\b/u',
+            '/^quiero\s+hacer\s+una?\s+app\b/u',
+            '/^hacer\s+una?\s+app\b/u',
+        ];
+        foreach ($explicitOnboarding as $pattern) {
+            if (preg_match($pattern, $normalized) === 1) {
+                return false;
+            }
+        }
+
+        $hasCreate = preg_match('/\b(crear|crea|hacer|haz|armar|construir)\b/u', $normalized) === 1;
+        if (!$hasCreate) {
+            return false;
+        }
+        if (preg_match('/\b(tabla|entidad|formulario|form)\b/u', $normalized) === 1) {
+            return false;
+        }
+
+        return preg_match('/\b(ayuda|ayudame|ayudas|algo|app|aplicacion|programa|sistema)\b/u', $normalized) === 1;
+    }
+
+    private function isBuilderContextResetHint(string $text): bool
+    {
+        $normalized = $this->normalizeBuilderIntentText($text);
+
+        return preg_match('/\bno\s+te\s+he\s+dicho\b/u', $normalized) === 1
+            || preg_match('/\bno\s+(?:soy|es)\b/u', $normalized) === 1;
+    }
+
+    private function isFarewell(string $text): bool
+    {
+        $normalized = $this->normalize($text);
+        return in_array($normalized, ['chao', 'chau', 'adios', 'hasta luego', 'hasta pronto', 'nos vemos', 'bye'], true);
+    }
+
+    private function resetBuilderInferenceState(array $state): array
+    {
+        $this->clearBuilderPendingCommand($state);
+        $state['builder_calc_prompt'] = null;
+        $state['active_task'] = null;
+        $state['entity'] = null;
+        $state['collected'] = [];
+        $state['missing'] = [];
+        $state['requested_slot'] = null;
+        $state['proposed_profile'] = null;
+        $state['analysis_approved'] = null;
+        $state['dynamic_playbook_proposal'] = null;
+        $state['dynamic_playbook'] = null;
+        $state['unknown_business_discovery'] = null;
+        $state['unknown_business_force_research'] = false;
+        $state['business_resolution_last_candidate'] = null;
+        $state['business_resolution_last_status'] = null;
+        $state['business_resolution_last_result'] = null;
+        $state['business_resolution_last_at'] = null;
+        $state['confirm_scope_last_hash'] = null;
+        $state['confirm_scope_repeats'] = 0;
+        $state['onboarding_step'] = 'business_type';
+
+        return $state;
+    }
+
+    private function buildBuilderAmbiguityReply(string $text, array $profile = []): string
+    {
+        $normalized = $this->normalizeBuilderIntentText($text);
+        $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
+        $mentionsApp = preg_match('/\b(app|aplicacion|programa|sistema)\b/u', $normalized) === 1;
+
+        if ($mentionsApp && $businessType !== '') {
+            return 'Claro. Que proceso quieres resolver primero en tu negocio?';
+        }
+        if ($mentionsApp) {
+            return 'Claro. A que se dedica tu negocio?';
+        }
+
+        return 'Claro. Que quieres crear primero: una app, una tabla o un formulario?';
+    }
+
+    private function resetBuilderBusinessProfile(array $profile): array
+    {
+        unset(
+            $profile['business_type'],
+            $profile['business_candidate'],
+            $profile['business_label'],
+            $profile['needs_scope'],
+            $profile['needs_scope_items'],
+            $profile['documents_scope'],
+            $profile['documents_scope_items'],
+            $profile['operation_model']
+        );
+
+        return $profile;
     }
 
     private function shouldResetBuilderFlow(string $text, array $state): bool
@@ -2464,8 +2588,6 @@ final class ConversationGateway
         $candidate = trim($candidate);
         if ($candidate === '') {
             
-        
-
         return [];
         }
 
@@ -2476,8 +2598,6 @@ final class ConversationGateway
         $enabled = (bool) ($unknownProtocol['enabled'] ?? true);
         if (!$enabled) {
             
-        
-
         return [];
         }
 
@@ -3783,8 +3903,6 @@ final class ConversationGateway
     {
         if ($businessType === '') {
             
-        
-
         return [];
         }
         if (empty($playbook)) {
@@ -3798,8 +3916,6 @@ final class ConversationGateway
             }
         }
         
-        
-
         return [];
     }
 
@@ -4070,8 +4186,6 @@ final class ConversationGateway
 
         if (empty($found)) {
             
-        
-
         return [];
         }
 
@@ -4129,8 +4243,6 @@ final class ConversationGateway
 
         if (empty($found)) {
             
-        
-
         return [];
         }
 
@@ -4180,8 +4292,6 @@ final class ConversationGateway
         }
         if (empty($excluded)) {
             
-        
-
         return [];
         }
         $ordered = [];
@@ -4268,7 +4378,6 @@ final class ConversationGateway
         }
         return false;
     }
-
 
     private function buildCreateTableProposal(string $entity, array $profile = [], array $fields = []): array
     {
@@ -4454,23 +4563,17 @@ final class ConversationGateway
         $target = $this->normalizeEntityForSchema($entity);
         if ($target === '') {
             
-        
-
         return [];
         }
         $rules = $this->loadEntityDependencyRules();
         if (empty($rules[$target]) || !is_array($rules[$target])) {
             
-        
-
         return [];
         }
         $rule = $rules[$target];
         $requiresGroups = is_array($rule['requires'] ?? null) ? $rule['requires'] : [];
         if (empty($requiresGroups)) {
             
-        
-
         return [];
         }
 
@@ -4497,16 +4600,12 @@ final class ConversationGateway
         }
         if (empty($missingGroups)) {
             
-        
-
         return [];
         }
 
         $nextEntity = $missingGroups[0][0] ?? '';
         if ($nextEntity === '' || $nextEntity === $target) {
             
-        
-
         return [];
         }
         $proposal = $this->buildCreateTableProposal($nextEntity, $profile);
@@ -4544,6 +4643,7 @@ final class ConversationGateway
         $map = [
             'cliente' => 'clientes',
             'producto' => 'productos',
+            'paciente' => 'pacientes',
             'servicio' => 'servicios',
             'factura' => 'facturas',
             'pago' => 'pagos',
@@ -4560,6 +4660,66 @@ final class ConversationGateway
             return $map[$entity];
         }
         return $entity;
+    }
+
+    private function builderEntityNoiseTokens(): array
+    {
+        return array_values(array_unique(array_merge(
+            $this->confusionNonEntityTokens(),
+            [
+                'me',
+                'te',
+                'se',
+                'nos',
+                'algo',
+                'app',
+                'aplicacion',
+                'programa',
+                'sistema',
+                'ayuda',
+                'ayudame',
+                'ayudas',
+                'ayduas',
+                'crear',
+                'crea',
+                'hacer',
+                'haz',
+                'quiero',
+                'quieres',
+                'puedo',
+                'necesito',
+                'he',
+                'dicho',
+                'hago',
+                'negocio',
+                'empresa',
+                'cosa',
+            ]
+        )));
+    }
+
+    private function isInvalidBuilderEntityCandidate(string $candidate): bool
+    {
+        $candidate = $this->normalizeEntityForSchema($candidate);
+        if ($candidate === '' || strlen($candidate) < 3) {
+            return true;
+        }
+
+        $noise = array_fill_keys($this->builderEntityNoiseTokens(), true);
+        $parts = array_values(array_filter(explode('_', $candidate), static fn(string $part): bool => $part !== ''));
+        if ($parts === []) {
+            return true;
+        }
+
+        $meaningful = 0;
+        foreach ($parts as $part) {
+            if (isset($noise[$part]) || strlen($part) < 3) {
+                continue;
+            }
+            $meaningful++;
+        }
+
+        return $meaningful === 0;
     }
 
     private function entityDisplayName(string $entity): string
@@ -4728,11 +4888,14 @@ final class ConversationGateway
                 $fields[] = ['name' => $name, 'type' => $type];
                 continue;
             }
-            $token = mb_strtolower(trim($token), 'UTF-8');
+            $token = $this->normalize(trim((string) $token));
             if (in_array($token, $stopWords, true)) {
                 continue;
             }
             if (!preg_match('/^[a-zA-Z0-9_\\x{00C0}-\\x{017F}-]+$/u', $token)) {
+                continue;
+            }
+            if ($this->isInvalidBuilderEntityCandidate($token)) {
                 continue;
             }
             $entityTokens[] = $token;
@@ -4746,6 +4909,9 @@ final class ConversationGateway
         }
 
         $entity = $this->normalizeEntityForSchema($entity);
+        if ($this->isInvalidBuilderEntityCandidate($entity)) {
+            $entity = '';
+        }
 
         return ['entity' => $entity, 'fields' => $fields];
     }
@@ -4759,13 +4925,16 @@ final class ConversationGateway
             'de', 'del', 'la', 'el', 'un', 'una', 'para', 'que', 'quiero', 'necesito', 'ayudame', 'campos',
             'si', 'no', 'cual', 'cuales', 'vas', 'crear', 'hacer', 'paso', 'ahora', 'explicame', 'me', 'a',
         ];
-        $stop = array_values(array_unique(array_merge($stop, $this->confusionNonEntityTokens())));
+        $stop = array_values(array_unique(array_merge($stop, $this->builderEntityNoiseTokens())));
         foreach ($tokens as $token) {
-            $token = strtolower(trim($token));
+            $token = $this->normalize(trim((string) $token));
             if ($token === '' || in_array($token, $stop, true)) {
                 continue;
             }
             if (preg_match('/^[a-z0-9_\\-]+$/i', $token) !== 1) {
+                continue;
+            }
+            if ($this->isInvalidBuilderEntityCandidate($token)) {
                 continue;
             }
             return $token;
@@ -4801,8 +4970,6 @@ final class ConversationGateway
                 return ['command' => $command, 'intent' => $intent, 'entity' => $entity, 'collected' => $collected];
             }
             
-        
-
         return [];
         }
 
@@ -4980,7 +5147,6 @@ final class ConversationGateway
         return false;
     }
 
-    
     private function hasRuntimeCrudSignals(string $text): bool
     {
         if ($this->hasFieldPairs($text) && preg_match('/\b(crear|registrar|guardar|agregar)\b/u', $text) === 1) {
@@ -4993,6 +5159,7 @@ final class ConversationGateway
     }
 private function parseEntityFromCrudText(string $text): string
     {
+        $text = $this->normalizeBuilderIntentText($text);
         $text = preg_replace('/^(quiero|puedo|necesito|me\\s+gustaria|deseo)\\s+/i', '', $text) ?? $text;
         $text = preg_replace('/^(crear|crea|agregar|nuevo|listar|lista|mostrar|muestrame|dame|ver|buscar|actualizar|editar|eliminar|borrar|guardar|registrar|emitir|facturar)\\s+/i', '', $text) ?? $text;
         $text = preg_replace('/^(un|una|el|la|los|las|lista|lista\\s+de|registros|registro|datos)\\s+/i', '', $text) ?? $text;
@@ -5010,14 +5177,18 @@ private function parseEntityFromCrudText(string $text): string
             'tabla', 'tablas', 'entidad', 'entidades', 'sabes', 'sobre', 'cual', 'cuales', 'vas', 'debo', 'hacer', 'crea',
             'ahora', 'paso', 'sigue', 'siguiente', 'explicame'
         ];
-        $stopwords = array_values(array_unique(array_merge($stopwords, $this->confusionNonEntityTokens())));
+        $stopwords = array_values(array_unique(array_merge($stopwords, $this->builderEntityNoiseTokens())));
 
         foreach ($tokens as $token) {
             $candidate = trim($token, " \t\n\r\0\x0B.,;:!?");
             if ($candidate === '' || str_contains($candidate, '=') || str_contains($candidate, ':')) {
                 continue;
             }
+            $candidate = $this->normalize($candidate);
             if (in_array($candidate, $stopwords, true)) {
+                continue;
+            }
+            if ($this->isInvalidBuilderEntityCandidate($candidate)) {
                 continue;
             }
             return $candidate;
@@ -5168,14 +5339,10 @@ private function parseEntityFromCrudText(string $text): string
     {
         if ($intent === 'list') {
             
-        
-
         return [];
         }
         if (in_array($intent, ['update', 'delete'], true)) {
             
-        
-
         return [];
         }
         if ($entity === '') {
@@ -5529,35 +5696,25 @@ private function parseEntityFromCrudText(string $text): string
     {
         if ($mode !== 'builder') {
             
-        
-
         return [];
         }
         if (trim($text) === '') {
             
-        
-
         return [];
         }
         if (!empty($state['builder_pending_command']) && is_array($state['builder_pending_command'])) {
             
-        
-
         return [];
         }
         $activeTask = (string) ($state['active_task'] ?? '');
         if (in_array($activeTask, ['builder_onboarding', 'unknown_business_discovery', 'business_research_confirmation'], true)) {
             
-        
-
         return [];
         }
 
         $guides = $this->loadBuilderGuidance($training);
         if (empty($guides)) {
             
-        
-
         return [];
         }
 
@@ -5593,8 +5750,6 @@ private function parseEntityFromCrudText(string $text): string
 
         if (empty($bestGuide)) {
             
-        
-
         return [];
         }
 
@@ -5602,16 +5757,12 @@ private function parseEntityFromCrudText(string $text): string
         $template = trim((string) ($bestGuide['agent_response_template'] ?? ''));
         if ($template === '') {
             
-        
-
         return [];
         }
 
         $reply = $this->renderBuilderGuidanceTemplate($template, $text, $state, $lexicon);
         if ($reply === '') {
             
-        
-
         return [];
         }
         $flowHint = $this->guidanceFlowHint($topic);
@@ -5681,8 +5832,6 @@ private function parseEntityFromCrudText(string $text): string
         $command = strtolower(trim($command));
         if ($command === '') {
             
-        
-
         return [];
         }
         $rules = is_array($training['feedback_rules'] ?? null) ? $training['feedback_rules'] : [];
@@ -5709,8 +5858,6 @@ private function parseEntityFromCrudText(string $text): string
             $target = $this->normalizeEntityForSchema((string) ($tables['tabla_B'] ?? ''));
             if ($source === '' || $target === '' || $source === $target) {
                 
-        
-
         return [];
             }
 
@@ -5728,8 +5875,6 @@ private function parseEntityFromCrudText(string $text): string
             $field = $this->detectGuidanceFieldFromText($text);
             if ($entity === '' || $field === '') {
                 
-        
-
         return [];
             }
 
@@ -5740,9 +5885,6 @@ private function parseEntityFromCrudText(string $text): string
                 'index_name' => 'idx_' . $entity . '_' . $field,
             ];
         }
-
-        
-        
 
         return [];
     }
@@ -6642,8 +6784,6 @@ private function parseEntityFromCrudText(string $text): string
             }
         }
         
-        
-
         return [];
     }
 
@@ -6781,8 +6921,6 @@ private function parseEntityFromCrudText(string $text): string
     {
         if ($mode !== 'builder') {
             
-        
-
         return [];
         }
 
@@ -6790,48 +6928,36 @@ private function parseEntityFromCrudText(string $text): string
         $step = trim((string) ($state['onboarding_step'] ?? ($runtime['current_step'] ?? '')));
         if ($step === '') {
             
-        
-
         return [];
         }
 
         $lastActivityRaw = (string) ($runtime['last_activity_at'] ?? '');
         if ($lastActivityRaw === '') {
             
-        
-
         return [];
         }
 
         $lastActivityAt = strtotime($lastActivityRaw);
         if ($lastActivityAt === false) {
             
-        
-
         return [];
         }
 
         $ttlSeconds = $this->flowRuntimeTtlSeconds();
         if ($ttlSeconds <= 0 || (time() - $lastActivityAt) < $ttlSeconds) {
             
-        
-
         return [];
         }
 
         $intent = $this->detectFlowControlIntent($text);
         if ($intent !== '') {
             
-        
-
         return [];
         }
 
         $alreadyNotified = (bool) ($state['flow_expiry_notice_sent'] ?? false);
         if ($alreadyNotified) {
             
-        
-
         return [];
         }
 
@@ -6875,8 +7001,6 @@ private function parseEntityFromCrudText(string $text): string
         $intent = $this->detectFlowControlIntent($text);
         if ($intent === '') {
             
-        
-
         return [];
         }
         $state['flow_expiry_notice_sent'] = false;
@@ -7064,9 +7188,6 @@ private function parseEntityFromCrudText(string $text): string
             ];
         }
 
-        
-        
-
         return [];
     }
 
@@ -7194,21 +7315,15 @@ private function parseEntityFromCrudText(string $text): string
     {
         if ($mode !== 'builder') {
             
-        
-
         return [];
         }
         if (is_array($state['builder_pending_command'] ?? null)) {
             
-        
-
         return [];
         }
         $pending = is_array($state['feedback_pending'] ?? null) ? (array) $state['feedback_pending'] : [];
         if (empty($pending)) {
             
-        
-
         return [];
         }
 
@@ -7230,8 +7345,6 @@ private function parseEntityFromCrudText(string $text): string
                 ];
             }
             
-        
-
         return [];
         }
 
@@ -7370,8 +7483,6 @@ private function parseEntityFromCrudText(string $text): string
         $intents = is_array($playbook['solver_intents'] ?? null) ? $playbook['solver_intents'] : [];
         if (empty($intents)) {
             
-        
-
         return [];
         }
 
@@ -7446,8 +7557,6 @@ private function parseEntityFromCrudText(string $text): string
 
         if ((string) ($best['intent'] ?? '') === '') {
             
-        
-
         return [];
         }
 
@@ -7476,8 +7585,6 @@ private function parseEntityFromCrudText(string $text): string
         $sectorKey = $this->sectorKeyByPlaybookAction($action);
         if ($sectorKey === '') {
             
-        
-
         return [];
         }
         $playbook = $this->loadDomainPlaybook();
@@ -7486,8 +7593,6 @@ private function parseEntityFromCrudText(string $text): string
             $sample = 'requested_action=' . $action . '; source=playbook_router';
             $this->appendResearchTopic($tenantId, $sectorKey . ':playbook_missing', $userId, mb_substr($sample, 0, 220));
             
-        
-
         return [];
         }
 
@@ -7609,8 +7714,6 @@ private function parseEntityFromCrudText(string $text): string
         $sectorKey = strtoupper(trim($sectorKey));
         if ($sectorKey === '') {
             
-        
-
         return [];
         }
         if (empty($playbook)) {
@@ -7626,8 +7729,6 @@ private function parseEntityFromCrudText(string $text): string
             }
         }
         
-        
-
         return [];
     }
 
@@ -7717,8 +7818,6 @@ private function parseEntityFromCrudText(string $text): string
     {
         if (empty($confusionBase) || empty($confusionBase['confusion_sets']) || !is_array($confusionBase['confusion_sets'])) {
             
-        
-
         return [];
         }
 
@@ -7756,8 +7855,6 @@ private function parseEntityFromCrudText(string $text): string
                 'intent' => 'mode_switch_app',
             ];
         }
-
-
 
         $pending = is_array($state['builder_pending_command'] ?? null) ? $state['builder_pending_command'] : [];
         if ($this->isBuilderProgressQuestion($text)) {
@@ -7839,9 +7936,6 @@ private function parseEntityFromCrudText(string $text): string
                 'active_task' => 'builder_onboarding',
             ];
         }
-
-        
-        
 
         return [];
     }
@@ -8012,8 +8106,6 @@ private function parseEntityFromCrudText(string $text): string
             }
         }
         
-        
-
         return [];
     }
 
@@ -8099,8 +8191,6 @@ private function parseEntityFromCrudText(string $text): string
         $text = preg_replace('/\\s+/', ' ', trim($text)) ?? $text;
         if ($text === '') {
             
-        
-
         return [];
         }
         $tokens = preg_split('/\\s+/', $text) ?: [];
@@ -9252,8 +9342,6 @@ private function parseEntityFromCrudText(string $text): string
         if (!is_file($frameworkPath)) {
             $this->domainPlaybookCache = [];
             
-        
-
         return [];
         }
         $raw = file_get_contents($frameworkPath);
@@ -9344,8 +9432,6 @@ private function parseEntityFromCrudText(string $text): string
         $items = is_array($knowledge['common_codes'] ?? null) ? $knowledge['common_codes'] : [];
         if (empty($items)) {
             
-        
-
         return [];
         }
         $matches = [];
@@ -9405,8 +9491,6 @@ private function parseEntityFromCrudText(string $text): string
         }
         if (empty($codes)) {
             
-        
-
         return [];
         }
 
@@ -9583,8 +9667,6 @@ private function parseEntityFromCrudText(string $text): string
             . '.json';
         if (!is_file($legacyPath)) {
             
-        
-
         return [];
         }
         $legacy = $this->readJson($legacyPath, []);
@@ -9609,8 +9691,6 @@ private function parseEntityFromCrudText(string $text): string
         $legacyPath = $this->projectRoot . '/storage/chat/glossary/' . $this->safe($tenantId) . '.json';
         if (!is_file($legacyPath)) {
             
-        
-
         return [];
         }
         $legacy = $this->readJson($legacyPath, []);
@@ -9630,8 +9710,6 @@ private function parseEntityFromCrudText(string $text): string
         $topic = trim($topic);
         if ($topic === '') {
             
-        
-
         return [];
         }
 
@@ -9803,7 +9881,6 @@ private function parseEntityFromCrudText(string $text): string
         $decoded = json_decode($raw, true);
         return is_array($decoded) ? $decoded : $default;
     }
-
 
     private function profileUserKey(string $userId): string
     {
