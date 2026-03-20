@@ -83,6 +83,10 @@
     ],
     "required_one_question_policy_for_required_slots": true
   },
+  "balance_rules": {
+    "min_total_utterances_per_intent": 4,
+    "max_intent_dominance_ratio": 2.5
+  },
   "anti_noise_rules": {
     "forbidden_marketing_copy": true,
     "forbidden_placeholder_text": true,
@@ -103,4 +107,3 @@
     "deprecated"
   ]
 }
-

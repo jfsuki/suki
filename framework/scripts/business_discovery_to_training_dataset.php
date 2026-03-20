@@ -24,6 +24,10 @@ foreach (array_slice($argv, 1) as $arg) {
         $outputPath = substr($arg, strlen('--out='));
         continue;
     }
+    if (str_starts_with($arg, '--sector-seed=')) {
+        $sectorSeedPath = substr($arg, strlen('--sector-seed='));
+        continue;
+    }
     if (!str_starts_with($arg, '--') && $inputPath === null) {
         $inputPath = $arg;
     }
@@ -52,6 +56,19 @@ if (!is_array($payload)) {
 
 if ($outputPath === null || trim($outputPath) === '') {
     $outputPath = deriveOutputPath($inputPath, $payload);
+}
+
+if (isset($sectorSeedPath) && is_file($sectorSeedPath)) {
+    $seedPayload = readJsonFile($sectorSeedPath);
+    if (is_array($seedPayload)) {
+        $payload['sector_seed'] = $seedPayload;
+    } else {
+        writeReportAndExit([
+            'ok' => false,
+            'action' => 'warning',
+            'error' => 'Sector seed invalido o no leible: ' . $sectorSeedPath,
+        ], 2);
+    }
 }
 
 try {
@@ -139,6 +156,9 @@ writeReportAndExit([
         'errors_count' => 0,
         'warnings_count' => count((array) ($validation['warnings'] ?? [])),
         'quality_score' => (float) (($validation['stats']['quality_score'] ?? 0.0)),
+        'intent_balance' => is_array($validation['stats']['intent_balance'] ?? null)
+            ? (array) $validation['stats']['intent_balance']
+            : null,
     ],
 ], 0);
 
@@ -180,7 +200,7 @@ function printHelp(): void
 {
     echo "Usage:\n";
     echo "  php framework/scripts/business_discovery_to_training_dataset.php [discovery.json]\n";
-    echo "      [--in=<discovery.json>] [--out=<dataset.json>]\n\n";
+    echo "      [--in=<discovery.json>] [--out=<dataset.json>] [--sector-seed=<seed.json>]\n\n";
     echo "Default input:\n";
     echo "  project/contracts/knowledge/business_discovery_template.json\n";
 }

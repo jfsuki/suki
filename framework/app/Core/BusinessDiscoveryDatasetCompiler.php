@@ -113,6 +113,7 @@ final class BusinessDiscoveryDatasetCompiler
             'emotion_cases' => self::buildEmotionCases($payload),
             'qa_cases' => self::buildQaCases($payload, $skillIntentMap),
         ];
+        $balanceAudit = SectorIntentBalance::audit((array) ($dataset['intents_expansion'] ?? []));
 
         return [
             'dataset' => $dataset,
@@ -126,6 +127,7 @@ final class BusinessDiscoveryDatasetCompiler
                 'emotion_cases' => count($dataset['emotion_cases']),
                 'qa_cases' => count($dataset['qa_cases']),
                 'dedupe_removed' => (int) ($intentsBuild['dedupe_removed'] ?? 0),
+                'intent_balance' => $balanceAudit,
             ],
         ];
     }
@@ -430,7 +432,8 @@ final class BusinessDiscoveryDatasetCompiler
             $explicit = self::uniqueIntentPhrases($explicitSource, $globalSeen, [], $dedupeRemoved);
             $blocked = self::phraseKeys($explicit);
             $implicit = self::uniqueIntentPhrases($implicitSource, $globalSeen, $blocked, $dedupeRemoved);
-            $blocked = array_merge($blocked, self::phraseKeys($implicit));
+            $explicit = self::ensureMinimumIntentCoverage($mapping, $explicit, $implicit, $globalSeen, $dedupeRemoved);
+            $blocked = self::phraseKeys(array_merge($explicit, $implicit));
             $negatives = self::uniqueIntentPhrases($negativeSource, $globalSeen, $blocked, $dedupeRemoved);
 
             $records[] = [
@@ -840,6 +843,58 @@ final class BusinessDiscoveryDatasetCompiler
         }
 
         return array_values(array_filter($mappings, 'is_array'));
+    }
+
+    /**
+     * @param array<string, mixed> $mapping
+     * @param array<int, string> $explicit
+     * @param array<int, string> $implicit
+     * @param array<string, bool> $globalSeen
+     * @param int $dedupeRemoved
+     * @return array<int, string>
+     */
+    private static function ensureMinimumIntentCoverage(
+        array $mapping,
+        array $explicit,
+        array $implicit,
+        array &$globalSeen,
+        int &$dedupeRemoved
+    ): array {
+        $thresholds = SectorIntentBalance::resolveThresholds();
+        $minTotal = (int) ($thresholds['min_total_utterances_per_intent'] ?? SectorIntentBalance::DEFAULT_MIN_TOTAL_UTTERANCES_PER_INTENT);
+        if ((count($explicit) + count($implicit)) >= $minTotal) {
+            return $explicit;
+        }
+
+        $skill = trim((string) ($mapping['skill'] ?? ''));
+        $label = self::sanitizeText((string) ($mapping['label'] ?? ''), true);
+        $candidates = array_merge(
+            SectorIntentBalance::catalogKeywords($skill),
+            $label !== '' ? [$label] : []
+        );
+
+        $localSeen = self::phraseKeys(array_merge($explicit, $implicit));
+        foreach ($candidates as $candidate) {
+            if ((count($explicit) + count($implicit)) >= $minTotal) {
+                break;
+            }
+
+            $text = self::sanitizeText((string) $candidate, true);
+            $key = self::toKey($text);
+            if ($key === '') {
+                continue;
+            }
+            if (isset($localSeen[$key]) || isset($globalSeen[$key])) {
+                $dedupeRemoved++;
+                continue;
+            }
+
+            $localSeen[$key] = true;
+            $globalSeen[$key] = true;
+            $explicit[] = $text;
+        }
+
+        return $explicit;
     }
 
     /**

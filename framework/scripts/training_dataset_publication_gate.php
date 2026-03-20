@@ -7,6 +7,7 @@ require_once __DIR__ . '/../vendor/autoload.php';
 require_once __DIR__ . '/../app/autoload.php';
 
 use App\Core\IntentDatasetValidator;
+use App\Core\SectorIntentBalance;
 use App\Core\TrainingDatasetValidator;
 
 const DEFAULT_MIN_QUALITY_SCORE = 0.75;
@@ -73,6 +74,14 @@ foreach (array_slice($argv, 1) as $arg) {
         $thresholdOverrides['min_coverage_ratio'] = (float) substr($arg, strlen('--min-coverage='));
         continue;
     }
+    if (str_starts_with($arg, '--min-intent-total=')) {
+        $thresholdOverrides['min_total_utterances_per_intent'] = (int) substr($arg, strlen('--min-intent-total='));
+        continue;
+    }
+    if (str_starts_with($arg, '--max-intent-ratio=')) {
+        $thresholdOverrides['max_intent_dominance_ratio'] = (float) substr($arg, strlen('--max-intent-ratio='));
+        continue;
+    }
     if (!str_starts_with($arg, '--') && $inputPath === null) {
         $inputPath = $arg;
     }
@@ -128,6 +137,8 @@ $validationOptions = [
     'min_hard_negatives' => $thresholds['min_hard_negatives'],
     'min_dialogues' => $thresholds['min_dialogues'],
     'min_qa_cases' => $thresholds['min_qa_cases'],
+    'min_total_utterances_per_intent' => $thresholds['min_total_utterances_per_intent'],
+    'max_intent_dominance_ratio' => $thresholds['max_intent_dominance_ratio'],
 ];
 
 try {
@@ -191,6 +202,16 @@ if ($qualityScore < $thresholds['min_quality_score']) {
 $coverageRatio = (float) ($stats['coverage_ratio'] ?? 0.0);
 if ($coverageRatio < $thresholds['min_coverage_ratio']) {
     $blockingReasons[] = 'coverage_ratio_below_min';
+}
+
+$balanceAudit = is_array($stats['intent_balance'] ?? null)
+    ? (array) $stats['intent_balance']
+    : SectorIntentBalance::audit(
+        is_array($payload['intents_expansion'] ?? null) ? (array) $payload['intents_expansion'] : [],
+        $thresholds
+    );
+if (($balanceAudit['ok'] ?? false) !== true) {
+    $blockingReasons[] = 'intent_balance_failed';
 }
 
 $noiseWarnings = array_values(array_filter($warnings, static function ($warning): bool {
@@ -267,6 +288,7 @@ $result = [
     'noise_warnings_count' => count($noiseWarnings),
     'quality_score' => $qualityScore,
     'coverage_ratio' => $coverageRatio,
+    'balance_audit' => $balanceAudit,
     'coverage_checks' => $coverageChecks,
     'publication_status' => $finalStatus !== '' ? $finalStatus : 'missing',
     'eligible_for_vectorization' => $ok && $finalStatus === 'published',
@@ -299,6 +321,7 @@ function readJsonFile(string $path): ?array
 function resolveThresholds(?array $contract, array $overrides): array
 {
     $qualityRules = is_array($contract['quality_rules'] ?? null) ? $contract['quality_rules'] : [];
+    $balanceRules = is_array($contract['balance_rules'] ?? null) ? $contract['balance_rules'] : [];
 
     $minQualityFromEnv = envFloatOrNull('TRAINING_DATASET_MIN_QUALITY_SCORE');
     $minCoverageFromEnv = envFloatOrNull('TRAINING_DATASET_MIN_COVERAGE_RATIO');
@@ -309,6 +332,14 @@ function resolveThresholds(?array $contract, array $overrides): array
         'min_hard_negatives' => max(1, (int) ($overrides['min_hard_negatives'] ?? $qualityRules['min_hard_negatives_per_intent'] ?? 40)),
         'min_dialogues' => max(1, (int) ($overrides['min_dialogues'] ?? $qualityRules['min_multi_turn_dialogues'] ?? 10)),
         'min_qa_cases' => max(1, (int) ($overrides['min_qa_cases'] ?? $qualityRules['min_qa_cases'] ?? 10)),
+        'min_total_utterances_per_intent' => max(
+            1,
+            (int) ($overrides['min_total_utterances_per_intent'] ?? $balanceRules['min_total_utterances_per_intent'] ?? SectorIntentBalance::DEFAULT_MIN_TOTAL_UTTERANCES_PER_INTENT)
+        ),
+        'max_intent_dominance_ratio' => max(
+            1.0,
+            (float) ($overrides['max_intent_dominance_ratio'] ?? $balanceRules['max_intent_dominance_ratio'] ?? SectorIntentBalance::DEFAULT_MAX_INTENT_DOMINANCE_RATIO)
+        ),
         'min_quality_score' => max(0.0, min(1.0, (float) ($overrides['min_quality_score'] ?? $minQualityFromEnv ?? DEFAULT_MIN_QUALITY_SCORE))),
         'min_coverage_ratio' => max(0.0, min(1.0, (float) ($overrides['min_coverage_ratio'] ?? $minCoverageFromEnv ?? DEFAULT_MIN_COVERAGE_RATIO))),
     ];
@@ -343,6 +374,7 @@ function printHelp(): void
     echo "      [--in=<dataset.json>] [--out=<dataset.json>] [--contract=<contract.json>]\n";
     echo "      [--min-explicit=40] [--min-implicit=40] [--min-hard-negatives=40]\n";
     echo "      [--min-dialogues=10] [--min-qa=10]\n";
+    echo "      [--min-intent-total=4] [--max-intent-ratio=2.5]\n";
     echo "      [--min-quality=0.75] [--min-coverage=0.80]\n";
     echo "      [--fail-on-warnings]\n";
     echo "      [--require-published]\n\n";

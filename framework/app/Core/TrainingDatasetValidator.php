@@ -195,6 +195,8 @@ final class TrainingDatasetValidator
             }
         }
 
+        self::validateIntentBalance($intents, $warnings, $options);
+
         $dialogues = is_array($payload['multi_turn_dialogues'] ?? null) ? $payload['multi_turn_dialogues'] : [];
         if (count($dialogues) < $minDialogues) {
             self::addWarning($warnings, '$.multi_turn_dialogues', 'Cobertura baja: ' . count($dialogues) . ' < ' . $minDialogues);
@@ -417,6 +419,7 @@ final class TrainingDatasetValidator
     private static function buildStats(array $payload, array $errors = [], array $warnings = [], array $options = []): array
     {
         $intents = is_array($payload['intents_expansion'] ?? null) ? $payload['intents_expansion'] : [];
+        $balanceAudit = SectorIntentBalance::audit($intents, $options);
         $explicit = 0;
         $implicit = 0;
         $negatives = 0;
@@ -541,7 +544,46 @@ final class TrainingDatasetValidator
             'uniqueness_ratio' => $uniquenessRatio,
             'governance_ratio' => $governanceRatio,
             'quality_score' => $qualityScore,
+            'intent_balance_ok' => (bool) ($balanceAudit['ok'] ?? false),
+            'intent_balance' => $balanceAudit,
         ];
+    }
+
+    /**
+     * @param array<int, mixed> $intents
+     * @param array<int, array<string, string>> $warnings
+     * @param array<string, mixed> $options
+     */
+    private static function validateIntentBalance(array $intents, array &$warnings, array $options): void
+    {
+        $audit = SectorIntentBalance::audit($intents, $options);
+        if (($audit['ok'] ?? true) === true) {
+            return;
+        }
+
+        $underrepresented = is_array($audit['underrepresented_intents'] ?? null)
+            ? array_values((array) $audit['underrepresented_intents'])
+            : [];
+        if ($underrepresented !== []) {
+            self::addWarning(
+                $warnings,
+                '$.intents_expansion',
+                'Balance intra-sector insuficiente: intents subrepresentados -> ' . implode(', ', $underrepresented)
+            );
+        }
+
+        $dominanceRatio = $audit['dominance_ratio'] ?? null;
+        $maxRatio = (float) (($audit['thresholds']['max_intent_dominance_ratio'] ?? SectorIntentBalance::DEFAULT_MAX_INTENT_DOMINANCE_RATIO));
+        if (is_numeric($dominanceRatio) && (float) $dominanceRatio > $maxRatio) {
+            self::addWarning(
+                $warnings,
+                '$.intents_expansion',
+                'Balance intra-sector insuficiente: dominance_ratio='
+                . number_format((float) $dominanceRatio, 2, '.', '')
+                . ' > '
+                . number_format($maxRatio, 2, '.', '')
+            );
+        }
     }
 
     /**
