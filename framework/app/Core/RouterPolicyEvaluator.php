@@ -135,8 +135,11 @@ final class RouterPolicyEvaluator
             trim((string) ($input['evidence_gate_status'] ?? ''))
         );
         $missingEvidence = is_array($evidence['missing'] ?? null) ? (array) $evidence['missing'] : [];
-        foreach ($missingEvidence as $missing) {
-            $violations[] = 'minimum_evidence_missing:' . (string) $missing;
+        $evidenceOverride = (bool) ($evidence['evidence_override'] ?? false);
+        if (!$evidenceOverride) {
+            foreach ($missingEvidence as $missing) {
+                $violations[] = 'minimum_evidence_missing:' . (string) $missing;
+            }
         }
 
         $violations = array_values(array_unique(array_filter(array_map(
@@ -209,6 +212,8 @@ final class RouterPolicyEvaluator
             'route_path_steps' => $routePathSteps,
             'intent_type' => $intentType,
             'evidence_status' => $evidence,
+            'evidence_override' => $evidenceOverride,
+            'evidence_score' => is_numeric($evidence['evidence_score'] ?? null) ? (float) $evidence['evidence_score'] : 0.0,
             'evidence_used' => [
                 'tenant_id' => $resolvedTenant,
                 'source_ids' => $evidence['source_ids'] ?? [],
@@ -263,7 +268,7 @@ final class RouterPolicyEvaluator
             return [];
         }
 
-        $allowed = ['cache', 'rules', 'skills', 'rag', 'llm', 'action_contract'];
+        $allowed = ['cache', 'rules', 'agent_training', 'skills', 'rag', 'llm', 'action_contract'];
         $result = [];
         foreach ($value as $stage) {
             $stage = strtolower(trim((string) $stage));
@@ -1689,6 +1694,9 @@ final class RouterPolicyEvaluator
                 $sourcesUsed[] = $name;
             }
         }
+        if ((bool) ($context['semantic_intent_match'] ?? false) || (bool) ($context['semantic_intent_candidate'] ?? false)) {
+            $sourcesUsed[] = 'agent_training';
+        }
         // Deterministic routes resolved before LLM fallback are evidence-backed by rules even when
         // upstream payloads do not yet annotate explicit source flags.
         $action = strtolower(trim((string) ($input['action'] ?? '')));
@@ -1709,6 +1717,12 @@ final class RouterPolicyEvaluator
         if (!empty($sourceIds) || !empty($sourcesUsed)) {
             $present[] = 'at_least_one_source_reference';
         }
+        if ((bool) ($context['semantic_intent_match'] ?? false)) {
+            $present[] = 'semantic_intent_match';
+        }
+        if ((bool) ($context['semantic_intent_candidate'] ?? false)) {
+            $present[] = 'semantic_intent_candidate';
+        }
 
         $inputEvidence = is_array($input['evidence'] ?? null) ? (array) $input['evidence'] : [];
         foreach ($inputEvidence as $evidenceName) {
@@ -1726,6 +1740,23 @@ final class RouterPolicyEvaluator
             $present[] = 'evidence_gate_skipped_by_rule';
         }
 
+        $semanticIntentScore = is_numeric($context['semantic_intent_similarity_score'] ?? null)
+            ? (float) $context['semantic_intent_similarity_score']
+            : 0.0;
+        $retrievalTopScore = is_numeric($context['retrieval_top_score'] ?? null)
+            ? (float) $context['retrieval_top_score']
+            : 0.0;
+        $evidenceScore = max($semanticIntentScore, $retrievalTopScore);
+        $evidenceOverride = $evidenceScore >= 0.75
+            && (
+                (bool) ($context['semantic_intent_match'] ?? false)
+                || (bool) ($context['rag_used'] ?? false)
+                || (bool) ($context['rag_hit'] ?? false)
+            );
+        if ($evidenceOverride) {
+            $present[] = 'evidence_override';
+        }
+
         $present = array_values(array_unique($present));
         $missing = [];
         foreach ($required as $item) {
@@ -1739,6 +1770,8 @@ final class RouterPolicyEvaluator
             'required' => $required,
             'present' => $present,
             'missing' => $missing,
+            'evidence_override' => $evidenceOverride,
+            'evidence_score' => $evidenceScore,
             'route_path_steps' => $routePathSteps,
             'sources_used' => $sourcesUsed,
             'source_ids' => $sourceIds,

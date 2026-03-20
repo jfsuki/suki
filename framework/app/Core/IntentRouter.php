@@ -8,6 +8,9 @@ final class IntentRouter
     private const REQUEST_MODE_OPERATION = 'operation';
     private const REQUEST_MODE_RESEARCH = 'research';
     private const TRACE_HISTORY_LIMIT = 8;
+    private const SEMANTIC_INTENT_STRONG_THRESHOLD = 0.75;
+    private const SEMANTIC_INTENT_CANDIDATE_THRESHOLD = 0.60;
+    private const EVIDENCE_OVERRIDE_THRESHOLD = 0.75;
     private const REQUEST_MODE_BUDGETS = [
         'operation' => [
             'max_router_steps' => 5,
@@ -106,6 +109,18 @@ final class IntentRouter
         $telemetry['runtime_budget'] = $runtimeBudget;
         $telemetry['query_hash'] = $queryHash;
 
+        $promotedGatewayFallback = $this->promoteGatewayFallbackToSemanticRouting($action, $reply, $llmRequest, $context);
+        if ($promotedGatewayFallback !== []) {
+            $action = (string) ($promotedGatewayFallback['action'] ?? $action);
+            $reply = array_key_exists('reply', $promotedGatewayFallback)
+                ? (string) ($promotedGatewayFallback['reply'] ?? '')
+                : $reply;
+            $llmRequest = is_array($promotedGatewayFallback['llm_request'] ?? null)
+                ? (array) $promotedGatewayFallback['llm_request']
+                : $llmRequest;
+            $telemetry = array_merge($telemetry, is_array($promotedGatewayFallback['telemetry'] ?? null) ? (array) $promotedGatewayFallback['telemetry'] : []);
+        }
+
         $routeOrder = ['cache', 'rules', 'skills', 'rag', 'llm'];
         $violations = [];
         $contractVersions = [
@@ -164,6 +179,27 @@ final class IntentRouter
             $skillRoutingHintSteps = $skillOutcome['routing_hint_steps'] ?? null;
             if (is_array($skillRoutingHintSteps) && $skillRoutingHintSteps !== []) {
                 $routingHintSteps = $skillRoutingHintSteps;
+            }
+        }
+
+        $semanticIntentOutcome = $this->maybeResolveSemanticIntent(
+            $action,
+            $gatewayResult,
+            $context,
+            $runtimeBudget,
+            $skillsRegistry,
+            $telemetry
+        );
+        if ($semanticIntentOutcome !== []) {
+            $action = (string) ($semanticIntentOutcome['action'] ?? $action);
+            $reply = array_key_exists('reply', $semanticIntentOutcome) ? (string) ($semanticIntentOutcome['reply'] ?? '') : $reply;
+            $command = is_array($semanticIntentOutcome['command'] ?? null) ? (array) $semanticIntentOutcome['command'] : $command;
+            $llmRequest = is_array($semanticIntentOutcome['llm_request'] ?? null) ? (array) $semanticIntentOutcome['llm_request'] : $llmRequest;
+            $context = array_merge($context, is_array($semanticIntentOutcome['context_overrides'] ?? null) ? (array) $semanticIntentOutcome['context_overrides'] : []);
+            $telemetry = array_merge($telemetry, is_array($semanticIntentOutcome['telemetry'] ?? null) ? (array) $semanticIntentOutcome['telemetry'] : []);
+            $semanticRoutingHintSteps = $semanticIntentOutcome['routing_hint_steps'] ?? null;
+            if (is_array($semanticRoutingHintSteps) && $semanticRoutingHintSteps !== []) {
+                $routingHintSteps = $semanticRoutingHintSteps;
             }
         }
 
@@ -226,6 +262,9 @@ final class IntentRouter
                     'rag_attempted',
                     'rag_used',
                     'rag_result_count',
+                    'retrieval_top_score',
+                    'evidence_override',
+                    'evidence_score',
                     'evidence_gate_status',
                     'fallback_reason',
                     'skip_evidence_gate',
@@ -273,6 +312,10 @@ final class IntentRouter
         );
         $violations = is_array($evaluation['violations'] ?? null) ? (array) $evaluation['violations'] : [];
         $gateDecision = (string) ($evaluation['gate_decision'] ?? $this->resolveGateDecision($violations));
+        $telemetry['evidence_override'] = (bool) ($evaluation['evidence_override'] ?? ($telemetry['evidence_override'] ?? false));
+        $telemetry['evidence_score'] = is_numeric($evaluation['evidence_score'] ?? null)
+            ? (float) $evaluation['evidence_score']
+            : (float) ($telemetry['evidence_score'] ?? 0.0);
         $routePathSteps = is_array($evaluation['route_path_steps'] ?? null)
             ? (array) $evaluation['route_path_steps']
             : $routePathSteps;
@@ -458,7 +501,7 @@ final class IntentRouter
     {
         if (!empty($routingHintSteps)) {
             $hintPath = [];
-            $allowed = ['cache', 'rules', 'skills', 'rag', 'llm', 'action_contract'];
+            $allowed = ['cache', 'rules', 'agent_training', 'skills', 'rag', 'llm', 'action_contract'];
             foreach ($routingHintSteps as $step) {
                 $step = strtolower(trim((string) $step));
                 if ($step === '' || !in_array($step, $allowed, true)) {
@@ -611,6 +654,7 @@ final class IntentRouter
         $routerLatencyMs = $this->resolveCount($telemetry['router_latency_ms'] ?? 0);
         $loopCheck = $this->detectRepeatedRouteLoop($state, $telemetry, $routePath, $runtimeBudget);
         $tenantScopeViolation = trim((string) ($telemetry['tenant_id'] ?? $context['tenant_id'] ?? '')) === '';
+        $evidenceOverride = (bool) ($telemetry['evidence_override'] ?? false);
         $guardTriggered = false;
         $guardReason = 'none';
         $guardStage = 'none';
@@ -646,7 +690,7 @@ final class IntentRouter
             $guardReason = 'llm_fallback_budget_exceeded';
             $guardStage = 'llm';
             $guardReply = 'Detuve esta ruta porque excede el presupuesto de fallback a LLM.';
-        } elseif ($routerLatencyMs > (int) ($runtimeBudget['max_execution_ms'] ?? 1500)) {
+        } elseif (!$evidenceOverride && $routerLatencyMs > (int) ($runtimeBudget['max_execution_ms'] ?? 1500)) {
             $guardTriggered = true;
             $guardReason = 'execution_time_budget_exceeded';
             $guardStage = 'router';
@@ -663,6 +707,7 @@ final class IntentRouter
             'retry_count' => $retryCount,
             'semantic_queries_count' => $semanticQueriesCount,
             'llm_fallback_count' => $llmFallbackCount,
+            'evidence_override' => $evidenceOverride,
             'loop_guard_triggered' => $guardTriggered,
             'loop_guard_reason' => $guardReason,
             'loop_guard_stage' => $guardStage,
@@ -817,7 +862,10 @@ final class IntentRouter
             'rag_attempted',
             'rag_used',
             'rag_result_count',
+            'retrieval_top_score',
             'evidence_gate_status',
+            'evidence_override',
+            'evidence_score',
             'fallback_reason',
             'memory_type',
             'tenant_id',
@@ -832,6 +880,16 @@ final class IntentRouter
             'tool_calls_count',
             'retry_count',
             'loop_guard_triggered',
+            'semantic_intent_status',
+            'semantic_intent_source',
+            'semantic_intent_match',
+            'semantic_intent_candidate',
+            'semantic_intent_skill',
+            'semantic_intent_similarity_score',
+            'semantic_intent_candidate_skill',
+            'semantic_intent_candidate_score',
+            'decision_path',
+            'decision_path_string',
             'skill_detected',
             'skill_selected',
             'skill_executed',
@@ -981,6 +1039,218 @@ final class IntentRouter
     }
 
     /**
+     * @param array<string,mixed> $llmRequest
+     * @param array<string,mixed> $context
+     * @return array<string,mixed>
+     */
+    private function promoteGatewayFallbackToSemanticRouting(
+        string $action,
+        string $reply,
+        array $llmRequest,
+        array $context
+    ): array {
+        if ($action === 'send_to_llm') {
+            return [];
+        }
+
+        if (strtolower(trim((string) ($context['mode'] ?? 'app'))) !== 'app') {
+            return [];
+        }
+
+        if (!$this->isGenericAppFallbackReply($reply)) {
+            return [];
+        }
+
+        $query = trim((string) ($context['message_text'] ?? $context['message'] ?? $context['text'] ?? ''));
+        if ($query === '' || $this->isTrivialConversationQuery($query)) {
+            return [];
+        }
+
+        if ($llmRequest === []) {
+            $llmRequest = [
+                'messages' => [
+                    ['role' => 'user', 'content' => $query],
+                ],
+                'user_message' => $query,
+            ];
+        }
+
+        return [
+            'action' => 'send_to_llm',
+            'reply' => '',
+            'llm_request' => $llmRequest,
+            'telemetry' => [
+                'gateway_fallback_promoted' => true,
+                'gateway_fallback_reason' => 'generic_app_fallback',
+                'route_reason' => 'gateway_fallback_promoted_for_semantic_routing',
+            ],
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $gatewayResult
+     * @param array<string,mixed> $context
+     * @param array<string,int> $runtimeBudget
+     * @param array<string,mixed> $existingTelemetry
+     * @return array<string,mixed>
+     */
+    private function maybeResolveSemanticIntent(
+        string $action,
+        array $gatewayResult,
+        array $context,
+        array $runtimeBudget,
+        ?SkillRegistry $skillsRegistry,
+        array $existingTelemetry
+    ): array {
+        if (!$skillsRegistry) {
+            return [];
+        }
+
+        $selectedSkill = strtolower(trim((string) ($existingTelemetry['skill_selected'] ?? 'none')));
+        $canOverride = $action === 'send_to_llm'
+            || in_array($selectedSkill, ['none', 'entity_search', 'entity_resolve'], true);
+        if (!$canOverride) {
+            return [];
+        }
+
+        $query = $this->extractRetrievalQuery($gatewayResult, $context);
+        if ($query === '' || $this->isTrivialConversationQuery($query)) {
+            return [];
+        }
+
+        $semanticMemory = $this->semanticMemory();
+        if (!$semanticMemory) {
+            return [];
+        }
+
+        try {
+            $retrieval = $semanticMemory->retrieveAgentTraining($query, [
+                'tenant_id' => trim((string) ($context['tenant_id'] ?? '')),
+                'app_id' => trim((string) ($context['app_id'] ?? $context['project_id'] ?? '')) ?: null,
+                'sector' => trim((string) ($context['sector'] ?? '')) ?: null,
+                'agent_role' => trim((string) ($context['agent_role'] ?? '')) ?: null,
+                'user_id' => trim((string) ($context['user_id'] ?? '')) ?: null,
+            ], 5);
+        } catch (\Throwable $e) {
+            return [
+                'telemetry' => [
+                    'semantic_intent_status' => 'error',
+                    'semantic_intent_source' => 'agent_training',
+                    'semantic_intent_error' => trim((string) $e->getMessage()),
+                ],
+            ];
+        }
+
+        $candidates = $this->buildSemanticIntentCandidates(is_array($retrieval['hits'] ?? null) ? (array) $retrieval['hits'] : []);
+        if ($candidates === []) {
+            return [
+                'telemetry' => [
+                    'semantic_intent_status' => 'no_match',
+                    'semantic_intent_source' => 'agent_training',
+                    'decision_path' => ['cache', 'rules', 'agent_training'],
+                    'decision_path_string' => 'cache>rules>agent_training',
+                ],
+            ];
+        }
+
+        $topCandidate = $candidates[0];
+        $skillName = trim((string) ($topCandidate['skill'] ?? ''));
+        $score = is_numeric($topCandidate['similarity_score'] ?? null) ? (float) $topCandidate['similarity_score'] : 0.0;
+        $normalizedQuery = $this->normalizeFreeText($query);
+        $forceCandidateIntent = $selectedSkill === 'none'
+            && preg_match('/^(como|por que|porque|que|cual|donde|cuando|why|how|what|where)\b/u', $normalizedQuery) === 1;
+        $decisionPath = ['cache', 'rules', 'agent_training'];
+        $semanticTelemetry = [
+            'semantic_intent_source' => 'agent_training',
+            'semantic_intent_skill' => $skillName,
+            'semantic_intent_similarity_score' => $score,
+            'semantic_intent_source_ids' => is_array($topCandidate['source_ids'] ?? null) ? (array) $topCandidate['source_ids'] : [],
+            'semantic_intent_top_hit_type' => (string) ($topCandidate['top_hit_type'] ?? ''),
+            'similarity_score' => $score,
+            'evidence_score' => $score,
+            'decision_path' => $decisionPath,
+            'decision_path_string' => implode('>', $decisionPath),
+        ];
+
+        if ($skillName === '') {
+            return [
+                'telemetry' => $semanticTelemetry + [
+                    'semantic_intent_status' => 'no_match',
+                ],
+            ];
+        }
+
+        if ($score < self::SEMANTIC_INTENT_CANDIDATE_THRESHOLD) {
+            return [
+                'telemetry' => $semanticTelemetry + [
+                    'semantic_intent_status' => 'below_threshold',
+                ],
+            ];
+        }
+
+        if ($forceCandidateIntent || $score < self::SEMANTIC_INTENT_STRONG_THRESHOLD) {
+            $llmRequest = is_array($gatewayResult['llm_request'] ?? null) ? (array) $gatewayResult['llm_request'] : [];
+            if ($llmRequest === []) {
+                $llmRequest = [
+                    'messages' => [
+                        ['role' => 'user', 'content' => $query],
+                    ],
+                    'user_message' => $query,
+                ];
+            }
+            $llmRequest['semantic_intent_candidate'] = [
+                'skill' => $skillName,
+                'similarity_score' => $score,
+                'source' => 'agent_training',
+            ];
+
+            return [
+                'action' => 'send_to_llm',
+                'reply' => '',
+                'llm_request' => $llmRequest,
+                'routing_hint_steps' => ['cache', 'rules', 'agent_training', 'rag', 'llm'],
+                'telemetry' => $semanticTelemetry + [
+                    'semantic_intent_status' => $forceCandidateIntent ? 'candidate_informative' : 'candidate',
+                    'semantic_intent_candidate' => true,
+                    'semantic_intent_candidate_skill' => $skillName,
+                    'semantic_intent_candidate_score' => $score,
+                    'route_reason' => 'semantic_intent_candidate_before_llm',
+                ],
+            ];
+        }
+
+        $skill = $skillsRegistry->get($skillName);
+        if (!is_array($skill)) {
+            return [
+                'telemetry' => $semanticTelemetry + [
+                    'semantic_intent_status' => 'catalog_missing',
+                ],
+            ];
+        }
+
+        $execution = $this->skillExecutor->execute($skill, $gatewayResult, $context, $runtimeBudget);
+        $routingHintSteps = is_array($execution['routing_hint_steps'] ?? null)
+            ? (array) $execution['routing_hint_steps']
+            : ($action === 'send_to_llm' ? ['cache', 'rules', 'skills', 'rag', 'llm'] : ['cache', 'rules', 'skills']);
+        $routingHintSteps = $this->injectAgentTrainingStage($routingHintSteps);
+
+        return array_merge($execution, [
+            'routing_hint_steps' => $routingHintSteps,
+            'telemetry' => array_merge(
+                is_array($execution['telemetry'] ?? null) ? (array) $execution['telemetry'] : [],
+                $semanticTelemetry,
+                [
+                    'semantic_intent_status' => 'matched',
+                    'semantic_intent_match' => true,
+                    'evidence_override' => $score >= self::EVIDENCE_OVERRIDE_THRESHOLD,
+                    'decision_path' => $routingHintSteps,
+                    'decision_path_string' => implode('>', $routingHintSteps),
+                ]
+            ),
+        ]);
+    }
+
+    /**
      * @param array<string,mixed> $gatewayResult
      * @param array<string,mixed> $context
      * @return array<string,mixed>
@@ -1038,6 +1308,12 @@ final class IntentRouter
         return trim($value);
     }
 
+    private function isGenericAppFallbackReply(string $reply): bool
+    {
+        $reply = $this->normalizeRouteGuardText($reply);
+        return str_starts_with($reply, 'solo puedo responder con datos reales de esta app.');
+    }
+
     private function isProjectStatusPrompt(string $messageText): bool
     {
         if ($messageText === '') {
@@ -1048,6 +1324,31 @@ final class IntentRouter
             '/\b(estado|status|resumen)\b.*\b(proyecto|app|aplicacion)\b|\b(proyecto|app|aplicacion)\b.*\b(estado|status|resumen)\b/u',
             $messageText
         ) === 1;
+    }
+
+    /**
+     * @param array<int,string> $routingHintSteps
+     * @return array<int,string>
+     */
+    private function injectAgentTrainingStage(array $routingHintSteps): array
+    {
+        $result = [];
+        foreach ($routingHintSteps as $step) {
+            $step = strtolower(trim((string) $step));
+            if ($step === '' || in_array($step, $result, true)) {
+                continue;
+            }
+            $result[] = $step;
+            if ($step === 'rules' && !in_array('agent_training', $result, true)) {
+                $result[] = 'agent_training';
+            }
+        }
+
+        if (!in_array('agent_training', $result, true)) {
+            array_splice($result, min(2, count($result)), 0, ['agent_training']);
+        }
+
+        return array_values(array_unique($result));
     }
 
     /**
@@ -1148,8 +1449,10 @@ final class IntentRouter
                 (int) ($runtimeBudget['max_context_chunks'] ?? $runtimeConfig['max_context_chunks'])
             );
             $rawHitCount = count((array) ($retrieval['hits'] ?? []));
+            $topScore = $this->resolveTopRetrievalScore(is_array($retrieval['hits'] ?? null) ? (array) $retrieval['hits'] : []);
             $passed = $preparedContext['used_count'] >= $runtimeConfig['min_evidence_chunks'];
             $retrievalLatencyMs = $this->latencyMs($retrievalStartedAt);
+            $evidenceOverride = $passed && $topScore >= self::EVIDENCE_OVERRIDE_THRESHOLD;
 
             return [
                 'ok' => true,
@@ -1168,6 +1471,9 @@ final class IntentRouter
                         'rag_used' => $passed,
                         'rag_result_count' => $passed ? (int) $preparedContext['used_count'] : 0,
                         'rag_result_count_raw' => $rawHitCount,
+                        'retrieval_top_score' => $topScore,
+                        'evidence_score' => $topScore,
+                        'evidence_override' => $evidenceOverride,
                         'evidence_gate_status' => $passed ? 'passed' : 'insufficient_evidence',
                         'fallback_reason' => $passed ? 'llm_last_resort_after_rag' : 'insufficient_evidence',
                         'route_reason' => $passed ? 'rag_backed_llm_fallback' : 'rag_attempted_but_insufficient',
@@ -1487,6 +1793,15 @@ final class IntentRouter
                 $reasons[$normalizedStep] = $rulesHit ? 'resolved_by_rules_or_dsl' : 'rules_unresolved';
                 continue;
             }
+            if ($normalizedStep === 'agent_training') {
+                $semanticStatus = trim((string) ($telemetry['semantic_intent_status'] ?? 'not_evaluated'));
+                $semanticSkill = trim((string) ($telemetry['semantic_intent_skill'] ?? ''));
+                $semanticScore = is_numeric($telemetry['semantic_intent_similarity_score'] ?? null)
+                    ? number_format((float) $telemetry['semantic_intent_similarity_score'], 2, '.', '')
+                    : '0.00';
+                $reasons[$normalizedStep] = $semanticStatus . ':' . ($semanticSkill !== '' ? $semanticSkill : 'none') . ':' . $semanticScore;
+                continue;
+            }
             if ($normalizedStep === 'skills') {
                 if (!(bool) ($telemetry['skill_detected'] ?? false)) {
                     $reasons[$normalizedStep] = 'skill_not_detected';
@@ -1532,6 +1847,9 @@ final class IntentRouter
      */
     private function resolveRouteReason(string $action, string $gateDecision, array $telemetry): string
     {
+        if ((bool) ($telemetry['semantic_intent_match'] ?? false) && (bool) ($telemetry['skill_executed'] ?? false) && $action !== 'send_to_llm') {
+            return 'semantic_intent_resolved_before_llm';
+        }
         if ((bool) ($telemetry['skill_executed'] ?? false) && $action !== 'send_to_llm') {
             return 'skill_resolved_before_llm';
         }
@@ -1818,6 +2136,119 @@ final class IntentRouter
         }
 
         return '';
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $hits
+     * @return array<int,array<string,mixed>>
+     */
+    private function buildSemanticIntentCandidates(array $hits): array
+    {
+        $candidates = [];
+        foreach ($hits as $hit) {
+            if (!is_array($hit)) {
+                continue;
+            }
+
+            $type = strtolower(trim((string) ($hit['type'] ?? '')));
+            if (!str_starts_with($type, 'intent_utterance_') && $type !== 'intent_dataset_utterance') {
+                continue;
+            }
+
+            $skill = $this->resolveSemanticSkillNameFromHit($hit);
+            if ($skill === '') {
+                continue;
+            }
+
+            $score = is_numeric($hit['score'] ?? null) ? (float) $hit['score'] : 0.0;
+            if (!isset($candidates[$skill])) {
+                $candidates[$skill] = [
+                    'skill' => $skill,
+                    'similarity_score' => $score,
+                    'hits_count' => 0,
+                    'source_ids' => [],
+                    'top_hit_type' => $type,
+                ];
+            }
+
+            $candidates[$skill]['hits_count']++;
+            if ($score > (float) $candidates[$skill]['similarity_score']) {
+                $candidates[$skill]['similarity_score'] = $score;
+                $candidates[$skill]['top_hit_type'] = $type;
+            }
+
+            $sourceId = trim((string) ($hit['source_id'] ?? ''));
+            if ($sourceId !== '' && !in_array($sourceId, $candidates[$skill]['source_ids'], true)) {
+                $candidates[$skill]['source_ids'][] = $sourceId;
+            }
+        }
+
+        $result = array_values($candidates);
+        usort($result, static function (array $left, array $right): int {
+            $scoreCompare = ((float) ($right['similarity_score'] ?? 0.0)) <=> ((float) ($left['similarity_score'] ?? 0.0));
+            if ($scoreCompare !== 0) {
+                return $scoreCompare;
+            }
+
+            return ((int) ($right['hits_count'] ?? 0)) <=> ((int) ($left['hits_count'] ?? 0));
+        });
+
+        return $result;
+    }
+
+    /**
+     * @param array<string,mixed> $hit
+     */
+    private function resolveSemanticSkillNameFromHit(array $hit): string
+    {
+        $metadata = is_array($hit['metadata'] ?? null) ? (array) $hit['metadata'] : [];
+        foreach (['action', 'skill'] as $key) {
+            $value = strtolower(trim((string) ($metadata[$key] ?? '')));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        $tags = is_array($hit['tags'] ?? null) ? (array) $hit['tags'] : [];
+        foreach ($tags as $tag) {
+            $tag = strtolower(trim((string) $tag));
+            foreach (['action:', 'skill:'] as $prefix) {
+                if (str_starts_with($tag, $prefix)) {
+                    $value = trim(substr($tag, strlen($prefix)));
+                    if ($value !== '') {
+                        return $value;
+                    }
+                }
+            }
+        }
+
+        $intent = strtolower(trim((string) ($metadata['intent'] ?? '')));
+        if (str_starts_with($intent, 'skill_')) {
+            return substr($intent, strlen('skill_'));
+        }
+
+        $sourceId = strtolower(trim((string) ($hit['source_id'] ?? '')));
+        if (preg_match('/:intent:skill_([a-z0-9_]+)/', $sourceId, $matches) === 1) {
+            return (string) ($matches[1] ?? '');
+        }
+
+        return '';
+    }
+
+    /**
+     * @param array<int,array<string,mixed>> $hits
+     */
+    private function resolveTopRetrievalScore(array $hits): float
+    {
+        $topScore = 0.0;
+        foreach ($hits as $hit) {
+            if (!is_array($hit) || !is_numeric($hit['score'] ?? null)) {
+                continue;
+            }
+            $topScore = max($topScore, (float) $hit['score']);
+        }
+
+        return $topScore;
     }
 
     private function isDeterministicPreLlmSkill(string $selectedName): bool

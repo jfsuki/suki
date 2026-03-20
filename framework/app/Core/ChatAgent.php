@@ -847,6 +847,81 @@ final class ChatAgent
         }
 
         if ($route->isLlmRequest()) {
+            $semanticLocalReply = $this->buildSemanticLocalReply($route, $telemetry);
+            if ($semanticLocalReply !== '') {
+                $task = $this->controlTowerCompleteTask($task, [
+                    'result_status' => 'success',
+                    'response_kind' => 'respond_local',
+                    'response_text' => $semanticLocalReply,
+                    'provider' => 'semantic_memory',
+                ]);
+                $semanticReply = $this->reply($semanticLocalReply, $channel, $sessionId, $userId, 'success', [
+                    'provider_used' => 'semantic_memory',
+                    'memory_type' => (string) ($telemetry['memory_type'] ?? ''),
+                    'source_ids' => is_array($telemetry['source_ids'] ?? null) ? (array) $telemetry['source_ids'] : [],
+                    'evidence_gate_status' => (string) ($telemetry['evidence_gate_status'] ?? ''),
+                ]);
+                $semanticReply = $this->annotateReplyWithControlTower($semanticReply, $task);
+                $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+                    'llm_called' => false,
+                    'error_flag' => false,
+                    'error_type' => 'none',
+                    'tool_calls_count' => 0,
+                    'retry_count' => 0,
+                    'provider_used' => 'semantic_memory',
+                    'task_id' => (string) ($task['task_id'] ?? ''),
+                    'conversation_id' => $conversationId,
+                ]);
+                $this->telemetry()->record($tenantId, array_merge($telemetry, [
+                    'message' => $text,
+                    'provider_used' => 'semantic_memory',
+                    'resolved_locally' => true,
+                    'action' => 'respond_local',
+                    'mode' => $mode,
+                    'llm_request_count' => 0,
+                    'session_id' => $sessionId,
+                    'user_id' => $userId,
+                    'project_id' => $projectId,
+                    'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                    'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
+                    'is_authenticated' => $isAuthenticated,
+                    'effective_role' => $role,
+                ], $this->buildAgentOpsTelemetryBase(
+                    $telemetry,
+                    $tenantId,
+                    $projectId,
+                    $sessionId,
+                    $messageId,
+                    $this->latencyMs($requestStartedAt),
+                    'response.emitted',
+                    [
+                        'llm_called' => false,
+                        'error_flag' => false,
+                        'error_type' => 'none',
+                        'response_kind' => 'respond_local',
+                        'response_text' => $semanticLocalReply,
+                        'provider_used' => 'semantic_memory',
+                        'task_id' => (string) ($task['task_id'] ?? ''),
+                        'conversation_id' => $conversationId,
+                    ]
+                )));
+                try {
+                    $this->telemetryService()->recordIntentMetric([
+                        'tenant_id' => $tenantId,
+                        'project_id' => $projectId,
+                        'session_id' => $sessionId,
+                        'mode' => $mode,
+                        'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
+                        'action' => 'respond_local',
+                        'latency_ms' => $this->latencyMs($requestStartedAt),
+                        'status' => 'success',
+                    ]);
+                } catch (\Throwable $ignored) {
+                    // observability must not block chat response
+                }
+                return $semanticReply;
+            }
+
             $task = $this->controlTowerMarkRunning($task, [
                 'route_path' => (string) ($telemetry['route_path'] ?? ''),
                 'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown'),
@@ -1089,6 +1164,68 @@ final class ChatAgent
             $task,
             $failure['incident']
         );
+    }
+
+    private function buildSemanticLocalReply(IntentRouteResult $route, array $telemetry): string
+    {
+        if (!(bool) ($telemetry['gateway_fallback_promoted'] ?? false)) {
+            return '';
+        }
+
+        $llmRequest = $route->llmRequest();
+        $semanticContext = is_array($llmRequest['semantic_context'] ?? null) ? (array) $llmRequest['semantic_context'] : [];
+        $chunks = is_array($semanticContext['chunks'] ?? null) ? (array) $semanticContext['chunks'] : [];
+        if ($chunks === []) {
+            return '';
+        }
+
+        $parts = [];
+        foreach ($chunks as $chunk) {
+            if (!is_array($chunk)) {
+                continue;
+            }
+            $snippet = $this->semanticChunkToReplySnippet((string) ($chunk['content'] ?? ''));
+            if ($snippet === '' || in_array($snippet, $parts, true)) {
+                continue;
+            }
+            $parts[] = $snippet;
+            if (count($parts) >= 2) {
+                break;
+            }
+        }
+
+        if ($parts === []) {
+            return '';
+        }
+
+        $reply = array_shift($parts);
+        if ($reply === null || trim($reply) === '') {
+            return '';
+        }
+
+        if ($parts !== []) {
+            $reply = rtrim($reply, ". \t\n\r\0\x0B") . '. ' . ltrim((string) $parts[0]);
+        }
+
+        return trim($reply);
+    }
+
+    private function semanticChunkToReplySnippet(string $content): string
+    {
+        $content = trim(preg_replace('/\s+/u', ' ', $content) ?? $content);
+        if ($content === '') {
+            return '';
+        }
+
+        if (preg_match('/respuesta:\s*(.+)$/iu', $content, $matches) === 1) {
+            return trim((string) ($matches[1] ?? ''));
+        }
+
+        if (str_starts_with(strtolower($content), 'pregunta:')) {
+            return '';
+        }
+
+        return trim($content);
     }
 
     public function parseLocal(string $text): array
