@@ -706,18 +706,18 @@ trait ConversationGatewayHandlePipelineTrait
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('question_local', true));
         }
 
-        if ($mode === 'builder') {
-            $reply = $this->buildBuilderFallbackReply($profile);
-            $state = $this->updateState($state, $raw, $reply, null, null, [], 'builder_onboarding');
-            $this->saveState($tenantId, $userId, $state);
-            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('builder_fallback', true));
-        }
-
         $capsule = $this->buildContextCapsule($normalized, $state, $lexicon, $policy, $classification);
         $state = $this->updateState($state, $raw, '', $capsule['intent'] ?? null, $capsule['entity'] ?? null, $capsule['state']['collected'] ?? [], $state['active_task'] ?? null);
         $this->saveState($tenantId, $userId, $state);
+        $telemetry = $this->telemetry('llm', false);
+        if ($mode === 'builder') {
+            $telemetry['builder_normal_flow'] = true;
+            $telemetry['builder_fallback_disabled'] = true;
+            $telemetry['route_reason'] = 'builder_continues_to_router';
+            $telemetry['routing_hint_steps'] = ['cache', 'rules', 'skills', 'rag', 'llm'];
+        }
 
-        return $this->result('send_to_llm', '', null, $capsule, $state, $this->telemetry('llm', false));
+        return $this->result('send_to_llm', '', null, $capsule, $state, $telemetry);
     }
 
 }
