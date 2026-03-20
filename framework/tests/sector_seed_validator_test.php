@@ -31,6 +31,24 @@ if (!is_array($payload)) {
     if (($mismatchReport['ok'] ?? false) === true) {
         $failures[] = 'SectorSeedValidator debe bloquear sector_key inconsistente.';
     }
+
+    $invalidSkill = $payload;
+    $invalidSkill['skill_overrides'][0]['skill'] = 'ghost_skill';
+    $invalidSkillReport = SectorSeedValidator::validate($invalidSkill, [
+        'expected_sector_key' => 'FERRETERIA_MINORISTA',
+    ]);
+    if (($invalidSkillReport['ok'] ?? false) === true) {
+        $failures[] = 'SectorSeedValidator debe bloquear skill inexistente.';
+    }
+
+    $invalidGbo = $payload;
+    $invalidGbo['knowledge_stable_seed'][0]['gbo_concepts'] = ['ghost_concept'];
+    $invalidGboReport = SectorSeedValidator::validate($invalidGbo, [
+        'expected_sector_key' => 'FERRETERIA_MINORISTA',
+    ]);
+    if (($invalidGboReport['ok'] ?? false) === true) {
+        $failures[] = 'SectorSeedValidator debe bloquear concepto GBO inexistente.';
+    }
 }
 
 $result = [

@@ -57,6 +57,14 @@
               "minLength": 2
             }
           },
+          "gbo_concepts": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 2
+            }
+          },
           "vectorize": {
             "type": "boolean"
           }
@@ -84,6 +92,14 @@
             "minLength": 8
           },
           "tags": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 2
+            }
+          },
+          "gbo_concepts": {
             "type": "array",
             "minItems": 1,
             "items": {
@@ -122,21 +138,19 @@
           },
           "related_skill": {
             "type": "string",
-            "enum": [
-              "create_invoice",
-              "send_invoice",
-              "register_expense",
-              "accounting_post",
-              "product_lookup",
-              "inventory_check",
-              "customer_lookup",
-              "read_document",
-              "extract_invoice_data",
-              "generate_report",
-              "business_explain",
-              "dataset_lookup",
-              "tax_accountant_advisor"
-            ]
+            "minLength": 3
+          },
+          "gbo_concept_id": {
+            "type": "string",
+            "minLength": 2
+          },
+          "gbo_aliases": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 2
+            }
           },
           "synonyms": {
             "type": "array",
@@ -177,21 +191,7 @@
         "properties": {
           "skill": {
             "type": "string",
-            "enum": [
-              "create_invoice",
-              "send_invoice",
-              "register_expense",
-              "accounting_post",
-              "product_lookup",
-              "inventory_check",
-              "customer_lookup",
-              "read_document",
-              "extract_invoice_data",
-              "generate_report",
-              "business_explain",
-              "dataset_lookup",
-              "tax_accountant_advisor"
-            ]
+            "minLength": 3
           },
           "utterances_explicit": {
             "type": "array",

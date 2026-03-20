@@ -14,6 +14,10 @@
         "mostrador",
         "venta_rapida"
       ],
+      "gbo_concepts": [
+        "inventory_item",
+        "invoice"
+      ],
       "vectorize": true
     }
   ],
@@ -24,6 +28,9 @@
       "tags": [
         "mostrador",
         "facturacion"
+      ],
+      "gbo_concepts": [
+        "invoice"
       ],
       "vectorize": true
     }
@@ -42,6 +49,26 @@
       ],
       "how_users_ask": [
         "es una venta rapida de mostrador"
+      ]
+    },
+    {
+      "term": "referencia",
+      "type": "identifier",
+      "related_skill": "product_lookup",
+      "gbo_concept_id": "inventory_item",
+      "gbo_aliases": [
+        "sku",
+        "codigo de articulo"
+      ],
+      "synonyms": [
+        "sku",
+        "codigo"
+      ],
+      "common_phrases": [
+        "buscar por referencia"
+      ],
+      "how_users_ask": [
+        "busca ese articulo por referencia"
       ]
     }
   ],
