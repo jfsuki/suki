@@ -34,14 +34,17 @@ final class LLMRouter
         $lastError = null;
         $attempted = [];
         $providerErrors = [];
+        $providerStatuses = [];
         $failoverReason = 'none';
         foreach ($providers as $providerName) {
             if ($this->isCircuitOpen($providerName)) {
+                $providerStatuses[$providerName] = 'circuit_open';
                 continue;
             }
             $localQuota = $this->consumeProviderRateLimit($providerName, $options);
             if (!($localQuota['ok'] ?? true)) {
                 $providerErrors[$providerName] = (string) ($localQuota['message'] ?? 'provider quota guard');
+                $providerStatuses[$providerName] = 'quota_exhausted';
                 if ($failoverReason === 'none') {
                     $failoverReason = 'provider_quota_guard';
                 }
@@ -72,15 +75,15 @@ final class LLMRouter
                     'raw' => $result['raw'] ?? null,
                     'attempted_providers' => $attempted,
                     'provider_errors' => $providerErrors,
+                    'provider_statuses' => array_merge($providerStatuses, [$providerName => 'healthy']),
                     'failover_count' => max(0, count($attempted) - 1),
                     'failover_reason' => $failoverReason,
                 ];
             } catch (RuntimeException $e) {
                 $lastError = $e->getMessage();
-                $reason = $this->isQuotaError($lastError)
-                    ? 'quota_exceeded'
-                    : $this->isStrictJsonViolation($lastError);
+                $reason = $this->classifyProviderFailureReason($lastError);
                 $providerErrors[$providerName] = $lastError;
+                $providerStatuses[$providerName] = $reason;
                 if ($failoverReason === 'none') {
                     $failoverReason = $reason;
                 }
@@ -93,6 +96,12 @@ final class LLMRouter
         if ($providerErrors !== []) {
             $baseError .= ' | provider_errors=' . json_encode(
                 $providerErrors,
+                JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
+            );
+        }
+        if ($providerStatuses !== []) {
+            $baseError .= ' | provider_statuses=' . json_encode(
+                $providerStatuses,
                 JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES
             );
         }
@@ -126,7 +135,7 @@ final class LLMRouter
 
     private function providerOrder(array $policy, array $options): array
     {
-        $mode = strtolower((string) ($options['mode'] ?? getenv('LLM_ROUTER_MODE') ?? 'auto'));
+        $mode = $this->resolveProviderMode($options);
         $order = [];
 
         if (in_array($mode, ['groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
@@ -163,6 +172,24 @@ final class LLMRouter
         }
 
         return $unique;
+    }
+
+    private function resolveProviderMode(array $options): string
+    {
+        $candidates = [
+            $options['provider_mode'] ?? null,
+            $options['mode'] ?? null,
+            getenv('LLM_ROUTER_MODE') ?: null,
+        ];
+
+        foreach ($candidates as $candidate) {
+            $mode = strtolower(trim((string) $candidate));
+            if (in_array($mode, ['auto', 'groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
+                return $mode;
+            }
+        }
+
+        return 'auto';
     }
 
     private function makeProvider(string $name)
@@ -251,8 +278,12 @@ final class LLMRouter
 
     private function tripCircuit(string $provider, string $reason = 'provider_error'): void
     {
-        if ($reason === 'quota_exceeded') {
+        if ($reason === 'quota_exhausted') {
             $ttl = max(30, (int) (getenv('LLM_CIRCUIT_TTL_QUOTA_SECONDS') ?: 600));
+        } elseif ($reason === 'invalid_config') {
+            $ttl = max(60, (int) (getenv('LLM_CIRCUIT_TTL_INVALID_CONFIG_SECONDS') ?: 3600));
+        } elseif ($reason === 'timeout') {
+            $ttl = max(20, (int) (getenv('LLM_CIRCUIT_TTL_TIMEOUT_SECONDS') ?: 180));
         } elseif ($reason === 'strict_json_violation') {
             $ttl = max(10, (int) (getenv('LLM_CIRCUIT_TTL_JSON_SECONDS') ?: 45));
         } else {
@@ -295,6 +326,70 @@ final class LLMRouter
             }
         }
         return false;
+    }
+
+    private function isInvalidConfigError(string $message): bool
+    {
+        $message = strtolower(trim($message));
+        if ($message === '') {
+            return false;
+        }
+        $patterns = [
+            'api key requerido',
+            'api key required',
+            'invalid api key',
+            'invalid key',
+            'user not found',
+            'unauthorized',
+            'unauthorised',
+            'forbidden',
+            'authentication',
+            'permission denied',
+            'account not found',
+            '401',
+            '403',
+        ];
+        foreach ($patterns as $pattern) {
+            if (str_contains($message, $pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function isTimeoutError(string $message): bool
+    {
+        $message = strtolower(trim($message));
+        if ($message === '') {
+            return false;
+        }
+        $patterns = [
+            'timed out',
+            'timeout',
+            'deadline exceeded',
+            'curl error 28',
+            'connection timed out',
+        ];
+        foreach ($patterns as $pattern) {
+            if (str_contains($message, $pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function classifyProviderFailureReason(string $message): string
+    {
+        if ($this->isQuotaError($message)) {
+            return 'quota_exhausted';
+        }
+        if ($this->isInvalidConfigError($message)) {
+            return 'invalid_config';
+        }
+        if ($this->isTimeoutError($message)) {
+            return 'timeout';
+        }
+        return $this->isStrictJsonViolation($message);
     }
 
     private function enforceSessionQuota(array $options): void

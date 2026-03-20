@@ -982,6 +982,7 @@ final class ChatAgent
                         'llm_provider_attempted' => 'llm',
                         'llm_error' => $llmFailure['message'],
                         'provider_errors' => $llmFailure['provider_errors'],
+                        'provider_statuses' => $llmFailure['provider_statuses'],
                         'semantic_fallback_used' => true,
                         'task_id' => (string) ($task['task_id'] ?? ''),
                         'conversation_id' => $conversationId,
@@ -1019,6 +1020,7 @@ final class ChatAgent
                             'llm_provider_attempted' => 'llm',
                             'llm_error' => $llmFailure['message'],
                             'provider_errors' => $llmFailure['provider_errors'],
+                            'provider_statuses' => $llmFailure['provider_statuses'],
                             'semantic_fallback_used' => true,
                             'task_id' => (string) ($task['task_id'] ?? ''),
                             'conversation_id' => $conversationId,
@@ -1046,6 +1048,7 @@ final class ChatAgent
                         'llm_provider_attempted' => 'llm',
                         'llm_error' => $llmFailure['message'],
                         'provider_errors' => $llmFailure['provider_errors'],
+                        'provider_statuses' => $llmFailure['provider_statuses'],
                         'semantic_fallback_used' => true,
                     ]);
                 }
@@ -1058,6 +1061,7 @@ final class ChatAgent
                     'llm_provider_attempted' => 'llm',
                     'llm_error' => $llmFailure['message'],
                     'provider_errors' => $llmFailure['provider_errors'],
+                    'provider_statuses' => $llmFailure['provider_statuses'],
                     'task_id' => (string) ($task['task_id'] ?? ''),
                     'conversation_id' => $conversationId,
                 ]);
@@ -1084,6 +1088,7 @@ final class ChatAgent
                     'effective_role' => $role,
                     'llm_error' => $llmFailure['message'],
                     'provider_errors' => $llmFailure['provider_errors'],
+                    'provider_statuses' => $llmFailure['provider_statuses'],
                 ], $this->buildAgentOpsTelemetryBase(
                     $telemetry,
                     $tenantId,
@@ -1101,6 +1106,7 @@ final class ChatAgent
                         'llm_provider_attempted' => 'llm',
                         'llm_error' => $llmFailure['message'],
                         'provider_errors' => $llmFailure['provider_errors'],
+                        'provider_statuses' => $llmFailure['provider_statuses'],
                         'task_id' => (string) ($task['task_id'] ?? ''),
                         'conversation_id' => $conversationId,
                     ]
@@ -1132,6 +1138,7 @@ final class ChatAgent
                     'llm_provider_attempted' => 'llm',
                     'llm_error' => $llmFailure['message'],
                     'provider_errors' => $llmFailure['provider_errors'],
+                    'provider_statuses' => $llmFailure['provider_statuses'],
                 ]);
             }
             $provider = $llmResult['provider'] ?? 'llm';
@@ -1365,23 +1372,44 @@ final class ChatAgent
     }
 
     /**
-     * @return array{message:string,provider_errors:array<string,string>}
+     * @return array{message:string,provider_errors:array<string,string>,provider_statuses:array<string,string>}
      */
     private function extractLlmFailureDetails(\Throwable $error): array
     {
         $message = trim($error->getMessage());
         $providerErrors = [];
-        if (preg_match('/^(.*?)\s*\|\s*provider_errors=(\{.*\})$/su', $message, $matches) === 1) {
-            $message = trim((string) ($matches[1] ?? $message));
-            $decoded = json_decode((string) ($matches[2] ?? ''), true);
-            if (is_array($decoded)) {
-                foreach ($decoded as $provider => $providerMessage) {
-                    $providerName = trim((string) $provider);
-                    $text = trim((string) $providerMessage);
-                    if ($providerName === '' || $text === '') {
-                        continue;
+        $providerStatuses = [];
+        $parts = preg_split('/\s+\|\s+/u', $message) ?: [$message];
+        if ($parts !== []) {
+            $message = trim((string) array_shift($parts));
+        }
+        foreach ($parts as $part) {
+            $segment = trim((string) $part);
+            if (str_starts_with($segment, 'provider_errors=')) {
+                $decoded = json_decode(substr($segment, strlen('provider_errors=')), true);
+                if (is_array($decoded)) {
+                    foreach ($decoded as $provider => $providerMessage) {
+                        $providerName = trim((string) $provider);
+                        $text = trim((string) $providerMessage);
+                        if ($providerName === '' || $text === '') {
+                            continue;
+                        }
+                        $providerErrors[$providerName] = $text;
                     }
-                    $providerErrors[$providerName] = $text;
+                }
+                continue;
+            }
+            if (str_starts_with($segment, 'provider_statuses=')) {
+                $decoded = json_decode(substr($segment, strlen('provider_statuses=')), true);
+                if (is_array($decoded)) {
+                    foreach ($decoded as $provider => $providerStatus) {
+                        $providerName = trim((string) $provider);
+                        $text = trim((string) $providerStatus);
+                        if ($providerName === '' || $text === '') {
+                            continue;
+                        }
+                        $providerStatuses[$providerName] = $text;
+                    }
                 }
             }
         }
@@ -1393,6 +1421,7 @@ final class ChatAgent
         return [
             'message' => $message,
             'provider_errors' => $providerErrors,
+            'provider_statuses' => $providerStatuses,
         ];
     }
 
@@ -2247,6 +2276,7 @@ final class ChatAgent
             'llm_model' => $llmModel,
             'llm_error' => trim((string) ($runtime['llm_error'] ?? '')),
             'provider_errors' => is_array($runtime['provider_errors'] ?? null) ? (array) $runtime['provider_errors'] : [],
+            'provider_statuses' => is_array($runtime['provider_statuses'] ?? null) ? (array) $runtime['provider_statuses'] : [],
             'semantic_fallback_used' => (bool) ($runtime['semantic_fallback_used'] ?? false),
             'agents_used' => $this->collectTestModeAgentsUsed($telemetry, $runtime, $providerUsed, $llmCalled),
         ];

@@ -1,6 +1,18 @@
 <?php
 // framework/config/llm.php
 
+$envFlag = static function (string $name, bool $default): bool {
+    $raw = getenv($name);
+    if ($raw === false) {
+        return $default;
+    }
+    $value = strtolower(trim((string) $raw));
+    if ($value === '') {
+        return $default;
+    }
+    return in_array($value, ['1', 'true', 'yes', 'on'], true);
+};
+
 $hasGroq = trim((string) getenv('GROQ_API_KEY')) !== '';
 $hasGemini = trim((string) getenv('GEMINI_API_KEY')) !== '';
 $hasOpenRouter = trim((string) getenv('OPENROUTER_API_KEY')) !== '';
@@ -9,19 +21,19 @@ $hasClaude = trim((string) getenv('CLAUDE_API_KEY')) !== '';
 return [
     'providers' => [
         'groq' => [
-            'enabled' => $hasGroq,
+            'enabled' => $envFlag('GROQ_ENABLED', $hasGroq),
             'class' => \App\Core\LLM\Providers\GroqProvider::class,
         ],
         'gemini' => [
-            'enabled' => $hasGemini,
+            'enabled' => $envFlag('GEMINI_ENABLED', $hasGemini),
             'class' => \App\Core\LLM\Providers\GeminiProvider::class,
         ],
         'openrouter' => [
-            'enabled' => $hasOpenRouter,
+            'enabled' => $envFlag('OPENROUTER_ENABLED', $hasOpenRouter),
             'class' => \App\Core\LLM\Providers\OpenRouterProvider::class,
         ],
         'claude' => [
-            'enabled' => $hasClaude,
+            'enabled' => $envFlag('CLAUDE_ENABLED', $hasClaude),
             'class' => \App\Core\LLM\Providers\ClaudeProvider::class,
         ],
     ],

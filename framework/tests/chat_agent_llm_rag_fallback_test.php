@@ -22,7 +22,7 @@ $buildTestInfo->setAccessible(true);
 $details = $extractFailure->invoke(
     $agent,
     new RuntimeException(
-        'User not found. | provider_errors={"gemini":"quota exceeded","openrouter":"User not found."}'
+        'User not found. | provider_errors={"gemini":"quota exceeded","openrouter":"User not found."} | provider_statuses={"gemini":"quota_exhausted","openrouter":"invalid_config"}'
     )
 );
 
@@ -31,11 +31,18 @@ if ((string) ($details['message'] ?? '') !== 'User not found.') {
 }
 
 $providerErrors = is_array($details['provider_errors'] ?? null) ? (array) $details['provider_errors'] : [];
+$providerStatuses = is_array($details['provider_statuses'] ?? null) ? (array) $details['provider_statuses'] : [];
 if (($providerErrors['gemini'] ?? '') !== 'quota exceeded') {
     $failures[] = 'El parser de error LLM debe extraer provider_errors.gemini.';
 }
 if (($providerErrors['openrouter'] ?? '') !== 'User not found.') {
     $failures[] = 'El parser de error LLM debe extraer provider_errors.openrouter.';
+}
+if (($providerStatuses['gemini'] ?? '') !== 'quota_exhausted') {
+    $failures[] = 'El parser de error LLM debe extraer provider_statuses.gemini.';
+}
+if (($providerStatuses['openrouter'] ?? '') !== 'invalid_config') {
+    $failures[] = 'El parser de error LLM debe extraer provider_statuses.openrouter.';
 }
 
 $route = new IntentRouteResult(
@@ -92,6 +99,7 @@ $testInfo = $buildTestInfo->invoke($agent, [
     'llm_provider_attempted' => 'llm',
     'llm_error' => 'quota exceeded',
     'provider_errors' => ['gemini' => 'quota exceeded'],
+    'provider_statuses' => ['gemini' => 'quota_exhausted'],
     'semantic_fallback_used' => true,
 ]);
 
@@ -100,6 +108,9 @@ if (($testInfo['llm_error'] ?? '') !== 'quota exceeded') {
 }
 if (($testInfo['provider_errors']['gemini'] ?? '') !== 'quota exceeded') {
     $failures[] = 'test_info debe exponer provider_errors.';
+}
+if (($testInfo['provider_statuses']['gemini'] ?? '') !== 'quota_exhausted') {
+    $failures[] = 'test_info debe exponer provider_statuses.';
 }
 if (($testInfo['semantic_fallback_used'] ?? false) !== true) {
     $failures[] = 'test_info debe exponer semantic_fallback_used=true.';
