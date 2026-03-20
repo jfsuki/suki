@@ -54,6 +54,7 @@ final class BusinessDiscoveryDatasetCompiler
     public static function compile(array $payload, ?string $schemaPath = null): array
     {
         self::validateTemplate($payload, $schemaPath);
+        $payload = self::applySectorSeed($payload);
 
         $version = trim((string) ($payload['version'] ?? '1.0.0'));
         if ($version === '') {
@@ -226,6 +227,34 @@ final class BusinessDiscoveryDatasetCompiler
             'vectorize' => true,
         ];
 
+        $sectorSeed = is_array($payload['_sector_seed'] ?? null) ? $payload['_sector_seed'] : [];
+        $seedKnowledge = is_array($sectorSeed['knowledge_stable_seed'] ?? null)
+            ? $sectorSeed['knowledge_stable_seed']
+            : [];
+        foreach ($seedKnowledge as $index => $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $title = trim((string) ($entry['title'] ?? ''));
+            $facts = self::uniqueLocalStrings($entry['facts'] ?? []);
+            if ($title === '' || $facts === []) {
+                continue;
+            }
+            $records[] = [
+                'id' => self::safeId($discoveryId . '_sector_seed_knowledge_' . $index),
+                'sector' => $sectorKey,
+                'title' => $title,
+                'facts' => $facts,
+                'source_refs' => ['business_discovery:' . $discoveryId, 'sector_seed:' . $sectorKey],
+                'tags' => self::uniqueLocalStrings(array_merge(
+                    ['sector_seed'],
+                    self::uniqueLocalStrings($entry['tags'] ?? [])
+                )),
+                'version' => $version,
+                'vectorize' => (bool) ($entry['vectorize'] ?? true),
+            ];
+        }
+
         return $records;
     }
 
@@ -260,6 +289,32 @@ final class BusinessDiscoveryDatasetCompiler
                 )),
                 'version' => $version,
                 'vectorize' => true,
+            ];
+        }
+
+        $sectorSeed = is_array($payload['_sector_seed'] ?? null) ? $payload['_sector_seed'] : [];
+        $seedFaq = is_array($sectorSeed['support_faq_seed'] ?? null) ? $sectorSeed['support_faq_seed'] : [];
+        foreach ($seedFaq as $index => $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $questionText = self::sanitizeText((string) ($entry['question'] ?? ''), true);
+            $answerText = self::sanitizeText((string) ($entry['answer'] ?? ''), false);
+            $key = self::toKey($questionText);
+            if ($key === '' || isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $records[] = [
+                'id' => self::safeId('seed_faq_' . $index . '_' . $key),
+                'question' => $questionText,
+                'answer' => $answerText,
+                'tags' => self::uniqueLocalStrings(array_merge(
+                    ['sector_seed'],
+                    self::uniqueLocalStrings($entry['tags'] ?? [])
+                )),
+                'version' => $version,
+                'vectorize' => (bool) ($entry['vectorize'] ?? true),
             ];
         }
 
@@ -674,6 +729,117 @@ final class BusinessDiscoveryDatasetCompiler
         }
 
         return $result;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private static function applySectorSeed(array $payload): array
+    {
+        $sectorSeed = is_array($payload['sector_seed'] ?? null) ? $payload['sector_seed'] : [];
+        if ($sectorSeed === []) {
+            return $payload;
+        }
+
+        SectorSeedValidator::validateOrFail($sectorSeed, [
+            'expected_sector_key' => (string) ($payload['sector_key'] ?? ''),
+            'expected_sector_label' => (string) ($payload['sector_label'] ?? ''),
+            'expected_country_or_regulation' => (string) ($payload['country_or_regulation'] ?? ''),
+        ]);
+
+        $payload['sector_terminology'] = self::mergeTerminologyEntries(
+            is_array($payload['sector_terminology'] ?? null) ? $payload['sector_terminology'] : [],
+            is_array($sectorSeed['terminology_seed'] ?? null) ? $sectorSeed['terminology_seed'] : []
+        );
+        $payload['skill_mappings'] = self::mergeSkillOverrides(
+            is_array($payload['skill_mappings'] ?? null) ? $payload['skill_mappings'] : [],
+            is_array($sectorSeed['skill_overrides'] ?? null) ? $sectorSeed['skill_overrides'] : []
+        );
+        $payload['_sector_seed'] = $sectorSeed;
+
+        return $payload;
+    }
+
+    /**
+     * @param array<int, mixed> $base
+     * @param array<int, mixed> $seed
+     * @return array<int, array<string, mixed>>
+     */
+    private static function mergeTerminologyEntries(array $base, array $seed): array
+    {
+        $result = [];
+        $seen = [];
+
+        foreach (array_merge($base, $seed) as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+            $term = trim((string) ($entry['term'] ?? ''));
+            $skill = trim((string) ($entry['related_skill'] ?? ''));
+            $key = self::toKey($term . '|' . $skill);
+            if ($key === '' || isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $result[] = $entry;
+        }
+
+        return $result;
+    }
+
+    /**
+     * @param array<int, mixed> $mappings
+     * @param array<int, mixed> $overrides
+     * @return array<int, array<string, mixed>>
+     */
+    private static function mergeSkillOverrides(array $mappings, array $overrides): array
+    {
+        if ($overrides === []) {
+            return array_values(array_filter($mappings, 'is_array'));
+        }
+
+        $bySkill = [];
+        foreach ($mappings as $index => $mapping) {
+            if (!is_array($mapping)) {
+                continue;
+            }
+            $skill = trim((string) ($mapping['skill'] ?? ''));
+            if ($skill !== '') {
+                $bySkill[$skill] = $index;
+            }
+        }
+
+        foreach ($overrides as $override) {
+            if (!is_array($override)) {
+                continue;
+            }
+            $skill = trim((string) ($override['skill'] ?? ''));
+            if ($skill === '') {
+                continue;
+            }
+            if (!isset($bySkill[$skill])) {
+                throw new RuntimeException('Sector seed referencia skill no presente en business discovery: ' . $skill);
+            }
+
+            $index = $bySkill[$skill];
+            $mapping = is_array($mappings[$index] ?? null) ? $mappings[$index] : [];
+            $mapping['utterances_explicit'] = self::uniqueLocalStrings(array_merge(
+                self::uniqueLocalStrings($mapping['utterances_explicit'] ?? []),
+                self::uniqueLocalStrings($override['utterances_explicit'] ?? [])
+            ));
+            $mapping['utterances_implicit'] = self::uniqueLocalStrings(array_merge(
+                self::uniqueLocalStrings($mapping['utterances_implicit'] ?? []),
+                self::uniqueLocalStrings($override['utterances_implicit'] ?? [])
+            ));
+            $mapping['hard_negatives'] = self::uniqueLocalStrings(array_merge(
+                self::uniqueLocalStrings($mapping['hard_negatives'] ?? []),
+                self::uniqueLocalStrings($override['hard_negatives'] ?? [])
+            ));
+            $mappings[$index] = $mapping;
+        }
+
+        return array_values(array_filter($mappings, 'is_array'));
     }
 
     /**

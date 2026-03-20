@@ -256,6 +256,9 @@
         "$ref": "#/definitions/skill_mapping"
       }
     },
+    "sector_seed": {
+      "type": "object"
+    },
     "architecture_guards": {
       "type": "array",
       "minItems": 5,

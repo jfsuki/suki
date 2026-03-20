@@ -1,0 +1,62 @@
+{
+  "version": "1.0.0",
+  "sector_key": "FERRETERIA_MINORISTA",
+  "sector_label": "Ferreteria minorista",
+  "country_or_regulation": "CO - IVA, retenciones y PUC comercial",
+  "knowledge_stable_seed": [
+    {
+      "title": "Operacion de mostrador",
+      "facts": [
+        "En ferreteria minorista es comun pedir productos por referencia corta, uso o ubicacion visual.",
+        "Una venta rapida de mostrador suele requerir validar existencias antes de facturar."
+      ],
+      "tags": [
+        "mostrador",
+        "venta_rapida"
+      ],
+      "vectorize": true
+    }
+  ],
+  "support_faq_seed": [
+    {
+      "question": "Como atiendo una venta rapida de mostrador?",
+      "answer": "Primero valida referencia, existencias y forma de pago antes de emitir la factura.",
+      "tags": [
+        "mostrador",
+        "facturacion"
+      ],
+      "vectorize": true
+    }
+  ],
+  "terminology_seed": [
+    {
+      "term": "mostrador",
+      "type": "channel",
+      "related_skill": "create_invoice",
+      "synonyms": [
+        "venta de mostrador",
+        "venta rapida"
+      ],
+      "common_phrases": [
+        "facturar en mostrador"
+      ],
+      "how_users_ask": [
+        "es una venta rapida de mostrador"
+      ]
+    }
+  ],
+  "skill_overrides": [
+    {
+      "skill": "inventory_check",
+      "utterances_explicit": [
+        "revisa stock de mostrador"
+      ],
+      "utterances_implicit": [
+        "mira si aun queda en vitrina"
+      ],
+      "hard_negatives": [
+        "cerrar inventario anual"
+      ]
+    }
+  ]
+}

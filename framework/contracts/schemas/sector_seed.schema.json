@@ -1,0 +1,263 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Sector Seed",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "version",
+    "sector_key",
+    "sector_label"
+  ],
+  "properties": {
+    "version": {
+      "type": "string",
+      "minLength": 3
+    },
+    "sector_key": {
+      "type": "string",
+      "minLength": 3
+    },
+    "sector_label": {
+      "type": "string",
+      "minLength": 3
+    },
+    "country_or_regulation": {
+      "type": "string",
+      "minLength": 3
+    },
+    "knowledge_stable_seed": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "title",
+          "facts",
+          "tags"
+        ],
+        "properties": {
+          "title": {
+            "type": "string",
+            "minLength": 4
+          },
+          "facts": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 5
+            }
+          },
+          "tags": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 2
+            }
+          },
+          "vectorize": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "support_faq_seed": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "question",
+          "answer",
+          "tags"
+        ],
+        "properties": {
+          "question": {
+            "type": "string",
+            "minLength": 5
+          },
+          "answer": {
+            "type": "string",
+            "minLength": 8
+          },
+          "tags": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 2
+            }
+          },
+          "vectorize": {
+            "type": "boolean"
+          }
+        }
+      }
+    },
+    "terminology_seed": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "term",
+          "type",
+          "related_skill",
+          "synonyms",
+          "common_phrases",
+          "how_users_ask"
+        ],
+        "properties": {
+          "term": {
+            "type": "string",
+            "minLength": 2
+          },
+          "type": {
+            "type": "string",
+            "minLength": 2
+          },
+          "related_skill": {
+            "type": "string",
+            "enum": [
+              "create_invoice",
+              "send_invoice",
+              "register_expense",
+              "accounting_post",
+              "product_lookup",
+              "inventory_check",
+              "customer_lookup",
+              "read_document",
+              "extract_invoice_data",
+              "generate_report",
+              "business_explain",
+              "dataset_lookup",
+              "tax_accountant_advisor"
+            ]
+          },
+          "synonyms": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 2
+            }
+          },
+          "common_phrases": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 3
+            }
+          },
+          "how_users_ask": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 3
+            }
+          }
+        }
+      }
+    },
+    "skill_overrides": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "skill"
+        ],
+        "properties": {
+          "skill": {
+            "type": "string",
+            "enum": [
+              "create_invoice",
+              "send_invoice",
+              "register_expense",
+              "accounting_post",
+              "product_lookup",
+              "inventory_check",
+              "customer_lookup",
+              "read_document",
+              "extract_invoice_data",
+              "generate_report",
+              "business_explain",
+              "dataset_lookup",
+              "tax_accountant_advisor"
+            ]
+          },
+          "utterances_explicit": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 3
+            }
+          },
+          "utterances_implicit": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 3
+            }
+          },
+          "hard_negatives": {
+            "type": "array",
+            "minItems": 1,
+            "items": {
+              "type": "string",
+              "minLength": 3
+            }
+          }
+        },
+        "anyOf": [
+          {
+            "required": [
+              "utterances_explicit"
+            ]
+          },
+          {
+            "required": [
+              "utterances_implicit"
+            ]
+          },
+          {
+            "required": [
+              "hard_negatives"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "anyOf": [
+    {
+      "required": [
+        "knowledge_stable_seed"
+      ]
+    },
+    {
+      "required": [
+        "support_faq_seed"
+      ]
+    },
+    {
+      "required": [
+        "terminology_seed"
+      ]
+    },
+    {
+      "required": [
+        "skill_overrides"
+      ]
+    }
+  ]
+}
