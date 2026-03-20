@@ -230,6 +230,52 @@ if (empty($failures)) {
                     }
                 }
 
+                $vectorizeHybridRun = runScript($php, $vectorizeScript, [
+                    '--in=' . $compiledPath,
+                    '--tenant-id=tenant_test',
+                    '--app-id=app_test',
+                    '--max-chars=220',
+                    '--include-intents-expansion',
+                    '--dry-run',
+                ]);
+                if ($vectorizeHybridRun['code'] !== 0) {
+                    $failures[] = 'La vectorizacion dry-run con intents_expansion debe pasar.';
+                } else {
+                    $json = $vectorizeHybridRun['json'];
+                    if (!is_array($json) || (($json['ok'] ?? false) !== true)) {
+                        $failures[] = 'La vectorizacion dry-run hibrida debe devolver ok=true.';
+                    }
+                    $layers = is_array($json['trace']['layers'] ?? null) ? (array) $json['trace']['layers'] : [];
+                    $knowledgeLayer = is_array($layers['knowledge_stable'] ?? null) ? (array) $layers['knowledge_stable'] : [];
+                    $faqLayer = is_array($layers['support_faq'] ?? null) ? (array) $layers['support_faq'] : [];
+                    $intentsLayer = is_array($layers['intents_expansion'] ?? null) ? (array) $layers['intents_expansion'] : [];
+                    if (($knowledgeLayer['memory_type'] ?? '') !== 'sector_knowledge') {
+                        $failures[] = 'knowledge_stable debe seguir vectorizando a sector_knowledge.';
+                    }
+                    if (($faqLayer['memory_type'] ?? '') !== 'sector_knowledge') {
+                        $failures[] = 'support_faq debe seguir vectorizando a sector_knowledge.';
+                    }
+                    if (($intentsLayer['memory_type'] ?? '') !== 'agent_training') {
+                        $failures[] = 'intents_expansion de business discovery debe ir a agent_training.';
+                    }
+                    if ((int) ($intentsLayer['chunks'] ?? 0) < 1) {
+                        $failures[] = 'intents_expansion debe preparar chunks en modo hibrido.';
+                    }
+                    $chunksByMemoryType = is_array($json['trace']['chunks_by_memory_type'] ?? null)
+                        ? (array) $json['trace']['chunks_by_memory_type']
+                        : [];
+                    if ((int) ($chunksByMemoryType['sector_knowledge'] ?? 0) < 1) {
+                        $failures[] = 'La vectorizacion hibrida debe preparar chunks sector_knowledge.';
+                    }
+                    if ((int) ($chunksByMemoryType['agent_training'] ?? 0) < 1) {
+                        $failures[] = 'La vectorizacion hibrida debe preparar chunks agent_training.';
+                    }
+                    $datasetInfo = is_array($json['dataset'] ?? null) ? (array) $json['dataset'] : [];
+                    if (($datasetInfo['batch_id'] ?? '') !== 'business_discovery_ferreteria_minorista_v1') {
+                        $failures[] = 'La vectorizacion hibrida debe preservar el mismo batch_id.';
+                    }
+                }
+
                 $agentTrainingDataset = $tmpDir . '/compiled_dataset_agent_training.json';
                 $agentPayload = readJson($compiledPath);
                 if (is_array($agentPayload)) {

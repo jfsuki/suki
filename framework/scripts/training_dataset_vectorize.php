@@ -234,10 +234,29 @@ $trace = [
     'chunks_prepared' => 0,
     'chunks_omitted' => 0,
     'omit_reasons' => [],
+    'chunks_by_memory_type' => [],
     'layers' => [
-        'knowledge_stable' => ['vectorize_enabled' => true, 'records' => 0, 'chunks' => 0, 'omitted' => 0],
-        'support_faq' => ['vectorize_enabled' => true, 'records' => 0, 'chunks' => 0, 'omitted' => 0],
-        'intents_expansion' => ['vectorize_enabled' => $includeIntentsExpansion, 'records' => 0, 'chunks' => 0, 'omitted' => 0],
+        'knowledge_stable' => [
+            'vectorize_enabled' => true,
+            'memory_type' => resolveLayerMemoryType($sourceType, 'knowledge_stable', $memoryType),
+            'records' => 0,
+            'chunks' => 0,
+            'omitted' => 0,
+        ],
+        'support_faq' => [
+            'vectorize_enabled' => true,
+            'memory_type' => resolveLayerMemoryType($sourceType, 'support_faq', $memoryType),
+            'records' => 0,
+            'chunks' => 0,
+            'omitted' => 0,
+        ],
+        'intents_expansion' => [
+            'vectorize_enabled' => $includeIntentsExpansion,
+            'memory_type' => resolveLayerMemoryType($sourceType, 'intents_expansion', $memoryType),
+            'records' => 0,
+            'chunks' => 0,
+            'omitted' => 0,
+        ],
     ],
 ];
 
@@ -271,6 +290,13 @@ $appendChunk = static function (array $chunk) use (&$chunks, &$seenChunks, &$tra
     $seenChunks[$dedupeKey] = true;
     $chunks[] = $chunk;
     $trace['chunks_prepared']++;
+    $chunkMemoryType = (string) ($chunk['memory_type'] ?? '');
+    if ($chunkMemoryType !== '') {
+        if (!isset($trace['chunks_by_memory_type'][$chunkMemoryType])) {
+            $trace['chunks_by_memory_type'][$chunkMemoryType] = 0;
+        }
+        $trace['chunks_by_memory_type'][$chunkMemoryType]++;
+    }
     return true;
 };
 
@@ -315,6 +341,7 @@ foreach ($knowledgeStable as $index => $record) {
     }
     $quality = is_numeric($record['quality_score'] ?? null) ? (float) $record['quality_score'] : $globalQuality;
     $quality = max(0.0, min(1.0, $quality));
+    $layerMemoryType = resolveLayerMemoryType($sourceType, 'knowledge_stable', $memoryType);
 
     foreach ($facts as $factIndex => $fact) {
         $baseText = trim($title !== '' ? ($title . '. ' . $fact) : $fact);
@@ -322,7 +349,7 @@ foreach ($knowledgeStable as $index => $record) {
         foreach ($parts as $partIndex => $part) {
             $sourceId = $batchId . ':knowledge_stable:' . $recordId;
             $chunk = [
-                'memory_type' => $memoryType,
+                'memory_type' => $layerMemoryType,
                 'tenant_id' => $tenantId,
                 'app_id' => $appId,
                 'agent_role' => null,
@@ -392,11 +419,12 @@ foreach ($supportFaq as $index => $record) {
     }
     $quality = is_numeric($record['quality_score'] ?? null) ? (float) $record['quality_score'] : $globalQuality;
     $quality = max(0.0, min(1.0, $quality));
+    $layerMemoryType = resolveLayerMemoryType($sourceType, 'support_faq', $memoryType);
 
     foreach (splitText($text, $maxChunkChars) as $partIndex => $part) {
         $sourceId = $batchId . ':support_faq:' . $recordId;
         $chunk = [
-            'memory_type' => $memoryType,
+            'memory_type' => $layerMemoryType,
             'tenant_id' => $tenantId,
             'app_id' => $appId,
             'agent_role' => null,
@@ -443,6 +471,7 @@ if ($includeIntentsExpansion) {
         $intentName = safeTag((string) ($intent['intent'] ?? 'intent_' . $index));
         $actionName = safeTag((string) ($intent['action'] ?? 'unknown_action'));
         $version = $datasetVersion;
+        $layerMemoryType = resolveLayerMemoryType($sourceType, 'intents_expansion', $memoryType);
         $groups = [
             'explicit' => stringList($intent['utterances_explicit'] ?? []),
             'implicit' => stringList($intent['utterances_implicit'] ?? []),
@@ -459,7 +488,7 @@ if ($includeIntentsExpansion) {
                 foreach (splitText($utterance, $maxChunkChars) as $partIndex => $part) {
                     $sourceId = $batchId . ':intent:' . $intentName;
                     $chunk = [
-                        'memory_type' => $memoryType,
+                        'memory_type' => $layerMemoryType,
                         'tenant_id' => $tenantId,
                         'app_id' => $appId,
                         'agent_role' => null,
@@ -565,7 +594,26 @@ try {
         null,
         new QdrantVectorStore(null, null, null, null, null, null, null, $memoryType)
     );
-    $ingest = $semantic->ingest($chunks, ['wait' => true]);
+    $chunksByMemoryType = groupChunksByMemoryType($chunks);
+    $ingestByMemoryType = [];
+    $totalUpserted = 0;
+    $totalAccepted = 0;
+    $totalReceived = 0;
+    $totalDeduped = 0;
+    $totalDropped = 0;
+
+    foreach ($chunksByMemoryType as $chunkMemoryType => $memoryTypeChunks) {
+        $ingest = $semantic->ingest($memoryTypeChunks, [
+            'wait' => true,
+            'memory_type' => $chunkMemoryType,
+        ]);
+        $ingestByMemoryType[$chunkMemoryType] = $ingest;
+        $totalUpserted += (int) ($ingest['upserted'] ?? 0);
+        $totalAccepted += (int) ($ingest['accepted'] ?? 0);
+        $totalReceived += (int) ($ingest['received'] ?? 0);
+        $totalDeduped += (int) ($ingest['deduped'] ?? 0);
+        $totalDropped += (int) ($ingest['dropped'] ?? 0);
+    }
 } catch (Throwable $e) {
     $baseReport['ok'] = false;
     $baseReport['action'] = 'failed';
@@ -573,8 +621,22 @@ try {
     writeAndExit($baseReport, 2);
 }
 
-$baseReport['semantic_memory'] = $ingest;
-$baseReport['chunks_vectorized'] = (int) ($ingest['upserted'] ?? 0);
+$baseReport['semantic_memory'] = [
+    'ok' => true,
+    'received' => $totalReceived,
+    'accepted' => $totalAccepted,
+    'upserted' => $totalUpserted,
+    'deduped' => $totalDeduped,
+    'dropped' => $totalDropped,
+    'memory_type' => $memoryType,
+    'collections' => array_values(array_unique(array_map(
+        static fn(array $report): string => (string) ($report['collection'] ?? ''),
+        $ingestByMemoryType
+    ))),
+    'by_memory_type' => $ingestByMemoryType,
+    'flow' => 'ingest->canonical_payload->embedding(768)->upsert_qdrant',
+];
+$baseReport['chunks_vectorized'] = $totalUpserted;
 
 writeAndExit($baseReport, 0);
 
@@ -811,6 +873,47 @@ function splitByWords(string $text, int $maxChars): array
         $chunks[] = $current;
     }
     return $chunks;
+}
+
+/**
+ * @param array<int,array<string,mixed>> $chunks
+ * @return array<string,array<int,array<string,mixed>>>
+ */
+function groupChunksByMemoryType(array $chunks): array
+{
+    $grouped = [];
+    foreach ($chunks as $chunk) {
+        if (!is_array($chunk)) {
+            continue;
+        }
+        $chunkMemoryType = trim((string) ($chunk['memory_type'] ?? ''));
+        if ($chunkMemoryType === '') {
+            continue;
+        }
+        if (!isset($grouped[$chunkMemoryType])) {
+            $grouped[$chunkMemoryType] = [];
+        }
+        $grouped[$chunkMemoryType][] = $chunk;
+    }
+
+    return $grouped;
+}
+
+function resolveLayerMemoryType(string $sourceType, string $layer, string $defaultMemoryType): string
+{
+    $sourceType = strtolower(trim($sourceType));
+    $layer = strtolower(trim($layer));
+
+    if ($sourceType === 'business_discovery') {
+        if ($layer === 'intents_expansion') {
+            return 'agent_training';
+        }
+        if (in_array($layer, ['knowledge_stable', 'support_faq'], true)) {
+            return 'sector_knowledge';
+        }
+    }
+
+    return $defaultMemoryType;
 }
 
 /**
