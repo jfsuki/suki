@@ -130,6 +130,53 @@
         }
         .bubble.in { background: #ffffff; border: 1px solid var(--border); }
         .bubble.out { background: #dbeafe; margin-left: auto; }
+        .message-card {
+            display: flex;
+            flex-direction: column;
+            margin-bottom: 10px;
+        }
+        .message-card.out { align-items: flex-end; }
+        .message-card.in { align-items: flex-start; }
+        .test-panel {
+            width: min(100%, 540px);
+            margin-top: -2px;
+            padding: 10px 12px;
+            border-radius: 14px;
+            border: 1px dashed #bfdbfe;
+            background: rgba(239, 246, 255, 0.95);
+            color: #1e3a8a;
+            font-size: 11px;
+        }
+        .test-title {
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+            color: #1d4ed8;
+        }
+        .test-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 6px 10px;
+        }
+        .test-row {
+            display: flex;
+            flex-direction: column;
+            gap: 2px;
+        }
+        .test-row strong {
+            font-size: 10px;
+            color: #1e40af;
+        }
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 12px;
+            color: var(--text);
+        }
+        .toggle-row input { margin: 0; }
         .input-row { display: flex; gap: 8px; margin-top: 10px; }
         .input-row input[type="text"] {
             flex: 1;
@@ -236,6 +283,10 @@
                 <label>API Base</label>
                 <input type="text" id="apiBase" value="" placeholder="(vacio = mismo host)" />
             </div>
+            <div class="form-row">
+                <label class="toggle-row"><input type="checkbox" id="testMode" /> Activar TEST MODE</label>
+                <div class="meta">Muestra route_path, embeddings, Qdrant, LLM y agentes reales.</div>
+            </div>
             <div class="status" id="statusText">Lista para registrar datos</div>
             <div class="status" id="qualityText" style="margin-top:8px;background:#eef2ff;color:#1d4ed8;">Calidad conversacional: cargando...</div>
             <div class="input-row">
@@ -264,6 +315,7 @@
         const tenantIdEl = document.getElementById('tenantId');
         const projectIdEl = document.getElementById('projectId');
         const chipsEl = document.getElementById('quickChips');
+        const testModeEl = document.getElementById('testMode');
 
         let sessions = [];
 
@@ -275,6 +327,7 @@
             if (saved.projectId) projectIdEl.value = saved.projectId;
             if (saved.channel) channelEl.value = saved.channel;
             if (saved.apiBase !== undefined) apiBaseEl.value = saved.apiBase;
+            testModeEl.checked = !!saved.testMode;
             loadQuickChips();
         }
 
@@ -286,6 +339,7 @@
                 projectId: projectIdEl.value.trim(),
                 channel: channelEl.value,
                 apiBase: apiBaseEl.value.trim(),
+                testMode: testModeEl.checked,
             };
             localStorage.setItem('suki_chat_app_settings', JSON.stringify(payload));
         }
@@ -393,6 +447,7 @@
                 tenant_id: tenantIdEl.value.trim() || 'default',
                 project_id: projectIdEl.value.trim() || '',
                 session_id: session.id,
+                test_mode: testModeEl.checked,
             };
         }
 
@@ -429,12 +484,55 @@
             chatEl.innerHTML = '';
             if (!session) return;
             session.messages.forEach(m => {
-                const div = document.createElement('div');
-                div.className = 'bubble ' + (m.dir === 'in' ? 'in' : 'out');
-                div.textContent = m.text;
-                chatEl.appendChild(div);
+                const card = document.createElement('div');
+                card.className = 'message-card ' + (m.dir === 'in' ? 'in' : 'out');
+                const bubble = document.createElement('div');
+                bubble.className = 'bubble ' + (m.dir === 'in' ? 'in' : 'out');
+                bubble.textContent = m.text;
+                card.appendChild(bubble);
+                if (m.dir === 'out' && m.testInfo && testModeEl.checked) {
+                    card.appendChild(renderTestInfo(m.testInfo));
+                }
+                chatEl.appendChild(card);
             });
             chatEl.scrollTop = chatEl.scrollHeight;
+        }
+
+        function renderTestInfo(info) {
+            const panel = document.createElement('div');
+            panel.className = 'test-panel';
+            const title = document.createElement('div');
+            title.className = 'test-title';
+            title.textContent = 'Test info';
+            panel.appendChild(title);
+
+            const grid = document.createElement('div');
+            grid.className = 'test-grid';
+            const rows = [
+                ['route_path', info.route_path || 'unknown'],
+                ['classification', info.classification || 'unknown'],
+                ['action', info.action || 'unknown'],
+                ['resolved_locally', String(!!info.resolved_locally)],
+                ['llm', info.llm_model ? `${info.llm_provider || 'llm'} / ${info.llm_model}` : (info.llm_provider || 'none')],
+                ['embeddings', info.embeddings_used ? `si / ${info.embedding_model || 'unknown'} / ${info.embedding_dimensions || 0}d` : 'no'],
+                ['Qdrant', info.collection ? `si / ${info.collection} / hits=${info.hits || 0}` : 'no'],
+                ['evidence_count', String(info.evidence_count || 0)],
+                ['agents_used', Array.isArray(info.agents_used) && info.agents_used.length ? info.agents_used.join(', ') : 'none'],
+                ['route_reason', info.route_reason || 'unknown'],
+            ];
+            rows.forEach(([label, value]) => {
+                const row = document.createElement('div');
+                row.className = 'test-row';
+                const strong = document.createElement('strong');
+                strong.textContent = label;
+                const span = document.createElement('span');
+                span.textContent = value;
+                row.appendChild(strong);
+                row.appendChild(span);
+                grid.appendChild(row);
+            });
+            panel.appendChild(grid);
+            return panel;
         }
 
         async function sendMessage(text, meta = {}) {
@@ -458,7 +556,8 @@
                 });
                 const data = await res.json();
                 const reply = (data.reply || (data.data && data.data.reply) || data.message || JSON.stringify(data));
-                session.messages.push({ dir: 'out', text: reply });
+                const testInfo = data.data && data.data.test_info ? data.data.test_info : null;
+                session.messages.push({ dir: 'out', text: reply, testInfo });
                 renderChat();
             } catch (err) {
                 session.messages.push({ dir: 'out', text: 'Error de conexion con el servidor.' });
@@ -510,7 +609,7 @@
             addSession('sess_' + Date.now());
         });
 
-        [userIdEl, roleEl, tenantIdEl, projectIdEl, channelEl, apiBaseEl].forEach(el => {
+        [userIdEl, roleEl, tenantIdEl, projectIdEl, channelEl, apiBaseEl, testModeEl].forEach(el => {
             el.addEventListener('change', saveSettings);
         });
         apiBaseEl.addEventListener('change', loadQuickChips);

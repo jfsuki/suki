@@ -1166,6 +1166,12 @@ final class IntentRouter
             'semantic_intent_similarity_score' => $score,
             'semantic_intent_source_ids' => is_array($topCandidate['source_ids'] ?? null) ? (array) $topCandidate['source_ids'] : [],
             'semantic_intent_top_hit_type' => (string) ($topCandidate['top_hit_type'] ?? ''),
+            'semantic_intent_collection' => trim((string) (($retrieval['telemetry']['collection'] ?? ''))),
+            'semantic_intent_memory_type' => trim((string) (($retrieval['telemetry']['memory_type'] ?? ''))),
+            'semantic_intent_top_k' => is_numeric($retrieval['telemetry']['top_k'] ?? null)
+                ? max(0, (int) $retrieval['telemetry']['top_k'])
+                : 0,
+            'semantic_intent_hit_count' => count((array) ($retrieval['hits'] ?? [])),
             'similarity_score' => $score,
             'evidence_score' => $score,
             'decision_path' => $decisionPath,

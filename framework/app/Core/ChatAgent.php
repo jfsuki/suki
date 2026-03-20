@@ -47,6 +47,7 @@ final class ChatAgent
     public function handle(array $payload): array
     {
         $requestStartedAt = microtime(true);
+        $testMode = $this->isTestMode($payload);
         $text = trim((string) ($payload['message'] ?? $payload['text'] ?? ''));
         $channel = trim((string) ($payload['channel'] ?? 'local'));
         $sessionId = trim((string) ($payload['session_id'] ?? 'sess_' . time()));
@@ -591,7 +592,12 @@ final class ChatAgent
             } catch (\Throwable $e) {
                 // observability must not block chat response
             }
-            return $reply;
+            return $this->attachTestInfo($reply, $testMode, $telemetry, [
+                'action' => $action,
+                'resolved_locally' => true,
+                'llm_called' => false,
+                'provider_used' => 'none',
+            ]);
         }
 
         if ($route->isCommand()) {
@@ -683,7 +689,12 @@ final class ChatAgent
                         'conversation_id' => $conversationId,
                     ]
                 )));
-                return $blockedReply;
+                return $this->attachTestInfo($blockedReply, $testMode, $telemetry, [
+                    'action' => 'execute_command',
+                    'resolved_locally' => true,
+                    'llm_called' => false,
+                    'provider_used' => 'none',
+                ]);
             }
             try {
                 $reply = $this->dispatchCommandPayload($commandPayload, $channel, $sessionId, $userId, $mode);
@@ -843,7 +854,12 @@ final class ChatAgent
             } catch (\Throwable $e) {
                 // observability must not block chat response
             }
-            return $reply;
+            return $this->attachTestInfo($reply, $testMode, $commandTelemetry, [
+                'action' => $action,
+                'resolved_locally' => true,
+                'llm_called' => false,
+                'provider_used' => 'none',
+            ]);
         }
 
         if ($route->isLlmRequest()) {
@@ -919,7 +935,12 @@ final class ChatAgent
                 } catch (\Throwable $ignored) {
                     // observability must not block chat response
                 }
-                return $semanticReply;
+                return $this->attachTestInfo($semanticReply, $testMode, $telemetry, [
+                    'action' => 'respond_local',
+                    'resolved_locally' => true,
+                    'llm_called' => false,
+                    'provider_used' => 'semantic_memory',
+                ]);
             }
 
             $task = $this->controlTowerMarkRunning($task, [
@@ -997,11 +1018,17 @@ final class ChatAgent
                 } catch (\Throwable $ignored) {
                     // observability must not block chat response
                 }
-                return $this->annotateReplyWithControlTower(
+                $errorReply = $this->annotateReplyWithControlTower(
                     $this->reply('IA no disponible. Usa comandos simples.', $channel, $sessionId, $userId),
                     $task,
                     $failure['incident']
                 );
+                return $this->attachTestInfo($errorReply, $testMode, $telemetry, [
+                    'action' => $action,
+                    'resolved_locally' => true,
+                    'llm_called' => true,
+                    'provider_used' => 'llm',
+                ]);
             }
             $provider = $llmResult['provider'] ?? 'llm';
             $usage = $this->normalizeUsage((array) ($llmResult['usage'] ?? []));
@@ -1097,7 +1124,13 @@ final class ChatAgent
             } catch (\Throwable $ignored) {
                 // observability must not block chat response
             }
-            return $reply;
+            return $this->attachTestInfo($reply, $testMode, $telemetry, [
+                'action' => $action,
+                'resolved_locally' => false,
+                'llm_called' => true,
+                'provider_used' => (string) $provider,
+                'llm_result' => is_array($llmResult) ? $llmResult : [],
+            ]);
         }
 
         $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
@@ -1946,6 +1979,190 @@ final class ChatAgent
                 'user_id' => $userId,
             ], $data),
         ];
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     */
+    private function isTestMode(array $payload): bool
+    {
+        if (array_key_exists('test_mode', $payload)) {
+            return (bool) $payload['test_mode'];
+        }
+
+        $meta = is_array($payload['meta'] ?? null) ? (array) $payload['meta'] : [];
+        return (bool) ($meta['test_mode'] ?? false);
+    }
+
+    /**
+     * @param array<string,mixed> $reply
+     * @param array<string,mixed> $telemetry
+     * @param array<string,mixed> $runtime
+     * @return array<string,mixed>
+     */
+    private function attachTestInfo(array $reply, bool $testMode, array $telemetry, array $runtime = []): array
+    {
+        if (!$testMode) {
+            return $reply;
+        }
+
+        $data = is_array($reply['data'] ?? null) ? (array) $reply['data'] : [];
+        $data['test_info'] = $this->buildTestInfo($telemetry, $runtime);
+        $reply['data'] = $data;
+
+        return $reply;
+    }
+
+    /**
+     * @param array<string,mixed> $telemetry
+     * @param array<string,mixed> $runtime
+     * @return array<string,mixed>
+     */
+    private function buildTestInfo(array $telemetry, array $runtime = []): array
+    {
+        $retrieval = is_array($telemetry['retrieval'] ?? null) ? (array) $telemetry['retrieval'] : [];
+        $semanticIntentCollection = trim((string) ($telemetry['semantic_intent_collection'] ?? ''));
+        $semanticIntentSource = trim((string) ($telemetry['semantic_intent_source'] ?? ''));
+        $semanticIntentUsed = $semanticIntentSource === 'agent_training';
+        $retrievalAttempted = (bool) ($retrieval['retrieval_attempted'] ?? false);
+        $embeddingUsed = $retrievalAttempted || $semanticIntentUsed;
+        $embeddingModel = $embeddingUsed ? (string) (getenv('EMBEDDING_MODEL') ?: 'gemini-embedding-001') : '';
+        $embeddingDimensions = $embeddingUsed
+            ? max(1, (int) (getenv('EMBEDDING_OUTPUT_DIMENSIONALITY') ?: 768))
+            : 0;
+        $collection = trim((string) ($retrieval['collection'] ?? ''));
+        if ($collection === '' && $semanticIntentCollection !== '') {
+            $collection = $semanticIntentCollection;
+        }
+        $memoryType = trim((string) ($retrieval['memory_type'] ?? ''));
+        if ($memoryType === '' && $semanticIntentUsed) {
+            $memoryType = trim((string) ($telemetry['semantic_intent_memory_type'] ?? ''));
+        }
+        $hits = 0;
+        if ($retrieval !== []) {
+            $hits = max(
+                0,
+                (int) ($telemetry['rag_result_count_raw'] ?? $retrieval['retrieval_result_count'] ?? $telemetry['rag_result_count'] ?? 0)
+            );
+        } elseif ($semanticIntentUsed) {
+            $hits = max(0, (int) ($telemetry['semantic_intent_hit_count'] ?? 0));
+        }
+        $topK = 0;
+        if ($retrieval !== []) {
+            $topK = max(0, (int) ($retrieval['top_k'] ?? 0));
+        } elseif ($semanticIntentUsed) {
+            $topK = max(0, (int) ($telemetry['semantic_intent_top_k'] ?? 0));
+        }
+        $evidenceCount = 0;
+        if ($retrieval !== []) {
+            $evidenceCount = max(0, (int) ($telemetry['rag_result_count'] ?? 0));
+        } elseif ($semanticIntentUsed) {
+            $evidenceCount = $hits;
+        }
+        $providerUsed = trim((string) ($runtime['provider_used'] ?? $telemetry['provider_used'] ?? ''));
+        $llmCalled = (bool) ($runtime['llm_called'] ?? $telemetry['llm_called'] ?? false);
+        $llmModel = $llmCalled
+            ? $this->resolveTestModeLlmModel(
+                is_array($runtime['llm_result'] ?? null) ? (array) $runtime['llm_result'] : [],
+                $providerUsed
+            )
+            : '';
+
+        return [
+            'route_path' => trim((string) ($telemetry['route_path'] ?? '')) ?: 'unknown',
+            'classification' => trim((string) ($telemetry['classification'] ?? '')) ?: 'unknown',
+            'action' => trim((string) ($runtime['action'] ?? $telemetry['action'] ?? '')) ?: 'unknown',
+            'resolved_locally' => (bool) ($runtime['resolved_locally'] ?? $telemetry['resolved_locally'] ?? false),
+            'route_reason' => trim((string) ($telemetry['route_reason'] ?? '')) ?: 'unknown',
+            'embedding_model' => $embeddingModel,
+            'embedding_dimensions' => $embeddingDimensions,
+            'embeddings_used' => $embeddingUsed,
+            'vector_store' => $collection !== '' ? 'qdrant' : 'none',
+            'collection' => $collection,
+            'memory_type' => $memoryType !== '' ? $memoryType : 'none',
+            'hits' => $hits,
+            'top_k' => $topK,
+            'evidence_count' => $evidenceCount,
+            'top_score' => is_numeric($telemetry['retrieval_top_score'] ?? $telemetry['semantic_intent_similarity_score'] ?? null)
+                ? (float) ($telemetry['retrieval_top_score'] ?? $telemetry['semantic_intent_similarity_score'])
+                : 0.0,
+            'llm_provider' => $llmCalled ? ($providerUsed !== '' ? $providerUsed : 'llm') : 'none',
+            'llm_model' => $llmModel,
+            'agents_used' => $this->collectTestModeAgentsUsed($telemetry, $runtime, $providerUsed, $llmCalled),
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $llmResult
+     */
+    private function resolveTestModeLlmModel(array $llmResult, string $providerUsed): string
+    {
+        $raw = is_array($llmResult['raw'] ?? null) ? (array) $llmResult['raw'] : [];
+        $rawData = is_array($raw['data'] ?? null) ? (array) $raw['data'] : [];
+        $candidates = [
+            trim((string) ($llmResult['model'] ?? '')),
+            trim((string) ($raw['model'] ?? '')),
+            trim((string) ($rawData['model'] ?? '')),
+        ];
+
+        foreach ($candidates as $candidate) {
+            if ($candidate !== '') {
+                return $candidate;
+            }
+        }
+
+        return match (strtolower(trim($providerUsed))) {
+            'gemini' => (string) (getenv('GEMINI_MODEL') ?: 'gemini-2.5-flash-lite'),
+            'deepseek' => (string) (getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat'),
+            'openrouter' => (string) (getenv('OPENROUTER_MODEL') ?: 'openrouter/free'),
+            'claude' => (string) (getenv('CLAUDE_MODEL') ?: 'claude-3-5-haiku-latest'),
+            'groq' => (string) (getenv('GROQ_MODEL') ?: ''),
+            default => '',
+        };
+    }
+
+    /**
+     * @param array<string,mixed> $telemetry
+     * @param array<string,mixed> $runtime
+     * @return array<int,string>
+     */
+    private function collectTestModeAgentsUsed(array $telemetry, array $runtime, string $providerUsed, bool $llmCalled): array
+    {
+        $agentsUsed = [];
+        $skillSelected = trim((string) ($telemetry['skill_selected'] ?? ''));
+        $moduleUsed = trim((string) ($telemetry['module_used'] ?? ''));
+        $skillGroup = trim((string) ($telemetry['skill_group'] ?? ''));
+        $semanticIntentSource = trim((string) ($telemetry['semantic_intent_source'] ?? ''));
+        $agentToolsAction = trim((string) ($telemetry['agent_tools_action'] ?? ''));
+
+        if ($semanticIntentSource !== '') {
+            $agentsUsed[] = $semanticIntentSource;
+        }
+        if ((bool) ($telemetry['rag_attempted'] ?? false)) {
+            $agentsUsed[] = 'rag';
+        }
+        if ($skillSelected !== '' && $skillSelected !== 'none') {
+            $agentsUsed[] = 'skill:' . $skillSelected;
+        }
+        if ($skillGroup !== '' && $skillGroup !== 'unknown') {
+            $agentsUsed[] = 'skill_group:' . $skillGroup;
+        }
+        if ($moduleUsed !== '' && $moduleUsed !== 'none') {
+            $agentsUsed[] = 'module:' . $moduleUsed;
+        }
+        if ($agentToolsAction !== '' && $agentToolsAction !== 'none') {
+            $agentsUsed[] = 'agent_tools:' . $agentToolsAction;
+        }
+        if ($llmCalled) {
+            $agentsUsed[] = 'llm:' . ($providerUsed !== '' ? $providerUsed : 'llm');
+        }
+
+        $agentsUsed = array_values(array_unique(array_filter(array_map(
+            static fn($value): string => trim((string) $value),
+            $agentsUsed
+        ), static fn(string $value): bool => $value !== '')));
+
+        return $agentsUsed;
     }
 
     private function denyExecutableChat(
