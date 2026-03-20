@@ -56,7 +56,7 @@ final class BuilderOnboardingFlow
             return ['action' => 'respond_local', 'reply' => (string) ($ops['buildProjectStatus'])(), 'state' => $state];
         }
 
-        if (!$isOnboarding && !$isUnknownDiscovery && !$trigger && !$businessHint) {
+        if (!$isOnboarding && !$isUnknownDiscovery && !$trigger) {
             return null;
         }
 

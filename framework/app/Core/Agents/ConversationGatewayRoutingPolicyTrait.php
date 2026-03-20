@@ -61,6 +61,14 @@ trait ConversationGatewayRoutingPolicyTrait
         return [];
         }
         $intentName = (string) $route['intent'];
+        $normalizedRouteText = $this->normalize($text);
+        $builderBusinessHint = '';
+        if ($mode === 'builder') {
+            $builderBusinessHint = $this->normalizeBusinessType($this->detectBusinessType($normalizedRouteText));
+            if ($builderBusinessHint === '') {
+                $builderBusinessHint = $this->normalizeBusinessType($normalizedRouteText);
+            }
+        }
         $action = (string) ($route['action'] ?? '');
         $isPlaybookAction = str_starts_with($action, 'APPLY_PLAYBOOK_');
         $confidence = (float) ($route['confidence'] ?? 0);
@@ -86,6 +94,10 @@ trait ConversationGatewayRoutingPolicyTrait
         
 
         return [];
+        }
+
+        if ($mode === 'builder' && $intentName === 'APP_CREATE' && $builderBusinessHint !== '') {
+            return [];
         }
 
         if ($confidence < $threshold || $missing) {

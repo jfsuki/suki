@@ -145,7 +145,7 @@ final class AcidChatRunner
             ['msg' => 'crear formulario clientes', 'mode' => 'builder', 'expect' => ['ask_user'], 'contains' => 'tabla base'],
             ['msg' => 'crear producto', 'mode' => 'app', 'expect' => ['respond_local'], 'contains' => 'no existe'],
             ['msg' => 'quiero crear una app', 'mode' => 'app', 'expect' => ['respond_local'], 'contains' => 'Creador de apps'],
-            ['msg' => 'crear producto', 'mode' => 'builder', 'expect' => ['ask_user'], 'contains' => 'contado, credito o mixto'],
+            ['msg' => 'crear producto', 'mode' => 'builder', 'expect' => ['ask_user'], 'contains' => 'Quieres que la cree'],
             ['msg' => 'quiero crear un programa para mi veterinaria', 'mode' => 'builder', 'expect' => ['ask_user'], 'contains' => 'Paso 2', 'user' => 'builder_switch'],
             ['msg' => 'mixto', 'mode' => 'builder', 'expect' => ['ask_user'], 'contains' => 'Paso 3', 'user' => 'builder_switch'],
             ['msg' => 'si crea la tabla pacientes', 'mode' => 'builder', 'expect' => ['ask_user'], 'contains' => 'tabla pacientes', 'user' => 'builder_switch'],

@@ -583,7 +583,11 @@ trait ConversationGatewayHandlePipelineTrait
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('crud_guide', true));
         }
 
-        if ($this->isProfileHint($normalized)) {
+        $skipBuilderProfileLearning = $mode === 'builder'
+            && ((string) ($state['active_task'] ?? '')) === ''
+            && !$this->isBuilderOnboardingTrigger($normalized)
+            && $this->normalizeBusinessType($this->detectBusinessType($normalized)) !== '';
+        if ($this->isProfileHint($normalized) && !$skipBuilderProfileLearning) {
             $updated = $this->updateProfileFromText($profile, $normalized, $tenantId, $userId);
             $state = $this->updateState($state, $raw, $updated['reply'], 'profile', null, [], 'profile');
             $this->saveState($tenantId, $userId, $state);

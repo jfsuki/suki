@@ -13,7 +13,7 @@ $baseOps = [
     'parseInstallPlaybookRequest' => fn(string $text): array => ['matched' => false],
     'classifyWithPlaybookIntents' => fn(string $text, array $profile): array => [],
     'isBuilderOnboardingTrigger' => fn(string $text): bool => str_contains($text, 'crear una app'),
-    'detectBusinessType' => fn(string $text): string => str_contains($text, 'ferreteria') ? 'ferreteria' : '',
+    'detectBusinessType' => fn(string $text): string => preg_match('/ferreteria|herramientas/u', $text) === 1 ? 'ferreteria' : '',
     'isFormListQuestion' => fn(string $text): bool => str_contains($text, 'formularios'),
     'buildFormList' => fn(): string => 'Aun no hay formularios. Quieres crear uno?',
     'isEntityListQuestion' => fn(string $text): bool => str_contains($text, 'tablas'),
@@ -77,6 +77,19 @@ if ($playbookResult !== null) {
     $failures[] = 'Expected null when playbook intent should bypass onboarding.';
 }
 
+$businessHintOnlyResult = $flow->handle(
+    'tengo una ferreteria',
+    [],
+    [],
+    'default',
+    'test',
+    $baseOps,
+    $coreHandler
+);
+if ($businessHintOnlyResult !== null) {
+    $failures[] = 'Business hint alone should not enter builder onboarding.';
+}
+
 $delegatedResult = $flow->handle(
     'quiero crear una app',
     ['active_task' => 'builder_onboarding'],
@@ -99,4 +112,3 @@ $report = [
 
 echo json_encode($report, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . PHP_EOL;
 exit($ok ? 0 : 1);
-

@@ -1914,6 +1914,8 @@ final class ConversationGateway
             'que debo hacer ahora',
             'paso sigue',
             'ruta de trabajo',
+            'mi negocio es',
+            'mi empresa es',
             'empresa de',
             'tengo una empresa',
         ];
@@ -2112,7 +2114,7 @@ final class ConversationGateway
 
     private function detectBusinessType(string $text): string
     {
-        $text = $this->stripNegatedBusinessMentions($text);
+        $text = $this->normalize($this->stripNegatedBusinessMentions($text));
         if (str_contains($text, 'taller automotriz') || (str_contains($text, 'automotriz') && str_contains($text, 'taller'))) {
             return 'taller_automotriz';
         }
