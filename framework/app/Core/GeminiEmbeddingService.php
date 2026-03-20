@@ -76,6 +76,7 @@ final class GeminiEmbeddingService
         }
 
         $payload = [
+            'model' => 'models/' . $this->model,
             'content' => [
                 'parts' => [
                     ['text' => $text],

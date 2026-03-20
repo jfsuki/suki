@@ -121,7 +121,71 @@ if ((string) ($trivialTelemetry['skill_result_status'] ?? '') !== 'no_skill_matc
     $failures[] = 'Consulta trivial sin skill debe dejar skill_result_status=no_skill_match.';
 }
 
-// 4) Technical query without matching skill still uses RAG, dedupes context, then falls back to LLM.
+// 4) Builder business discovery queries must attempt RAG when semantic memory is available.
+$builderSemantic = buildSemanticService([
+    [
+        'memory_type' => 'sector_knowledge',
+        'tenant_id' => 'default',
+        'app_id' => 'pilot_ferreteria',
+        'sector' => 'retail',
+        'source_type' => 'training_dataset',
+        'source_id' => 'sector_builder_intro',
+        'source' => 'sector_builder_intro',
+        'chunk_id' => 'builder_ferreteria_1',
+        'type' => 'knowledge',
+        'tags' => ['sector:retail', 'builder'],
+        'version' => '1.0.0',
+        'quality_score' => 0.96,
+        'created_at' => '2026-03-09T00:00:00+00:00',
+        'updated_at' => '2026-03-09T00:00:00+00:00',
+        'metadata' => [],
+        'content' => 'Una ferretería vende herramientas, tornillería y materiales de mostrador.',
+    ],
+], false);
+$builderRouter = new IntentRouter(null, 'warn', null, $builderSemantic);
+$builderBusiness = $builderRouter->route([
+    'action' => 'send_to_llm',
+    'llm_request' => [
+        'messages' => [
+            ['role' => 'user', 'content' => 'tengo una ferretería y vendo herramientas'],
+        ],
+        'user_message' => 'tengo una ferretería y vendo herramientas',
+    ],
+], [
+    'tenant_id' => 'default',
+    'project_id' => 'default',
+    'sector' => 'retail',
+    'session_id' => 'intent_router_builder_business',
+    'mode' => 'builder',
+    'role' => 'admin',
+]);
+if (!$builderBusiness->isLlmRequest()) {
+    $failures[] = 'Builder business discovery con semantic memory disponible debe continuar a LLM con contexto verificado.';
+}
+$builderBusinessTelemetry = $builderBusiness->telemetry();
+if (!(bool) ($builderBusinessTelemetry['rag_attempted'] ?? false) || !(bool) ($builderBusinessTelemetry['rag_used'] ?? false)) {
+    $failures[] = 'Builder business discovery debe dejar rag_attempted=true y rag_used=true.';
+}
+if ((string) ($builderBusinessTelemetry['semantic_memory_status'] ?? '') !== 'enabled') {
+    $failures[] = 'Builder business discovery debe dejar semantic_memory_status=enabled.';
+}
+if ((string) ($builderBusinessTelemetry['route_reason'] ?? '') !== 'llm_after_verified_rag') {
+    $failures[] = 'Builder business discovery con evidencia valida debe dejar route_reason=llm_after_verified_rag.';
+}
+if ((string) ($builderBusinessTelemetry['memory_type'] ?? '') !== 'sector_knowledge') {
+    $failures[] = 'Builder business discovery debe consultar sector_knowledge por defecto.';
+}
+if ((int) ($builderBusinessTelemetry['rag_result_count'] ?? 0) <= 0) {
+    $failures[] = 'Builder business discovery debe recuperar evidencia util.';
+}
+if (($builderBusinessTelemetry['semantic_scope_app_relaxed'] ?? false) !== true) {
+    $failures[] = 'Builder business discovery debe relajar app_id cuando el proyecto activo sigue en default.';
+}
+if (!array_key_exists('semantic_scope_app_id', $builderBusinessTelemetry) || $builderBusinessTelemetry['semantic_scope_app_id'] !== null) {
+    $failures[] = 'Builder business discovery relajado debe consultar semantic memory sin app_id.';
+}
+
+// 5) Technical query without matching skill still uses RAG, dedupes context, then falls back to LLM.
 $ragChunks = [
     [
         'memory_type' => 'sector_knowledge',

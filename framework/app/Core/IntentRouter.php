@@ -655,6 +655,10 @@ final class IntentRouter
         $loopCheck = $this->detectRepeatedRouteLoop($state, $telemetry, $routePath, $runtimeBudget);
         $tenantScopeViolation = trim((string) ($telemetry['tenant_id'] ?? $context['tenant_id'] ?? '')) === '';
         $evidenceOverride = (bool) ($telemetry['evidence_override'] ?? false);
+        $verifiedSemanticEvidence = $evidenceOverride
+            || (bool) ($telemetry['rag_used'] ?? false)
+            || (bool) ($telemetry['semantic_intent_match'] ?? false)
+            || trim((string) ($telemetry['evidence_gate_status'] ?? '')) === 'passed';
         $guardTriggered = false;
         $guardReason = 'none';
         $guardStage = 'none';
@@ -690,7 +694,7 @@ final class IntentRouter
             $guardReason = 'llm_fallback_budget_exceeded';
             $guardStage = 'llm';
             $guardReply = 'Detuve esta ruta porque excede el presupuesto de fallback a LLM.';
-        } elseif (!$evidenceOverride && $routerLatencyMs > (int) ($runtimeBudget['max_execution_ms'] ?? 1500)) {
+        } elseif (!$verifiedSemanticEvidence && $routerLatencyMs > (int) ($runtimeBudget['max_execution_ms'] ?? 1500)) {
             $guardTriggered = true;
             $guardReason = 'execution_time_budget_exceeded';
             $guardStage = 'router';
@@ -708,6 +712,7 @@ final class IntentRouter
             'semantic_queries_count' => $semanticQueriesCount,
             'llm_fallback_count' => $llmFallbackCount,
             'evidence_override' => $evidenceOverride,
+            'verified_semantic_evidence' => $verifiedSemanticEvidence,
             'loop_guard_triggered' => $guardTriggered,
             'loop_guard_reason' => $guardReason,
             'loop_guard_stage' => $guardStage,
@@ -1102,6 +1107,10 @@ final class IntentRouter
         ?SkillRegistry $skillsRegistry,
         array $existingTelemetry
     ): array {
+        if ($action !== 'send_to_llm') {
+            return [];
+        }
+
         if (!$skillsRegistry) {
             return [];
         }
@@ -1123,10 +1132,13 @@ final class IntentRouter
             return [];
         }
 
+        $semanticAppScope = $this->resolveSemanticAppScope($context, $query);
+        $semanticScopeTelemetry = $this->buildSemanticScopeTelemetry($context, $semanticAppScope);
+
         try {
             $retrieval = $semanticMemory->retrieveAgentTraining($query, [
                 'tenant_id' => trim((string) ($context['tenant_id'] ?? '')),
-                'app_id' => trim((string) ($context['app_id'] ?? $context['project_id'] ?? '')) ?: null,
+                'app_id' => $semanticAppScope,
                 'sector' => trim((string) ($context['sector'] ?? '')) ?: null,
                 'agent_role' => trim((string) ($context['agent_role'] ?? '')) ?: null,
                 'user_id' => trim((string) ($context['user_id'] ?? '')) ?: null,
@@ -1137,7 +1149,7 @@ final class IntentRouter
                     'semantic_intent_status' => 'error',
                     'semantic_intent_source' => 'agent_training',
                     'semantic_intent_error' => trim((string) $e->getMessage()),
-                ],
+                ] + $semanticScopeTelemetry,
             ];
         }
 
@@ -1149,7 +1161,7 @@ final class IntentRouter
                     'semantic_intent_source' => 'agent_training',
                     'decision_path' => ['cache', 'rules', 'agent_training'],
                     'decision_path_string' => 'cache>rules>agent_training',
-                ],
+                ] + $semanticScopeTelemetry,
             ];
         }
 
@@ -1176,7 +1188,7 @@ final class IntentRouter
             'evidence_score' => $score,
             'decision_path' => $decisionPath,
             'decision_path_string' => implode('>', $decisionPath),
-        ];
+        ] + $semanticScopeTelemetry;
 
         if ($skillName === '') {
             return [
@@ -1375,12 +1387,15 @@ final class IntentRouter
         $memoryType = $this->resolveRetrievalMemoryType($context, $actionCatalogEntry);
         $runtimeConfig = SemanticMemoryService::retrievalRuntimeConfig();
         $availability = SemanticMemoryService::availabilityFromEnv();
+        $semanticAppScope = $this->resolveSemanticAppScope($context, $query);
+        $semanticScopeTelemetry = $this->buildSemanticScopeTelemetry($context, $semanticAppScope);
         $scope = [
             'tenant_id' => trim((string) ($context['tenant_id'] ?? '')),
-            'app_id' => trim((string) ($context['app_id'] ?? $context['project_id'] ?? '')) ?: null,
+            'app_id' => $semanticAppScope,
             'sector' => trim((string) ($context['sector'] ?? '')) ?: null,
             'agent_role' => trim((string) ($context['agent_role'] ?? '')) ?: null,
             'user_id' => trim((string) ($context['user_id'] ?? '')) ?: null,
+            'mode' => trim((string) ($context['mode'] ?? '')) ?: 'app',
         ];
         $policy = $this->evaluateRetrievalPolicy($action, $actionCatalogEntry, $query, $scope);
         $baseTelemetry = [
@@ -1407,7 +1422,7 @@ final class IntentRouter
             'request_mode' => $requestMode,
             'runtime_budget' => $runtimeBudget,
             'retrieval_latency_ms' => 0,
-        ];
+        ] + $semanticScopeTelemetry;
 
         if (!(bool) ($policy['should_attempt'] ?? false)) {
             return [
@@ -1623,7 +1638,9 @@ final class IntentRouter
             ];
         }
 
+        $mode = strtolower(trim((string) ($scope['mode'] ?? 'app')));
         $requiresCorpus = $this->isTechnicalInformativeQuery($query)
+            || ($mode === 'builder' && $this->isBusinessDiscoveryQuery($query))
             || (is_array($actionCatalogEntry) && (bool) ($actionCatalogEntry['rag_required'] ?? false));
         if (!$requiresCorpus) {
             return [
@@ -1762,6 +1779,76 @@ final class IntentRouter
         }
 
         return str_contains($normalized, '?') && count($tokens) >= 5;
+    }
+
+    private function isBusinessDiscoveryQuery(string $query): bool
+    {
+        $normalized = $this->normalizeFreeText($query);
+        if ($normalized === '') {
+            return false;
+        }
+
+        $tokens = preg_split('/\s+/', $normalized) ?: [];
+        if (count($tokens) < 3) {
+            return false;
+        }
+
+        $patterns = [
+            '/^tengo\s+(una|un|mi)\b/u',
+            '/^vendo\b/u',
+            '/^quiero\s+(una|un)\s+app\s+para\b/u',
+            '/^mi\s+(negocio|empresa)\s+es\b/u',
+            '/^somos\b/u',
+            '/^ofrezco\b/u',
+            '/^fabrico\b/u',
+            '/^fabricamos\b/u',
+            '/^atiendo\b/u',
+        ];
+        foreach ($patterns as $pattern) {
+            if (preg_match($pattern, $normalized) === 1) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    /**
+     * @param array<string,mixed> $context
+     */
+    private function resolveSemanticAppScope(array $context, string $query): ?string
+    {
+        $appId = trim((string) ($context['app_id'] ?? $context['project_id'] ?? ''));
+        if ($appId === '') {
+            return null;
+        }
+
+        $mode = strtolower(trim((string) ($context['mode'] ?? 'app')));
+        if ($mode !== 'builder') {
+            return $appId;
+        }
+
+        if ($appId !== 'default') {
+            return $appId;
+        }
+
+        return $this->isBusinessDiscoveryQuery($query) ? null : $appId;
+    }
+
+    /**
+     * @param array<string,mixed> $context
+     * @return array<string,mixed>
+     */
+    private function buildSemanticScopeTelemetry(array $context, ?string $resolvedAppId): array
+    {
+        $requestedAppId = trim((string) ($context['app_id'] ?? $context['project_id'] ?? ''));
+        $relaxed = $requestedAppId !== '' && $resolvedAppId === null;
+
+        return [
+            'semantic_scope_app_id' => $resolvedAppId,
+            'semantic_scope_app_relaxed' => $relaxed,
+            'semantic_scope_reason' => $relaxed ? 'builder_default_project_scope_relaxed' : 'app_scope_preserved',
+        ];
     }
 
     private function normalizeFreeText(string $text): string

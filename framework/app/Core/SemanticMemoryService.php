@@ -41,19 +41,38 @@ final class SemanticMemoryService
      */
     public static function availabilityFromEnv(): array
     {
-        $raw = trim((string) (getenv('SEMANTIC_MEMORY_ENABLED') ?: '0'));
-        if ($raw === '1') {
+        $raw = getenv('SEMANTIC_MEMORY_ENABLED');
+        if ($raw !== false) {
+            $normalized = strtolower(trim((string) $raw));
+            if (in_array($normalized, ['1', 'true', 'yes', 'on'], true)) {
+                return [
+                    'enabled' => true,
+                    'status' => 'enabled',
+                    'reason' => 'semantic_memory_enabled',
+                ];
+            }
+
+            return [
+                'enabled' => false,
+                'status' => 'disabled',
+                'reason' => 'semantic_memory_disabled_by_config',
+            ];
+        }
+
+        $hasQdrant = trim((string) (getenv('QDRANT_URL') ?: '')) !== '';
+        $hasGemini = trim((string) (getenv('GEMINI_API_KEY') ?: '')) !== '';
+        if ($hasQdrant && $hasGemini) {
             return [
                 'enabled' => true,
                 'status' => 'enabled',
-                'reason' => 'semantic_memory_enabled',
+                'reason' => 'semantic_memory_enabled_by_runtime_dependencies',
             ];
         }
 
         return [
             'enabled' => false,
             'status' => 'disabled',
-            'reason' => 'semantic_memory_disabled_by_config',
+            'reason' => 'semantic_memory_missing_runtime_dependencies',
         ];
     }
 

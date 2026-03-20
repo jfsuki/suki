@@ -65,6 +65,9 @@ if (count($calls) !== 2) {
             $failures[] = 'Endpoint embedContent no detectado en URL.';
         }
         $payload = is_array($call['payload'] ?? null) ? (array) $call['payload'] : [];
+        if ((string) ($payload['model'] ?? '') !== 'models/gemini-embedding-001') {
+            $failures[] = 'Payload debe incluir model=models/gemini-embedding-001.';
+        }
         if ((int) ($payload['outputDimensionality'] ?? 0) !== 768) {
             $failures[] = 'Payload debe forzar outputDimensionality=768.';
         }

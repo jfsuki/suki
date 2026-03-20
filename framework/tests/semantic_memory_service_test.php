@@ -14,6 +14,9 @@ $failures = [];
 $lastQueryPayload = [];
 $collections = [];
 $collectionCalls = [];
+$previousSemanticEnabled = getenv('SEMANTIC_MEMORY_ENABLED');
+$previousQdrantUrl = getenv('QDRANT_URL');
+$previousGeminiApiKey = getenv('GEMINI_API_KEY');
 
 $embeddingTransport = static function (string $method, string $url, array $headers, array $payload, int $timeoutSec): array {
     $text = trim((string) ($payload['content']['parts'][0]['text'] ?? ''));
@@ -385,6 +388,39 @@ if ((int) ($prepared['used_count'] ?? 0) !== 3) {
 }
 if (count((array) ($prepared['source_ids'] ?? [])) !== 3) {
     $failures[] = 'prepareContext debe mantener source_ids utiles y deduplicados.';
+}
+
+putenv('SEMANTIC_MEMORY_ENABLED');
+putenv('QDRANT_URL=http://localhost:6333');
+putenv('GEMINI_API_KEY=test_key');
+$availabilityAuto = SemanticMemoryService::availabilityFromEnv();
+if (($availabilityAuto['enabled'] ?? false) !== true) {
+    $failures[] = 'Semantic memory debe autoactivarse si la infraestructura runtime existe y no hay override explicito.';
+}
+if ((string) ($availabilityAuto['reason'] ?? '') !== 'semantic_memory_enabled_by_runtime_dependencies') {
+    $failures[] = 'Semantic memory autoactivado debe reportar reason=semantic_memory_enabled_by_runtime_dependencies.';
+}
+
+putenv('SEMANTIC_MEMORY_ENABLED=0');
+$availabilityForcedOff = SemanticMemoryService::availabilityFromEnv();
+if (($availabilityForcedOff['enabled'] ?? true) !== false) {
+    $failures[] = 'SEMANTIC_MEMORY_ENABLED=0 debe seguir desactivando semantic memory explicitamente.';
+}
+
+if ($previousSemanticEnabled === false) {
+    putenv('SEMANTIC_MEMORY_ENABLED');
+} else {
+    putenv('SEMANTIC_MEMORY_ENABLED=' . $previousSemanticEnabled);
+}
+if ($previousQdrantUrl === false) {
+    putenv('QDRANT_URL');
+} else {
+    putenv('QDRANT_URL=' . $previousQdrantUrl);
+}
+if ($previousGeminiApiKey === false) {
+    putenv('GEMINI_API_KEY');
+} else {
+    putenv('GEMINI_API_KEY=' . $previousGeminiApiKey);
 }
 
 $ok = empty($failures);
