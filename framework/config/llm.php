@@ -47,19 +47,25 @@ return [
             'groq' => getenv('GROQ_MODEL') ?: 'llama-3.1-8b-instant',
             'gemini' => getenv('GEMINI_MODEL') ?: 'gemini-2.5-flash-lite',
             'deepseek' => getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat',
+            'openrouter' => getenv('OPENROUTER_MODEL') ?: 'openrouter/free',
         ],
         'default' => [
             'groq' => getenv('GROQ_MODEL') ?: 'llama-3.1-8b-instant',
             'gemini' => getenv('GEMINI_MODEL') ?: 'gemini-2.5-flash-lite',
             'deepseek' => getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat',
+            'openrouter' => getenv('OPENROUTER_MODEL') ?: 'openrouter/free',
         ],
         'fallback' => [
-            'deepseek' => getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat',
             'openrouter' => getenv('OPENROUTER_MODEL') ?: 'openrouter/free',
+            'deepseek' => getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat',
         ],
         'premium' => [
             'claude' => getenv('CLAUDE_MODEL') ?: 'claude-3-5-haiku-latest',
         ],
+    ],
+    'routing' => [
+        'primary' => strtolower(trim((string) (getenv('LLM_PRIMARY_PROVIDER') ?: 'openrouter'))),
+        'secondary' => strtolower(trim((string) (getenv('LLM_SECONDARY_PROVIDER') ?: 'deepseek'))),
     ],
     'limits' => [
         'timeout' => 20,

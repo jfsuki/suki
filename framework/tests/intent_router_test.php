@@ -695,7 +695,7 @@ if (!(bool) ($budgetTelemetry['loop_guard_triggered'] ?? false)) {
 if ((string) ($budgetTelemetry['loop_guard_reason'] ?? '') !== 'tool_calls_budget_exceeded') {
     $failures[] = 'Exceso de tool_calls debe dejar razon explicita.';
 }
-if ((string) $budgetBlocked->reply() !== 'Vamos por partes. Dime el siguiente paso concreto y sigo contigo.') {
+if ((string) $budgetBlocked->reply() !== 'No pude completar ese paso ahora. Dime en una frase corta que necesitas y sigo contigo.') {
     $failures[] = 'El guard de budget debe responder con copy segura para usuario final.';
 }
 if (str_contains((string) $budgetBlocked->reply(), 'Detuve esta ruta')) {

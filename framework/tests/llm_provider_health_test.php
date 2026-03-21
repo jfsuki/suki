@@ -27,6 +27,18 @@ namespace App\Tests\LLM\Health {
         }
     }
 
+    final class NetworkErrorProvider
+    {
+        public function __construct(array $config = [])
+        {
+        }
+
+        public function sendChat(array $messages, array $params = []): array
+        {
+            throw new \RuntimeException('Error HTTP OpenRouter: Could not resolve host: api.openrouter.ai');
+        }
+    }
+
     final class SuccessProvider
     {
         public function __construct(array $config = [])
@@ -79,10 +91,11 @@ namespace {
 
     $routerQuota = new LLMRouter([
         'providers' => [
-            'gemini' => ['enabled' => true, 'class' => \App\Tests\LLM\Health\QuotaProvider::class],
-            'openrouter' => ['enabled' => true, 'class' => \App\Tests\LLM\Health\SuccessProvider::class],
+            'openrouter' => ['enabled' => true, 'class' => \App\Tests\LLM\Health\QuotaProvider::class],
+            'deepseek' => ['enabled' => true, 'class' => \App\Tests\LLM\Health\SuccessProvider::class],
         ],
         'models' => [],
+        'routing' => ['primary' => 'openrouter', 'secondary' => 'deepseek'],
         'limits' => ['timeout' => 20, 'max_tokens' => 200],
     ]);
 
@@ -90,19 +103,20 @@ namespace {
         $resetCircuit();
         $result = $routerQuota->chat($capsule, [
             'mode' => 'builder',
+            'provider_mode' => 'openrouter',
             'tenant_id' => 'default',
             'project_id' => 'unit_llm_health',
             'session_id' => 'llm_health_quota',
         ]);
         $statuses = is_array($result['provider_statuses'] ?? null) ? (array) $result['provider_statuses'] : [];
-        if ((string) ($result['provider'] ?? '') !== 'openrouter') {
-            $failures[] = 'El fallback por cuota debe terminar en openrouter.';
+        if ((string) ($result['provider'] ?? '') !== 'deepseek') {
+            $failures[] = 'El fallback por cuota debe terminar en deepseek.';
         }
-        if (($statuses['gemini'] ?? '') !== 'quota_exhausted') {
-            $failures[] = 'Gemini debe clasificarse como quota_exhausted.';
+        if (($statuses['openrouter'] ?? '') !== 'quota_exhausted') {
+            $failures[] = 'OpenRouter debe clasificarse como quota_exhausted.';
         }
-        if (($statuses['openrouter'] ?? '') !== 'healthy') {
-            $failures[] = 'OpenRouter debe clasificarse como healthy cuando responde.';
+        if (($statuses['deepseek'] ?? '') !== 'healthy') {
+            $failures[] = 'DeepSeek debe clasificarse como healthy cuando responde.';
         }
     } catch (\Throwable $e) {
         $failures[] = 'Escenario quota->healthy fallo: ' . $e->getMessage();
@@ -135,14 +149,44 @@ namespace {
         }
     }
 
+    $routerNetwork = new LLMRouter([
+        'providers' => [
+            'openrouter' => ['enabled' => true, 'class' => \App\Tests\LLM\Health\NetworkErrorProvider::class],
+            'deepseek' => ['enabled' => true, 'class' => \App\Tests\LLM\Health\SuccessProvider::class],
+        ],
+        'models' => [],
+        'routing' => ['primary' => 'openrouter', 'secondary' => 'deepseek'],
+        'limits' => ['timeout' => 20, 'max_tokens' => 200],
+    ]);
+    try {
+        $resetCircuit();
+        $result = $routerNetwork->chat($capsule, [
+            'mode' => 'builder',
+            'provider_mode' => 'openrouter',
+            'tenant_id' => 'default',
+            'project_id' => 'unit_llm_health',
+            'session_id' => 'llm_health_network',
+        ]);
+        $statuses = is_array($result['provider_statuses'] ?? null) ? (array) $result['provider_statuses'] : [];
+        if (($statuses['openrouter'] ?? '') !== 'network_error') {
+            $failures[] = 'OpenRouter debe clasificarse como network_error.';
+        }
+        if ((string) ($result['provider'] ?? '') !== 'deepseek') {
+            $failures[] = 'El fallback por network_error debe terminar en deepseek.';
+        }
+    } catch (\Throwable $e) {
+        $failures[] = 'Escenario network_error fallo: ' . $e->getMessage();
+    }
+
     $previousMode = getenv('LLM_ROUTER_MODE');
     putenv('LLM_ROUTER_MODE=openrouter');
     $routerEnvMode = new LLMRouter([
         'providers' => [
-            'gemini' => ['enabled' => true, 'class' => \App\Tests\LLM\Health\QuotaProvider::class],
             'openrouter' => ['enabled' => true, 'class' => \App\Tests\LLM\Health\SuccessProvider::class],
+            'deepseek' => ['enabled' => true, 'class' => \App\Tests\LLM\Health\QuotaProvider::class],
         ],
         'models' => [],
+        'routing' => ['primary' => 'openrouter', 'secondary' => 'deepseek'],
         'limits' => ['timeout' => 20, 'max_tokens' => 200],
     ]);
     try {

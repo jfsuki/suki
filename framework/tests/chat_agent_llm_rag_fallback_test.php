@@ -82,12 +82,12 @@ if ((string) $emptyReply !== '') {
 }
 
 $builderSafeReply = $buildUserSafeLlmUnavailableReply->invoke($agent, 'builder');
-if ((string) $builderSafeReply !== 'No pude completar esa respuesta ahora. Dime en una frase corta que quieres crear y sigo contigo.') {
+if ((string) $builderSafeReply !== 'No pude completar ese paso ahora. Dime en una frase corta que necesitas y sigo contigo.') {
     $failures[] = 'El fallback LLM de builder debe usar copy segura para usuario final.';
 }
 
 $appSafeReply = $buildUserSafeLlmUnavailableReply->invoke($agent, 'app');
-if ((string) $appSafeReply !== 'No pude completar esa respuesta ahora. Dime el dato clave o la accion que necesitas y sigo contigo.') {
+if ((string) $appSafeReply !== 'Dime el dato clave o la accion que necesitas y sigo contigo.') {
     $failures[] = 'El fallback LLM de app debe usar copy segura para usuario final.';
 }
 
@@ -110,25 +110,25 @@ $testInfo = $buildTestInfo->invoke($agent, [
     'provider_used' => 'semantic_memory',
     'llm_provider_attempted' => 'llm',
     'llm_error' => 'quota exceeded',
-    'provider_errors' => ['gemini' => 'quota exceeded'],
-    'provider_statuses' => ['gemini' => 'quota_exhausted'],
+    'provider_errors' => ['openrouter' => 'quota exceeded', 'deepseek' => 'timeout'],
+    'provider_statuses' => ['openrouter' => 'quota_exhausted', 'deepseek' => 'timeout'],
     'semantic_fallback_used' => true,
 ]);
 
 if (($testInfo['llm_error'] ?? '') !== 'quota exceeded') {
     $failures[] = 'test_info debe exponer llm_error.';
 }
-if (($testInfo['provider_errors']['gemini'] ?? '') !== 'quota exceeded') {
+if (($testInfo['provider_errors']['openrouter'] ?? '') !== 'quota exceeded') {
     $failures[] = 'test_info debe exponer provider_errors.';
 }
-if (($testInfo['provider_statuses']['gemini'] ?? '') !== 'quota_exhausted') {
+if (($testInfo['provider_statuses']['deepseek_direct'] ?? '') !== 'timeout') {
     $failures[] = 'test_info debe exponer provider_statuses.';
 }
 if (($testInfo['semantic_fallback_used'] ?? false) !== true) {
     $failures[] = 'test_info debe exponer semantic_fallback_used=true.';
 }
-if (($testInfo['llm_provider'] ?? '') !== 'llm') {
-    $failures[] = 'test_info debe mantener trazabilidad del proveedor LLM intentado.';
+if (($testInfo['llm_provider'] ?? '') !== 'semantic_memory') {
+    $failures[] = 'test_info debe distinguir semantic_memory cuando el fallback semantico responde.';
 }
 
 $ok = $failures === [];

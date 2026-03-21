@@ -702,7 +702,7 @@ final class IntentRouter
         }
 
         if ($guardTriggered) {
-            $guardReply = $this->buildUserSafeRuntimeGuardReply($guardReason);
+            $guardReply = $this->buildUserSafeRuntimeGuardReply($guardReason, $context);
         }
 
         $telemetryPatch = [
@@ -735,14 +735,14 @@ final class IntentRouter
         ];
     }
 
-    private function buildUserSafeRuntimeGuardReply(string $guardReason): string
+    private function buildUserSafeRuntimeGuardReply(string $guardReason, array $context = []): string
     {
-        return match ($guardReason) {
-            'tool_calls_budget_exceeded' => 'Vamos por partes. Dime el siguiente paso concreto y sigo contigo.',
-            'retry_budget_exceeded', 'repeated_route_without_progress' => 'No te entendi del todo. Dime el dato clave o el siguiente paso y sigo contigo.',
-            'execution_time_budget_exceeded', 'semantic_query_budget_exceeded', 'llm_fallback_budget_exceeded', 'router_steps_budget_exceeded' => 'No pude completar ese paso ahora. Dime el dato clave o el siguiente paso y sigo contigo.',
-            default => 'No pude procesar ese mensaje como venia. Dilo en una frase corta y sigo contigo.',
-        };
+        $mode = strtolower(trim((string) ($context['mode'] ?? 'app')));
+        if ($mode === 'builder') {
+            return 'No pude completar ese paso ahora. Dime en una frase corta que necesitas y sigo contigo.';
+        }
+
+        return 'Dime el dato clave o la accion que necesitas y sigo contigo.';
     }
 
     /**

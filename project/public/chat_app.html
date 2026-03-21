@@ -545,9 +545,12 @@
                 ['action', info.action || 'unknown'],
                 ['resolved_locally', String(!!info.resolved_locally)],
                 ['llm', info.llm_model ? `${info.llm_provider || 'llm'} / ${info.llm_model}` : (info.llm_provider || 'none')],
+                ['llm_error', info.llm_error || 'none'],
+                ['provider_statuses', info.provider_statuses && Object.keys(info.provider_statuses).length ? JSON.stringify(info.provider_statuses) : 'none'],
                 ['embeddings', info.embeddings_used ? `si / ${info.embedding_model || 'unknown'} / ${info.embedding_dimensions || 0}d` : 'no'],
                 ['Qdrant', info.collection ? `si / ${info.collection} / hits=${info.hits || 0}` : 'no'],
                 ['evidence_count', String(info.evidence_count || 0)],
+                ['semantic_fallback_used', String(!!info.semantic_fallback_used)],
                 ['agents_used', Array.isArray(info.agents_used) && info.agents_used.length ? info.agents_used.join(', ') : 'none'],
                 ['route_reason', info.route_reason || 'unknown'],
             ];

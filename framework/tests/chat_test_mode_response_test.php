@@ -68,6 +68,9 @@ if ($failures === []) {
                 'classification',
                 'action',
                 'resolved_locally',
+                'llm_provider',
+                'llm_error',
+                'provider_statuses',
                 'embedding_model',
                 'embeddings_used',
                 'vector_store',
@@ -75,6 +78,7 @@ if ($failures === []) {
                 'hits',
                 'evidence_count',
                 'llm_model',
+                'semantic_fallback_used',
                 'agents_used',
             ];
             foreach ($requiredKeys as $key) {
@@ -126,6 +130,11 @@ foreach ([
     }
     if (strpos($contents, 'card.appendChild(renderTestInfo') !== false) {
         $failures[] = $file . ' no debe mezclar test info dentro del flujo conversacional.';
+    }
+    foreach (['provider_statuses', 'llm_error', 'semantic_fallback_used'] as $needle) {
+        if (strpos($contents, $needle) === false) {
+            $failures[] = $file . ' debe mostrar ' . $needle . ' en el inspector tecnico.';
+        }
     }
 }
 

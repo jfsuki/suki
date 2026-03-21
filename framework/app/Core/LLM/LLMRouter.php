@@ -119,16 +119,20 @@ final class LLMRouter
         }
         return [
             'providers' => [
+                'openrouter' => [
+                    'class' => \App\Core\LLM\Providers\OpenRouterProvider::class,
+                    'enabled' => !empty(getenv('OPENROUTER_API_KEY')),
+                ],
                 'deepseek' => [
                     'class' => \App\Core\LLM\Providers\DeepSeekProvider::class,
                     'enabled' => !empty(getenv('DEEPSEEK_API_KEY')),
                 ],
-                'gemini' => [
-                    'class' => \App\Core\LLM\Providers\GeminiProvider::class,
-                    'enabled' => !empty(getenv('GEMINI_API_KEY')),
-                ],
             ],
             'models' => [],
+            'routing' => [
+                'primary' => 'openrouter',
+                'secondary' => 'deepseek',
+            ],
             'limits' => ['timeout' => 20, 'max_tokens' => 600],
         ];
     }
@@ -141,21 +145,22 @@ final class LLMRouter
         if (in_array($mode, ['groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
             $order[] = $mode;
         } else {
+            $routing = is_array($this->config['routing'] ?? null) ? (array) $this->config['routing'] : [];
+            $primary = strtolower(trim((string) ($routing['primary'] ?? 'openrouter')));
+            $secondary = strtolower(trim((string) ($routing['secondary'] ?? 'deepseek')));
+            foreach ([$primary, $secondary] as $preferredProvider) {
+                if (in_array($preferredProvider, ['groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
+                    $order[] = $preferredProvider;
+                }
+            }
             $latency = (int) ($policy['latency_budget_ms'] ?? 1200);
             if ($latency <= 1200) {
-                $order[] = 'groq';
-                $order[] = 'gemini';
+                $order[] = 'openrouter';
+                $order[] = 'deepseek';
             } else {
-                $order[] = 'gemini';
-                $order[] = 'groq';
+                $order[] = 'deepseek';
+                $order[] = 'openrouter';
             }
-        }
-
-        if (!empty($this->config['providers']['openrouter']['enabled'])) {
-            $order[] = 'openrouter';
-        }
-        if (!empty($this->config['providers']['claude']['enabled'])) {
-            $order[] = 'claude';
         }
 
         foreach (array_keys((array) ($this->config['providers'] ?? [])) as $providerName) {
@@ -284,6 +289,8 @@ final class LLMRouter
             $ttl = max(60, (int) (getenv('LLM_CIRCUIT_TTL_INVALID_CONFIG_SECONDS') ?: 3600));
         } elseif ($reason === 'timeout') {
             $ttl = max(20, (int) (getenv('LLM_CIRCUIT_TTL_TIMEOUT_SECONDS') ?: 180));
+        } elseif ($reason === 'network_error') {
+            $ttl = max(20, (int) (getenv('LLM_CIRCUIT_TTL_NETWORK_SECONDS') ?: 180));
         } elseif ($reason === 'strict_json_violation') {
             $ttl = max(10, (int) (getenv('LLM_CIRCUIT_TTL_JSON_SECONDS') ?: 45));
         } else {
@@ -316,6 +323,8 @@ final class LLMRouter
             'rate limit',
             'resource has been exhausted',
             'insufficient_quota',
+            'insufficient balance',
+            'balance exhausted',
             '429',
             'limit exceeded',
             'too many requests',
@@ -378,6 +387,36 @@ final class LLMRouter
         return false;
     }
 
+    private function isNetworkError(string $message): bool
+    {
+        $message = strtolower(trim($message));
+        if ($message === '') {
+            return false;
+        }
+        $patterns = [
+            'could not resolve host',
+            'failed to connect',
+            'connection refused',
+            'connection reset',
+            'connection closed',
+            'network is unreachable',
+            'empty reply from server',
+            'recv failure',
+            'curl error 6',
+            'curl error 7',
+            'curl error 35',
+            'ssl connect error',
+            'name or service not known',
+            'temporary failure in name resolution',
+        ];
+        foreach ($patterns as $pattern) {
+            if (str_contains($message, $pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     private function classifyProviderFailureReason(string $message): string
     {
         if ($this->isQuotaError($message)) {
@@ -388,6 +427,9 @@ final class LLMRouter
         }
         if ($this->isTimeoutError($message)) {
             return 'timeout';
+        }
+        if ($this->isNetworkError($message)) {
+            return 'network_error';
         }
         return $this->isStrictJsonViolation($message);
     }

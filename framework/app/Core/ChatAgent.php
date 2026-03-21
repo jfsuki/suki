@@ -1337,10 +1337,10 @@ final class ChatAgent
     private function buildUserSafeLlmUnavailableReply(string $mode): string
     {
         if (strtolower(trim($mode)) === 'builder') {
-            return 'No pude completar esa respuesta ahora. Dime en una frase corta que quieres crear y sigo contigo.';
+            return 'No pude completar ese paso ahora. Dime en una frase corta que necesitas y sigo contigo.';
         }
 
-        return 'No pude completar esa respuesta ahora. Dime el dato clave o la accion que necesitas y sigo contigo.';
+        return 'Dime el dato clave o la accion que necesitas y sigo contigo.';
     }
 
     private function buildSemanticReplyFromRoute(IntentRouteResult $route): string
@@ -2254,11 +2254,25 @@ final class ChatAgent
             $evidenceCount = $hits;
         }
         $providerUsed = trim((string) ($runtime['provider_used'] ?? $telemetry['provider_used'] ?? ''));
+        if (strtolower($providerUsed) === 'llm') {
+            $providerUsed = '';
+        }
+        $providerErrorsRaw = is_array($runtime['provider_errors'] ?? null) ? (array) $runtime['provider_errors'] : [];
+        $providerStatusesRaw = is_array($runtime['provider_statuses'] ?? null) ? (array) $runtime['provider_statuses'] : [];
         $llmCalled = (bool) ($runtime['llm_called'] ?? $telemetry['llm_called'] ?? false);
         $llmProvider = trim((string) ($runtime['llm_provider_attempted'] ?? ''));
         if ($llmProvider === '' && $llmCalled) {
             $llmProvider = $providerUsed !== '' ? $providerUsed : 'llm';
+        } elseif ($llmProvider === 'llm' && $providerUsed !== '') {
+            $llmProvider = $providerUsed;
+        } elseif (($llmProvider === '' || $llmProvider === 'llm') && $providerUsed === '' && $providerStatusesRaw !== []) {
+            $firstProvider = array_key_first($providerStatusesRaw);
+            if (is_string($firstProvider) && trim($firstProvider) !== '') {
+                $llmProvider = $firstProvider;
+            }
         }
+        $providerUsedLabel = $this->normalizeTestModeProviderLabel($providerUsed);
+        $llmProviderLabel = $this->normalizeTestModeProviderLabel($llmProvider);
         $llmModel = $llmCalled
             ? $this->resolveTestModeLlmModel(
                 is_array($runtime['llm_result'] ?? null) ? (array) $runtime['llm_result'] : [],
@@ -2284,14 +2298,43 @@ final class ChatAgent
             'top_score' => is_numeric($telemetry['retrieval_top_score'] ?? $telemetry['semantic_intent_similarity_score'] ?? null)
                 ? (float) ($telemetry['retrieval_top_score'] ?? $telemetry['semantic_intent_similarity_score'])
                 : 0.0,
-            'llm_provider' => $llmCalled ? ($llmProvider !== '' ? $llmProvider : 'llm') : 'none',
+            'llm_provider' => $llmCalled ? ($llmProviderLabel !== '' ? $llmProviderLabel : 'llm') : 'none',
             'llm_model' => $llmModel,
             'llm_error' => trim((string) ($runtime['llm_error'] ?? '')),
-            'provider_errors' => is_array($runtime['provider_errors'] ?? null) ? (array) $runtime['provider_errors'] : [],
-            'provider_statuses' => is_array($runtime['provider_statuses'] ?? null) ? (array) $runtime['provider_statuses'] : [],
+            'provider_errors' => $this->normalizeTestModeProviderMap($providerErrorsRaw),
+            'provider_statuses' => $this->normalizeTestModeProviderMap($providerStatusesRaw),
             'semantic_fallback_used' => (bool) ($runtime['semantic_fallback_used'] ?? false),
-            'agents_used' => $this->collectTestModeAgentsUsed($telemetry, $runtime, $providerUsed, $llmCalled),
+            'agents_used' => $this->collectTestModeAgentsUsed(
+                $telemetry,
+                $runtime,
+                $providerUsedLabel !== ''
+                    ? $providerUsedLabel
+                    : ($llmProviderLabel !== '' ? $llmProviderLabel : $providerUsed),
+                $llmCalled
+            ),
         ];
+    }
+
+    private function normalizeTestModeProviderLabel(string $provider): string
+    {
+        return match (strtolower(trim($provider))) {
+            'deepseek' => 'deepseek_direct',
+            default => strtolower(trim($provider)),
+        };
+    }
+
+    /**
+     * @param array<string,mixed> $providerMap
+     * @return array<string,mixed>
+     */
+    private function normalizeTestModeProviderMap(array $providerMap): array
+    {
+        $normalized = [];
+        foreach ($providerMap as $provider => $value) {
+            $normalized[$this->normalizeTestModeProviderLabel((string) $provider)] = $value;
+        }
+
+        return $normalized;
     }
 
     /**

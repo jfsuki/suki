@@ -2601,8 +2601,7 @@ final class ConversationGateway
         return [];
         }
 
-        $hasGemini = trim((string) getenv('GEMINI_API_KEY')) !== '';
-        if (!$hasGemini) {
+        if (!$this->runtimeLlmChatAvailable()) {
             return ['status' => 'LLM_NOT_AVAILABLE'];
         }
 
@@ -2780,7 +2779,8 @@ final class ConversationGateway
 
         try {
             $router = new LLMRouter();
-            $llm = $router->chat($capsule, ['mode' => 'gemini', 'temperature' => 0.1]);
+            $providerMode = $this->resolveRuntimeLlmProviderMode();
+            $llm = $router->chat($capsule, ['provider_mode' => $providerMode, 'temperature' => 0.1]);
             $json = is_array($llm['json'] ?? null) ? (array) $llm['json'] : [];
             if (empty($json)) {
                 $emptyResult = [
@@ -2801,7 +2801,7 @@ final class ConversationGateway
                     'training_gaps' => [],
                     'next_data_questions' => [],
                     'clarifying_question' => 'Para ubicar bien tu negocio, dime en una frase que vendes o fabricas.',
-                    'provider_used' => (string) ($llm['provider'] ?? 'gemini'),
+                    'provider_used' => (string) ($llm['provider'] ?? $providerMode),
                     'used_compiled_prompt' => $technicalPrompt !== '',
                 ];
                 $quality = $this->evaluateUnknownBusinessLlmQuality($emptyResult, $confidenceThreshold);
@@ -2828,7 +2828,7 @@ final class ConversationGateway
                 $confidenceThreshold,
                 $scopeFallback
             );
-            $resolved['provider_used'] = (string) ($llm['provider'] ?? 'gemini');
+            $resolved['provider_used'] = (string) ($llm['provider'] ?? $providerMode);
             $resolved['used_compiled_prompt'] = $technicalPrompt !== '';
 
             $quality = $this->evaluateUnknownBusinessLlmQuality($resolved, $confidenceThreshold);
@@ -7962,15 +7962,15 @@ private function parseEntityFromCrudText(string $text): string
 
     private function resolveBuilderEntityConfusionWithLLM(string $text, array $state, array $profile, string $tenantId, string $userId): array
     {
-        $hasGemini = trim((string) getenv('GEMINI_API_KEY')) !== '';
-                $hasDeepSeek = trim((string) getenv('DEEPSEEK_API_KEY')) !== '';
-        
         // 0. Silent Learning: Check if we solved this recently
         $cacheKey = md5(trim(strtolower($text)));
         if (isset($state['llm_usage']['history'][$cacheKey])) {
             return $state['llm_usage']['history'][$cacheKey];
         }
-        if (!$hasGemini && !$hasDeepSeek) return [];
+        $providerMode = $this->resolveRuntimeLlmProviderMode();
+        if ($providerMode === 'auto' && !$this->runtimeLlmChatAvailable()) {
+            return [];
+        }
 
         // 1. Build STATE_JSON with PENDING context
         $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
@@ -8025,9 +8025,9 @@ private function parseEntityFromCrudText(string $text): string
 
         try {
             $router = new \App\Core\LLM\LLMRouter();
-            $llm = $router->chat($capsule, ['mode' => $hasDeepSeek ? 'deepseek' : 'gemini', 'temperature' => 0.1]);
+            $llm = $router->chat($capsule, ['provider_mode' => $providerMode, 'temperature' => 0.1]);
             $llmUsageData = [
-                'provider' => $llm['provider'] ?? 'unknown',
+                'provider' => $llm['provider'] ?? $providerMode,
                 'usage' => $llm['usage'] ?? [],
                 'quality' => !empty($llm['json']) ? 'Alta' : 'Baja'
             ];
@@ -9542,6 +9542,51 @@ private function parseEntityFromCrudText(string $text): string
         $all = array_merge($entities, $base, $business, $byOperation);
         $all = array_values(array_filter(array_unique(array_map(static fn($v) => (string) $v, $all))));
         return $all;
+    }
+
+    private function runtimeLlmChatAvailable(): bool
+    {
+        return $this->runtimeLlmProviderEnabled('openrouter') || $this->runtimeLlmProviderEnabled('deepseek');
+    }
+
+    private function resolveRuntimeLlmProviderMode(): string
+    {
+        if ($this->runtimeLlmProviderEnabled('openrouter')) {
+            return 'openrouter';
+        }
+        if ($this->runtimeLlmProviderEnabled('deepseek')) {
+            return 'deepseek';
+        }
+
+        $envMode = strtolower(trim((string) (getenv('LLM_ROUTER_MODE') ?: '')));
+        if (in_array($envMode, ['openrouter', 'deepseek', 'auto'], true)) {
+            return $envMode;
+        }
+
+        return 'auto';
+    }
+
+    private function runtimeLlmProviderEnabled(string $provider): bool
+    {
+        $provider = strtolower(trim($provider));
+        if ($provider === '') {
+            return false;
+        }
+
+        $apiKeyVar = strtoupper($provider) . '_API_KEY';
+        $enabledVar = strtoupper($provider) . '_ENABLED';
+        $hasApiKey = trim((string) (getenv($apiKeyVar) ?: '')) !== '';
+        $raw = getenv($enabledVar);
+        if ($raw === false) {
+            return $hasApiKey;
+        }
+
+        $value = strtolower(trim((string) $raw));
+        if ($value === '') {
+            return $hasApiKey;
+        }
+
+        return in_array($value, ['1', 'true', 'yes', 'on'], true);
     }
 
     private function projectRegistry(): ?ProjectRegistry
