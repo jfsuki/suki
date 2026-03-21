@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Core\Agents;
 
+use App\Core\LLM\LLMRouter;
+
 trait ConversationGatewayBuilderOnboardingTrait
 {
     private function handleBuilderOnboardingCore(
@@ -25,11 +27,12 @@ trait ConversationGatewayBuilderOnboardingTrait
         $localState['onboarding_step'] = $currentStep;
 
         if ($this->isBuilderUserFrustrated($text)) {
+            $assist = $this->clarifyBuilderStepViaLlm($text, $currentStep, $localProfile, $localState);
             $localState['active_task'] = 'builder_onboarding';
             $localState['onboarding_step'] = $currentStep;
             return [
                 'action' => 'ask_user',
-                'reply' => $this->buildBuilderOnboardingRecoveryReply($currentStep, $localProfile),
+                'reply' => $this->resolveBuilderLlmAssistHelpReply($assist, $currentStep, $localProfile),
                 'state' => $localState,
             ];
         }
@@ -395,6 +398,42 @@ trait ConversationGatewayBuilderOnboardingTrait
                 }
             }
         }
+        if (
+            $businessType === ''
+            && $businessCandidate === ''
+            && $currentStep === 'business_type'
+            && !$this->isQuestionLike($text)
+            && !$this->isBuilderActionMessage($text)
+            && !$this->isAffirmativeReply($text)
+            && !$this->isNegativeReply($text)
+        ) {
+            $assist = $this->clarifyBuilderStepViaLlm($text, 'business_type', $localProfile, $localState);
+            $mappedBusinessType = $this->extractBuilderLlmAssistMappedValue($assist, 'business_type');
+            if ($mappedBusinessType !== '') {
+                $localProfile['business_type'] = $mappedBusinessType;
+                unset($localProfile['business_candidate']);
+                unset($localState['unknown_business_notice_sent']);
+                $localState['proposed_profile'] = $mappedBusinessType;
+                $localState['resolution_attempts'] = 0;
+                $localState['dynamic_playbook_proposal'] = null;
+                $localState['business_resolution_last_candidate'] = null;
+                $localState['business_resolution_last_status'] = null;
+                $localState['business_resolution_last_result'] = null;
+                $localState['business_resolution_last_at'] = date('c');
+                $businessType = $mappedBusinessType;
+                $businessResolvedNote = 'Entendi tu negocio como "' . $this->domainLabelByBusinessType($mappedBusinessType) . '".'
+                    . ' Si no es correcto, dime: "no, cambiemos el tipo de negocio".';
+                $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+            } elseif ($assist !== null) {
+                $localState['active_task'] = 'builder_onboarding';
+                $localState['onboarding_step'] = 'business_type';
+                return [
+                    'action' => 'ask_user',
+                    'reply' => $this->resolveBuilderLlmAssistHelpReply($assist, 'business_type', $localProfile),
+                    'state' => $localState,
+                ];
+            }
+        }
         if ($businessType === '') {
             $localState['active_task'] = 'builder_onboarding';
             $localState['onboarding_step'] = 'business_type';
@@ -449,54 +488,64 @@ trait ConversationGatewayBuilderOnboardingTrait
         }
         if (empty($localProfile['operation_model'])) {
             if ($currentStep === 'operation_model' && $operationModel === '') {
+                $assist = $this->clarifyBuilderStepViaLlm($text, 'operation_model', $localProfile, $localState);
+                $mappedOperationModel = $this->extractBuilderLlmAssistMappedValue($assist, 'operation_model');
+                if ($mappedOperationModel !== '') {
+                    $localProfile['operation_model'] = $mappedOperationModel;
+                    $operationModel = $mappedOperationModel;
+                    $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                } else {
+                    $localState['active_task'] = 'builder_onboarding';
+                    $localState['onboarding_step'] = 'operation_model';
+                    $reply = $this->resolveBuilderLlmAssistHelpReply($assist, 'operation_model', $localProfile);
+                    if ($businessResolvedNote !== '') {
+                        $reply = $businessResolvedNote . "\n" . $reply;
+                    }
+                    return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+                }
+            }
+            if (empty($localProfile['operation_model'])) {
+                $captured = [];
+                $needsDraft = $this->extractNeedItems($text, $businessType);
+                if (!empty($needsDraft)) {
+                    $currentNeeds = [];
+                    if (is_array($localProfile['needs_scope_items'] ?? null)) {
+                        $currentNeeds = array_values((array) $localProfile['needs_scope_items']);
+                    } elseif (!empty($localProfile['needs_scope'])) {
+                        $currentNeeds = array_map('trim', explode(',', (string) $localProfile['needs_scope']));
+                    }
+                    $mergedNeeds = $this->mergeScopeLabels($currentNeeds, $needsDraft);
+                    $localProfile['needs_scope_items'] = $mergedNeeds;
+                    $localProfile['needs_scope'] = implode(', ', $mergedNeeds);
+                    $captured[] = 'control del negocio';
+                }
+                $docsDraft = $this->extractDocumentItems($text);
+                if (!empty($docsDraft)) {
+                    $currentDocs = [];
+                    if (is_array($localProfile['documents_scope_items'] ?? null)) {
+                        $currentDocs = array_values((array) $localProfile['documents_scope_items']);
+                    } elseif (!empty($localProfile['documents_scope'])) {
+                        $currentDocs = array_map('trim', explode(',', (string) $localProfile['documents_scope']));
+                    }
+                    $mergedDocs = $this->mergeScopeLabels($currentDocs, $docsDraft);
+                    $localProfile['documents_scope_items'] = $mergedDocs;
+                    $localProfile['documents_scope'] = implode(', ', $mergedDocs);
+                    $captured[] = 'documentos';
+                }
+                if (!empty($captured)) {
+                    $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                }
                 $localState['active_task'] = 'builder_onboarding';
                 $localState['onboarding_step'] = 'operation_model';
-                $reply = 'En este paso responde solo como cobras: contado, credito o mixto.';
+                $reply = 'Perfecto. Paso 2: como manejas pagos? contado, credito o mixto.';
+                if (!empty($captured)) {
+                    $reply = 'Ya tome nota de ' . implode(' y ', $captured) . '.' . "\n" . $reply;
+                }
                 if ($businessResolvedNote !== '') {
                     $reply = $businessResolvedNote . "\n" . $reply;
                 }
                 return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
             }
-            $captured = [];
-            $needsDraft = $this->extractNeedItems($text, $businessType);
-            if (!empty($needsDraft)) {
-                $currentNeeds = [];
-                if (is_array($localProfile['needs_scope_items'] ?? null)) {
-                    $currentNeeds = array_values((array) $localProfile['needs_scope_items']);
-                } elseif (!empty($localProfile['needs_scope'])) {
-                    $currentNeeds = array_map('trim', explode(',', (string) $localProfile['needs_scope']));
-                }
-                $mergedNeeds = $this->mergeScopeLabels($currentNeeds, $needsDraft);
-                $localProfile['needs_scope_items'] = $mergedNeeds;
-                $localProfile['needs_scope'] = implode(', ', $mergedNeeds);
-                $captured[] = 'control del negocio';
-            }
-            $docsDraft = $this->extractDocumentItems($text);
-            if (!empty($docsDraft)) {
-                $currentDocs = [];
-                if (is_array($localProfile['documents_scope_items'] ?? null)) {
-                    $currentDocs = array_values((array) $localProfile['documents_scope_items']);
-                } elseif (!empty($localProfile['documents_scope'])) {
-                    $currentDocs = array_map('trim', explode(',', (string) $localProfile['documents_scope']));
-                }
-                $mergedDocs = $this->mergeScopeLabels($currentDocs, $docsDraft);
-                $localProfile['documents_scope_items'] = $mergedDocs;
-                $localProfile['documents_scope'] = implode(', ', $mergedDocs);
-                $captured[] = 'documentos';
-            }
-            if (!empty($captured)) {
-                $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
-            }
-            $localState['active_task'] = 'builder_onboarding';
-            $localState['onboarding_step'] = 'operation_model';
-            $reply = 'Perfecto. Paso 2: como manejas pagos? contado, credito o mixto.';
-            if (!empty($captured)) {
-                $reply = 'Ya tome nota de ' . implode(' y ', $captured) . '.' . "\n" . $reply;
-            }
-            if ($businessResolvedNote !== '') {
-                $reply = $businessResolvedNote . "\n" . $reply;
-            }
-            return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
         }
 
         $currentStep = (string) ($localState['onboarding_step'] ?? '');
@@ -524,13 +573,28 @@ trait ConversationGatewayBuilderOnboardingTrait
                 $localProfile['needs_scope'] = implode(', ', $needsItems);
                 $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
             } elseif ($this->shouldEscalateUnusableBuilderScopeAnswer($text, [])) {
-                $localState['active_task'] = 'builder_onboarding';
-                $localState['onboarding_step'] = 'needs_scope';
-                return [
-                    'action' => 'ask_user',
-                    'reply' => $this->buildBuilderOnboardingRecoveryReply('needs_scope', $localProfile),
-                    'state' => $localState,
-                ];
+                $assist = $this->clarifyBuilderStepViaLlm($text, 'needs_scope', $localProfile, $localState);
+                $mappedNeed = $this->extractBuilderLlmAssistMappedValue($assist, 'needs_scope');
+                if ($mappedNeed !== '') {
+                    $currentNeeds = [];
+                    if (is_array($localProfile['needs_scope_items'] ?? null)) {
+                        $currentNeeds = array_values((array) $localProfile['needs_scope_items']);
+                    } elseif (!empty($localProfile['needs_scope'])) {
+                        $currentNeeds = array_map('trim', explode(',', (string) $localProfile['needs_scope']));
+                    }
+                    $mergedNeeds = $this->mergeScopeLabels($currentNeeds, [$mappedNeed]);
+                    $localProfile['needs_scope_items'] = $mergedNeeds;
+                    $localProfile['needs_scope'] = implode(', ', $mergedNeeds);
+                    $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                } else {
+                    $localState['active_task'] = 'builder_onboarding';
+                    $localState['onboarding_step'] = 'needs_scope';
+                    return [
+                        'action' => 'ask_user',
+                        'reply' => $this->resolveBuilderLlmAssistHelpReply($assist, 'needs_scope', $localProfile),
+                        'state' => $localState,
+                    ];
+                }
             } else {
                 $localProfile['needs_scope'] = $this->sanitizeRequirementText($text);
                 unset($localProfile['needs_scope_items']);
@@ -562,13 +626,28 @@ trait ConversationGatewayBuilderOnboardingTrait
                 $localProfile['documents_scope'] = implode(', ', $documentItems);
                 $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
             } elseif ($this->shouldEscalateUnusableBuilderScopeAnswer($text, [])) {
-                $localState['active_task'] = 'builder_onboarding';
-                $localState['onboarding_step'] = 'documents_scope';
-                return [
-                    'action' => 'ask_user',
-                    'reply' => $this->buildBuilderOnboardingRecoveryReply('documents_scope', $localProfile),
-                    'state' => $localState,
-                ];
+                $assist = $this->clarifyBuilderStepViaLlm($text, 'documents_scope', $localProfile, $localState);
+                $mappedDocument = $this->extractBuilderLlmAssistMappedValue($assist, 'documents_scope');
+                if ($mappedDocument !== '') {
+                    $currentDocs = [];
+                    if (is_array($localProfile['documents_scope_items'] ?? null)) {
+                        $currentDocs = array_values((array) $localProfile['documents_scope_items']);
+                    } elseif (!empty($localProfile['documents_scope'])) {
+                        $currentDocs = array_map('trim', explode(',', (string) $localProfile['documents_scope']));
+                    }
+                    $mergedDocs = $this->mergeScopeLabels($currentDocs, [$mappedDocument]);
+                    $localProfile['documents_scope_items'] = $mergedDocs;
+                    $localProfile['documents_scope'] = implode(', ', $mergedDocs);
+                    $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+                } else {
+                    $localState['active_task'] = 'builder_onboarding';
+                    $localState['onboarding_step'] = 'documents_scope';
+                    return [
+                        'action' => 'ask_user',
+                        'reply' => $this->resolveBuilderLlmAssistHelpReply($assist, 'documents_scope', $localProfile),
+                        'state' => $localState,
+                    ];
+                }
             } else {
                 $localProfile['documents_scope'] = $this->sanitizeRequirementText($text);
                 unset($localProfile['documents_scope_items']);
@@ -646,6 +725,11 @@ trait ConversationGatewayBuilderOnboardingTrait
                     $reply = $this->buildRequirementsSummaryReply($businessType, $localProfile, $plan);
                     return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
                 }
+
+                if ($this->isBuilderUserFrustrated($text) || $this->isClarificationRequest($text)) {
+                    $assist = $this->clarifyBuilderStepViaLlm($text, 'confirm_scope', $localProfile, $localState);
+                    return $this->routeBuilderConfirmScopeAssist($assist, $localProfile, $localState, $businessType, $plan);
+                }
             }
             if ($this->isNegativeReply($text)) {
                 $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
@@ -685,11 +769,8 @@ trait ConversationGatewayBuilderOnboardingTrait
                 $localState['resolution_attempts'] = (int) ($localState['resolution_attempts'] ?? 0) + 1;
                 $localState['confirm_scope_last_hash'] = null;
                 $localState['confirm_scope_repeats'] = 0;
-                return [
-                    'action' => 'ask_user',
-                    'reply' => $this->buildBuilderOnboardingRecoveryReply('confirm_scope', $localProfile),
-                    'state' => $localState,
-                ];
+                $assist = $this->clarifyBuilderStepViaLlm($text, 'confirm_scope', $localProfile, $localState);
+                return $this->routeBuilderConfirmScopeAssist($assist, $localProfile, $localState, $businessType, $plan);
             }
 
             if (!$this->isAffirmativeReply($text)) {
@@ -827,6 +908,341 @@ trait ConversationGatewayBuilderOnboardingTrait
                 ? 'Voy mas simple. Dime el siguiente dato clave y sigo contigo.'
                 : 'Voy mas simple. Dime en una frase que vendes o a que se dedica tu negocio.',
         };
+    }
+
+    private function clarifyBuilderStepViaLlm(string $text, string $step, array $profile, array $state): ?array
+    {
+        $step = trim($step);
+        if ($step === '') {
+            return null;
+        }
+
+        if (
+            $this->isPureGreeting($text)
+            || $this->isFarewell($text)
+            || $this->isBuilderActionMessage($text)
+        ) {
+            return null;
+        }
+
+        $allowedValues = $this->builderLlmAllowedValuesForStep($step, $profile, $state);
+        if ($allowedValues === []) {
+            return null;
+        }
+
+        $stubRaw = trim((string) (getenv('SUKI_BUILDER_ONBOARDING_LLM_STUB_JSON') ?: ''));
+        if ($stubRaw !== '') {
+            $decoded = json_decode($stubRaw, true);
+            if (is_array($decoded)) {
+                if (isset($decoded[$step]) && is_array($decoded[$step])) {
+                    $decoded = (array) $decoded[$step];
+                }
+                return $this->normalizeBuilderLlmAssistResult($decoded, $step, $profile, $state);
+            }
+        }
+
+        $enabled = getenv('BUILDER_LLM_ASSIST_ENABLED');
+        if ($enabled !== false && !in_array(strtolower(trim((string) $enabled)), ['1', 'true', 'yes', 'on'], true)) {
+            return $this->buildBuilderLlmAssistFallback($step, $profile);
+        }
+
+        if (!$this->runtimeLlmChatAvailable()) {
+            return $this->buildBuilderLlmAssistFallback($step, $profile);
+        }
+
+        $capsule = [
+            'intent' => 'BUILDER_ONBOARDING_STEP_CLARIFIER',
+            'entity' => '',
+            'entity_contract_min' => ['required' => [], 'types' => []],
+            'state' => [
+                'collected' => [],
+                'missing' => $this->builderLlmMissingFieldsForStep($step, $profile, $state),
+            ],
+            'user_message' => $text,
+            'policy' => [
+                'requires_strict_json' => true,
+                'max_output_tokens' => 220,
+                'latency_budget_ms' => 1800,
+            ],
+            'prompt_contract' => [
+                'ROLE' => 'Builder Step Clarifier',
+                'INPUT' => [
+                    'onboarding_step' => $step,
+                    'known_fields' => $this->builderLlmKnownFields($profile),
+                    'missing_fields' => $this->builderLlmMissingFieldsForStep($step, $profile, $state),
+                    'allowed_values' => $allowedValues,
+                    'user_text' => $this->sanitizeRequirementText($text),
+                ],
+                'CONSTRAINTS' => [
+                    'response_language' => 'es-CO',
+                    'strict_catalog_only' => true,
+                    'do_not_write_new_fields' => true,
+                    'short_help_reply' => true,
+                    'help_reply_max_words' => 18,
+                    'if_not_sure_resolved_false' => true,
+                    'if_user_is_confused_prefer_frustration_help' => true,
+                ],
+                'OUTPUT_FORMAT' => [
+                    'resolved' => ['type' => 'boolean'],
+                    'mapped_value' => ['type' => ['string', 'null']],
+                    'help_reply' => ['type' => 'string'],
+                    'confidence' => ['type' => 'number', 'minimum' => 0, 'maximum' => 1],
+                    'intent_type' => ['type' => 'string', 'enum' => ['map_value', 'clarify', 'frustration_help']],
+                ],
+            ],
+        ];
+
+        try {
+            $router = new LLMRouter();
+            $providerMode = $this->resolveRuntimeLlmProviderMode();
+            $llm = $router->chat($capsule, ['provider_mode' => $providerMode, 'temperature' => 0.1]);
+            $json = is_array($llm['json'] ?? null) ? (array) $llm['json'] : [];
+            if ($json === []) {
+                return $this->buildBuilderLlmAssistFallback($step, $profile);
+            }
+            return $this->normalizeBuilderLlmAssistResult($json, $step, $profile, $state);
+        } catch (\Throwable $e) {
+            return $this->buildBuilderLlmAssistFallback($step, $profile);
+        }
+    }
+
+    private function resolveBuilderLlmAssistHelpReply(?array $assist, string $step, array $profile): string
+    {
+        $reply = trim((string) ($assist['help_reply'] ?? ''));
+        if ($reply !== '') {
+            return $reply;
+        }
+
+        return $this->buildBuilderOnboardingRecoveryReply($step, $profile);
+    }
+
+    private function extractBuilderLlmAssistMappedValue(?array $assist, string $step): string
+    {
+        if (!is_array($assist) || !($assist['resolved'] ?? false)) {
+            return '';
+        }
+
+        return trim((string) ($assist['mapped_value'] ?? ''));
+    }
+
+    private function normalizeBuilderLlmAssistResult(array $result, string $step, array $profile, array $state): array
+    {
+        $intentType = trim((string) ($result['intent_type'] ?? 'clarify'));
+        if (!in_array($intentType, ['map_value', 'clarify', 'frustration_help'], true)) {
+            $intentType = 'clarify';
+        }
+
+        $confidence = is_numeric($result['confidence'] ?? null)
+            ? max(0.0, min(1.0, (float) $result['confidence']))
+            : 0.0;
+
+        $mappedValue = trim((string) ($result['mapped_value'] ?? ''));
+        $mappedValue = $this->normalizeBuilderLlmMappedValue($step, $mappedValue, $profile, $state);
+        $resolved = (bool) ($result['resolved'] ?? false) && $mappedValue !== '';
+
+        return [
+            'resolved' => $resolved,
+            'mapped_value' => $resolved ? $mappedValue : null,
+            'help_reply' => trim((string) ($result['help_reply'] ?? $this->buildBuilderOnboardingRecoveryReply($step, $profile))),
+            'confidence' => $confidence,
+            'intent_type' => $intentType,
+        ];
+    }
+
+    private function normalizeBuilderLlmMappedValue(string $step, string $value, array $profile, array $state): string
+    {
+        $value = trim($value);
+        if ($value === '') {
+            return '';
+        }
+
+        $allowedValues = $this->builderLlmAllowedValuesForStep($step, $profile, $state);
+        $normalizedAllowed = [];
+        foreach ($allowedValues as $allowedValue) {
+            $normalizedAllowed[$this->normalize((string) $allowedValue)] = (string) $allowedValue;
+        }
+
+        $normalizedValue = $this->normalize($value);
+        return (string) ($normalizedAllowed[$normalizedValue] ?? '');
+    }
+
+    private function buildBuilderLlmAssistFallback(string $step, array $profile): array
+    {
+        return [
+            'resolved' => false,
+            'mapped_value' => null,
+            'help_reply' => $this->buildBuilderOnboardingRecoveryReply($step, $profile),
+            'confidence' => 0.0,
+            'intent_type' => 'clarify',
+        ];
+    }
+
+    private function builderLlmKnownFields(array $profile): array
+    {
+        return [
+            'business_type' => trim((string) ($profile['business_type'] ?? '')),
+            'operation_model' => trim((string) ($profile['operation_model'] ?? '')),
+            'needs_scope' => is_array($profile['needs_scope_items'] ?? null)
+                ? array_values((array) $profile['needs_scope_items'])
+                : trim((string) ($profile['needs_scope'] ?? '')),
+            'documents_scope' => is_array($profile['documents_scope_items'] ?? null)
+                ? array_values((array) $profile['documents_scope_items'])
+                : trim((string) ($profile['documents_scope'] ?? '')),
+        ];
+    }
+
+    private function builderLlmMissingFieldsForStep(string $step, array $profile, array $state): array
+    {
+        $ordered = ['business_type', 'operation_model', 'needs_scope', 'documents_scope', 'confirm_scope'];
+        $currentIndex = array_search($step, $ordered, true);
+        if ($currentIndex === false) {
+            $currentIndex = 0;
+        }
+
+        $missing = [];
+        foreach (array_slice($ordered, $currentIndex) as $field) {
+            if ($field === 'business_type' && $this->normalizeBusinessType((string) ($profile['business_type'] ?? '')) === '') {
+                $missing[] = 'business_type';
+            }
+            if ($field === 'operation_model' && trim((string) ($profile['operation_model'] ?? '')) === '') {
+                $missing[] = 'operation_model';
+            }
+            if ($field === 'needs_scope' && empty($profile['needs_scope']) && empty($profile['needs_scope_items'])) {
+                $missing[] = 'needs_scope';
+            }
+            if ($field === 'documents_scope' && empty($profile['documents_scope']) && empty($profile['documents_scope_items'])) {
+                $missing[] = 'documents_scope';
+            }
+            if ($field === 'confirm_scope' && empty($state['analysis_approved'])) {
+                $missing[] = 'confirm_scope';
+            }
+        }
+
+        return $missing;
+    }
+
+    private function builderLlmAllowedValuesForStep(string $step, array $profile, array $state): array
+    {
+        return match ($step) {
+            'business_type' => $this->builderLlmAllowedBusinessTypes(),
+            'operation_model' => ['contado', 'credito', 'mixto'],
+            'needs_scope' => [
+                'citas',
+                'historia clinica',
+                'inventario',
+                'medicamentos',
+                'medico en turno',
+                'pacientes',
+                'duenos',
+                'facturacion',
+                'pagos',
+                'ordenes de trabajo',
+                'servicios/tratamientos',
+                'productos',
+                'muestras/examenes',
+                'gastos/costos',
+            ],
+            'documents_scope' => [
+                'factura',
+                'historia clinica',
+                'orden de trabajo',
+                'cotizacion',
+                'recibo de pago',
+                'receta',
+                'remision',
+                'control impreso',
+                'inventario',
+            ],
+            'confirm_scope' => ['si', 'no', 'negocio', 'pagos', 'control', 'documentos'],
+            default => [],
+        };
+    }
+
+    private function builderLlmAllowedBusinessTypes(): array
+    {
+        $playbook = $this->loadDomainPlaybook();
+        $profiles = is_array($playbook['profiles'] ?? null) ? $playbook['profiles'] : [];
+        $allowed = [];
+        foreach ($profiles as $item) {
+            if (!is_array($item)) {
+                continue;
+            }
+            $key = $this->normalizeBusinessType((string) ($item['key'] ?? ''));
+            if ($key !== '') {
+                $allowed[] = $key;
+            }
+        }
+
+        return array_values(array_unique($allowed));
+    }
+
+    private function routeBuilderConfirmScopeAssist(?array $assist, array $profile, array $state, string $businessType, array $plan): array
+    {
+        $mappedValue = $this->extractBuilderLlmAssistMappedValue($assist, 'confirm_scope');
+        if ($mappedValue === '') {
+            $state['active_task'] = 'builder_onboarding';
+            $state['onboarding_step'] = 'confirm_scope';
+            return [
+                'action' => 'ask_user',
+                'reply' => $this->resolveBuilderLlmAssistHelpReply($assist, 'confirm_scope', $profile),
+                'state' => $state,
+            ];
+        }
+
+        if ($mappedValue === 'si') {
+            $state['analysis_approved'] = true;
+            $state['onboarding_step'] = 'plan_ready';
+            $state['confirm_scope_last_hash'] = null;
+            $state['confirm_scope_repeats'] = 0;
+            $proposal = $this->buildNextStepProposal(
+                $businessType,
+                $plan,
+                $profile,
+                (string) ($profile['owner_name'] ?? ''),
+                $state
+            );
+            if (!empty($proposal['command']) && is_array($proposal['command'])) {
+                $this->setBuilderPendingCommand($state, (array) $proposal['command']);
+                $state['entity'] = $proposal['entity'] ?? null;
+                $state['active_task'] = (string) ($proposal['active_task'] ?? 'create_table');
+                return ['action' => 'ask_user', 'reply' => (string) ($proposal['reply'] ?? ''), 'state' => $state];
+            }
+
+            $this->clearBuilderPendingCommand($state);
+            $state['active_task'] = (string) ($proposal['active_task'] ?? 'builder_onboarding');
+            return [
+                'action' => 'respond_local',
+                'reply' => (string) ($proposal['reply'] ?? $this->buildBuilderPlanProgressReply($state, $profile, false)),
+                'state' => $state,
+            ];
+        }
+
+        if ($mappedValue === 'no') {
+            $state['onboarding_step'] = 'needs_scope';
+            unset($state['analysis_approved']);
+            return [
+                'action' => 'ask_user',
+                'reply' => 'Listo, ajustamos el alcance.' . "\n"
+                    . 'Dime que quieres cambiar primero (control del negocio o documentos).',
+                'state' => $state,
+            ];
+        }
+
+        $nextStep = match ($mappedValue) {
+            'negocio' => 'business_type',
+            'pagos' => 'operation_model',
+            'control' => 'needs_scope',
+            'documentos' => 'documents_scope',
+            default => 'confirm_scope',
+        };
+        $state['active_task'] = 'builder_onboarding';
+        $state['onboarding_step'] = $nextStep;
+
+        return [
+            'action' => 'ask_user',
+            'reply' => $this->resolveBuilderLlmAssistHelpReply($assist, $nextStep, $profile),
+            'state' => $state,
+        ];
     }
 
     private function shouldEscalateUnusableBuilderScopeAnswer(string $text, array $detectedItems): bool

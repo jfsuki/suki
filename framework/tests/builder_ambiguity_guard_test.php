@@ -16,10 +16,14 @@ $dbPath = $tmpDir . '/builder_ambiguity_guard.sqlite';
 $previous = [
     'APP_ENV' => getenv('APP_ENV'),
     'ALLOW_RUNTIME_SCHEMA' => getenv('ALLOW_RUNTIME_SCHEMA'),
+    'BUILDER_LLM_ASSIST_ENABLED' => getenv('BUILDER_LLM_ASSIST_ENABLED'),
+    'SUKI_BUILDER_ONBOARDING_LLM_STUB_JSON' => getenv('SUKI_BUILDER_ONBOARDING_LLM_STUB_JSON'),
 ];
 
 putenv('APP_ENV=local');
 putenv('ALLOW_RUNTIME_SCHEMA=1');
+putenv('BUILDER_LLM_ASSIST_ENABLED=0');
+putenv('SUKI_BUILDER_ONBOARDING_LLM_STUB_JSON=');
 
 try {
     $pdo = new PDO('sqlite:' . $dbPath);
