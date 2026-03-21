@@ -29,6 +29,11 @@ Mandatory checklist before any code/doc change in SUKI.
 - [ ] If it fails, fix root cause before implementing further.
 
 ## E) QA gate after implementation
+- [ ] Run immediate Post-Change Audit before moving to the next patch:
+  - `php framework/scripts/qa_gate.php incremental --change="short label" --test="php framework/tests/<target_test>.php"`
+  - Accept only `PASS` or `PASS_WITH_WARNING`.
+  - `FAIL_BLOCKING` stops the next change until root cause is fixed.
+- [ ] Evidence short is mandatory in the incremental audit output.
 - [ ] `php framework/tests/run.php`
 - [ ] `php framework/tests/chat_acid.php`
 - [ ] `php framework/tests/chat_golden.php`
