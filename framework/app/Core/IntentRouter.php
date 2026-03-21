@@ -659,6 +659,9 @@ final class IntentRouter
             || (bool) ($telemetry['rag_used'] ?? false)
             || (bool) ($telemetry['semantic_intent_match'] ?? false)
             || trim((string) ($telemetry['evidence_gate_status'] ?? '')) === 'passed';
+        $rawQuery = trim((string) ($context['message_text'] ?? $context['message'] ?? $context['text'] ?? ''));
+        $shortConfirmationBudgetBypass = $action === 'send_to_llm'
+            && $this->isShortBuilderConfirmationQuery($rawQuery, $context, ['mode' => $context['mode'] ?? '']);
         $guardTriggered = false;
         $guardReason = 'none';
         $guardStage = 'none';
@@ -694,7 +697,7 @@ final class IntentRouter
             $guardReason = 'llm_fallback_budget_exceeded';
             $guardStage = 'llm';
             $guardReply = 'Detuve esta ruta porque excede el presupuesto de fallback a LLM.';
-        } elseif (!$verifiedSemanticEvidence && $routerLatencyMs > (int) ($runtimeBudget['max_execution_ms'] ?? 1500)) {
+        } elseif (!$verifiedSemanticEvidence && !$shortConfirmationBudgetBypass && $routerLatencyMs > (int) ($runtimeBudget['max_execution_ms'] ?? 1500)) {
             $guardTriggered = true;
             $guardReason = 'execution_time_budget_exceeded';
             $guardStage = 'router';
@@ -713,6 +716,7 @@ final class IntentRouter
             'llm_fallback_count' => $llmFallbackCount,
             'evidence_override' => $evidenceOverride,
             'verified_semantic_evidence' => $verifiedSemanticEvidence,
+            'short_confirmation_budget_bypass' => $shortConfirmationBudgetBypass,
             'loop_guard_triggered' => $guardTriggered,
             'loop_guard_reason' => $guardReason,
             'loop_guard_stage' => $guardStage,
@@ -1069,6 +1073,15 @@ final class IntentRouter
         $query = trim((string) ($context['message_text'] ?? $context['message'] ?? $context['text'] ?? ''));
         if ($query === '' || $this->isTrivialConversationQuery($query)) {
             return [];
+        }
+
+        if ($this->isShortBuilderConfirmationQuery($query, $context)) {
+            return [
+                'telemetry' => [
+                    'semantic_intent_status' => 'skipped_short_builder_confirmation',
+                    'semantic_intent_source' => 'agent_training',
+                ],
+            ];
         }
 
         if ($llmRequest === []) {
@@ -1695,6 +1708,34 @@ final class IntentRouter
 
         $tokens = preg_split('/\s+/', $normalized) ?: [];
         return count($tokens) <= 2 && preg_match('/^(hola|gracias|ok|si|no|dale|vale|adios)/u', $normalized) === 1;
+    }
+
+    /**
+     * @param array<string,mixed> $context
+     * @param array<string,mixed>|null $gatewayResult
+     */
+    private function isShortBuilderConfirmationQuery(string $query, array $context, ?array $gatewayResult = null): bool
+    {
+        $mode = strtolower(trim((string) ($context['mode'] ?? (($gatewayResult['mode'] ?? null) ?: 'app'))));
+        if ($mode !== 'builder') {
+            return false;
+        }
+
+        $normalized = $this->normalizeFreeText($query);
+        if ($normalized === '') {
+            return false;
+        }
+
+        $tokens = preg_split('/\s+/', $normalized) ?: [];
+        if (count($tokens) > 4) {
+            return false;
+        }
+
+        if (preg_match('/^(si|sí|aja|ajá|claro|correcto|exacto|eso)\b/u', $normalized) !== 1) {
+            return false;
+        }
+
+        return preg_match('/\b(si|sí|aja|ajá|claro|correcto|exacto|eso)\b/u', $normalized) === 1;
     }
 
     private function isTechnicalInformativeQuery(string $query): bool

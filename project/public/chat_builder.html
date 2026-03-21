@@ -65,6 +65,7 @@
             gap: 16px;
             padding: 18px;
             height: calc(100vh - 80px);
+            min-height: 0;
         }
         .panel {
             background: var(--panel);
@@ -74,6 +75,7 @@
             padding: 16px;
             display: flex;
             flex-direction: column;
+            min-height: 0;
         }
         .panel h3 {
             font-size: 12px;
@@ -97,12 +99,35 @@
         .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--primary); }
         .chat {
             flex: 1;
+            min-height: 0;
             overflow-y: auto;
             padding: 12px;
             border-radius: 16px;
             background: #f8fafc;
             border: 1px solid var(--border);
+            overscroll-behavior: contain;
         }
+        .conversation-panel {
+            padding: 0;
+            overflow: hidden;
+        }
+        .conversation-shell {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            height: 100%;
+            min-height: 0;
+            padding: 16px;
+        }
+        .composer {
+            position: sticky;
+            bottom: 0;
+            z-index: 2;
+            margin-top: auto;
+            padding-top: 12px;
+            background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.96) 22%, rgba(255,255,255,1) 100%);
+        }
+        .composer .input-row:first-child { margin-top: 0; }
         .bubble {
             max-width: 75%;
             padding: 12px 14px;
@@ -205,7 +230,8 @@
         .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
         .chip { padding: 6px 10px; border-radius: 999px; background: var(--primary-soft); color: #0f766e; font-size: 11px; cursor: pointer; }
         @media (max-width: 1100px) {
-            .layout { grid-template-columns: 1fr; height: auto; }
+            .layout { grid-template-columns: 1fr; height: auto; min-height: calc(100vh - 80px); }
+            .conversation-panel { min-height: 68vh; }
         }
     </style>
 </head>
@@ -230,19 +256,23 @@
             </div>
         </div>
 
-        <div class="panel">
-            <h3>Conversacion</h3>
-            <div class="chat" id="chat"></div>
-            <div class="chips" id="quickChips"></div>
-            <div class="input-row">
-                <input type="text" id="message" placeholder="Ej: crear tabla clientes nombre:texto nit:texto" />
-                <button id="send">Enviar</button>
+        <div class="panel conversation-panel">
+            <div class="conversation-shell">
+                <h3>Conversacion</h3>
+                <div class="chat" id="chat"></div>
+                <div class="composer">
+                    <div class="chips" id="quickChips"></div>
+                    <div class="input-row">
+                        <input type="text" id="message" placeholder="Ej: crear tabla clientes nombre:texto nit:texto" />
+                        <button id="send">Enviar</button>
+                    </div>
+                    <div class="input-row">
+                        <input type="file" id="file" />
+                        <button class="secondary" id="sendFile">Enviar archivo</button>
+                    </div>
+                    <div class="meta">Canal simulado: /api/chat/message | Probar sistema: /api/chat/acid-test</div>
+                </div>
             </div>
-            <div class="input-row">
-                <input type="file" id="file" />
-                <button class="secondary" id="sendFile">Enviar archivo</button>
-            </div>
-            <div class="meta">Canal simulado: /api/chat/message | Probar sistema: /api/chat/acid-test</div>
         </div>
 
         <div class="panel">
