@@ -18,16 +18,20 @@ trait ConversationGatewayBuilderOnboardingTrait
     ): ?array {
         $localProfile = $profile;
         $localState = $state;
-        $currentStep = (string) ($localState['onboarding_step'] ?? '');
+        $currentStep = $this->resolveBuilderOnboardingStep($localProfile, $localState);
+        $localState['active_task'] = (string) ($localState['active_task'] ?? '') === 'unknown_business_discovery'
+            ? 'unknown_business_discovery'
+            : 'builder_onboarding';
+        $localState['onboarding_step'] = $currentStep;
 
         if ($this->isBuilderUserFrustrated($text)) {
-            if (in_array($currentStep, ['needs_scope', 'documents_scope'], true)) {
-                $reply = $currentStep === 'documents_scope'
-                    ? 'Voy mas simple. Que documentos vas a usar?'
-                    : 'Voy mas simple. Que quieres controlar primero?';
-                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
-            }
-            return null;
+            $localState['active_task'] = 'builder_onboarding';
+            $localState['onboarding_step'] = $currentStep;
+            return [
+                'action' => 'ask_user',
+                'reply' => $this->buildBuilderOnboardingRecoveryReply($currentStep, $localProfile),
+                'state' => $localState,
+            ];
         }
 
         if ($isOnboarding && $this->isBuilderActionMessage($text) && !$trigger) {
@@ -419,7 +423,13 @@ trait ConversationGatewayBuilderOnboardingTrait
                 $maxCorrectionAttempts = 2;
             }
             if ($attempts >= $maxCorrectionAttempts) {
-                return null;
+                $localState['active_task'] = 'builder_onboarding';
+                $localState['onboarding_step'] = 'business_type';
+                return [
+                    'action' => 'ask_user',
+                    'reply' => $this->buildBuilderOnboardingRecoveryReply('business_type', $localProfile),
+                    'state' => $localState,
+                ];
             }
 
             if ($businessCandidate !== '' && !$alreadyNotified && $unknownEnabled) {
@@ -514,7 +524,13 @@ trait ConversationGatewayBuilderOnboardingTrait
                 $localProfile['needs_scope'] = implode(', ', $needsItems);
                 $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
             } elseif ($this->shouldEscalateUnusableBuilderScopeAnswer($text, [])) {
-                return null;
+                $localState['active_task'] = 'builder_onboarding';
+                $localState['onboarding_step'] = 'needs_scope';
+                return [
+                    'action' => 'ask_user',
+                    'reply' => $this->buildBuilderOnboardingRecoveryReply('needs_scope', $localProfile),
+                    'state' => $localState,
+                ];
             } else {
                 $localProfile['needs_scope'] = $this->sanitizeRequirementText($text);
                 unset($localProfile['needs_scope_items']);
@@ -546,7 +562,13 @@ trait ConversationGatewayBuilderOnboardingTrait
                 $localProfile['documents_scope'] = implode(', ', $documentItems);
                 $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
             } elseif ($this->shouldEscalateUnusableBuilderScopeAnswer($text, [])) {
-                return null;
+                $localState['active_task'] = 'builder_onboarding';
+                $localState['onboarding_step'] = 'documents_scope';
+                return [
+                    'action' => 'ask_user',
+                    'reply' => $this->buildBuilderOnboardingRecoveryReply('documents_scope', $localProfile),
+                    'state' => $localState,
+                ];
             } else {
                 $localProfile['documents_scope'] = $this->sanitizeRequirementText($text);
                 unset($localProfile['documents_scope_items']);
@@ -658,9 +680,16 @@ trait ConversationGatewayBuilderOnboardingTrait
 
             if (!$this->isAffirmativeReply($text) && $repeats > 2) {
                 unset($localState['analysis_approved']);
-                $localState['onboarding_step'] = 'business_type';
+                $localState['active_task'] = 'builder_onboarding';
+                $localState['onboarding_step'] = 'confirm_scope';
                 $localState['resolution_attempts'] = (int) ($localState['resolution_attempts'] ?? 0) + 1;
-                return null;
+                $localState['confirm_scope_last_hash'] = null;
+                $localState['confirm_scope_repeats'] = 0;
+                return [
+                    'action' => 'ask_user',
+                    'reply' => $this->buildBuilderOnboardingRecoveryReply('confirm_scope', $localProfile),
+                    'state' => $localState,
+                ];
             }
 
             if (!$this->isAffirmativeReply($text)) {
@@ -741,7 +770,63 @@ trait ConversationGatewayBuilderOnboardingTrait
             return ['action' => 'respond_local', 'reply' => (string) ($proposal['reply'] ?? $this->buildBuilderPlanProgressReply($localState, $localProfile, false)), 'state' => $localState];
         }
 
+        if ($isOnboarding || $trigger || $businessHint) {
+            $localState['active_task'] = 'builder_onboarding';
+            $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
+            return [
+                'action' => 'ask_user',
+                'reply' => $this->buildBuilderOnboardingRecoveryReply((string) $localState['onboarding_step'], $localProfile),
+                'state' => $localState,
+            ];
+        }
+
         return null;
+    }
+
+    private function resolveBuilderOnboardingStep(array $profile, array $state): string
+    {
+        $currentStep = trim((string) ($state['onboarding_step'] ?? ''));
+        if ($currentStep !== '') {
+            return $currentStep;
+        }
+
+        $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
+        if ($businessType === '') {
+            return 'business_type';
+        }
+
+        if (trim((string) ($profile['operation_model'] ?? '')) === '') {
+            return 'operation_model';
+        }
+
+        $needsKnown = !empty($profile['needs_scope'])
+            || (is_array($profile['needs_scope_items'] ?? null) && !empty($profile['needs_scope_items']));
+        if (!$needsKnown) {
+            return 'needs_scope';
+        }
+
+        $documentsKnown = !empty($profile['documents_scope'])
+            || (is_array($profile['documents_scope_items'] ?? null) && !empty($profile['documents_scope_items']));
+        if (!$documentsKnown) {
+            return 'documents_scope';
+        }
+
+        return !empty($state['analysis_approved']) ? 'plan_ready' : 'confirm_scope';
+    }
+
+    private function buildBuilderOnboardingRecoveryReply(string $step, array $profile): string
+    {
+        return match ($step) {
+            'business_type' => 'Voy mas simple. Dime en una frase que vendes o a que se dedica tu negocio.',
+            'operation_model' => 'Voy mas simple. Como cobras: contado, credito o mixto?',
+            'needs_scope' => 'Voy mas simple. Que quieres controlar primero?',
+            'documents_scope' => 'Voy mas simple. Que documentos vas a usar?',
+            'confirm_scope' => 'Voy mas simple. Dime que quieres ajustar: negocio, pagos, control o documentos.',
+            'plan_ready' => 'Voy mas simple. Dime si quieres crear la primera tabla o ajustar algo del alcance.',
+            default => !empty($profile['business_type'])
+                ? 'Voy mas simple. Dime el siguiente dato clave y sigo contigo.'
+                : 'Voy mas simple. Dime en una frase que vendes o a que se dedica tu negocio.',
+        };
     }
 
     private function shouldEscalateUnusableBuilderScopeAnswer(string $text, array $detectedItems): bool
@@ -818,7 +903,8 @@ trait ConversationGatewayBuilderOnboardingTrait
             'no entendi', 'no entiendo', 'no te entendi', 'no te entiendo', 'que dices', 'que hablas',
             'estas loco', 'no me estas entendiendo', 'no me estas entenid', 'hablas por hablar', 'hablas por hablas', 'estas mal',
             'no se', 'ni idea', 'ayuda', 'me perdi', 'estoy confundido', 'no se que responder',
-            'no se que hacer', 'como asi', 'que es eso', 'que significa', 'explicame',
+            'no se que hacer', 'como asi', 'que es eso', 'que significa', 'explicame', 'explicamelo facil',
+            'por donde vas', 'q es es',
             'no comprendo', 'bot inutil'
         ];
         foreach ($patterns as $pattern) {

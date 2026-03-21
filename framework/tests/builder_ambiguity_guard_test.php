@@ -38,6 +38,8 @@ try {
             'expected_route_path' => ['cache', 'rules'],
             'reply_contains' => 'A que se dedica tu negocio',
             'reply_not_contains' => 'tabla',
+            'expected_active_task' => 'builder_onboarding',
+            'expected_onboarding_step' => 'business_type',
         ],
         [
             'message' => 'me ayduas a crear una pp',
@@ -46,6 +48,8 @@ try {
             'expected_route_path' => ['cache', 'rules'],
             'reply_contains' => 'A que se dedica tu negocio',
             'reply_not_contains' => 'tabla',
+            'expected_active_task' => 'builder_onboarding',
+            'expected_onboarding_step' => 'business_type',
         ],
         [
             'message' => 'ayudame a crear algo',
@@ -54,6 +58,8 @@ try {
             'expected_route_path' => ['cache', 'rules'],
             'reply_contains' => 'Que quieres crear primero',
             'reply_not_contains' => 'crearemos la tabla',
+            'expected_active_task' => 'builder_onboarding',
+            'expected_onboarding_step' => 'business_type',
         ],
         [
             'message' => 'quiero crear una tabla productos',
@@ -110,12 +116,10 @@ try {
                 'active_task' => 'builder_onboarding',
                 'onboarding_step' => 'needs_scope',
             ],
-            'expected_action' => 'send_to_llm',
-            'expected_classification' => 'llm',
-            'expected_route_path' => ['cache', 'rules', 'skills', 'rag', 'llm'],
-            'expected_route_reason' => 'builder_continues_to_router',
-            'expected_local' => false,
-            'reply_not_contains' => 'Paso 4',
+            'expected_action' => 'ask_user',
+            'expected_classification' => 'builder_onboarding',
+            'expected_route_path' => ['cache', 'rules'],
+            'reply_contains' => 'Voy mas simple',
             'expect_scope_empty' => ['needs_scope'],
         ],
         [
@@ -144,11 +148,10 @@ try {
                 'active_task' => 'builder_onboarding',
                 'onboarding_step' => 'needs_scope',
             ],
-            'expected_action' => 'send_to_llm',
-            'expected_classification' => 'llm',
-            'expected_route_path' => ['cache', 'rules', 'skills', 'rag', 'llm'],
-            'expected_route_reason' => 'builder_continues_to_router',
-            'expected_local' => false,
+            'expected_action' => 'ask_user',
+            'expected_classification' => 'builder_onboarding',
+            'expected_route_path' => ['cache', 'rules'],
+            'reply_contains' => 'Voy mas simple',
             'expect_scope_empty' => ['needs_scope'],
         ],
         [
@@ -179,11 +182,10 @@ try {
                 'active_task' => 'builder_onboarding',
                 'onboarding_step' => 'needs_scope',
             ],
-            'expected_action' => 'send_to_llm',
-            'expected_classification' => 'llm',
-            'expected_route_path' => ['cache', 'rules', 'skills', 'rag', 'llm'],
-            'expected_route_reason' => 'builder_continues_to_router',
-            'expected_local' => false,
+            'expected_action' => 'ask_user',
+            'expected_classification' => 'builder_onboarding',
+            'expected_route_path' => ['cache', 'rules'],
+            'reply_contains' => 'Voy mas simple',
             'expect_scope_empty' => ['needs_scope'],
         ],
         [
@@ -269,6 +271,12 @@ try {
         }
         if (!empty($case['expect_pending_cleared']) && !empty($state['builder_pending_command'])) {
             $failures[] = 'Pending builder command should be cleared for "' . $case['message'] . '".';
+        }
+        if (isset($case['expected_active_task']) && (string) ($state['active_task'] ?? '') !== $case['expected_active_task']) {
+            $failures[] = 'Unexpected active_task for "' . $case['message'] . '": ' . (string) ($state['active_task'] ?? '');
+        }
+        if (isset($case['expected_onboarding_step']) && (string) ($state['onboarding_step'] ?? '') !== $case['expected_onboarding_step']) {
+            $failures[] = 'Unexpected onboarding_step for "' . $case['message'] . '": ' . (string) ($state['onboarding_step'] ?? '');
         }
     }
 } catch (Throwable $e) {

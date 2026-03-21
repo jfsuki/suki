@@ -98,11 +98,14 @@ trait ConversationGatewayHandlePipelineTrait
                 $state['missing'] = [];
                 $state['requested_slot'] = null;
             }
+            $state['active_task'] = 'builder_onboarding';
+            $state['onboarding_step'] = $this->resolveBuilderOnboardingStep($profile, $state);
             $reply = $this->buildBuilderAmbiguityReply($normalizedBase, $profile);
-            $state = $this->updateState($state, $raw, $reply, 'builder_clarify', null, [], $state['active_task'] ?? null);
+            $state = $this->updateState($state, $raw, $reply, 'builder_clarify', null, [], 'builder_onboarding');
             $this->saveState($tenantId, $userId, $state);
             $telemetry = $this->telemetry('builder_clarify', true);
             $telemetry['builder_ambiguity_guard'] = true;
+            $telemetry['builder_onboarding_step'] = (string) ($state['onboarding_step'] ?? '');
             return $this->result('ask_user', $reply, null, null, $state, $telemetry);
         }
 
@@ -444,7 +447,12 @@ trait ConversationGatewayHandlePipelineTrait
             $state['entity'] = null;
         }
 
-        $confusionRoute = $this->routeConfusion($normalizedBase, $mode, $state, $profile, $confusionBase, $tenantId, $userId);
+        $skipBuilderConfusionRoute = $mode === 'builder'
+            && in_array((string) ($state['active_task'] ?? ''), ['builder_onboarding', 'unknown_business_discovery'], true)
+            && ($this->isBuilderUserFrustrated($normalizedBase) || $this->isClarificationRequest($normalizedBase));
+        $confusionRoute = $skipBuilderConfusionRoute
+            ? []
+            : $this->routeConfusion($normalizedBase, $mode, $state, $profile, $confusionBase, $tenantId, $userId);
         if (!empty($confusionRoute)) {
             $reply = (string) ($confusionRoute['reply'] ?? '');
             $state = $this->updateState(
