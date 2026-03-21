@@ -10,8 +10,8 @@ final class OpenRouterProvider
     public function sendChat(array $messages, array $params = []): array
     {
         $apiKey = getenv('OPENROUTER_API_KEY') ?: '';
-        $model = getenv('OPENROUTER_MODEL') ?: 'openrouter/free';
-        $baseUrl = getenv('OPENROUTER_BASE_URL') ?: 'https://openrouter.ai/api/v1/chat/completions';
+        $model = getenv('OPENROUTER_MODEL') ?: 'qwen/qwen-2.5-coder-32b-instruct';
+        $baseUrl = $this->normalizeBaseUrl((string) (getenv('OPENROUTER_BASE_URL') ?: 'https://openrouter.ai/api/v1'));
 
         if ($apiKey === '') {
             throw new RuntimeException('OPENROUTER_API_KEY requerido.');
@@ -27,17 +27,38 @@ final class OpenRouterProvider
             $payload['response_format'] = ['type' => 'json_object'];
         }
 
-        $response = $this->request($baseUrl, $payload, [
-            'Authorization: Bearer ' . $apiKey,
-            'HTTP-Referer: ' . (getenv('OPENROUTER_REFERER') ?: 'http://localhost'),
-            'X-Title: ' . (getenv('OPENROUTER_TITLE') ?: 'suki'),
-        ]);
+        $response = $this->request($baseUrl, $payload, $this->buildHeaders($apiKey));
 
         $content = $response['data']['choices'][0]['message']['content'] ?? '';
         return [
             'text' => $content,
             'usage' => $response['data']['usage'] ?? [],
             'raw' => $response,
+        ];
+    }
+
+    private function normalizeBaseUrl(string $baseUrl): string
+    {
+        $normalized = rtrim(trim($baseUrl), '/');
+        if ($normalized === '') {
+            return 'https://openrouter.ai/api/v1/chat/completions';
+        }
+        if (str_ends_with($normalized, '/chat/completions')) {
+            return $normalized;
+        }
+
+        return $normalized . '/chat/completions';
+    }
+
+    /**
+     * @return array<int,string>
+     */
+    private function buildHeaders(string $apiKey): array
+    {
+        return [
+            'Authorization: Bearer ' . $apiKey,
+            'HTTP-Referer: ' . (getenv('OPENROUTER_REFERER') ?: 'http://localhost'),
+            'X-Title: ' . (getenv('OPENROUTER_TITLE') ?: 'suki'),
         ];
     }
 

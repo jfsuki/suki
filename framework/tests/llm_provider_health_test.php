@@ -65,6 +65,8 @@ namespace {
     require_once __DIR__ . '/../app/autoload.php';
 
     use App\Core\LLM\LLMRouter;
+    use App\Core\LLM\Providers\DeepSeekProvider;
+    use App\Core\LLM\Providers\OpenRouterProvider;
 
     $failures = [];
     $resetCircuit = static function (): void {
@@ -227,6 +229,34 @@ namespace {
         putenv('OPENROUTER_ENABLED');
     } else {
         putenv('OPENROUTER_ENABLED=' . $previousOpenRouterEnabled);
+    }
+
+    $openRouterReflection = new ReflectionClass(OpenRouterProvider::class);
+    $openRouterNormalize = $openRouterReflection->getMethod('normalizeBaseUrl');
+    $openRouterNormalize->setAccessible(true);
+    $openRouterHeaders = $openRouterReflection->getMethod('buildHeaders');
+    $openRouterHeaders->setAccessible(true);
+    $openRouterProvider = $openRouterReflection->newInstanceWithoutConstructor();
+    if ($openRouterNormalize->invoke($openRouterProvider, 'https://openrouter.ai/api/v1') !== 'https://openrouter.ai/api/v1/chat/completions') {
+        $failures[] = 'OpenRouter debe normalizar /api/v1 a /chat/completions.';
+    }
+    if ($openRouterNormalize->invoke($openRouterProvider, 'https://openrouter.ai/api/v1/chat/completions') !== 'https://openrouter.ai/api/v1/chat/completions') {
+        $failures[] = 'OpenRouter no debe duplicar /chat/completions.';
+    }
+    $headers = (array) $openRouterHeaders->invoke($openRouterProvider, 'sk-or-test');
+    if (!in_array('HTTP-Referer: ' . (getenv('OPENROUTER_REFERER') ?: 'http://localhost'), $headers, true)) {
+        $failures[] = 'OpenRouter debe mantener HTTP-Referer.';
+    }
+    if (!in_array('X-Title: ' . (getenv('OPENROUTER_TITLE') ?: 'suki'), $headers, true)) {
+        $failures[] = 'OpenRouter debe mantener X-Title.';
+    }
+
+    $deepSeekReflection = new ReflectionClass(DeepSeekProvider::class);
+    $deepSeekNormalize = $deepSeekReflection->getMethod('normalizeBaseUrl');
+    $deepSeekNormalize->setAccessible(true);
+    $deepSeekProvider = $deepSeekReflection->newInstanceWithoutConstructor();
+    if ($deepSeekNormalize->invoke($deepSeekProvider, 'https://api.deepseek.com/v1') !== 'https://api.deepseek.com/v1/chat/completions') {
+        $failures[] = 'DeepSeek debe normalizar /v1 a /chat/completions.';
     }
 
     $ok = $failures === [];

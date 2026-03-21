@@ -47,16 +47,16 @@ return [
             'groq' => getenv('GROQ_MODEL') ?: 'llama-3.1-8b-instant',
             'gemini' => getenv('GEMINI_MODEL') ?: 'gemini-2.5-flash-lite',
             'deepseek' => getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat',
-            'openrouter' => getenv('OPENROUTER_MODEL') ?: 'openrouter/free',
+            'openrouter' => getenv('OPENROUTER_MODEL') ?: 'qwen/qwen-2.5-coder-32b-instruct',
         ],
         'default' => [
             'groq' => getenv('GROQ_MODEL') ?: 'llama-3.1-8b-instant',
             'gemini' => getenv('GEMINI_MODEL') ?: 'gemini-2.5-flash-lite',
             'deepseek' => getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat',
-            'openrouter' => getenv('OPENROUTER_MODEL') ?: 'openrouter/free',
+            'openrouter' => getenv('OPENROUTER_MODEL') ?: 'qwen/qwen-2.5-coder-32b-instruct',
         ],
         'fallback' => [
-            'openrouter' => getenv('OPENROUTER_MODEL') ?: 'openrouter/free',
+            'openrouter' => getenv('OPENROUTER_MODEL') ?: 'qwen/qwen-2.5-coder-32b-instruct',
             'deepseek' => getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat',
         ],
         'premium' => [
