@@ -636,10 +636,24 @@ trait ConversationGatewayHandlePipelineTrait
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('crud_guide', true));
         }
 
+        $builderSemanticProfileHint = $this->normalizeBusinessType($this->detectBusinessType($normalized)) !== '';
+        $builderScopeStep = (string) ($state['onboarding_step'] ?? '');
+        $builderScopeDeflection = $mode === 'builder'
+            && (string) ($state['active_task'] ?? '') === 'builder_onboarding'
+            && in_array($builderScopeStep, ['needs_scope', 'documents_scope'], true)
+            && (
+                $builderSemanticProfileHint
+                || preg_match('/\b(vendo|vendemos|tengo una|tengo un|mi empresa|mi negocio|programa|progama|app)\b/u', $normalized) === 1
+            );
         $skipBuilderProfileLearning = $mode === 'builder'
-            && ((string) ($state['active_task'] ?? '')) === ''
-            && !$this->isBuilderOnboardingTrigger($normalized)
-            && $this->normalizeBusinessType($this->detectBusinessType($normalized)) !== '';
+            && (
+                (
+                    ((string) ($state['active_task'] ?? '')) === ''
+                    && !$this->isBuilderOnboardingTrigger($normalized)
+                    && $builderSemanticProfileHint
+                )
+                || $builderScopeDeflection
+            );
         if ($this->isProfileHint($normalized) && !$skipBuilderProfileLearning) {
             $updated = $this->updateProfileFromText($profile, $normalized, $tenantId, $userId);
             $state = $this->updateState($state, $raw, $updated['reply'], 'profile', null, [], 'profile');

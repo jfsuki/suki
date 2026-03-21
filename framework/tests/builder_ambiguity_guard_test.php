@@ -101,6 +101,92 @@ try {
             'expected_local' => false,
         ],
         [
+            'message' => 'me interesa hacr mi progama para mi empresa',
+            'profile' => [
+                'business_type' => 'ferreteria_minorista',
+                'operation_model' => 'contado',
+            ],
+            'state' => [
+                'active_task' => 'builder_onboarding',
+                'onboarding_step' => 'needs_scope',
+            ],
+            'expected_action' => 'send_to_llm',
+            'expected_classification' => 'llm',
+            'expected_route_path' => ['cache', 'rules', 'skills', 'rag', 'llm'],
+            'expected_route_reason' => 'builder_continues_to_router',
+            'expected_local' => false,
+            'reply_not_contains' => 'Paso 4',
+            'expect_scope_empty' => ['needs_scope'],
+        ],
+        [
+            'message' => 'no entendi todo eso q escribes',
+            'profile' => [
+                'business_type' => 'ferreteria_minorista',
+                'operation_model' => 'contado',
+            ],
+            'state' => [
+                'active_task' => 'builder_onboarding',
+                'onboarding_step' => 'needs_scope',
+            ],
+            'expected_action' => 'ask_user',
+            'expected_classification' => 'builder_onboarding',
+            'expected_route_path' => ['cache', 'rules'],
+            'reply_contains' => 'Voy mas simple',
+            'expect_scope_empty' => ['needs_scope'],
+        ],
+        [
+            'message' => 'por donde vas q es es',
+            'profile' => [
+                'business_type' => 'ferreteria_minorista',
+                'operation_model' => 'contado',
+            ],
+            'state' => [
+                'active_task' => 'builder_onboarding',
+                'onboarding_step' => 'needs_scope',
+            ],
+            'expected_action' => 'send_to_llm',
+            'expected_classification' => 'llm',
+            'expected_route_path' => ['cache', 'rules', 'skills', 'rag', 'llm'],
+            'expected_route_reason' => 'builder_continues_to_router',
+            'expected_local' => false,
+            'expect_scope_empty' => ['needs_scope'],
+        ],
+        [
+            'message' => 'pero hablas por hablas no me estas entenidnedo',
+            'profile' => [
+                'business_type' => 'ferreteria_minorista',
+                'operation_model' => 'contado',
+                'needs_scope' => 'inventario, facturacion',
+                'needs_scope_items' => ['inventario', 'facturacion'],
+            ],
+            'state' => [
+                'active_task' => 'builder_onboarding',
+                'onboarding_step' => 'documents_scope',
+            ],
+            'expected_action' => 'ask_user',
+            'expected_classification' => 'builder_onboarding',
+            'expected_route_path' => ['cache', 'rules'],
+            'reply_contains' => 'Voy mas simple',
+            'expect_scope_empty' => ['documents_scope'],
+        ],
+        [
+            'message' => 'vendo pulidoras y taladros',
+            'profile' => [
+                'business_type' => 'ferreteria_minorista',
+                'operation_model' => 'contado',
+            ],
+            'state' => [
+                'active_task' => 'builder_onboarding',
+                'onboarding_step' => 'needs_scope',
+            ],
+            'expected_action' => 'send_to_llm',
+            'expected_classification' => 'llm',
+            'expected_route_path' => ['cache', 'rules', 'skills', 'rag', 'llm'],
+            'expected_route_reason' => 'builder_continues_to_router',
+            'expected_local' => false,
+            'expect_scope_empty' => ['needs_scope'],
+        ],
+        [
             'message' => 'chao',
             'expected_action' => 'respond_local',
             'expected_classification' => 'farewell',
@@ -147,13 +233,13 @@ try {
         ];
         $results[] = $record;
 
-        if ($record['action'] !== $case['expected_action']) {
+        if (isset($case['expected_action']) && $record['action'] !== $case['expected_action']) {
             $failures[] = 'Unexpected action for "' . $case['message'] . '": ' . $record['action'];
         }
-        if ($record['classification'] !== $case['expected_classification']) {
+        if (isset($case['expected_classification']) && $record['classification'] !== $case['expected_classification']) {
             $failures[] = 'Unexpected classification for "' . $case['message'] . '": ' . $record['classification'];
         }
-        if ($routingHintSteps !== $case['expected_route_path']) {
+        if (isset($case['expected_route_path']) && $routingHintSteps !== $case['expected_route_path']) {
             $failures[] = 'Unexpected route_path for "' . $case['message'] . '".';
         }
         if (isset($case['expected_route_reason']) && $record['route_reason'] !== $case['expected_route_reason']) {
@@ -167,6 +253,16 @@ try {
         }
         if (isset($case['reply_not_contains']) && str_contains($reply, (string) $case['reply_not_contains'])) {
             $failures[] = 'Reply for "' . $case['message'] . '" should not contain "' . $case['reply_not_contains'] . '".';
+        }
+        if (!empty($case['blocked_classifications']) && in_array($record['classification'], (array) $case['blocked_classifications'], true)) {
+            $failures[] = 'Classification for "' . $case['message'] . '" should not stay in early onboarding.';
+        }
+        if (!empty($case['expect_scope_empty'])) {
+            foreach ((array) $case['expect_scope_empty'] as $scopeKey) {
+                if (trim((string) ($profile[(string) $scopeKey] ?? '')) !== '') {
+                    $failures[] = 'Profile key "' . $scopeKey . '" should remain empty for "' . $case['message'] . '".';
+                }
+            }
         }
         if (!empty($case['expect_profile_cleared']) && (string) ($profile['business_type'] ?? '') !== '') {
             $failures[] = 'Profile business_type should be cleared for "' . $case['message'] . '".';

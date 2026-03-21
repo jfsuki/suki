@@ -16,13 +16,24 @@ trait ConversationGatewayBuilderOnboardingTrait
         bool $trigger,
         bool $businessHint
     ): ?array {
+        $localProfile = $profile;
+        $localState = $state;
+        $currentStep = (string) ($localState['onboarding_step'] ?? '');
+
+        if ($this->isBuilderUserFrustrated($text)) {
+            if (in_array($currentStep, ['needs_scope', 'documents_scope'], true)) {
+                $reply = $currentStep === 'documents_scope'
+                    ? 'Voy mas simple. Que documentos vas a usar?'
+                    : 'Voy mas simple. Que quieres controlar primero?';
+                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+            }
+            return null;
+        }
+
         if ($isOnboarding && $this->isBuilderActionMessage($text) && !$trigger) {
             return null;
         }
 
-        $localProfile = $profile;
-        $localState = $state;
-        $currentStep = (string) ($localState['onboarding_step'] ?? '');
         $playbookData = $this->loadDomainPlaybook();
         $unknownProtocol = is_array($playbookData['unknown_business_protocol'] ?? null)
             ? (array) $playbookData['unknown_business_protocol']
@@ -408,9 +419,7 @@ trait ConversationGatewayBuilderOnboardingTrait
                 $maxCorrectionAttempts = 2;
             }
             if ($attempts >= $maxCorrectionAttempts) {
-                $reply = 'Para evitar confusiones, dime en una frase exacta que vendes o fabricas.' . "\n"
-                    . 'Ejemplo: "fabrico bolsos" o "vendo repuestos".';
-                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+                return null;
             }
 
             if ($businessCandidate !== '' && !$alreadyNotified && $unknownEnabled) {
@@ -504,6 +513,8 @@ trait ConversationGatewayBuilderOnboardingTrait
                 $localProfile['needs_scope_items'] = $needsItems;
                 $localProfile['needs_scope'] = implode(', ', $needsItems);
                 $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+            } elseif ($this->shouldEscalateUnusableBuilderScopeAnswer($text, [])) {
+                return null;
             } else {
                 $localProfile['needs_scope'] = $this->sanitizeRequirementText($text);
                 unset($localProfile['needs_scope_items']);
@@ -534,6 +545,8 @@ trait ConversationGatewayBuilderOnboardingTrait
                 $localProfile['documents_scope_items'] = $documentItems;
                 $localProfile['documents_scope'] = implode(', ', $documentItems);
                 $this->saveProfile($tenantId, $this->profileUserKey($userId), $localProfile);
+            } elseif ($this->shouldEscalateUnusableBuilderScopeAnswer($text, [])) {
+                return null;
             } else {
                 $localProfile['documents_scope'] = $this->sanitizeRequirementText($text);
                 unset($localProfile['documents_scope_items']);
@@ -647,9 +660,7 @@ trait ConversationGatewayBuilderOnboardingTrait
                 unset($localState['analysis_approved']);
                 $localState['onboarding_step'] = 'business_type';
                 $localState['resolution_attempts'] = (int) ($localState['resolution_attempts'] ?? 0) + 1;
-                $reply = 'Para evitar un bucle, vamos a recalibrar tu negocio.' . "\n"
-                    . 'Dime en una frase exacta que vendes o fabricas.';
-                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
+                return null;
             }
 
             if (!$this->isAffirmativeReply($text)) {
@@ -733,4 +744,88 @@ trait ConversationGatewayBuilderOnboardingTrait
         return null;
     }
 
+    private function shouldEscalateUnusableBuilderScopeAnswer(string $text, array $detectedItems): bool
+    {
+        if (!empty($detectedItems)) {
+            return false;
+        }
+
+        if ($this->isBuilderUserFrustrated($text) || $this->isClarificationRequest($text)) {
+            return true;
+        }
+
+        $normalized = strtolower($this->normalize($text));
+        if ($normalized === '') {
+            return true;
+        }
+
+        $genericPatterns = [
+            'crear una app',
+            'crear un app',
+            'hacer una app',
+            'hacer un app',
+            'crear algo',
+            'mi app',
+            'mi programa',
+            'mi progama',
+            'para mi empresa',
+            'para mi negocio',
+            'por donde vas',
+            'q escribes',
+            'que escribes',
+            'que es es',
+        ];
+        foreach ($genericPatterns as $pattern) {
+            if (str_contains($normalized, $pattern)) {
+                return true;
+            }
+        }
+
+        if (preg_match('/\b(vendo|vendemos|tengo una|tengo un|mi negocio es|mi empresa es|fabricamos|ofrezco|ofrecemos)\b/u', $normalized) === 1) {
+            return true;
+        }
+
+        $sanitized = $this->sanitizeRequirementText($normalized);
+        if ($sanitized === '' || mb_strlen($sanitized, 'UTF-8') < 12) {
+            return true;
+        }
+
+        $tokens = preg_split('/[^[:alnum:]_]+/u', $normalized) ?: [];
+        $genericTokens = [
+            'a', 'algo', 'app', 'ayuda', 'ayudame', 'crear', 'de', 'el', 'empresa', 'en', 'es', 'eso',
+            'hacer', 'hacr', 'interesa', 'la', 'lo', 'me', 'mi', 'mis', 'negocio', 'para', 'por',
+            'pp', 'progama', 'programa', 'q', 'que', 'te', 'todo', 'una', 'uno', 'vas', 'ya',
+        ];
+        $meaningfulTokens = [];
+        foreach ($tokens as $token) {
+            $token = trim((string) $token);
+            if ($token === '' || mb_strlen($token, 'UTF-8') < 3) {
+                continue;
+            }
+            if (in_array($token, $genericTokens, true)) {
+                continue;
+            }
+            $meaningfulTokens[$token] = true;
+        }
+
+        return count($meaningfulTokens) < 2;
+    }
+
+    private function isBuilderUserFrustrated(string $text): bool
+    {
+        $normalized = strtolower($this->normalize($text));
+        $patterns = [
+            'no entendi', 'no entiendo', 'no te entendi', 'no te entiendo', 'que dices', 'que hablas',
+            'estas loco', 'no me estas entendiendo', 'no me estas entenid', 'hablas por hablar', 'hablas por hablas', 'estas mal',
+            'no se', 'ni idea', 'ayuda', 'me perdi', 'estoy confundido', 'no se que responder',
+            'no se que hacer', 'como asi', 'que es eso', 'que significa', 'explicame',
+            'no comprendo', 'bot inutil'
+        ];
+        foreach ($patterns as $pattern) {
+            if (str_contains($normalized, $pattern)) {
+                return true;
+            }
+        }
+        return false;
+    }
 }
