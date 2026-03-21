@@ -671,42 +671,38 @@ final class IntentRouter
             $guardTriggered = true;
             $guardReason = 'invalid_request_mode';
             $guardStage = 'router';
-            $guardReply = 'El request_mode recibido no es valido para esta ruta.';
         } elseif ($routeStepCount > (int) ($runtimeBudget['max_router_steps'] ?? 4)) {
             $guardTriggered = true;
             $guardReason = 'router_steps_budget_exceeded';
             $guardStage = 'router';
-            $guardReply = 'Detuve esta ruta porque excede el presupuesto operativo permitido.';
         } elseif ($toolCallsCount > (int) ($runtimeBudget['max_tool_calls'] ?? 1)) {
             $guardTriggered = true;
             $guardReason = 'tool_calls_budget_exceeded';
             $guardStage = 'execution';
-            $guardReply = 'Detuve esta ruta porque excede el numero permitido de acciones en este turno.';
         } elseif ($retryCount > (int) ($runtimeBudget['max_retries'] ?? 0)) {
             $guardTriggered = true;
             $guardReason = 'retry_budget_exceeded';
             $guardStage = 'retry';
-            $guardReply = 'Detuve esta ruta para evitar reintentos repetitivos sin control.';
         } elseif ($semanticQueriesCount > (int) ($runtimeBudget['max_semantic_queries'] ?? 1)) {
             $guardTriggered = true;
             $guardReason = 'semantic_query_budget_exceeded';
             $guardStage = 'rag';
-            $guardReply = 'Detuve esta ruta porque excede el presupuesto de consultas semanticas.';
         } elseif ($llmFallbackCount > (int) ($runtimeBudget['max_llm_fallbacks'] ?? 1)) {
             $guardTriggered = true;
             $guardReason = 'llm_fallback_budget_exceeded';
             $guardStage = 'llm';
-            $guardReply = 'Detuve esta ruta porque excede el presupuesto de fallback a LLM.';
         } elseif (!$verifiedSemanticEvidence && !$shortConfirmationBudgetBypass && $routerLatencyMs > (int) ($runtimeBudget['max_execution_ms'] ?? 1500)) {
             $guardTriggered = true;
             $guardReason = 'execution_time_budget_exceeded';
             $guardStage = 'router';
-            $guardReply = 'Detuve esta ruta porque excede el tiempo maximo permitido para este modo.';
         } elseif ((bool) ($loopCheck['triggered'] ?? false)) {
             $guardTriggered = true;
             $guardReason = 'repeated_route_without_progress';
             $guardStage = 'router';
-            $guardReply = 'Detuve esta ruta para evitar repetir el mismo fallback sin progreso. Cambia el dato clave o concreta el siguiente paso.';
+        }
+
+        if ($guardTriggered) {
+            $guardReply = $this->buildUserSafeRuntimeGuardReply($guardReason);
         }
 
         $telemetryPatch = [
@@ -737,6 +733,16 @@ final class IntentRouter
             'reply' => $guardReply,
             'telemetry' => $telemetryPatch,
         ];
+    }
+
+    private function buildUserSafeRuntimeGuardReply(string $guardReason): string
+    {
+        return match ($guardReason) {
+            'tool_calls_budget_exceeded' => 'Vamos por partes. Dime el siguiente paso concreto y sigo contigo.',
+            'retry_budget_exceeded', 'repeated_route_without_progress' => 'No te entendi del todo. Dime el dato clave o el siguiente paso y sigo contigo.',
+            'execution_time_budget_exceeded', 'semantic_query_budget_exceeded', 'llm_fallback_budget_exceeded', 'router_steps_budget_exceeded' => 'No pude completar ese paso ahora. Dime el dato clave o el siguiente paso y sigo contigo.',
+            default => 'No pude procesar ese mensaje como venia. Dilo en una frase corta y sigo contigo.',
+        };
     }
 
     /**

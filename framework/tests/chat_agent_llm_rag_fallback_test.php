@@ -16,6 +16,8 @@ $extractFailure = $reflection->getMethod('extractLlmFailureDetails');
 $extractFailure->setAccessible(true);
 $buildFailureReply = $reflection->getMethod('buildSemanticLlmFailureReply');
 $buildFailureReply->setAccessible(true);
+$buildUserSafeLlmUnavailableReply = $reflection->getMethod('buildUserSafeLlmUnavailableReply');
+$buildUserSafeLlmUnavailableReply->setAccessible(true);
 $buildTestInfo = $reflection->getMethod('buildTestInfo');
 $buildTestInfo->setAccessible(true);
 
@@ -77,6 +79,16 @@ $emptyReply = $buildFailureReply->invoke($agent, $route, [
 
 if ((string) $emptyReply !== '') {
     $failures[] = 'Sin evidencia RAG valida no debe construirse fallback semantico.';
+}
+
+$builderSafeReply = $buildUserSafeLlmUnavailableReply->invoke($agent, 'builder');
+if ((string) $builderSafeReply !== 'No pude completar esa respuesta ahora. Dime en una frase corta que quieres crear y sigo contigo.') {
+    $failures[] = 'El fallback LLM de builder debe usar copy segura para usuario final.';
+}
+
+$appSafeReply = $buildUserSafeLlmUnavailableReply->invoke($agent, 'app');
+if ((string) $appSafeReply !== 'No pude completar esa respuesta ahora. Dime el dato clave o la accion que necesitas y sigo contigo.') {
+    $failures[] = 'El fallback LLM de app debe usar copy segura para usuario final.';
 }
 
 $testInfo = $buildTestInfo->invoke($agent, [

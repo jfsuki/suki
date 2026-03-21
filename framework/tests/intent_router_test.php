@@ -695,6 +695,12 @@ if (!(bool) ($budgetTelemetry['loop_guard_triggered'] ?? false)) {
 if ((string) ($budgetTelemetry['loop_guard_reason'] ?? '') !== 'tool_calls_budget_exceeded') {
     $failures[] = 'Exceso de tool_calls debe dejar razon explicita.';
 }
+if ((string) $budgetBlocked->reply() !== 'Vamos por partes. Dime el siguiente paso concreto y sigo contigo.') {
+    $failures[] = 'El guard de budget debe responder con copy segura para usuario final.';
+}
+if (str_contains((string) $budgetBlocked->reply(), 'Detuve esta ruta')) {
+    $failures[] = 'El guard de budget no debe exponer mensajes internos al usuario final.';
+}
 
 // 13) Repeating the same route without progress must trigger anti-loop.
 $loopRouter = new IntentRouter(null, 'warn', null, $ragSemantic);
@@ -745,6 +751,9 @@ if ((int) ($loopTelemetry['same_route_repeat_count'] ?? 0) < 2) {
 }
 if ((int) (($loopTelemetry['metrics_delta']['loop_guard_hits'] ?? 0)) !== 1) {
     $failures[] = 'Anti-loop debe reflejarse en metrics_delta.';
+}
+if (str_contains((string) $loopRoute->reply(), 'Detuve esta ruta')) {
+    $failures[] = 'El anti-loop no debe exponer copy interna al usuario final.';
 }
 
 if ($previousMode === false) {

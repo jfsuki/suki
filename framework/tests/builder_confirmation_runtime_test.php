@@ -80,6 +80,9 @@ foreach (['si eso ferreteria', 'aja si'] as $message) {
     if (str_contains($reply, 'Detuve esta ruta porque excede el tiempo maximo permitido para este modo.')) {
         $failures[] = 'La respuesta de budget guard no debe aparecer para "' . $message . '".';
     }
+    if (str_contains($reply, 'IA no disponible. Usa comandos simples.')) {
+        $failures[] = 'La respuesta no debe exponer fallback interno LLM para "' . $message . '".';
+    }
 }
 
 $builderHtml = @file_get_contents(dirname(__DIR__, 2) . '/project/public/chat_builder.html');

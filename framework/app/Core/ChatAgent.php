@@ -957,6 +957,7 @@ final class ChatAgent
                 ]);
             } catch (\Throwable $e) {
                 $llmFailure = $this->extractLlmFailureDetails($e);
+                $userSafeLlmUnavailableReply = $this->buildUserSafeLlmUnavailableReply($mode);
                 $semanticFailureReply = $this->buildSemanticLlmFailureReply($route, $telemetry);
                 if ($semanticFailureReply !== '') {
                     $task = $this->controlTowerCompleteTask($task, [
@@ -1067,7 +1068,9 @@ final class ChatAgent
                 ]);
                 $failure = $this->controlTowerFailTask($task, [
                     'error_type' => 'llm_unavailable',
-                    'description' => 'IA no disponible. Usa comandos simples.',
+                    'description' => $llmFailure['message'] !== ''
+                        ? 'llm_unavailable: ' . $llmFailure['message']
+                        : 'llm_unavailable',
                     'created_at' => date('c'),
                 ]);
                 $task = $failure['task'];
@@ -1102,7 +1105,7 @@ final class ChatAgent
                         'error_flag' => true,
                         'error_type' => 'llm_unavailable',
                         'response_kind' => 'respond_local',
-                        'response_text' => 'IA no disponible. Usa comandos simples.',
+                        'response_text' => $userSafeLlmUnavailableReply,
                         'llm_provider_attempted' => 'llm',
                         'llm_error' => $llmFailure['message'],
                         'provider_errors' => $llmFailure['provider_errors'],
@@ -1126,7 +1129,7 @@ final class ChatAgent
                     // observability must not block chat response
                 }
                 $errorReply = $this->annotateReplyWithControlTower(
-                    $this->reply('IA no disponible. Usa comandos simples.', $channel, $sessionId, $userId),
+                    $this->reply($userSafeLlmUnavailableReply, $channel, $sessionId, $userId),
                     $task,
                     $failure['incident']
                 );
@@ -1329,6 +1332,15 @@ final class ChatAgent
         }
 
         return $this->buildSemanticReplyFromRoute($route);
+    }
+
+    private function buildUserSafeLlmUnavailableReply(string $mode): string
+    {
+        if (strtolower(trim($mode)) === 'builder') {
+            return 'No pude completar esa respuesta ahora. Dime en una frase corta que quieres crear y sigo contigo.';
+        }
+
+        return 'No pude completar esa respuesta ahora. Dime el dato clave o la accion que necesitas y sigo contigo.';
     }
 
     private function buildSemanticReplyFromRoute(IntentRouteResult $route): string
