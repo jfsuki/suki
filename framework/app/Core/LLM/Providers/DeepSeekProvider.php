@@ -11,7 +11,7 @@ final class DeepSeekProvider
     {
         $apiKey = getenv('DEEPSEEK_API_KEY') ?: '';
         $model = getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat';
-        $baseUrl = getenv('DEEPSEEK_BASE_URL') ?: 'https://api.deepseek.com/chat/completions';
+        $baseUrl = $this->normalizeBaseUrl((string) (getenv('DEEPSEEK_BASE_URL') ?: 'https://api.deepseek.com'));
 
         if ($apiKey === '') {
             throw new RuntimeException('DEEPSEEK_API_KEY requerido.');
@@ -38,6 +38,19 @@ final class DeepSeekProvider
             'usage' => $response['data']['usage'] ?? [],
             'raw' => $response,
         ];
+    }
+
+    private function normalizeBaseUrl(string $baseUrl): string
+    {
+        $normalized = rtrim(trim($baseUrl), '/');
+        if ($normalized === '') {
+            return 'https://api.deepseek.com/chat/completions';
+        }
+        if (str_ends_with($normalized, '/chat/completions')) {
+            return $normalized;
+        }
+
+        return $normalized . '/chat/completions';
     }
 
     private function request(string $url, array $payload, array $extraHeaders): array

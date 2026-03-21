@@ -15,6 +15,7 @@ $envFlag = static function (string $name, bool $default): bool {
 
 $hasGroq = trim((string) getenv('GROQ_API_KEY')) !== '';
 $hasGemini = trim((string) getenv('GEMINI_API_KEY')) !== '';
+$hasDeepSeek = trim((string) getenv('DEEPSEEK_API_KEY')) !== '';
 $hasOpenRouter = trim((string) getenv('OPENROUTER_API_KEY')) !== '';
 $hasClaude = trim((string) getenv('CLAUDE_API_KEY')) !== '';
 
@@ -27,6 +28,10 @@ return [
         'gemini' => [
             'enabled' => $envFlag('GEMINI_ENABLED', $hasGemini),
             'class' => \App\Core\LLM\Providers\GeminiProvider::class,
+        ],
+        'deepseek' => [
+            'enabled' => $envFlag('DEEPSEEK_ENABLED', $hasDeepSeek),
+            'class' => \App\Core\LLM\Providers\DeepSeekProvider::class,
         ],
         'openrouter' => [
             'enabled' => $envFlag('OPENROUTER_ENABLED', $hasOpenRouter),
@@ -41,12 +46,15 @@ return [
         'fast' => [
             'groq' => getenv('GROQ_MODEL') ?: 'llama-3.1-8b-instant',
             'gemini' => getenv('GEMINI_MODEL') ?: 'gemini-2.5-flash-lite',
+            'deepseek' => getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat',
         ],
         'default' => [
             'groq' => getenv('GROQ_MODEL') ?: 'llama-3.1-8b-instant',
             'gemini' => getenv('GEMINI_MODEL') ?: 'gemini-2.5-flash-lite',
+            'deepseek' => getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat',
         ],
         'fallback' => [
+            'deepseek' => getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat',
             'openrouter' => getenv('OPENROUTER_MODEL') ?: 'openrouter/free',
         ],
         'premium' => [
