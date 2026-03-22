@@ -1,7 +1,43 @@
 <?php
-// project/public/api.php
-
 declare(strict_types=1);
+// project/public/api.php
+// ============================================================
+// BLINDAJE JSON — antes de cualquier require/autoload
+// Garantiza que nunca se envíe HTML al frontend aunque PHP falle
+// ============================================================
+ini_set('display_errors', '0');
+ini_set('display_startup_errors', '0');
+error_reporting(0);
+ob_start(); // Captura output espurio (BOM, warnings, notices)
+
+header('Content-Type: application/json; charset=utf-8');
+
+set_exception_handler(function (Throwable $e) {
+    while (ob_get_level() > 0) { ob_end_clean(); }
+    http_response_code(500);
+    header('Content-Type: application/json; charset=utf-8');
+    echo json_encode([
+        'ok'    => false,
+        'error' => 'Error interno del servidor.',
+        'debug' => (getenv('APP_ENV') === 'dev') ? $e->getMessage() : null,
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+});
+
+register_shutdown_function(function () {
+    $err = error_get_last();
+    if ($err && in_array($err['type'], [E_ERROR, E_PARSE, E_CORE_ERROR, E_COMPILE_ERROR], true)) {
+        while (ob_get_level() > 0) { ob_end_clean(); }
+        http_response_code(500);
+        header('Content-Type: application/json; charset=utf-8');
+        echo json_encode([
+            'ok'    => false,
+            'error' => 'Error fatal del servidor.',
+            'debug' => (getenv('APP_ENV') === 'dev') ? $err['message'] . ' in ' . $err['file'] . ':' . $err['line'] : null,
+        ], JSON_UNESCAPED_UNICODE);
+    }
+});
+// ============================================================
 
 define('PROJECT_ROOT', dirname(__DIR__));
 require_once PROJECT_ROOT . '/config/env_loader.php';

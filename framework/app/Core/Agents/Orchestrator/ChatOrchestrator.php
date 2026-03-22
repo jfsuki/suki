@@ -161,14 +161,34 @@ class ChatOrchestrator
         string $userMessage = '',
         string $assistantReply = ''
     ): void {
-        // El nuevo pipeline no tiene estado monolítico en DB heredada.
-        // En el futuro, MemoryWindow o un EventStore reemplazará esto.
-        // Por ahora es un no-op seguro para mantener compatibilidad.
-        // TODO Fase 5+: persistir snapshot en ops_semantic_cache o EventStore.
+        // FIX A5: persistir snapshot de ejecución en JSONL de sesión
+        // Permite que el agente sepa qué acciones ejecutó en el turno anterior.
+        $snapshot = [
+            'ts'          => date('c'),
+            'tenant_id'   => $tenantId,
+            'user_id'     => $userId,
+            'project_id'  => $projectId,
+            'mode'        => $mode,
+            'command'     => $command['command']  ?? 'unknown',
+            'entity'      => $command['entity']   ?? '',
+            'user_msg'    => $userMessage,
+            'reply'       => $assistantReply,
+            'result_ok'   => !empty($resultData['ok'] ?? true),
+        ];
+
+        $logDir = defined('APP_ROOT') ? APP_ROOT . '/tests/tmp' : sys_get_temp_dir();
+        $logFile = $logDir . '/session_' . preg_replace('/[^a-z0-9_]/i', '_', $tenantId . '_' . $userId) . '.jsonl';
+
+        @file_put_contents(
+            $logFile,
+            json_encode($snapshot, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n",
+            FILE_APPEND | LOCK_EX
+        );
+
         error_log(sprintf(
             '[ChatOrchestrator] rememberExecution: cmd=%s entity=%s tenant=%s mode=%s',
-            (string) ($command['command'] ?? 'unknown'),
-            (string) ($command['entity']  ?? ''),
+            $snapshot['command'],
+            $snapshot['entity'],
             $tenantId,
             $mode
         ));
@@ -257,8 +277,9 @@ class ChatOrchestrator
         $memoryWindow->appendShortTerm('user', $userText);
 
         // 3. Caché semántico (0 tokens, 0 USD para duplicados recientes)
+        $userId      = (string) ($state['user_id'] ?? '');
         $cacheContext = ['active_task' => $state['active_task'] ?? 'none'];
-        $signature    = $this->semanticCache->generateSignature($tenantId, $mode, $userText, $cacheContext);
+        $signature    = $this->semanticCache->generateSignature($tenantId, $mode, $userText, $cacheContext, $userId);
         $cached       = $this->semanticCache->get($signature);
         if ($cached !== null) {
             return $cached;

@@ -44,18 +44,26 @@ class SemanticCache
 
     /**
      * Genera una firma única del request para saber si ya se procesó.
+     * Incluye user_id para evitar cross-session contamination.
+     *
+     * @param array<string,mixed> $contextFields
      */
-    public function generateSignature(string $tenantId, string $mode, string $userText, array $contextFields = []): string
-    {
+    public function generateSignature(
+        string $tenantId,
+        string $mode,
+        string $userText,
+        array $contextFields = [],
+        string $userId = ''
+    ): string {
         // Normalización básica para ignorar espacios y mayúsculas
         $normalizedText = trim(preg_replace('/\s+/', ' ', strtolower($userText)) ?? '');
-        
-        // El contextFields asegura que "hola" no devuelva lo mismo si el estado del usuario cambió
-        // (ej. de onboarding paso 1 a paso 2)
+
+        // contextFields diferencia el estado del turno (active_task, pending_entity, etc.)
         ksort($contextFields);
         $contextString = json_encode($contextFields, JSON_UNESCAPED_UNICODE);
-        
-        $payload = sprintf('%s|%s|%s|%s', $tenantId, $mode, $normalizedText, $contextString);
+
+        // FIX: incluir user_id para aislar por usuario/sesión y evitar colisiones cross-session
+        $payload = sprintf('%s|%s|%s|%s|%s', $tenantId, $userId, $mode, $normalizedText, $contextString);
         return hash('sha256', $payload);
     }
 

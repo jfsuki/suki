@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Core\Agents\Processes;
 
 use App\Core\Agents\Memory\MemoryWindow;
+use App\Core\Agents\Memory\TokenBudgeter;
 use App\Core\IntentRouter;
+use App\Core\LLM\LLMRouter;
 
 /**
  * Agente Especialista: Operación Pura de Apps (SUKI Business)
@@ -25,45 +27,78 @@ class AppExecutionProcess
      * @param IntentRouter|null $router Invoca búsqueda semántica (Qdrant)
      * @return array
      */
-    public function execute(string $userText, MemoryWindow $memory, ?IntentRouter $router = null): array
-    {
-        // Esto enruta hacia las funciones de negocio de SUKI
-        // utilizando la misma filosofía estricta.
-        
-        $context = $memory->compileLlmContext(new \App\Core\Agents\Memory\TokenBudgeter(), 600);
-        
-        // --- CONEXIÓN REAL QDRANT/NLU ---
+    /**
+     * @param string      $userText Texto del usuario
+     * @param MemoryWindow $memory  Ventana de memoria del turno
+     * @param IntentRouter|null $router Clasificador Qdrant/NLU
+     * @param LLMRouter|null    $llm    Fallback semántico si el router no resuelve (FIX A4)
+     */
+    public function execute(
+        string $userText,
+        MemoryWindow $memory,
+        ?IntentRouter $router = null,
+        ?LLMRouter $llm = null
+    ): array {
+        $context = $memory->compileLlmContext(new TokenBudgeter(), 600);
+
+        // --- FIX A1: pasar el mensaje real al IntentRouter ---
+        // El router lee 'message_text' del contexto Y del gatewayResult.
+        // Poblamos ambos para garantizar compatibilidad con las rutas internas.
         if ($router) {
-            // Intent Router espera un array tipo "gatewayResult"
-            $pseudoResult = ['intent' => 'unknown', 'action' => 'respond_local', 'reply' => ''];
-            $route = $router->route($pseudoResult, [
+            $gatewayResult = [
+                'intent'       => 'unknown',
+                'action'       => 'respond_local',
+                'reply'        => '',
+                'message_text' => $userText,   // FIX A1: texto real en gatewayResult
+            ];
+            $route = $router->route($gatewayResult, [
                 'message_text' => $userText,
-                'request_mode' => 'operation'
+                'request_mode' => 'operation',
             ]);
 
             if ($route->isCommand()) {
                 $cmd = $route->command();
                 return [
-                    'action' => 'execute_command',
-                    'command' => $cmd,
-                    'reply' => 'Ejecutando: ' . ($cmd['command'] ?? 'acción'),
-                    'telemetry' => $route->telemetry()
+                    'action'    => 'execute_command',
+                    'command'   => $cmd,
+                    'reply'     => 'Ejecutando: ' . ($cmd['command'] ?? 'acción'),
+                    'telemetry' => $route->telemetry(),
                 ];
             }
 
-            if ($route->kind() === 'ask_user' || $route->kind() === 'respond_local') {
+            if (in_array($route->kind(), ['ask_user', 'respond_local'], true)) {
                 return [
-                    'action' => $route->kind(),
-                    'reply' => $route->reply(),
-                    'telemetry' => $route->telemetry()
+                    'action'    => $route->kind(),
+                    'reply'     => $route->reply(),
+                    'telemetry' => $route->telemetry(),
                 ];
             }
         }
 
+        // FIX A4: si el IntentRouter no resolvió, usar LLM como fallback semántico
+        if ($llm) {
+            try {
+                $result = $llm->chat([
+                    'policy'       => ['requires_strict_json' => false],
+                    'user_message' => $userText,
+                ]);
+                $reply = trim((string) ($result['text'] ?? ''));
+                if ($reply !== '') {
+                    return [
+                        'action'    => 'respond_local',
+                        'reply'     => $reply,
+                        'telemetry' => ['agent' => 'AppExecutionProcess', 'llm_fallback' => true],
+                    ];
+                }
+            } catch (\Throwable $e) {
+                error_log('[AppExecutionProcess] LLM fallback error: ' . $e->getMessage());
+            }
+        }
+
         return [
-            'action' => 'ask_user',
-            'reply' => 'Aún estoy aprendiendo a usar las herramientas de tu ERP. ¿Qué transacción deseas hacer? (Prueba decir "crear factura")',
-            'telemetry' => ['agent' => 'AppExecutionProcess', 'fallback' => true]
+            'action'    => 'ask_user',
+            'reply'     => 'Aún estoy aprendiendo a usar las herramientas de tu ERP. ¿Qué transacción deseas hacer? (Prueba decir "crear factura")',
+            'telemetry' => ['agent' => 'AppExecutionProcess', 'fallback' => true],
         ];
     }
 }
