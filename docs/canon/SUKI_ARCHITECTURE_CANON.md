@@ -31,6 +31,7 @@ The system SHALL interpret business requests through governed router stages, val
 - PHP kernel calculates, validates, persists, and executes.
 - LLM SHALL NOT perform business math, direct persistence, or side effects.
 - Any executable outcome SHALL be represented as a governed action or command before execution.
+- **Conversational Layering**: Intent classification MUST stream through Semantic Classifier (Qdrant) -> LLM JSON Fast Parser -> PHP Kernel. Rigid regex for business intents is explicitly forbidden.
 
 ### 3.2 Multitenant Law
 - Multitenant isolation is mandatory.

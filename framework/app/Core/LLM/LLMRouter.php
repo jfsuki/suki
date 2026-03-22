@@ -119,6 +119,10 @@ final class LLMRouter
         }
         return [
             'providers' => [
+                'mistral' => [
+                    'class' => \App\Core\LLM\Providers\MistralProvider::class,
+                    'enabled' => !empty(getenv('MISTRAL_API_KEY')),
+                ],
                 'openrouter' => [
                     'class' => \App\Core\LLM\Providers\OpenRouterProvider::class,
                     'enabled' => !empty(getenv('OPENROUTER_API_KEY')),
@@ -130,8 +134,8 @@ final class LLMRouter
             ],
             'models' => [],
             'routing' => [
-                'primary' => 'openrouter',
-                'secondary' => 'deepseek',
+                'primary' => 'mistral',
+                'secondary' => 'openrouter',
             ],
             'limits' => ['timeout' => 20, 'max_tokens' => 600],
         ];
@@ -142,23 +146,25 @@ final class LLMRouter
         $mode = $this->resolveProviderMode($options);
         $order = [];
 
-        if (in_array($mode, ['groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
+        if (in_array($mode, ['mistral', 'groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
             $order[] = $mode;
         } else {
             $routing = is_array($this->config['routing'] ?? null) ? (array) $this->config['routing'] : [];
             $primary = strtolower(trim((string) ($routing['primary'] ?? 'openrouter')));
             $secondary = strtolower(trim((string) ($routing['secondary'] ?? 'deepseek')));
             foreach ([$primary, $secondary] as $preferredProvider) {
-                if (in_array($preferredProvider, ['groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
+                if (in_array($preferredProvider, ['mistral', 'groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
                     $order[] = $preferredProvider;
                 }
             }
             $latency = (int) ($policy['latency_budget_ms'] ?? 1200);
             if ($latency <= 1200) {
+                $order[] = 'mistral';
                 $order[] = 'openrouter';
                 $order[] = 'deepseek';
             } else {
                 $order[] = 'deepseek';
+                $order[] = 'mistral';
                 $order[] = 'openrouter';
             }
         }
@@ -189,7 +195,7 @@ final class LLMRouter
 
         foreach ($candidates as $candidate) {
             $mode = strtolower(trim((string) $candidate));
-            if (in_array($mode, ['auto', 'groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
+            if (in_array($mode, ['auto', 'mistral', 'groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
                 return $mode;
             }
         }
@@ -212,6 +218,11 @@ final class LLMRouter
 
     private function systemPrompt(array $policy): string
     {
+        // Permitir que el agente inyecte su propio system prompt
+        $override = trim((string) ($policy['system_prompt_override'] ?? ''));
+        if ($override !== '') {
+            return $override;
+        }
         $strict = !empty($policy['requires_strict_json']);
         if ($strict) {
             return 'Responde solo con JSON valido. No uses markdown.';

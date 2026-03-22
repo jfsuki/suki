@@ -18,9 +18,14 @@ $hasGemini = trim((string) getenv('GEMINI_API_KEY')) !== '';
 $hasDeepSeek = trim((string) getenv('DEEPSEEK_API_KEY')) !== '';
 $hasOpenRouter = trim((string) getenv('OPENROUTER_API_KEY')) !== '';
 $hasClaude = trim((string) getenv('CLAUDE_API_KEY')) !== '';
+$hasMistral = trim((string) getenv('MISTRAL_API_KEY')) !== '';
 
 return [
     'providers' => [
+        'mistral' => [
+            'enabled' => $envFlag('MISTRAL_ENABLED', $hasMistral),
+            'class' => \App\Core\LLM\Providers\MistralProvider::class,
+        ],
         'groq' => [
             'enabled' => $envFlag('GROQ_ENABLED', $hasGroq),
             'class' => \App\Core\LLM\Providers\GroqProvider::class,

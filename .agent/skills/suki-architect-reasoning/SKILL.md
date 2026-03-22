@@ -40,6 +40,7 @@ When proposing a change, state:
 
 ## Red flags
 
+- rigid regex or `in_array` lists for Natural Language Processing (use Qdrant + LLM JSON)
 - new execution path outside `skills -> CommandBus -> PHP kernel`
 - cross-tenant reads or writes
 - direct SQL in app logic

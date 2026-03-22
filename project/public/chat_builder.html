@@ -1,755 +1,868 @@
 <!doctype html>
-<html lang="es">
+<html lang="es" data-theme="dark">
 <head>
-    <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Suki Builder Chat</title>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700&display=swap');
-        :root {
-            --bg: #f4fffb;
-            --panel: #ffffff;
-            --border: #e5e7eb;
-            --text: #0f172a;
-            --muted: #6b7280;
-            --primary: #14b8a6;
-            --primary-soft: #ccfbf1;
-            --shadow: 0 14px 34px rgba(15, 23, 42, 0.12);
-        }
-        * { box-sizing: border-box; font-family: 'Manrope', Arial, sans-serif; }
-        body {
-            margin: 0;
-            background:
-                radial-gradient(circle at 10% 10%, #ccfbf1, transparent 40%),
-                radial-gradient(circle at 90% 0%, #e0f2fe, transparent 35%),
-                linear-gradient(180deg, #f8fafc 0%, #ecfeff 100%);
-            color: var(--text);
-        }
-        header {
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 16px;
-            padding: 18px 24px;
-            background: rgba(255,255,255,0.9);
-            backdrop-filter: blur(12px);
-            border-bottom: 1px solid var(--border);
-            box-shadow: var(--shadow);
-        }
-        header h1 { margin: 0; font-size: 18px; }
-        header span { font-size: 12px; color: var(--muted); }
-        .badge {
-            background: var(--primary-soft);
-            color: #0f766e;
-            padding: 6px 12px;
-            border-radius: 999px;
-            font-size: 12px;
-        }
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-        .link-btn {
-            padding: 8px 12px;
-            border-radius: 999px;
-            border: 1px solid var(--border);
-            text-decoration: none;
-            font-size: 12px;
-            color: var(--text);
-            background: #ffffff;
-        }
-        .layout {
-            display: grid;
-            grid-template-columns: 260px 1fr 300px;
-            gap: 16px;
-            padding: 18px;
-            height: calc(100vh - 80px);
-            min-height: 0;
-        }
-        .panel {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 18px;
-            box-shadow: var(--shadow);
-            padding: 16px;
-            display: flex;
-            flex-direction: column;
-            min-height: 0;
-        }
-        .panel h3 {
-            font-size: 12px;
-            margin: 0 0 10px 0;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-            color: var(--muted);
-        }
-        .sessions { display: flex; flex-direction: column; gap: 10px; overflow-y: auto; }
-        .session {
-            padding: 10px 12px;
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            cursor: pointer;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-        }
-        .session.active { border-color: var(--primary); background: #f0fdfa; }
-        .dot { width: 8px; height: 8px; border-radius: 999px; background: var(--primary); }
-        .chat {
-            flex: 1;
-            min-height: 0;
-            overflow-y: auto;
-            padding: 12px;
-            border-radius: 16px;
-            background: #f8fafc;
-            border: 1px solid var(--border);
-            overscroll-behavior: contain;
-        }
-        .conversation-panel {
-            padding: 0;
-            overflow: hidden;
-        }
-        .conversation-shell {
-            display: flex;
-            flex-direction: column;
-            gap: 12px;
-            height: 100%;
-            min-height: 0;
-            padding: 16px;
-        }
-        .composer {
-            position: sticky;
-            bottom: 0;
-            z-index: 2;
-            margin-top: auto;
-            padding-top: 12px;
-            background: linear-gradient(180deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.96) 22%, rgba(255,255,255,1) 100%);
-        }
-        .composer .input-row:first-child { margin-top: 0; }
-        .bubble {
-            max-width: 75%;
-            padding: 12px 14px;
-            border-radius: 16px;
-            margin-bottom: 10px;
-            font-size: 13px;
-            line-height: 1.5;
-            white-space: pre-line;
-        }
-        .bubble.in { background: #ffffff; border: 1px solid var(--border); }
-        .bubble.out { background: #ccfbf1; margin-left: auto; }
-        .message-card {
-            display: flex;
-            flex-direction: column;
-            margin-bottom: 10px;
-        }
-        .message-card.out { align-items: flex-end; }
-        .message-card.in { align-items: flex-start; }
-        .bubble.inspectable { cursor: pointer; }
-        .bubble.inspectable.selected {
-            outline: 2px solid rgba(20, 184, 166, 0.45);
-            outline-offset: 2px;
-        }
-        .test-inspector {
-            margin-top: 12px;
-            padding: 10px 12px;
-            border-radius: 14px;
-            border: 1px dashed #99f6e4;
-            background: rgba(240, 253, 250, 0.92);
-            color: #134e4a;
-            font-size: 11px;
-        }
-        .test-inspector summary {
-            cursor: pointer;
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            color: #0f766e;
-        }
-        .test-inspector[hidden] { display: none; }
-        .test-title {
-            font-size: 10px;
-            font-weight: 700;
-            letter-spacing: 0.08em;
-            text-transform: uppercase;
-            margin-bottom: 8px;
-            color: #0f766e;
-        }
-        .test-empty {
-            margin-top: 10px;
-            color: #115e59;
-        }
-        .test-grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 6px 10px;
-            margin-top: 10px;
-        }
-        .test-row {
-            display: flex;
-            flex-direction: column;
-            gap: 2px;
-        }
-        .test-row strong {
-            font-size: 10px;
-            color: #115e59;
-        }
-        .toggle-row {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            font-size: 12px;
-            color: var(--text);
-        }
-        .toggle-row input { margin: 0; }
-        .input-row { display: flex; gap: 8px; margin-top: 10px; }
-        .input-row input[type="text"] {
-            flex: 1;
-            padding: 12px;
-            border: 1px solid var(--border);
-            border-radius: 12px;
-            font-size: 13px;
-        }
-        button {
-            padding: 12px 14px;
-            border: none;
-            border-radius: 12px;
-            background: var(--primary);
-            color: white;
-            font-size: 13px;
-            cursor: pointer;
-        }
-        button.secondary { background: #e2e8f0; color: var(--text); }
-        .meta { font-size: 11px; color: var(--muted); margin-top: 8px; }
-        .form-row { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-        .form-row label { font-size: 11px; color: var(--muted); }
-        .form-row input, .form-row select { padding: 10px; border:1px solid var(--border); border-radius: 10px; font-size: 12px; }
-        .status { font-size: 12px; padding: 8px 10px; border-radius: 10px; background: #ecfeff; color: #0f766e; }
-        .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
-        .chip { padding: 6px 10px; border-radius: 999px; background: var(--primary-soft); color: #0f766e; font-size: 11px; cursor: pointer; }
-        @media (max-width: 1100px) {
-            .layout { grid-template-columns: 1fr; height: auto; min-height: calc(100vh - 80px); }
-            .conversation-panel { min-height: 68vh; }
-        }
-    </style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="SUKI Builder — Crea tu app empresarial por conversación">
+  <title>SUKI Builder · Web App OS</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    /* ─── TOKENS ────────────────────────────────────────────────── */
+    :root {
+      --bg:            #0a0f1e;
+      --surface:       #111827;
+      --surface2:      #1a2235;
+      --border:        rgba(255,255,255,0.07);
+      --glow:          rgba(139, 92, 246, 0.35);
+      --text:          #e2e8f0;
+      --muted:         #64748b;
+      --accent:        #8b5cf6;
+      --accent-soft:   rgba(139,92,246,0.12);
+      --teal:          #14b8a6;
+      --teal-soft:     rgba(20,184,166,0.12);
+      --danger:        #ef4444;
+      --success:       #22c55e;
+      --warn:          #f59e0b;
+      --radius:        14px;
+      --radius-sm:     8px;
+      --shadow:        0 20px 60px rgba(0,0,0,0.5);
+      --font:          'Inter', system-ui, sans-serif;
+      --transition:    0.22s cubic-bezier(0.4,0,0.2,1);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background-image:
+        radial-gradient(ellipse 80% 60% at 10% -10%, rgba(139,92,246,0.18) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 90% 110%, rgba(20,184,166,0.12) 0%, transparent 50%);
+    }
+
+    /* ─── NAV ─────────────────────────────────────────────────── */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 22px;
+      height: 58px;
+      flex-shrink: 0;
+      border-bottom: 1px solid var(--border);
+      background: rgba(10,15,30,0.85);
+      backdrop-filter: blur(20px);
+      -webkit-backdrop-filter: blur(20px);
+      z-index: 100;
+    }
+    .nav-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 15px;
+      letter-spacing: -0.3px;
+    }
+    .nav-logo {
+      width: 30px; height: 30px;
+      background: linear-gradient(135deg, var(--accent) 0%, var(--teal) 100%);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 14px;
+      box-shadow: 0 0 14px var(--glow);
+    }
+    .nav-badge {
+      background: var(--accent-soft);
+      color: var(--accent);
+      border: 1px solid rgba(139,92,246,0.25);
+      font-size: 10px;
+      font-weight: 600;
+      padding: 2px 8px;
+      border-radius: 999px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+    .nav-actions { display: flex; align-items: center; gap: 8px; }
+    .nav-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 12px;
+      font-weight: 500;
+      padding: 6px 14px;
+      border-radius: 999px;
+      cursor: pointer;
+      text-decoration: none;
+      transition: var(--transition);
+      display: flex; align-items: center; gap: 5px;
+    }
+    .nav-btn:hover { background: var(--surface); border-color: var(--accent); color: var(--accent); }
+    .nav-btn.primary {
+      background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+      border-color: transparent; color: #fff;
+      box-shadow: 0 0 18px var(--glow);
+    }
+    .nav-btn.primary:hover { opacity: 0.88; }
+
+    /* ─── LAYOUT ──────────────────────────────────────────────── */
+    .layout {
+      display: grid;
+      grid-template-columns: 260px 1fr 300px;
+      gap: 12px;
+      padding: 12px;
+      flex: 1;
+      min-height: 0;
+    }
+    .panel {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+      overflow: hidden;
+      transition: var(--transition);
+    }
+    .panel-head {
+      padding: 14px 16px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      flex-shrink: 0;
+    }
+    .panel-icon {
+      width: 28px; height: 28px;
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+    }
+    .panel-icon.purple { background: var(--accent-soft); }
+    .panel-icon.teal   { background: var(--teal-soft); }
+    .panel-icon.slate  { background: rgba(100,116,139,0.15); }
+    .panel-head h3 {
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--text);
+      flex: 1;
+      letter-spacing: 0.2px;
+    }
+    .panel-body { flex: 1; overflow-y: auto; padding: 12px 14px; min-height: 0; }
+    .panel-body::-webkit-scrollbar { width: 4px; }
+    .panel-body::-webkit-scrollbar-track { background: transparent; }
+    .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ─── PIPELINE STATUS ────────────────────────────────────── */
+    .pipeline-steps { display: flex; flex-direction: column; gap: 6px; }
+    .step {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      padding: 9px 11px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      font-weight: 500;
+      border: 1px solid transparent;
+      transition: var(--transition);
+      cursor: default;
+    }
+    .step .dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: var(--muted);
+      flex-shrink: 0;
+      transition: var(--transition);
+    }
+    .step.active {
+      background: var(--accent-soft);
+      border-color: rgba(139,92,246,0.2);
+      color: var(--accent);
+    }
+    .step.active .dot { background: var(--accent); box-shadow: 0 0 8px var(--accent); animation: pulse 1.4s infinite; }
+    .step.done   { color: var(--success); }
+    .step.done .dot { background: var(--success); }
+    .step.skip   { opacity: 0.35; }
+    @keyframes pulse {
+      0%,100% { opacity:1; transform:scale(1); }
+      50%      { opacity:.5; transform:scale(1.35); }
+    }
+    .step-label { flex: 1; }
+    .step-time { font-size: 10px; color: var(--muted); }
+
+    /* ─── ENTITY LIST ─────────────────────────────────────────── */
+    .entity-list { display: flex; flex-direction: column; gap: 6px; }
+    .entity-item {
+      padding: 9px 11px;
+      border-radius: var(--radius-sm);
+      font-size: 12px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      display: flex; align-items: center; gap: 8px;
+      transition: var(--transition);
+    }
+    .entity-item:hover { border-color: var(--accent); }
+    .entity-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--teal); flex-shrink: 0; }
+    .entity-name { flex: 1; font-weight: 500; }
+    .entity-badge {
+      font-size: 10px; padding: 1px 6px;
+      border-radius: 999px; background: var(--teal-soft);
+      color: var(--teal); font-weight: 600;
+    }
+    .empty-hint {
+      text-align: center; color: var(--muted);
+      font-size: 12px; padding: 24px 8px; line-height: 1.6;
+    }
+    .empty-hint .icon { font-size: 28px; margin-bottom: 8px; display: block; }
+
+    /* ─── CHAT ────────────────────────────────────────────────── */
+    .chat-panel {
+      display: flex;
+      flex-direction: column;
+      min-height: 0;
+    }
+    .chat-messages {
+      flex: 1; overflow-y: auto;
+      padding: 16px;
+      display: flex; flex-direction: column; gap: 12px;
+      min-height: 0;
+      scroll-behavior: smooth;
+    }
+    .chat-messages::-webkit-scrollbar { width: 4px; }
+    .chat-messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+    .msg {
+      display: flex; gap: 10px; max-width: 85%;
+      animation: msgIn 0.28s cubic-bezier(0.34,1.56,0.64,1) both;
+    }
+    @keyframes msgIn {
+      from { opacity:0; transform:translateY(10px) scale(0.97); }
+      to   { opacity:1; transform:translateY(0) scale(1); }
+    }
+    .msg.user { align-self: flex-end; flex-direction: row-reverse; }
+    .msg-avatar {
+      width: 30px; height: 30px; border-radius: 9px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 13px; flex-shrink: 0; font-weight: 600;
+    }
+    .msg.user .msg-avatar {
+      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      color: #fff; box-shadow: 0 0 12px var(--glow);
+    }
+    .msg.bot .msg-avatar {
+      background: var(--teal-soft);
+      color: var(--teal);
+      border: 1px solid rgba(20,184,166,0.25);
+    }
+    .msg-bubble {
+      padding: 11px 14px;
+      border-radius: 14px;
+      font-size: 13.5px;
+      line-height: 1.65;
+    }
+    .msg.user .msg-bubble {
+      background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+      color: #fff;
+      border-radius: 14px 4px 14px 14px;
+      box-shadow: 0 4px 20px var(--glow);
+    }
+    .msg.bot .msg-bubble {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text);
+      border-radius: 4px 14px 14px 14px;
+    }
+    .msg-meta { font-size: 10px; color: var(--muted); margin-top: 4px; }
+    .msg.user .msg-meta { text-align: right; }
+
+    /* Typing indicator */
+    .typing-bubble {
+      display: flex; align-items: center; gap: 5px;
+      padding: 12px 16px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 4px 14px 14px 14px;
+      width: fit-content;
+    }
+    .typing-bubble span {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--accent); animation: bounce 1.2s infinite;
+    }
+    .typing-bubble span:nth-child(2) { animation-delay: 0.2s; }
+    .typing-bubble span:nth-child(3) { animation-delay: 0.4s; }
+    @keyframes bounce {
+      0%,60%,100% { transform:translateY(0); opacity:.5; }
+      30%          { transform:translateY(-5px); opacity:1; }
+    }
+
+    /* ─── INPUT BAR ──────────────────────────────────────────── */
+    .chat-input-wrap {
+      padding: 12px 14px;
+      border-top: 1px solid var(--border);
+      flex-shrink: 0;
+      background: var(--surface);
+    }
+    .chat-input-row {
+      display: flex; align-items: flex-end; gap: 8px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 8px 8px 8px 14px;
+      transition: var(--transition);
+    }
+    .chat-input-row:focus-within {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(139,92,246,0.12);
+    }
+    #chatInput {
+      flex: 1;
+      background: none; border: none; outline: none;
+      color: var(--text); font-family: var(--font);
+      font-size: 13.5px; resize: none;
+      max-height: 120px; min-height: 20px; overflow-y: auto;
+      line-height: 1.5;
+    }
+    #chatInput::placeholder { color: var(--muted); }
+    #sendBtn {
+      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      border: none; border-radius: 10px;
+      width: 36px; height: 36px; flex-shrink: 0;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      font-size: 15px; color: #fff;
+      box-shadow: 0 0 14px var(--glow);
+      transition: var(--transition);
+    }
+    #sendBtn:hover { transform: scale(1.08); }
+    #sendBtn:active { transform: scale(0.95); }
+    #sendBtn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+    .input-hint { font-size: 10px; color: var(--muted); margin-top: 7px; text-align: center; }
+
+    /* ─── METRICS PANEL ──────────────────────────────────────── */
+    .metrics-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 12px; }
+    .metric-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
+    }
+    .metric-val { font-size: 20px; font-weight: 700; color: var(--text); line-height: 1; margin-bottom: 3px; }
+    .metric-val.accent { color: var(--accent); }
+    .metric-val.teal   { color: var(--teal); }
+    .metric-val.warn   { color: var(--warn); }
+    .metric-val.success { color: var(--success); }
+    .metric-lbl { font-size: 10px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+    .section-lbl {
+      font-size: 10px; font-weight: 600; color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.8px;
+      margin: 14px 0 8px;
+    }
+
+    /* route path trace */
+    .route-trace {
+      display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 12px;
+    }
+    .route-step {
+      font-size: 10px; font-weight: 600; padding: 3px 8px;
+      border-radius: 999px;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      text-transform: uppercase; letter-spacing: 0.5px;
+    }
+    .route-step.active { background: var(--accent-soft); border-color: rgba(139,92,246,0.3); color: var(--accent); }
+
+    /* agent orquestrator badge */
+    .orchestrator-badge {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--accent-soft);
+      border: 1px solid rgba(139,92,246,0.2);
+      border-radius: var(--radius-sm);
+      padding: 9px 11px;
+      margin-bottom: 10px;
+    }
+    .orchestrator-badge .ob-dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 8px var(--accent);
+      animation: pulse 2s infinite;
+      flex-shrink: 0;
+    }
+    .orchestrator-badge .ob-text { font-size: 11px; color: var(--accent); font-weight: 600; }
+    .orchestrator-badge .ob-sub  { font-size: 10px; color: var(--muted); }
+
+    /* test mode toggle */
+    .test-toggle {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 9px 11px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius-sm); margin-bottom: 10px;
+      font-size: 11px; font-weight: 500; caption-side
+    }
+    .toggle-switch {
+      position: relative; width: 34px; height: 18px;
+    }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider {
+      position: absolute; inset: 0;
+      background: var(--surface); border-radius: 9px; cursor: pointer;
+      transition: var(--transition); border: 1px solid var(--border);
+    }
+    .toggle-slider::before {
+      content: '';
+      position: absolute; width: 12px; height: 12px;
+      border-radius: 50%; left: 2px; bottom: 2px;
+      background: var(--muted); transition: var(--transition);
+    }
+    .toggle-switch input:checked + .toggle-slider { background: var(--accent-soft); border-color: var(--accent); }
+    .toggle-switch input:checked + .toggle-slider::before {
+      background: var(--accent); transform: translateX(16px);
+      box-shadow: 0 0 6px var(--accent);
+    }
+
+    /* responsive */
+    @media (max-width: 900px) {
+      .layout { grid-template-columns: 1fr; }
+      .layout > *:not(.chat-panel) { display: none; }
+    }
+  </style>
 </head>
 <body>
-    <header>
-        <div>
-            <h1>Suki - Chat Creador</h1>
-            <span>Modo creador (tablas, formularios, contratos)</span>
-        </div>
-        <div class="header-actions">
-            <a class="link-btn" href="chat_app.html">Ir al chat de la app</a>
-            <div class="badge">Modo BUILD</div>
-        </div>
-    </header>
 
-    <div class="layout">
-        <div class="panel">
-            <h3>Sesiones</h3>
-            <div class="sessions" id="sessions"></div>
-            <div class="input-row">
-                <button class="secondary" id="newSession">Nueva sesion</button>
-            </div>
-        </div>
+<!-- NAV -->
+<nav>
+  <div class="nav-brand">
+    <div class="nav-logo">⚡</div>
+    SUKI
+    <span class="nav-badge">Builder</span>
+  </div>
+  <div class="nav-actions">
+    <a href="chat_app.html" class="nav-btn">🚀 Ir al App</a>
+    <a href="#" class="nav-btn primary" id="testModeNav">🧪 Test Mode</a>
+  </div>
+</nav>
 
-        <div class="panel conversation-panel">
-            <div class="conversation-shell">
-                <h3>Conversacion</h3>
-                <div class="chat" id="chat"></div>
-                <div class="composer">
-                    <div class="chips" id="quickChips"></div>
-                    <div class="input-row">
-                        <input type="text" id="message" placeholder="Ej: crear tabla clientes nombre:texto nit:texto" />
-                        <button id="send">Enviar</button>
-                    </div>
-                    <div class="input-row">
-                        <input type="file" id="file" />
-                        <button class="secondary" id="sendFile">Enviar archivo</button>
-                    </div>
-                    <div class="meta">Canal simulado: /api/chat/message | Probar sistema: /api/chat/acid-test</div>
-                </div>
-            </div>
-        </div>
+<!-- MAIN LAYOUT -->
+<div class="layout">
 
-        <div class="panel">
-            <h3>Configuracion</h3>
-            <div class="form-row">
-                <label>Canal</label>
-                <select id="channel">
-                    <option value="telegram">Telegram</option>
-                    <option value="whatsapp">WhatsApp</option>
-                    <option value="local">Local</option>
-                </select>
-            </div>
-            <div class="form-row">
-                <label>User ID</label>
-                <input type="text" id="userId" value="builder_demo" />
-            </div>
-            <div class="form-row">
-                <label>Rol</label>
-                <select id="role">
-                    <option value="admin">Administrador</option>
-                    <option value="builder">Creador</option>
-                </select>
-            </div>
-            <div class="form-row">
-                <label>Tenant ID</label>
-                <input type="text" id="tenantId" value="default" />
-            </div>
-            <div class="form-row">
-                <label>Project ID</label>
-                <input type="text" id="projectId" value="" placeholder="(opcional)" />
-            </div>
-            <div class="form-row">
-                <label>Session ID</label>
-                <input type="text" id="sessionId" />
-            </div>
-            <div class="form-row">
-                <label>API Base</label>
-                <input type="text" id="apiBase" value="" placeholder="(vacio = mismo host)" />
-            </div>
-            <div class="form-row">
-                <label class="toggle-row"><input type="checkbox" id="testMode" /> Activar TEST MODE</label>
-                <div class="meta">Muestra route_path, embeddings, Qdrant, LLM y agentes reales.</div>
-            </div>
-            <details class="test-inspector" id="testInspector" hidden>
-                <summary>Inspector tecnico</summary>
-                <div class="meta" id="testInspectorMeta">Selecciona una respuesta para ver la traza tecnica real.</div>
-                <div class="test-grid" id="testInspectorGrid"></div>
-                <div class="test-empty" id="testInspectorEmpty">Todavia no hay trazas para esta sesion.</div>
-            </details>
-            <div class="status" id="statusText">Lista para construir</div>
-            <div class="status" id="qualityText" style="margin-top:8px;background:#eef2ff;color:#1d4ed8;">Calidad conversacional: cargando...</div>
-            <div class="input-row">
-                <button class="secondary" id="refreshQuality">Actualizar calidad</button>
-            </div>
-            <div class="meta" id="qualityMeta"></div>
-        </div>
+  <!-- PANEL IZQUIERDO: Entidades del proyecto -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-icon teal">📦</div>
+      <h3>Proyecto Activo</h3>
     </div>
+    <div class="panel-body">
+      <div class="section-lbl">Tablas creadas</div>
+      <div class="entity-list" id="entityList">
+        <div class="empty-hint">
+          <span class="icon">✨</span>
+          Aún no hay tablas.<br>Dile a SUKI qué tipo de negocio tienes.
+        </div>
+      </div>
 
-    <script>
-        const MODE = 'builder';
-        const sessionsEl = document.getElementById('sessions');
-        const chatEl = document.getElementById('chat');
-        const messageEl = document.getElementById('message');
-        const sendEl = document.getElementById('send');
-        const channelEl = document.getElementById('channel');
-        const userIdEl = document.getElementById('userId');
-        const sessionIdEl = document.getElementById('sessionId');
-        const apiBaseEl = document.getElementById('apiBase');
-        const fileEl = document.getElementById('file');
-        const sendFileEl = document.getElementById('sendFile');
-        const roleEl = document.getElementById('role');
-        const statusEl = document.getElementById('statusText');
-        const qualityTextEl = document.getElementById('qualityText');
-        const qualityMetaEl = document.getElementById('qualityMeta');
-        const tenantIdEl = document.getElementById('tenantId');
-        const projectIdEl = document.getElementById('projectId');
-        const chipsEl = document.getElementById('quickChips');
-        const testModeEl = document.getElementById('testMode');
-        const testInspectorEl = document.getElementById('testInspector');
-        const testInspectorMetaEl = document.getElementById('testInspectorMeta');
-        const testInspectorGridEl = document.getElementById('testInspectorGrid');
-        const testInspectorEmptyEl = document.getElementById('testInspectorEmpty');
+      <div class="section-lbl" id="formSectionLbl" style="display:none">Formularios</div>
+      <div class="entity-list" id="formList"></div>
+    </div>
+  </div>
 
-        let sessions = [];
+  <!-- PANEL CENTRO: Chat -->
+  <div class="panel chat-panel">
+    <div class="panel-head">
+      <div class="panel-icon purple">💬</div>
+      <h3>Chat con SUKI Builder</h3>
+    </div>
+    <div class="chat-messages" id="chatMessages">
+      <!-- Welcome -->
+      <div class="msg bot">
+        <div class="msg-avatar">S</div>
+        <div>
+          <div class="msg-bubble">
+            👋 Hola, soy <strong>Cami</strong>, tu asistente de construcción.<br><br>
+            ¿Qué tipo de negocio quieres crear? Dímelo en una frase y lo armamos juntos. 🚀
+          </div>
+          <div class="msg-meta">0ms · cache · agente: builder_onboarding</div>
+        </div>
+      </div>
+    </div>
+    <div class="chat-input-wrap">
+      <div class="chat-input-row">
+        <textarea id="chatInput" placeholder="Ej: tienda de ropa con inventario y ventas..."
+          rows="1" autocomplete="off"></textarea>
+        <button id="sendBtn" title="Enviar">➤</button>
+      </div>
+      <div class="input-hint">Enter para enviar · Shift+Enter nueva línea</div>
+    </div>
+  </div>
 
-        function loadSettings() {
-            const saved = JSON.parse(localStorage.getItem('suki_chat_builder_settings') || '{}');
-            if (saved.userId) userIdEl.value = saved.userId;
-            if (saved.role) roleEl.value = saved.role;
-            if (saved.tenantId) tenantIdEl.value = saved.tenantId;
-            if (saved.projectId) projectIdEl.value = saved.projectId;
-            if (saved.channel) channelEl.value = saved.channel;
-            if (saved.apiBase !== undefined) apiBaseEl.value = saved.apiBase;
-            testModeEl.checked = !!saved.testMode;
-            loadQuickChips();
-        }
+  <!-- PANEL DERECHO: Métricas y pipeline -->
+  <div class="panel">
+    <div class="panel-head">
+      <div class="panel-icon slate">📊</div>
+      <h3>Orquestador</h3>
+    </div>
+    <div class="panel-body">
 
-        function saveSettings() {
-            const payload = {
-                userId: userIdEl.value.trim(),
-                role: roleEl.value,
-                tenantId: tenantIdEl.value.trim(),
-                projectId: projectIdEl.value.trim(),
-                channel: channelEl.value,
-                apiBase: apiBaseEl.value.trim(),
-                testMode: testModeEl.checked,
-            };
-            localStorage.setItem('suki_chat_builder_settings', JSON.stringify(payload));
-        }
+      <!-- Orchestrator status -->
+      <div class="orchestrator-badge">
+        <div class="ob-dot"></div>
+        <div>
+          <div class="ob-text">ChatOrchestrator v2</div>
+          <div class="ob-sub">Multi-Agent Pipeline · CrewAI</div>
+        </div>
+      </div>
 
-        function apiBase() {
-            const raw = apiBaseEl.value.trim();
-            if (raw) return raw.replace(/\/+$/, '');
-            const path = window.location.pathname || '';
-            const marker = '/project/public/';
-            const idx = path.indexOf(marker);
-            if (idx >= 0) {
-                return (window.location.origin + path.substring(0, idx + marker.length - 1)).replace(/\/+$/, '');
-            }
-            return window.location.origin;
-        }
+      <!-- Test mode toggle -->
+      <div class="test-toggle">
+        <span>🧪 Inspector técnico</span>
+        <label class="toggle-switch">
+          <input type="checkbox" id="testModeToggle">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
 
-        function addChip(label, msg = '', action = '') {
-            const chip = document.createElement('div');
-            chip.className = 'chip';
-            if (msg) chip.dataset.msg = msg;
-            if (action) chip.dataset.action = action;
-            chip.textContent = label;
-            chip.addEventListener('click', () => {
-                const act = chip.dataset.action || '';
-                const message = chip.dataset.msg || '';
-                if (act === 'help') {
-                    fetchHelp();
-                    return;
-                }
-                if (act === 'acid') {
-                    runAcidTest();
-                    return;
-                }
-                if (message) {
-                    messageEl.value = message;
-                    messageEl.focus();
-                    sendMessage();
-                }
-            });
-            chipsEl.appendChild(chip);
-        }
+      <!-- Métricas -->
+      <div class="metrics-grid">
+        <div class="metric-card">
+          <div class="metric-val accent" id="mMsgs">0</div>
+          <div class="metric-lbl">Mensajes</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val teal" id="mTokens">0</div>
+          <div class="metric-lbl">Tokens</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val success" id="mCache">0</div>
+          <div class="metric-lbl">Cache Hits</div>
+        </div>
+        <div class="metric-card">
+          <div class="metric-val warn" id="mLatency">—</div>
+          <div class="metric-lbl">P95 ms</div>
+        </div>
+      </div>
 
-        async function loadQuickChips() {
-            chipsEl.innerHTML = '';
-            addChip('Ayuda viva', '', 'help');
-            addChip('Crear tabla', 'crear tabla clientes nombre:texto nit:texto', '');
-            addChip('Probar sistema', '', 'acid');
-            try {
-                const res = await fetch(apiBase() + '/api/registry/entities');
-                if (!res.ok) return;
-                const json = await res.json();
-                const entities = (json.data && json.data.entities) ? json.data.entities : (json.entities || []);
-                if (!Array.isArray(entities) || entities.length === 0) {
-                    return;
-                }
-                const ent = entities[0];
-                if (ent && ent.name) {
-                    const label = ent.label || ent.name;
-                    addChip('Crear formulario ' + label, 'crear formulario ' + ent.name, '');
-                }
-            } catch (e) {
-                // ignore
-            }
-        }
+      <!-- Route path -->
+      <div class="section-lbl">Último Route Path</div>
+      <div class="route-trace" id="routeTrace">
+        <span class="route-step">cache</span>
+        <span class="route-step">rules</span>
+        <span class="route-step">rag</span>
+        <span class="route-step">tools</span>
+        <span class="route-step">llm</span>
+      </div>
 
-        async function loadQuality() {
-            const tenantId = tenantIdEl.value.trim() || 'default';
-            const projectId = projectIdEl.value.trim();
-            const qs = new URLSearchParams({
-                tenant_id: tenantId,
-                days: '7',
-            });
-            if (projectId) {
-                qs.set('project_id', projectId);
-            }
-            try {
-                const res = await fetch(apiBase() + '/api/chat/quality?' + qs.toString());
-                const json = await res.json();
-                const report = json.data && json.data.report ? json.data.report : null;
-                if (!report || !report.summary) {
-                    qualityTextEl.textContent = 'Calidad conversacional: sin datos';
-                    qualityMetaEl.textContent = '';
-                    return;
-                }
-                const s = report.summary;
-                const ops = report.ops_summary || {};
-                const i = ops.intent_metrics || {};
-                const c = ops.command_metrics || {};
-                qualityTextEl.textContent = `Calidad: ${s.success_rate}% exito | ${s.unresolved_intents} no resueltas | p95 intent ${i.p95_latency_ms || 0}ms | p95 cmd ${c.p95_latency_ms || 0}ms`;
-                const top = Array.isArray(report.unresolved_top) ? report.unresolved_top.slice(0, 3) : [];
-                const opsLine = `Guardrails: ${c.blocked || 0} bloqueos | Fallback LLM: ${i.fallback_llm || 0} | Tokens: ${(ops.token_usage && ops.token_usage.total_tokens) || 0}`;
-                qualityMetaEl.textContent = top.length
-                    ? ('Pendientes frecuentes: ' + top.map(x => `"${x.message}" (${x.count})`).join(' | ') + ' | ' + opsLine)
-                    : ('Sin pendientes frecuentes. ' + opsLine);
-            } catch (e) {
-                qualityTextEl.textContent = 'Calidad conversacional: error';
-                qualityMetaEl.textContent = '';
-            }
-        }
+      <!-- Pipeline steps -->
+      <div class="section-lbl">Pipeline en tiempo real</div>
+      <div class="pipeline-steps">
+        <div class="step" id="ps-cache">
+          <div class="dot"></div>
+          <span class="step-label">1. Semantic Cache</span>
+          <span class="step-time" id="ps-cache-t">—</span>
+        </div>
+        <div class="step" id="ps-budget">
+          <div class="dot"></div>
+          <span class="step-label">2. Token Budget</span>
+          <span class="step-time" id="ps-budget-t">—</span>
+        </div>
+        <div class="step" id="ps-qdrant">
+          <div class="dot"></div>
+          <span class="step-label">3. Qdrant Classifier</span>
+          <span class="step-time" id="ps-qdrant-t">—</span>
+        </div>
+        <div class="step" id="ps-process">
+          <div class="dot"></div>
+          <span class="step-label">4. Agent Process</span>
+          <span class="step-time" id="ps-process-t">—</span>
+        </div>
+        <div class="step" id="ps-kernel">
+          <div class="dot"></div>
+          <span class="step-label">5. PHP Kernel</span>
+          <span class="step-time" id="ps-kernel-t">—</span>
+        </div>
+      </div>
 
-        function basePayload(session) {
-            return {
-                mode: MODE,
-                channel: channelEl.value,
-                user_id: userIdEl.value.trim() || 'builder_demo',
-                role: roleEl.value,
-                tenant_id: tenantIdEl.value.trim() || 'default',
-                project_id: projectIdEl.value.trim() || '',
-                session_id: session.id,
-                test_mode: testModeEl.checked,
-            };
-        }
+      <!-- Test info box (visible en test mode) -->
+      <div id="testInfoBox" style="display:none; margin-top:12px;">
+        <div class="section-lbl">Debug Info</div>
+        <pre id="testInfoPre" style="font-size:10px; color:var(--muted); background:var(--surface2);
+          border:1px solid var(--border); border-radius:8px; padding:10px; overflow:auto; max-height:200px;
+          white-space:pre-wrap; word-break:break-all; line-height:1.5;"></pre>
+      </div>
 
-        function addSession(id) {
-            sessions.push({ id, messages: [], selectedTestIndex: null });
-            renderSessions();
-            selectSession(id);
-        }
+    </div>
+  </div>
+</div>
 
-        function selectSession(id) {
-            sessionIdEl.value = id;
-            renderSessions();
-            renderChat();
-        }
+<script>
+// ════════════════════════════════════════════
+// SUKI Builder Chat — v2 Multi-Agent Pipeline
+// ════════════════════════════════════════════
+(function() {
+  const input      = document.getElementById('chatInput');
+  const sendBtn    = document.getElementById('sendBtn');
+  const messages   = document.getElementById('chatMessages');
+  const testToggle = document.getElementById('testModeToggle');
+  const testNav    = document.getElementById('testModeNav');
+  const testBox    = document.getElementById('testInfoBox');
+  const testPre    = document.getElementById('testInfoPre');
+  const entityList = document.getElementById('entityList');
+  const formList   = document.getElementById('formList');
 
-        function currentSession() {
-            const id = sessionIdEl.value.trim();
-            return sessions.find(s => s.id === id);
-        }
+  // Counters
+  let msgCount   = 0;
+  let tokenCount = 0;
+  let cacheHits  = 0;
+  let latencies  = [];
 
-        function renderSessions() {
-            sessionsEl.innerHTML = '';
-            sessions.forEach(s => {
-                const div = document.createElement('div');
-                div.className = 'session' + (s.id === sessionIdEl.value.trim() ? ' active' : '');
-                div.innerHTML = '<span class="dot"></span>' + s.id;
-                div.onclick = () => selectSession(s.id);
-                sessionsEl.appendChild(div);
-            });
-        }
+  // Config
+  const API_URL   = '../api/chat/message';
+  const MODE      = 'builder';
+  const TENANT_ID = _cfg('tenant_id', 'demo');
+  const USER_ID   = _cfg('user_id',   'admin');
+  const PROJECT_ID = _cfg('project_id', 'default');
 
-        function renderChat() {
-            const session = currentSession();
-            chatEl.innerHTML = '';
-            if (!session) {
-                updateTestInspector();
-                return;
-            }
-            session.messages.forEach((m, index) => {
-                const card = document.createElement('div');
-                card.className = 'message-card ' + (m.dir === 'in' ? 'in' : 'out');
-                const bubble = document.createElement('div');
-                bubble.className = 'bubble ' + (m.dir === 'in' ? 'in' : 'out');
-                bubble.textContent = m.text;
-                if (m.dir === 'out' && m.testInfo && testModeEl.checked) {
-                    bubble.classList.add('inspectable');
-                    if (session.selectedTestIndex === index) {
-                        bubble.classList.add('selected');
-                    }
-                    bubble.title = 'Ver traza tecnica';
-                    bubble.addEventListener('click', () => {
-                        session.selectedTestIndex = index;
-                        renderChat();
-                    });
-                }
-                card.appendChild(bubble);
-                chatEl.appendChild(card);
-            });
-            chatEl.scrollTop = chatEl.scrollHeight;
-            updateTestInspector();
-        }
+  function _cfg(k, def) {
+    const m = document.cookie.match(new RegExp('(?:^|;)\\s*' + k + '=([^;]*)'));
+    return m ? decodeURIComponent(m[1]) : def;
+  }
 
-        function buildTestRows(info) {
-            return [
-                ['route_path', info.route_path || 'unknown'],
-                ['classification', info.classification || 'unknown'],
-                ['action', info.action || 'unknown'],
-                ['resolved_locally', String(!!info.resolved_locally)],
-                ['llm', info.llm_model ? `${info.llm_provider || 'llm'} / ${info.llm_model}` : (info.llm_provider || 'none')],
-                ['llm_error', info.llm_error || 'none'],
-                ['provider_statuses', info.provider_statuses && Object.keys(info.provider_statuses).length ? JSON.stringify(info.provider_statuses) : 'none'],
-                ['embeddings', info.embeddings_used ? `si / ${info.embedding_model || 'unknown'} / ${info.embedding_dimensions || 0}d` : 'no'],
-                ['Qdrant', info.collection ? `si / ${info.collection} / hits=${info.hits || 0}` : 'no'],
-                ['evidence_count', String(info.evidence_count || 0)],
-                ['semantic_fallback_used', String(!!info.semantic_fallback_used)],
-                ['agents_used', Array.isArray(info.agents_used) && info.agents_used.length ? info.agents_used.join(', ') : 'none'],
-                ['route_reason', info.route_reason || 'unknown'],
-            ];
-        }
+  // ── Test mode ─────────────────────────────
+  function setTestMode(on) {
+    testBox.style.display = on ? 'block' : 'none';
+    testNav.textContent   = on ? '✅ Test ON' : '🧪 Test Mode';
+  }
+  testToggle.addEventListener('change', () => setTestMode(testToggle.checked));
+  testNav.addEventListener('click', (e) => {
+    e.preventDefault();
+    testToggle.checked = !testToggle.checked;
+    setTestMode(testToggle.checked);
+  });
 
-        function resolveSelectedTestIndex(session) {
-            if (!session) return -1;
-            if (
-                Number.isInteger(session.selectedTestIndex)
-                && session.selectedTestIndex >= 0
-                && session.messages[session.selectedTestIndex]
-                && session.messages[session.selectedTestIndex].testInfo
-            ) {
-                return session.selectedTestIndex;
-            }
-            for (let i = session.messages.length - 1; i >= 0; i -= 1) {
-                const msg = session.messages[i];
-                if (msg && msg.dir === 'out' && msg.testInfo) {
-                    return i;
-                }
-            }
-            return -1;
-        }
+  // ── Pipeline animation ─────────────────────
+  function resetPipeline() {
+    ['ps-cache','ps-budget','ps-qdrant','ps-process','ps-kernel'].forEach(id => {
+      const el = document.getElementById(id);
+      el.className = 'step';
+      document.getElementById(id+'-t').textContent = '—';
+    });
+  }
+  function activateStep(id) {
+    const el = document.getElementById(id);
+    if (el) el.className = 'step active';
+  }
+  function doneStep(id, ms) {
+    const el = document.getElementById(id);
+    if (el) {
+      el.className = 'step done';
+      document.getElementById(id+'-t').textContent = ms ? ms+'ms' : '✓';
+    }
+  }
+  function skipStep(id) {
+    const el = document.getElementById(id);
+    if (el) el.className = 'step skip';
+  }
 
-        function updateTestInspector() {
-            const session = currentSession();
-            if (!testModeEl.checked) {
-                testInspectorEl.hidden = true;
-                testInspectorGridEl.innerHTML = '';
-                testInspectorMetaEl.textContent = 'Selecciona una respuesta para ver la traza tecnica real.';
-                testInspectorEmptyEl.hidden = false;
-                return;
-            }
+  // ── Route trace ───────────────────────────
+  function renderRoutePath(path) {
+    const trace = document.getElementById('routeTrace');
+    const steps = ['cache','rules','rag','tools','llm'];
+    const reached = path ? path.split('>').map(s => s.trim()) : [];
+    trace.innerHTML = steps.map(s =>
+      `<span class="route-step ${reached.includes(s) ? 'active' : ''}">${s}</span>`
+    ).join('');
+  }
 
-            testInspectorEl.hidden = false;
-            const selectedIndex = resolveSelectedTestIndex(session);
-            if (!session || selectedIndex < 0) {
-                testInspectorGridEl.innerHTML = '';
-                testInspectorMetaEl.textContent = 'Selecciona una respuesta para ver la traza tecnica real.';
-                testInspectorEmptyEl.hidden = false;
-                return;
-            }
+  // ── Metrics ───────────────────────────────
+  function updateMetrics(latency, tokens, fromCache) {
+    msgCount++;
+    if (tokens)     tokenCount += parseInt(tokens) || 0;
+    if (fromCache)  cacheHits++;
+    if (latency)    latencies.push(latency);
+    document.getElementById('mMsgs').textContent    = msgCount;
+    document.getElementById('mTokens').textContent  = tokenCount > 999 ? (tokenCount/1000).toFixed(1)+'k' : tokenCount;
+    document.getElementById('mCache').textContent   = cacheHits;
+    // p95
+    const sorted = [...latencies].sort((a,b)=>a-b);
+    const p95    = sorted[Math.floor(sorted.length * 0.95)] ?? (sorted[sorted.length-1] ?? 0);
+    document.getElementById('mLatency').textContent = p95 ? p95+'ms' : '—';
+  }
 
-            session.selectedTestIndex = selectedIndex;
-            const info = session.messages[selectedIndex].testInfo || {};
-            testInspectorGridEl.innerHTML = '';
-            buildTestRows(info).forEach(([label, value]) => {
-                const row = document.createElement('div');
-                row.className = 'test-row';
-                const strong = document.createElement('strong');
-                strong.textContent = label;
-                const span = document.createElement('span');
-                span.textContent = value;
-                row.appendChild(strong);
-                row.appendChild(span);
-                testInspectorGridEl.appendChild(row);
-            });
-            testInspectorMetaEl.textContent = `Respuesta ${selectedIndex + 1}. Haz clic en otra respuesta para inspeccionarla.`;
-            testInspectorEmptyEl.hidden = true;
-        }
+  // ── Entity panel ──────────────────────────
+  function refreshEntities(entities, forms) {
+    if (!entities || !entities.length) return;
+    entityList.innerHTML = entities.map(e =>
+      `<div class="entity-item">
+        <span class="entity-dot"></span>
+        <span class="entity-name">${e.name || e}</span>
+        <span class="entity-badge">${e.fields ? e.fields+'f' : 'tabla'}</span>
+      </div>`
+    ).join('');
+    if (forms && forms.length) {
+      document.getElementById('formSectionLbl').style.display = '';
+      formList.innerHTML = forms.map(f =>
+        `<div class="entity-item">
+          <span class="entity-dot" style="background:var(--accent)"></span>
+          <span class="entity-name">${f.name || f}</span>
+          <span class="entity-badge" style="background:var(--accent-soft);color:var(--accent)">form</span>
+        </div>`
+      ).join('');
+    }
+  }
 
-        async function sendMessage(text, meta = {}) {
-            const session = currentSession();
-            if (!session) return;
-            session.messages.push({ dir: 'in', text });
-            renderChat();
+  // ── Message rendering ──────────────────────
+  function ts() {
+    return new Date().toLocaleTimeString('es', { hour:'2-digit', minute:'2-digit' });
+  }
+  function addMsg(role, text, meta) {
+    const cls  = role === 'user' ? 'user' : 'bot';
+    const av   = role === 'user' ? 'U' : 'S';
+    const wrap = document.createElement('div');
+    wrap.className = `msg ${cls}`;
+    wrap.innerHTML = `
+      <div class="msg-avatar">${av}</div>
+      <div>
+        <div class="msg-bubble">${escHtml(text).replace(/\n/g,'<br>')}</div>
+        ${meta ? `<div class="msg-meta">${meta}</div>` : ''}
+      </div>`;
+    messages.appendChild(wrap);
+    messages.scrollTop = messages.scrollHeight;
+    return wrap;
+  }
+  function addTyping() {
+    const wrap = document.createElement('div');
+    wrap.className = 'msg bot';
+    wrap.id = 'typing';
+    wrap.innerHTML = `
+      <div class="msg-avatar">S</div>
+      <div class="typing-bubble">
+        <span></span><span></span><span></span>
+      </div>`;
+    messages.appendChild(wrap);
+    messages.scrollTop = messages.scrollHeight;
+    return wrap;
+  }
+  function removeTyping() {
+    const t = document.getElementById('typing');
+    if (t) t.remove();
+  }
+  function escHtml(s) {
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
 
-            const payload = {
-                ...basePayload(session),
-                message: text,
-                meta
-            };
-            saveSettings();
+  // ── Send message ───────────────────────────
+  async function sendMessage() {
+    const text = input.value.trim();
+    if (!text) return;
+    input.value = ''; input.style.height = 'auto';
+    sendBtn.disabled = true;
 
-            try {
-                const res = await fetch(apiBase() + '/api/chat/message', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(payload)
-                });
-                const data = await res.json();
-                const reply = (data.reply || (data.data && data.data.reply) || data.message || JSON.stringify(data));
-                const testInfo = data.data && data.data.test_info ? data.data.test_info : null;
-                session.messages.push({ dir: 'out', text: reply, testInfo });
-                if (testInfo) {
-                    session.selectedTestIndex = session.messages.length - 1;
-                }
-                renderChat();
-            } catch (err) {
-                session.messages.push({ dir: 'out', text: 'Error de conexion con el servidor.' });
-                renderChat();
-            }
-        }
+    addMsg('user', text);
+    const typing = addTyping();
+    resetPipeline();
 
-        async function fetchHelp() {
-            const session = currentSession();
-            if (!session) return;
-            session.messages.push({ dir: 'in', text: '[ayuda viva]' });
-            renderChat();
-            saveSettings();
-            try {
-                const res = await fetch(apiBase() + '/api/chat/help', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(basePayload(session))
-                });
-                const data = await res.json();
-                const reply = (data.data && data.data.reply) || data.reply || data.message || 'Listo.';
-                session.messages.push({ dir: 'out', text: reply });
-                renderChat();
-            } catch (err) {
-                session.messages.push({ dir: 'out', text: 'No pude cargar la ayuda viva.' });
-                renderChat();
-            }
-        }
+    const t0 = Date.now();
+    // Animate pipeline visually (steps simulados hasta tener telemetría real)
+    activateStep('ps-cache');
+    await wait(80);
+    activateStep('ps-budget');
+    await wait(60);
+    activateStep('ps-qdrant');
 
-        async function runAcidTest() {
-            const session = currentSession();
-            if (!session) return;
-            session.messages.push({ dir: 'in', text: '[probar sistema] Ejecutando diagnostico...' });
-            renderChat();
-            statusEl.textContent = 'Ejecutando diagnostico...';
-            saveSettings();
-            try {
-                const res = await fetch(apiBase() + '/api/chat/acid-test', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(basePayload(session))
-                });
-                const data = await res.json();
-                const report = data.data && data.data.report ? data.data.report : null;
-                const summary = report && report.summary ? report.summary : null;
-                let reply = 'Diagnostico chat listo.';
-                if (summary) {
-                    reply = `Diagnostico chat: ${summary.passed} ok, ${summary.failed} fail.`;
-                    const fails = (report.results || []).filter(r => !r.ok).slice(0, 3);
-                    if (fails.length) {
-                        reply += ' Fallas: ' + fails.map(f => `#${f.id} ${f.message}`).join(', ');
-                    }
-                }
-                session.messages.push({ dir: 'out', text: reply });
-                statusEl.textContent = summary && summary.failed > 0 ? 'Diagnostico con fallas' : 'Diagnostico OK';
-                renderChat();
-            } catch (err) {
-                session.messages.push({ dir: 'out', text: 'Error ejecutando diagnostico.' });
-                statusEl.textContent = 'Error en diagnostico';
-                renderChat();
-            }
-        }
+    try {
+      const body = {
+        message:   text,
+        mode:      MODE,
+        tenant_id: TENANT_ID,
+        user_id:   USER_ID,
+        project_id: PROJECT_ID,
+        test_mode: testToggle.checked,
+      };
+      const res  = await fetch(API_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+        body:   JSON.stringify(body),
+      });
+      const json = await res.json();
+      const latency = Date.now() - t0;
 
-        sendEl.addEventListener('click', () => {
-            const text = messageEl.value.trim();
-            if (!text) return;
-            messageEl.value = '';
-            sendMessage(text);
-        });
+      removeTyping();
 
-        messageEl.addEventListener('keydown', (e) => {
-            if (e.key === 'Enter') sendEl.click();
-        });
+      const data     = json.data    ?? {};
+      const reply    = data.reply   ?? json.message ?? 'Sin respuesta.';
+      const testInfo = data.test_info ?? {};
+      const routePath   = testInfo.route_path ?? '';
+      const fromCache   = routePath && routePath.includes('cache');
+      const llmProvider = testInfo.llm_provider ?? '';
+      const llmModel    = testInfo.llm_model    ?? '';
+      const classification = testInfo.classification ?? testInfo.action ?? '';
+      const agentsUsed  = Array.isArray(testInfo.agents_used) ? testInfo.agents_used.join(', ') : '';
+      const tokens      = testInfo.evidence_count ?? 0;
 
-        sendFileEl.addEventListener('click', () => {
-            const file = fileEl.files[0];
-            if (!file) return;
-            sendMessage('[archivo] ' + file.name, { files: [{ name: file.name, size: file.size }] });
-            fileEl.value = '';
-        });
+      // Pipeline done states
+      if (fromCache) {
+        doneStep('ps-cache', latency);
+        skipStep('ps-budget'); skipStep('ps-qdrant'); skipStep('ps-process'); skipStep('ps-kernel');
+      } else {
+        doneStep('ps-cache');
+        doneStep('ps-budget');
+        doneStep('ps-qdrant', latency > 400 ? Math.round(latency*0.35) : null);
+        activateStep('ps-process');
+        await wait(50);
+        doneStep('ps-process');
+        doneStep('ps-kernel', latency);
+      }
 
-        document.getElementById('newSession').addEventListener('click', () => {
-            addSession('sess_' + Date.now());
-        });
+      // Build meta line
+      const metaParts = [
+        latency+'ms',
+        routePath && 'route: '+routePath,
+        classification && classification,
+        llmProvider && llmProvider + (llmModel ? '/'+llmModel.split('-').slice(-1)[0] : ''),
+        agentsUsed && 'agents: '+agentsUsed,
+      ].filter(Boolean);
 
-        [userIdEl, roleEl, tenantIdEl, projectIdEl, channelEl, apiBaseEl].forEach(el => {
-            el.addEventListener('change', saveSettings);
-        });
-        testModeEl.addEventListener('change', () => {
-            saveSettings();
-            renderChat();
-        });
-        apiBaseEl.addEventListener('change', loadQuickChips);
-        tenantIdEl.addEventListener('change', loadQuality);
-        document.getElementById('refreshQuality').addEventListener('click', loadQuality);
+      addMsg('bot', reply, metaParts.join(' · '));
+      renderRoutePath(routePath);
+      updateMetrics(latency, tokens, fromCache);
 
-        loadSettings();
-        addSession('sess_demo');
-        loadQuality();
-    </script>
+      // Test info dump
+      if (testToggle.checked && Object.keys(testInfo).length) {
+        testPre.textContent = JSON.stringify(testInfo, null, 2);
+      }
+
+      // Refresh entity panel
+      if (data.entities || data.forms) {
+        refreshEntities(data.entities ?? [], data.forms ?? []);
+      }
+
+    } catch (err) {
+      removeTyping();
+      resetPipeline();
+      addMsg('bot', '⚠️ Error de conexión: ' + err.message);
+      console.error(err);
+    } finally {
+      sendBtn.disabled = false;
+      input.focus();
+    }
+  }
+
+  function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+  // ── Input auto-resize ─────────────────────
+  input.addEventListener('input', () => {
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 120) + 'px';
+  });
+  input.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      sendMessage();
+    }
+  });
+  sendBtn.addEventListener('click', sendMessage);
+  input.focus();
+
+})();
+</script>
 </body>
 </html>

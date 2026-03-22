@@ -99,13 +99,38 @@ trait ConversationGatewayHandlePipelineTrait
                 $state['requested_slot'] = null;
             }
             $state['active_task'] = 'builder_onboarding';
-            $state['onboarding_step'] = $this->resolveBuilderOnboardingStep($profile, $state);
-            $reply = $this->buildBuilderAmbiguityReply($normalizedBase, $profile);
+            $currentStep = $this->resolveBuilderOnboardingStep($profile, $state);
+            $state['onboarding_step'] = $currentStep;
+
+            // ── FAST PATH: LLM-first translation instead of static canned reply.
+            // BuilderFastPathParser sends a compact payload (no history, no RAG) and returns strict JSON.
+            // PHP validates the JSON and picks the reply. Fallback is always a safe hardcoded string.
+            $fastPath = $this->builderFastPath(
+                $normalizedBase,
+                $currentStep,
+                $profile,
+                $state,
+                $this->builderAllowedValuesForStep($currentStep, $profile, $state)
+            );
+
+            // If the LLM mapped a real value (e.g. business_type), persist it now.
+            if (
+                $fastPath['intent'] === 'set_business_type'
+                && !empty($fastPath['mapped_fields']['business_type'])
+            ) {
+                $profile['business_type'] = (string) $fastPath['mapped_fields']['business_type'];
+                $this->saveProfile($tenantId, $this->profileUserKey($userId), $profile);
+            }
+
+            $reply = $fastPath['reply'];
             $state = $this->updateState($state, $raw, $reply, 'builder_clarify', null, [], 'builder_onboarding');
             $this->saveState($tenantId, $userId, $state);
             $telemetry = $this->telemetry('builder_clarify', true);
             $telemetry['builder_ambiguity_guard'] = true;
-            $telemetry['builder_onboarding_step'] = (string) ($state['onboarding_step'] ?? '');
+            $telemetry['builder_onboarding_step'] = $currentStep;
+            $telemetry['fast_path_intent'] = $fastPath['intent'];
+            $telemetry['fast_path_confidence'] = $fastPath['confidence'];
+            $telemetry['fast_path_via'] = $fastPath['via'];
             return $this->result('ask_user', $reply, null, null, $state, $telemetry);
         }
 

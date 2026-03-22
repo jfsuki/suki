@@ -17,6 +17,17 @@ if (is_file($projectEnvLoader)) {
 }
 
 spl_autoload_register(function ($class) {
+    // 1. PSR-4 direct mapping (Primary)
+    if (str_starts_with($class, 'App\\')) {
+        $path = str_replace('\\', '/', substr($class, 4));
+        $file = FRAMEWORK_ROOT . '/app/' . $path . '.php';
+        if (is_file($file)) {
+            require_once $file;
+            return;
+        }
+    }
+
+    // 2. Legacy Flat Candidates (Fallback)
     $baseName = basename(str_replace('\\', '/', $class));
 
     $candidates = [
@@ -30,7 +41,7 @@ spl_autoload_register(function ($class) {
     ];
 
     foreach ($candidates as $file) {
-        if (file_exists($file)) {
+        if (is_file($file)) {
             require_once $file;
             return;
         }

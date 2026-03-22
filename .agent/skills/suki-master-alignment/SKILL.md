@@ -13,6 +13,7 @@ description: Default SUKI architecture alignment for any repository task. Use wh
 
 ## Core laws
 
+- **Conversational Boundary:** Semantic Classifier (Qdrant) -> LLM JSON Parser -> PHP. Rigid regex/lists for intents are forbidden.
 - LLM interprets and guides.
 - PHP kernel calculates, validates, persists, and executes.
 - Agents are controlled copilots, not autonomous executors.

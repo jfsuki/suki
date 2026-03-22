@@ -22,14 +22,14 @@ class Database
             return self::$pdo;
         }
 
-        $driver = getenv('DB_DRIVER') ?: 'mysql';
-        $host = getenv('DB_HOST') ?: 'localhost';
-        $port = getenv('DB_PORT') ?: '';
-        $db = getenv('DB_NAME') ?: '';
-        $user = getenv('DB_USER') ?: '';
-        $pass = getenv('DB_PASS') ?: '';
-        $charset = getenv('DB_CHARSET') ?: 'utf8mb4';
-        $path = getenv('DB_PATH') ?: '';
+        $driver = getenv('DB_DRIVER') ?: ($_ENV['DB_DRIVER'] ?? ($_SERVER['DB_DRIVER'] ?? 'mysql'));
+        $host = getenv('DB_HOST') ?: ($_ENV['DB_HOST'] ?? ($_SERVER['DB_HOST'] ?? 'localhost'));
+        $port = getenv('DB_PORT') ?: ($_ENV['DB_PORT'] ?? ($_SERVER['DB_PORT'] ?? ''));
+        $db = getenv('DB_NAME') ?: ($_ENV['DB_NAME'] ?? ($_SERVER['DB_NAME'] ?? ''));
+        $user = getenv('DB_USER') ?: ($_ENV['DB_USER'] ?? ($_SERVER['DB_USER'] ?? ''));
+        $pass = getenv('DB_PASS') ?: ($_ENV['DB_PASS'] ?? ($_SERVER['DB_PASS'] ?? ''));
+        $charset = getenv('DB_CHARSET') ?: ($_ENV['DB_CHARSET'] ?? ($_SERVER['DB_CHARSET'] ?? 'utf8mb4'));
+        $path = getenv('DB_PATH') ?: ($_ENV['DB_PATH'] ?? ($_SERVER['DB_PATH'] ?? ''));
 
         try {
             $dsn = self::buildDsn($driver, $host, $port, $db, $charset, $path);

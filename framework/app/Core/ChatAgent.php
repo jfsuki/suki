@@ -3,7 +3,11 @@
 
 namespace App\Core;
 
-use App\Core\Agents\ConversationGateway;
+use App\Core\Agents\Orchestrator\ChatOrchestrator;
+use App\Core\Agents\Memory\TokenBudgeter;
+use App\Core\Agents\Memory\SemanticCache;
+use App\Core\Agents\Processes\BuilderOnboardingProcess;
+use App\Core\Agents\Processes\AppExecutionProcess;
 use App\Core\Agents\AcidChatRunner;
 use App\Core\Agents\Telemetry;
 use App\Core\LLM\LLMRouter;
@@ -16,7 +20,7 @@ final class ChatAgent
     private ?CommandLayer $command = null;
     private EntityRegistry $entities;
     private ?EntityMigrator $migrator = null;
-    private ?ConversationGateway $gateway = null;
+    private ?ChatOrchestrator $gateway = null;
     private ?LLMRouter $llmRouter = null;
     private ?Telemetry $telemetry = null;
     private ?TelemetryService $telemetryService = null;
@@ -2559,10 +2563,19 @@ final class ChatAgent
         return $this->migrator;
     }
 
-    private function gateway(): ConversationGateway
+    private function gateway(): ChatOrchestrator
     {
         if (!$this->gateway) {
-            $this->gateway = new ConversationGateway();
+            $pdo = null; // SemanticCache funciona sin PDO externo (usa ops_semantic_cache vía RuntimeSchemaPolicy)
+            $this->gateway = new ChatOrchestrator(
+                new TokenBudgeter(),
+                new SemanticCache($pdo),
+                new BuilderOnboardingProcess(),
+                new AppExecutionProcess(),
+                $this->intentRouter(),
+                $this->commandBus(),
+                $this->llmRouter()
+            );
         }
         return $this->gateway;
     }
@@ -2690,7 +2703,7 @@ final class ChatAgent
      * @param array<string, mixed>|null $task
      */
     private function linkControlTowerTask(
-        ConversationGateway $gateway,
+        ChatOrchestrator $gateway,
         string $tenantId,
         string $userId,
         string $projectId,

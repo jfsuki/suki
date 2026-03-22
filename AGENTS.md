@@ -178,8 +178,11 @@ Cuando se modifique un archivo de gobierno (AGENTS/docs):
 - Contratos canonicos de runtime: `docs/contracts/*`.
 - Contratos del proyecto activo: `project/contracts/*`.
 - Estado, registry y metricas livianas: `project/storage/meta/project_registry.sqlite`.
-- Pipeline mental minimo para agentes:
-  - `cache -> rules -> rag -> tools -> llm fallback`
+- **Pipeline mental minimo para agentes (3 Capas):**
+  1. `Layer 1`: Qdrant Semantic Classifier (embeddings exactos).
+  2. `Layer 2`: LLM Fast Parser (Qwen/DeepSeek retorna estricto JSON, nunca texto).
+  3. `Layer 3`: PHP Kernel Executor (valida JSON y ejecuta).
+- **Prohibido**: Uso de `preg_match` o listas rígidas (`in_array`) para clasificar intenciones de negocio.
 - En trazas actuales el stage `tools` puede aparecer como `skills` + `CommandBus`; ambos pertenecen a la misma capa de ejecucion controlada.
 
 ### Working rules for contributors

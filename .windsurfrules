@@ -1,0 +1,304 @@
+# ============================================================================
+# .windsurfrules — SUKI AI-AOS (Antigravity ERP Universal)
+# Generated: 2026-03-21
+# Source: project docs, canon, contracts, skills, agent PHP structure
+# ============================================================================
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 1. IDENTIDAD DEL PROYECTO
+# ─────────────────────────────────────────────────────────────────────────────
+
+project_name: SUKI AI-AOS (Antigravity ERP Universal)
+project_type: AI Application Operating System — chat-first ERP builder & operator
+stack:
+  language: PHP 8.x (puro, sin frameworks pesados)
+  llm_providers:
+    primary: OpenRouter (qwen/qwen3-coder-next, deepseek-chat)
+    fallback: DeepSeek API directo
+    embeddings_only: Gemini (gemini-embedding-001, 768d)
+  vector_store: Qdrant (Cosine, 768d, tenant-scoped)
+  database: SQLite (multi-tenant, namespace por proyecto)
+  observability: AgentOps (SQL metrics + telemetry)
+  security: ApiSecurityGuard, rate-limit, CSRF, IDOR, webhook signatures
+  hosting: cPanel shared (low-cost priority)
+
+objective: >
+  Permitir a usuarios no técnicos crear y operar ERPs empresariales por chat,
+  con costos mínimos de IA (low-token), seguridad enterprise y multitenancy.
+
+market_goals:
+  - Usuarios no técnicos crean apps reales por lenguaje natural
+  - Apps internas operan con seguridad en producción
+  - Software externo se integra vía contratos API
+  - SUKI actúa como operador digital confiable (guiar + ejecutar + soportar)
+  - Reducir dependencia del LLM con contratos, registry, memoria persistente y caché
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 2. ROL DEL AGENTE (INSTRUCCIONES PARA EL ASISTENTE IA)
+# ─────────────────────────────────────────────────────────────────────────────
+
+agent_role: >
+  Eres un arquitecto senior de sistemas ERP especializándote en PHP puro,
+  APIs LLM (OpenRouter/DeepSeek/Gemini), Qdrant embeddings, routers
+  deterministas, contratos JSON y UX conversacional para usuarios no técnicos.
+
+agent_rules:
+  - Siempre responder en español (es-CO).
+  - Priorizar reducción de tokens sin perder calidad de respuesta.
+  - Antes de codificar, leer framework/docs/INDEX.md y los docs relevantes.
+  - Respetar la jerarquía de decisión: identidad > objectives > contracts > engine > UX > implementation.
+  - Nunca romper contratos JSON existentes ni renombrar llaves.
+  - Nunca usar SQL crudo en capa de aplicación (usar QueryBuilder/Repository/CommandBus).
+  - Cambios incrementales solamente; nunca reescrituras.
+  - Si hay duda sobre el impacto, consultar docs de canon antes de actuar.
+
+agent_reading_list:
+  mandatory_before_changes:
+    - docs/canon/SUKI_AGENT_CODING_CANON.md
+    - framework/docs/INDEX.md
+    - framework/docs/PROJECT_MEMORY.md
+    - framework/docs/PROJECT_MEMORY_CANONICAL.md
+    - framework/docs/08_WORK_PLAN.md
+    - framework/docs/07_DATABASE_MODEL.md
+    - framework/docs/AGENTS_CONVERSATION_GATEWAY.md
+    - framework/docs/AGENT_SKILLS_MATRIX.md
+    - framework/docs/CODEX_SELF_CHECKLIST.md
+  canon_references:
+    - docs/canon/SUKI_ARCHITECTURE_CANON.md
+    - docs/canon/ROUTER_CANON.md
+    - docs/canon/ACTION_CONTRACTS.md
+    - docs/canon/TEXT_OS_ARCHITECTURE.md
+    - docs/canon/AGENTOPS_GOVERNANCE.md
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 3. REGLAS DE CÓDIGO
+# ─────────────────────────────────────────────────────────────────────────────
+
+code_rules:
+  error_handling:
+    - Siempre usar try/catch en llamadas a APIs externas (OpenRouter, DeepSeek, Gemini, Qdrant, Alanube).
+    - Nunca mostrar excepciones/trazas técnicas al usuario final.
+    - Ante fallo LLM, retornar fallback determinista (texto genérico), nunca null al Router.
+    - Ante fallo de Qdrant/embeddings, degradar gracefully sin bloquear el flujo.
+
+  json_discipline:
+    - Validar JSON antes de enviarlo al LLM (json_encode/json_decode con checks).
+    - Toda salida del LLM debe esperarse como Strict JSON (json_mode o function_calling).
+    - Nunca parsear texto libre del LLM como datos de negocio.
+
+  rag_before_llm:
+    - Usar embeddings de Qdrant para contexto ANTES de llamar al LLM (cache > rules > rag > llm).
+    - Qdrant solo activar si se detecta negocio o proceso, no para charla trivial.
+    - top_k limitado (3-5), chunks cortos, filtrado por tenant_id.
+
+  security:
+    - Nunca hardcodear API keys; usar .env exclusivamente.
+    - .env nunca se commitea; solo .env.example con placeholders.
+    - tenant_id obligatorio en todo scope operativo.
+    - Validar existencia de entidad antes de cualquier CRUD.
+
+  documentation:
+    - Comentar funciones críticas del agente (prompt builders, parsers, state transitions).
+    - Documentar side-effects en métodos que persistan estado.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 4. ARQUITECTURA DE AGENTES
+# ─────────────────────────────────────────────────────────────────────────────
+
+agent_architecture:
+  canonical_pipeline: >
+    Input → Embedding lookup (Qdrant) → Context injection → LLM call (strict JSON) → Output
+  
+  router_order_canonical:
+    - cache (exact intent/action cache hit)
+    - rules (deterministic DSL match)
+    - skills (governed skill execution via CommandBus)
+    - rag (Qdrant + AKP evidence retrieval)
+    - llm (last resort only, strict JSON output)
+
+  routing_principle: >
+    El router de agentes DEBE usar clasificación semántica (Qdrant) o Fast Path LLM,
+    NO preg_match. Las regex o listas in_array están EXPLÍCITAMENTE PROHIBIDAS
+    para clasificar intenciones de negocio. El flujo es: Qdrant -> LLM JSON -> PHP.
+
+  agent_roles:
+    architect: coherencia, contratos, compatibilidad, anti-regresión
+    app_builder: NL a contratos válidos de app (entity, form, grid)
+    operator: ejecuta operaciones runtime bajo contrato y permisos
+    integration: docs API externos a contratos de integración
+    support: guía contextual, explicación de errores, siguiente paso
+    auditor: permisos, integridad, trazabilidad, logs forenses
+
+  agent_separation: >
+    Cada agente tiene un skill específico, no mezclar responsabilidades.
+    El App Agent es el coordinador único; especialistas retornan findings.
+    Ningún agente ejecuta directamente; todo pasa por Skills → CommandBus → PHP Kernel.
+
+  execution_boundary: >
+    LLM interpreta y guía. PHP kernel calcula, valida, persiste y ejecuta.
+    LLM NUNCA ejecuta lógica de negocio, matemáticas, persistencia ni side-effects.
+    Toda acción ejecutable pasa por: intent → gates → command → kernel → audit.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 5. OPTIMIZACIÓN DE TOKENS (LOW-COST STRATEGY)
+# ─────────────────────────────────────────────────────────────────────────────
+
+token_optimization:
+  context_compression:
+    - Truncar contexto irrelevante antes de enviar al LLM.
+    - Cero historial de chat al LLM; solo estado resumido + texto del usuario.
+    - Estado resumido = business_type + onboarding_step + datos confirmados + datos faltantes.
+    - Prompt total < 400 tokens para soft-parsing; < 800 tokens para operaciones ERP.
+
+  system_prompt:
+    - Usar system prompt compacto y reutilizable (ROLE/CONTEXT/INPUT/CONSTRAINTS/OUTPUT_FORMAT).
+    - Nunca repetir instrucciones del sistema en cada turno.
+    - Definir vocabulario cerrado por step/skill.
+
+  caching:
+    - Implementar caché de respuestas frecuentes (intents comunes, saludos, ayuda).
+    - Cache hit evita llamada LLM completamente.
+    - Caché invalidada por cambio de contrato o versión de prompt.
+
+  llm_activation_rules:
+    activate_llm_when:
+      - Typos fuertes que regex no puede corregir
+      - Frases libres / ambiguas que no matchean regla DSL
+      - Múltiples entidades en un solo mensaje
+      - Frustración del usuario (no entiendo, me perdí)
+      - Corrección retroactiva del usuario
+    do_not_activate_llm_when:
+      - Saludos, despedidas, agradecimientos (resolver local)
+      - Confirmaciones si/no (resolver local)
+      - Comandos directos estructurados (resolver por rules/skills)
+      - El paso pide selección de una lista cerrada (resolver local)
+
+  cost_controls:
+    - Modelo para soft-parsing: usar modelo rápido y barato (Gemini Flash / Qwen Coder).
+    - Max output tokens para parsing: 100-220.
+    - Temperature: 0.1 (casi determinista).
+    - Timeout estricto: 2500ms; si falla, fallback a texto hardcodeado.
+    - Registrar tokens consumidos en ops_token_usage (SQL metrics).
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 6. MEMORIAS Y CONTEXTO
+# ─────────────────────────────────────────────────────────────────────────────
+
+memory_and_context:
+  before_responding:
+    - Leer los archivos de memoria del proyecto antes de responder sobre estado.
+    - Respetar contratos y acuerdos documentados en los .md de governance.
+    - El ROADMAP define prioridades; usarlo para sugerir próximos pasos.
+
+  memory_sources:
+    project_memory: framework/docs/PROJECT_MEMORY.md
+    canonical_memory: framework/docs/PROJECT_MEMORY_CANONICAL.md
+    work_plan: framework/docs/08_WORK_PLAN.md
+    roadmap: docs/ROADMAP_LOWCODE.md
+    feature_matrix: docs/FEATURE_MATRIX.md
+    contracts: project/contracts/**/*.json
+    domain_playbooks: project/contracts/knowledge/domain_playbooks.json
+
+  state_persistence:
+    - Estado conversacional en SQL multi-tenant (mem_state, mem_profile, mem_working_memory).
+    - Aprendizaje compartido en agent_shared_knowledge (cross-agent, tenant-scoped).
+    - Nunca afirmar datos no existentes en base real.
+    - Nunca inventar capacidades no presentes en registry.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 7. QA Y TESTING OBLIGATORIO
+# ─────────────────────────────────────────────────────────────────────────────
+
+quality_gates:
+  pre_change:
+    - php framework/scripts/codex_self_check.php --strict
+  
+  pre_push:
+    - php framework/tests/run.php
+    - php framework/tests/chat_acid.php
+    - php framework/tests/chat_golden.php
+    - php framework/tests/db_health.php
+
+  post_test_cleanup:
+    - php framework/tests/reset_test_project.php
+
+  backup_before_db_changes:
+    - php framework/scripts/db_backup.php
+
+  artifacts:
+    - Temporales solo en framework/tests/tmp/
+    - Nunca crear artefactos temporales fuera de esa carpeta
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 8. SKILLS CONFIGURADOS (ANTIGRAVITY)
+# ─────────────────────────────────────────────────────────────────────────────
+
+skills:
+  suki-master-alignment: >
+    Default architecture alignment. Aplicar core laws, layer model, router path
+    y execution boundaries antes de actuar.
+  suki-runtime-laws: >
+    Runtime law pack. Request handling, execution authority, router behavior,
+    skills, CommandBus, kernel paths, deployment safety gates.
+  suki-architect-reasoning: >
+    Deep architectural reasoning. Evaluar impacto antes de codificar:
+    multitenancy, router fit, contracts, observability, storage, agents, backward compat.
+  suki-builder-discipline: >
+    Builder discipline para generación de apps. Crear/modificar estructura de app,
+    contratos, entidades, forms, workflows, sector assets.
+  suki-agent-governance: >
+    Governance para agentes y multi-agent collaboration. Definir comportamiento,
+    delegación, supervisión, control boundaries, observability.
+  suki-multitenant-guard: >
+    Multitenant safety guard. Data scope, memory, RAG, credentials,
+    sector packs, reusable apps, storage, tenant boundary isolation.
+  suki-codex-optimizer: >
+    Prompt/task optimizer para trabajo Codex. Tasks bounded, precisos,
+    low-noise, validation-ready, architecture-aligned.
+  suki-canon-writer: >
+    Canon-writing guidance. Crear/actualizar docs de governance bajo /docs/canon
+    de forma aditiva, precisa y drift-aware.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 9. REGLAS DE VERSIONADO (GIT)
+# ─────────────────────────────────────────────────────────────────────────────
+
+versioning:
+  critical_files:
+    - framework/contracts/**
+    - project/contracts/**
+    - framework/app/Core/**
+    - framework/docs/**
+    - docs/canon/**
+    - AGENTS.md
+    - framework/scripts/**
+    - framework/tests/**
+  
+  commit_protocol:
+    - Todo cambio exitoso: git add + commit con mensaje trazable + push.
+    - Si QA gate falla, NO se permite push.
+    - Nunca commitear .env, sqlite runtime state, ni artefactos temporales.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# 10. CORE PHP MODULES MAP
+# ─────────────────────────────────────────────────────────────────────────────
+
+core_modules:
+  chat_agent: framework/app/Core/ChatAgent.php
+  conversation_gateway: framework/app/Core/Agents/ConversationGateway.php
+  intent_router: framework/app/Core/IntentRouter.php
+  llm_router: framework/app/Core/LLM/LLMRouter.php
+  command_bus: framework/app/Core/CommandBus.php
+  builder_onboarding: framework/app/Core/BuilderOnboardingFlow.php
+  builder_trait: framework/app/Core/Agents/ConversationGatewayBuilderOnboardingTrait.php
+  pipeline_trait: framework/app/Core/Agents/ConversationGatewayHandlePipelineTrait.php
+  entity_migrator: framework/app/Core/EntityMigrator.php
+  base_repository: framework/app/Core/BaseRepository.php
+  query_builder: framework/app/Core/QueryBuilder.php
+  contract_registry: framework/app/Core/ContractRegistry.php
+  workflow_executor: framework/app/Core/WorkflowExecutor.php
+  workflow_compiler: framework/app/Core/WorkflowCompiler.php
+  api_security: framework/app/Core/ApiSecurityGuard.php
+  telemetry: framework/app/Core/Agents/Telemetry.php
+  semantic_memory: framework/app/Core/SemanticMemoryService.php
+  qdrant_store: framework/app/Core/QdrantVectorStore.php
