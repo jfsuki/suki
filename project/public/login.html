@@ -81,14 +81,14 @@
             const password = passwordEl.value.trim();
             if (!id || !password) { show('Usuario y password requeridos.'); return; }
             try {
-                const json = await post('/api/auth/login', { id, password });
+                const json = await post('api/auth/login', { id, password });
                 show(json.status === 'success' ? 'Login OK.' : (json.message || 'Error'));
             } catch (e) { show('Error de conexion.'); }
         });
 
         document.getElementById('logoutBtn').addEventListener('click', async () => {
             try {
-                const json = await post('/api/auth/logout', {});
+                const json = await post('api/auth/logout', {});
                 show(json.message || 'Sesion cerrada.');
             } catch (e) { show('Error de conexion.'); }
         });
@@ -98,7 +98,7 @@
             const password = passwordEl.value.trim();
             if (!id || !password) { show('Usuario y password requeridos.'); return; }
             try {
-                const json = await post('/api/auth/register', { id, password, role: roleEl.value, tenant_id: tenantIdEl.value || 'default' });
+                const json = await post('api/auth/register', { id, password, role: roleEl.value, tenant_id: tenantIdEl.value || 'default' });
                 show(json.status === 'success' ? 'Usuario creado.' : (json.message || 'Error'));
             } catch (e) { show('Error de conexion.'); }
         });

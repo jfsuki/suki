@@ -213,7 +213,7 @@
             };
 
             try {
-                const res = await fetch(apiBase() + '/api/chat/message', {
+                const res = await fetch('api/chat/message', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(payload)
