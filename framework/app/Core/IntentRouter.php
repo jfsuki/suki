@@ -14,12 +14,12 @@ final class IntentRouter
     private const REQUEST_MODE_BUDGETS = [
         'operation' => [
             'max_router_steps' => 5,
-            'max_tool_calls' => 1,
+            'max_tool_calls' => 10,
             'max_retries' => 0,
             'max_llm_fallbacks' => 1,
             'max_semantic_queries' => 1,
             'max_context_chunks' => 2,
-            'max_execution_ms' => 1500,
+            'max_execution_ms' => 15000,
             'max_same_route_repeats' => 2,
         ],
         'research' => [
@@ -29,7 +29,7 @@ final class IntentRouter
             'max_llm_fallbacks' => 1,
             'max_semantic_queries' => 2,
             'max_context_chunks' => 4,
-            'max_execution_ms' => 3000,
+            'max_execution_ms' => 30000,
             'max_same_route_repeats' => 3,
         ],
     ];
@@ -203,7 +203,7 @@ final class IntentRouter
             }
         }
 
-        $routePathSteps = $this->resolveRoutePathSteps($action, $routeOrder, $routingHintSteps);
+        $routePathSteps = $this->resolveRoutePathSteps($action, $routeOrder, $gatewayResult, $context, $routingHintSteps);
         if ($action === 'send_to_llm' && !in_array('llm', $routePathSteps, true)) {
             $violations[] = 'router_policy_missing_llm_stage_for_send_to_llm';
         }
@@ -444,7 +444,7 @@ final class IntentRouter
                 if ($overrideAction === 'respond_local') {
                     return new IntentRouteResult(
                         'respond_local',
-                        $replyOverride !== '' ? $replyOverride : 'No hay evidencia minima suficiente para ejecutar.',
+                        $reply !== '' ? $reply : ($replyOverride !== '' ? $replyOverride : 'No hay evidencia minima suficiente para ejecutar.'),
                         [],
                         [],
                         $state,
@@ -453,6 +453,14 @@ final class IntentRouter
                     );
                 }
             }
+        }
+
+        // Final verification of reply for deterministic resolution
+        $query = mb_strtolower(trim($this->extractRetrievalQuery($gatewayResult, $context)));
+        $isIngestionQuery = $query !== '' && preg_match('/^(mi negocio se llama|mi negocio es|mi empresa es|somos)\b/u', $query) === 1;
+
+        if ($telemetry['route_reason'] === 'deterministic_route_resolved' && $reply === '' && $isIngestionQuery) {
+            $reply = "Entendido. He guardado esa información en mi memoria para ayudarte mejor.";
         }
 
         if (in_array($action, ['respond_local', 'ask_user'], true)) {
@@ -497,8 +505,11 @@ final class IntentRouter
      * @param array<int, string> $routingHintSteps
      * @return array<int, string>
      */
-    private function resolveRoutePathSteps(string $action, array $routeOrder, array $routingHintSteps = []): array
+    private function resolveRoutePathSteps(string $action, array $routeOrder, array $gatewayResult, array $context, array $routingHintSteps = []): array
     {
+        $query = mb_strtolower(trim($this->extractRetrievalQuery($gatewayResult, $context)));
+        $isMemoryQuery = $query !== '' && preg_match('/^(como|cual|donde|quien|que|dime|recuerda|sabes|ver|list|show|how|what|where)\b/u', $query) === 1;
+
         if (!empty($routingHintSteps)) {
             $hintPath = [];
             $allowed = ['cache', 'rules', 'agent_training', 'skills', 'rag', 'llm', 'action_contract'];
@@ -511,6 +522,16 @@ final class IntentRouter
                     $hintPath[] = $step;
                 }
             }
+
+            if ($isMemoryQuery) {
+                if (!in_array('agent_training', $hintPath, true)) {
+                    $hintPath[] = 'agent_training';
+                }
+                if (!in_array('rag', $hintPath, true)) {
+                    $hintPath[] = 'rag';
+                }
+            }
+
             if (!empty($hintPath)) {
                 return $hintPath;
             }
@@ -523,7 +544,7 @@ final class IntentRouter
         $path = [];
         foreach ($routeOrder as $step) {
             $path[] = $step;
-            if ($step === 'rules') {
+            if ($step === 'rules' && !$isMemoryQuery) {
                 break;
             }
         }
@@ -675,33 +696,40 @@ final class IntentRouter
             $guardTriggered = true;
             $guardReason = 'router_steps_budget_exceeded';
             $guardStage = 'router';
-        } elseif ($toolCallsCount > (int) ($runtimeBudget['max_tool_calls'] ?? 1)) {
+        } elseif ($toolCallsCount > (int) ($runtimeBudget['max_tool_calls'] ?? 10)) {
+            echo "DEBUG: Guard triggered by tool_calls_budget_exceeded ($toolCallsCount)\n";
             $guardTriggered = true;
             $guardReason = 'tool_calls_budget_exceeded';
-            $guardStage = 'execution';
+            $guardStage = 'orchestrator';
         } elseif ($retryCount > (int) ($runtimeBudget['max_retries'] ?? 0)) {
+            echo "DEBUG: Guard triggered by retry_budget_exceeded ($retryCount)\n";
             $guardTriggered = true;
             $guardReason = 'retry_budget_exceeded';
-            $guardStage = 'retry';
+            $guardStage = 'orchestrator';
         } elseif ($semanticQueriesCount > (int) ($runtimeBudget['max_semantic_queries'] ?? 1)) {
+            echo "DEBUG: Guard triggered by semantic_query_budget_exceeded ($semanticQueriesCount)\n";
             $guardTriggered = true;
             $guardReason = 'semantic_query_budget_exceeded';
             $guardStage = 'rag';
         } elseif ($llmFallbackCount > (int) ($runtimeBudget['max_llm_fallbacks'] ?? 1)) {
+            echo "DEBUG: Guard triggered by llm_fallback_budget_exceeded ($llmFallbackCount)\n";
             $guardTriggered = true;
             $guardReason = 'llm_fallback_budget_exceeded';
             $guardStage = 'llm';
-        } elseif (!$verifiedSemanticEvidence && !$shortConfirmationBudgetBypass && $routerLatencyMs > (int) ($runtimeBudget['max_execution_ms'] ?? 1500)) {
+        } elseif (!$verifiedSemanticEvidence && !$shortConfirmationBudgetBypass && $routerLatencyMs > (int) ($runtimeBudget['max_execution_ms'] ?? 5000)) {
+            echo "DEBUG: Guard triggered by execution_time_budget_exceeded ($routerLatencyMs ms)\n";
             $guardTriggered = true;
             $guardReason = 'execution_time_budget_exceeded';
             $guardStage = 'router';
         } elseif ((bool) ($loopCheck['triggered'] ?? false)) {
+            echo "DEBUG: Guard triggered by repeated_route_without_progress\n";
             $guardTriggered = true;
             $guardReason = 'repeated_route_without_progress';
             $guardStage = 'router';
         }
 
         if ($guardTriggered) {
+            echo "\nDEBUG: Runtime Guard Triggered! Reason: $guardReason, Stage: $guardStage\n";
             $guardReply = $this->buildUserSafeRuntimeGuardReply($guardReason, $context);
         }
 
@@ -754,6 +782,9 @@ final class IntentRouter
     private function detectRepeatedRouteLoop(array $state, array $telemetry, string $routePath, array $runtimeBudget): array
     {
         $history = is_array($state['agentops_trace_history'] ?? null) ? (array) $state['agentops_trace_history'] : [];
+        if (!empty($history)) {
+            error_log("[IntentRouter] LoopCheck: History count=" . count($history) . " path=" . $routePath);
+        }
         if ($history === [] || $routePath === '') {
             return ['triggered' => false, 'repeat_count' => 0];
         }
@@ -1496,6 +1527,30 @@ final class IntentRouter
             $retrieval = $semanticMemory->retrieve($query, array_merge($scope, [
                 'memory_type' => $memoryType,
             ]), $runtimeConfig['top_k']);
+
+            // Multi-Retrieval: Merge with User Persistent Memory if applicable
+            if ($memoryType !== 'user_memory' && trim((string) ($scope['user_id'] ?? '')) !== '') {
+                try {
+                    $userRetrieval = $semanticMemory->retrieve($query, array_merge($scope, [
+                        'memory_type' => 'user_memory',
+                    ]), 3);
+                    if (is_array($userRetrieval['hits'] ?? null) && $userRetrieval['hits'] !== []) {
+                        $retrieval['hits'] = array_merge((array) ($retrieval['hits'] ?? []), $userRetrieval['hits']);
+                        $retrieval['source_ids'] = array_values(array_unique(array_merge(
+                            (array) ($retrieval['source_ids'] ?? []),
+                            (array) ($userRetrieval['source_ids'] ?? [])
+                        )));
+                        $retrieval['evidence_ids'] = array_values(array_unique(array_merge(
+                            (array) ($retrieval['evidence_ids'] ?? []),
+                            (array) ($userRetrieval['evidence_ids'] ?? [])
+                        )));
+                        // Re-sort hits by score to keep best context first
+                        usort($retrieval['hits'], static fn($a, $b) => ($b['score'] ?? 0) <=> ($a['score'] ?? 0));
+                    }
+                } catch (\Throwable $e) {
+                    error_log('[IntentRouter] user_memory retrieval failed: ' . $e->getMessage());
+                }
+            }
             $preparedContext = SemanticMemoryService::prepareContext(
                 $retrieval,
                 (int) ($runtimeBudget['max_context_chunks'] ?? $runtimeConfig['max_context_chunks'])

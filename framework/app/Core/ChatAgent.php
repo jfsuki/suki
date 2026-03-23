@@ -12,6 +12,7 @@ use App\Core\Agents\AcidChatRunner;
 use App\Core\Agents\Telemetry;
 use App\Core\LLM\LLMRouter;
 use App\Core\PlaybookInstaller;
+use App\Core\SemanticMemoryService;
 
 use RuntimeException;
 
@@ -38,6 +39,7 @@ final class ChatAgent
     private ContractWriter $writer;
     private EntityBuilder $builder;
     private ChatMemoryStore $memory;
+    private ?SemanticMemoryService $semanticMemory = null;
 
     public function __construct()
     {
@@ -46,6 +48,7 @@ final class ChatAgent
         $this->writer = new ContractWriter();
         $this->builder = new EntityBuilder();
         $this->memory = new ChatMemoryStore();
+        $this->semanticMemory = new SemanticMemoryService();
     }
 
     public function handle(array $payload): array
@@ -596,6 +599,14 @@ final class ChatAgent
             } catch (\Throwable $e) {
                 // observability must not block chat response
             }
+            $this->persistToUserMemory($text, (string)$route->reply(), [
+                'user_id' => $userId,
+                'session_id' => $sessionId,
+                'tenant_id' => $tenantId,
+                'role' => $role,
+                'is_test' => $testMode
+            ]);
+
             return $this->attachTestInfo($reply, $testMode, $telemetry, [
                 'action' => $action,
                 'resolved_locally' => true,
@@ -4410,6 +4421,26 @@ final class ChatAgent
             'summary' => $summary,
             'history' => $history,
         ]);
+    }
+
+    private function persistToUserMemory(string $text, string $reply, array $params = []): void
+    {
+        if (trim($text) === '' || trim($reply) === '') {
+            return;
+        }
+
+        try {
+            if ($this->semanticMemory) {
+                $this->semanticMemory->ingestUserInteraction(
+                    (string) ($params['tenant_id'] ?? ''),
+                    (string) ($params['user_id'] ?? ''),
+                    $text,
+                    ['reply' => $reply, 'session_id' => (string) ($params['session_id'] ?? '')]
+                );
+            }
+        } catch (\Throwable $e) {
+            // Memory ingestion should not block chat
+        }
     }
 }
 

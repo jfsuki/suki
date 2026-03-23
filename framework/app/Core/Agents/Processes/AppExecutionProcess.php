@@ -45,10 +45,11 @@ class AppExecutionProcess
         // El router lee 'message_text' del contexto Y del gatewayResult.
         // Poblamos ambos para garantizar compatibilidad con las rutas internas.
         if ($router) {
+            $isGreeting = preg_match('/^(hola|hi|hello|buenos dias|buenas tardes|buenas noches)/i', trim($userText));
             $gatewayResult = [
-                'intent'       => 'unknown',
+                'intent'       => $isGreeting ? 'greeting' : 'unknown',
                 'action'       => 'respond_local',
-                'reply'        => '',
+                'reply'        => $isGreeting ? '¡Hola! Soy SUKI, tu asistente de negocios. ¿En qué puedo ayudarte hoy?' : '',
                 'message_text' => $userText,   // FIX A1: texto real en gatewayResult
             ];
             $route = $router->route($gatewayResult, [

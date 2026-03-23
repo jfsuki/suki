@@ -209,6 +209,27 @@ final class SemanticMemoryService
     }
 
     /**
+     * @param array<string,mixed> $metadata
+     * @return array<string,mixed>
+     */
+    public function ingestUserInteraction(string $tenantId, string $userId, string $text, array $metadata = []): array
+    {
+        $chunk = [
+            'memory_type' => 'user_memory',
+            'tenant_id' => $tenantId,
+            'user_id' => $userId,
+            'source' => 'chat_interaction',
+            'source_id' => 'chat_' . time(),
+            'content' => $text,
+            'metadata' => $metadata,
+            'quality_score' => 1.0,
+            'version' => '1.0',
+        ];
+
+        return $this->ingestUserMemory([$chunk]);
+    }
+
+    /**
      * @param array<string,mixed> $scope
      * @return array<string,mixed>
      */
