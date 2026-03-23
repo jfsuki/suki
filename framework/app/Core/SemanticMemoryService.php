@@ -527,11 +527,30 @@ final class SemanticMemoryService
                 'key' => 'memory_type',
                 'match' => ['value' => $memoryType],
             ],
-            [
+        ];
+
+        // Shared memory logic: agent_training and sector_knowledge can be shared from 'system'
+        if ($memoryType === 'agent_training' || $memoryType === 'sector_knowledge') {
+            if ($tenantId !== 'system') {
+                $must[] = [
+                    'should' => [
+                        ['key' => 'tenant_id', 'match' => ['value' => $tenantId]],
+                        ['key' => 'tenant_id', 'match' => ['value' => 'system']],
+                    ],
+                ];
+            } else {
+                $must[] = [
+                    'key' => 'tenant_id',
+                    'match' => ['value' => 'system'],
+                ];
+            }
+        } else {
+            // Strict isolation for other types (e.g., user_memory)
+            $must[] = [
                 'key' => 'tenant_id',
                 'match' => ['value' => $tenantId],
-            ],
-        ];
+            ];
+        }
 
         if ($appId !== null) {
             $must[] = [
