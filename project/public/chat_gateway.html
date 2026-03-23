@@ -61,13 +61,13 @@
 <body>
     <header>
         <div>
-            <h1>Suki - Cami Chat (legacy)</h1>
+            <h1>Suki - SUKI Chat (legacy)</h1>
             <small>Simula Telegram/WhatsApp sin instalar nada</small>
         </div>
         <div class="header-actions">
             <a class="link-btn" href="chat_app.html">Chat app</a>
             <a class="link-btn" href="chat_builder.html">Chat creador</a>
-            <div class="badge" id="agentStatus">Cami en linea</div>
+            <div class="badge" id="agentStatus">SUKI en linea</div>
         </div>
     </header>
 
@@ -123,7 +123,7 @@
                 <label>API Base</label>
                 <input type="text" id="apiBase" value="" placeholder="(vacio = mismo host)" />
             </div>
-            <div class="status" id="statusText">Cami lista para ayudarte</div>
+            <div class="status" id="statusText">SUKI lista para ayudarte</div>
             <div class="log" id="log"></div>
         </div>
     </div>
@@ -223,11 +223,11 @@
                 session.messages.push({ dir: 'out', text: reply });
                 renderChat();
                 log('OK: ' + (data.status || 'success'));
-                statusTextEl.textContent = 'Cami respondio';
+                statusTextEl.textContent = 'SUKI respondio';
             } catch (e) {
                 log('Error: ' + e.message);
-                statusTextEl.textContent = 'No pude conectar con Cami';
-                agentStatusEl.textContent = 'Cami desconectada';
+                statusTextEl.textContent = 'No pude conectar con SUKI';
+                agentStatusEl.textContent = 'SUKI desconectada';
             }
         }
 

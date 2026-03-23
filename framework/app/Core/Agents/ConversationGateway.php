@@ -1303,7 +1303,7 @@ declare(strict_types=1);
         {
             switch ($type) {
                 case 'greeting':
-                    return 'Hola, soy Cami. Dime que necesitas crear o consultar.';
+                    return 'Hola, soy SUKI. Dime que necesitas crear o consultar.';
                 case 'thanks':
                     return 'Con gusto. Estoy atenta.';
                 case 'confirm':
@@ -8853,6 +8853,7 @@ declare(strict_types=1);
                     'missing' => $state['missing'] ?? [],
                 ],
                 'user_message' => $text,
+                'last_messages' => $state['last_messages'] ?? [],
                 'policy' => [
                     'requires_strict_json' => $requiresJson,
                     'latency_budget_ms' => (int) ($policy['latency_budget_ms'] ?? 1200),

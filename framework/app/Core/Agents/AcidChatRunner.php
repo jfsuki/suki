@@ -24,7 +24,7 @@ final class AcidChatRunner
     public function run(string $tenantId = 'default', array $options = []): array
     {
         $tests = $options['tests'] ?? $this->defaultTests();
-        $gateway = new ConversationGateway($this->projectRoot);
+        $agent = new \App\Core\ChatAgent();
 
         $trainingRaw = is_file($this->trainingPath) ? file_get_contents($this->trainingPath) : '';
         $trainingRaw = $trainingRaw !== '' ? ltrim($trainingRaw, "\xEF\xBB\xBF") : '';
@@ -52,28 +52,27 @@ final class AcidChatRunner
             }
             $error = null;
             try {
-                $out = $gateway->handle($tenantId, $userId, $msg, $mode);
-                if (($out['action'] ?? '') === 'execute_command' && !empty($out['command']) && is_array($out['command'])) {
-                    $commandName = (string) ($out['command']['command'] ?? '');
-                    $mockResult = [];
-                    if ($commandName === 'CreateRecord') {
-                        $mockResult = ['id' => 1];
-                    } elseif ($commandName === 'QueryRecords') {
-                        $mockResult = [['id' => 1]];
-                    } elseif ($commandName === 'UpdateRecord') {
-                        $mockResult = ['updated' => 1];
-                    } elseif ($commandName === 'DeleteRecord') {
-                        $mockResult = ['deleted' => 1];
-                    }
-                    $gateway->rememberExecution($tenantId, $userId, 'default', $mode, (array) $out['command'], $mockResult, $msg, 'OK');
-                }
+                $sessionId = 'sess_acid_' . $userId;
+                $payload = [
+                    'message' => $msg,
+                    'tenant_id' => $tenantId,
+                    'user_id' => $userId,
+                    'session_id' => $sessionId,
+                    'mode' => $mode,
+                    'channel' => 'acid_test',
+                    'is_authenticated' => true,
+                    'auth_user_id' => $userId,
+                    'auth_tenant_id' => $tenantId,
+                ];
+                $out = $agent->handle($payload);
             } catch (\Throwable $e) {
                 $out = ['action' => 'error', 'reply' => 'exception', 'command' => []];
                 $error = $e->getMessage();
             }
-            $action = $out['action'] ?? '';
-            $reply = (string) ($out['reply'] ?? '');
-            $command = $out['command']['command'] ?? '';
+            $data = is_array($out['data'] ?? null) ? $out['data'] : [];
+            $action = (string) ($out['action'] ?? $data['test_info']['action'] ?? $data['action'] ?? '');
+            $reply = (string) ($data['reply'] ?? $out['reply'] ?? $out['message'] ?? '');
+            $command = (string) ($data['command'] ?? $out['command'] ?? '');
 
             $ok = in_array($action, $test['expect'], true);
             if ($ok && !empty($test['command'])) {
@@ -109,7 +108,7 @@ final class AcidChatRunner
         ];
 
         $confusion = $this->loadConfusionBase();
-        $confusionResult = $this->runConfusionScenarios($gateway, $tenantId, $runId, $confusion);
+        $confusionResult = $this->runConfusionScenarios($agent, $tenantId, $runId, $confusion);
         $summary['confusion_cases_total'] = $confusionResult['total'];
         $summary['confusion_cases_passed'] = $confusionResult['passed'];
         $summary['confusion_cases_failed'] = $confusionResult['failed'];
@@ -182,7 +181,7 @@ final class AcidChatRunner
         return is_array($decoded) ? $decoded : [];
     }
 
-    private function runConfusionScenarios(ConversationGateway $gateway, string $tenantId, string $runId, array $confusion): array
+    private function runConfusionScenarios(\App\Core\ChatAgent $agent, string $tenantId, string $runId, array $confusion): array
     {
         $cases = is_array($confusion['acid_conversation_cases'] ?? null) ? $confusion['acid_conversation_cases'] : [];
         if (empty($cases)) {
@@ -210,7 +209,17 @@ final class AcidChatRunner
             $trace = [];
             $ok = true;
             foreach ($turns as $turn) {
-                $res = $gateway->handle($tenantId, $userId, (string) $turn, $mode, 'default');
+                $payload = [
+                    'message' => (string) $turn,
+                    'tenant_id' => $tenantId,
+                    'user_id' => $userId,
+                    'mode' => $mode,
+                    'channel' => 'acid_test',
+                    'is_authenticated' => true,
+                    'auth_user_id' => $userId,
+                    'auth_tenant_id' => $tenantId,
+                ];
+                $res = $agent->handle($payload);
                 $state = is_array($res['state'] ?? null) ? $res['state'] : [];
                 $trace[] = [
                     'user' => (string) $turn,

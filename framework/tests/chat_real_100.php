@@ -120,7 +120,7 @@ foreach ($guidanceTests as $idx => $test) {
 
 // Block E: 15 safety/mode/use controls.
 $safetyTests = [
-    ['mode' => 'builder', 'message' => 'hola', 'contains' => 'Cami'],
+    ['mode' => 'builder', 'message' => 'hola', 'contains' => 'SUKI'],
     ['mode' => 'builder', 'message' => 'sabes sobre presidente petro?', 'contains' => 'Google, ChatGPT o Gemini'],
     ['mode' => 'app', 'message' => 'quiero crear una tabla productos', 'contains' => 'Creador de apps'],
     ['mode' => 'builder', 'message' => 'crear cliente nombre=Ana', 'contains' => 'chat de la app'],

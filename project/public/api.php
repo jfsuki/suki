@@ -981,7 +981,7 @@ function isHelpIntent(string $text): bool
 {
     $text = trim(mb_strtolower($text));
     if ($text === '') return true;
-    $keywords = ['hola', 'buenas', 'buenos', 'ayuda', 'help', 'menu', 'funciones', 'que puedes', 'que haces', 'cami'];
+    $keywords = ['hola', 'buenas', 'buenos', 'ayuda', 'help', 'menu', 'funciones', 'que puedes', 'que haces', 'suki'];
     foreach ($keywords as $kw) {
         if (str_contains($text, $kw)) {
             return true;
@@ -1011,7 +1011,7 @@ function buildHelpMessage(): string
     }
 
     $lines = [];
-    $lines[] = 'Hola, soy Cami. Estoy lista para ayudarte.';
+    $lines[] = 'Hola, soy SUKI. Estoy lista para ayudarte.';
     $lines[] = 'Puedes escribirme como hablas en WhatsApp.';
     $lines[] = 'Ejemplos rapidos:';
     $lines[] = '- crear cliente nombre=Juan nit=123';

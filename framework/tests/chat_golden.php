@@ -19,7 +19,7 @@ $base = [
 ];
 
 $steps = [
-    ['mode' => 'builder', 'message' => 'hola', 'contains' => 'Cami'],
+    ['mode' => 'builder', 'message' => 'hola', 'contains' => 'SUKI'],
     [
         'mode' => 'builder',
         'message' => 'quiero crear una app para inventario',

@@ -47,7 +47,7 @@ trait ConversationGatewayHandlePipelineTrait
                 $state['missing'] = [];
                 $state['requested_slot'] = null;
             }
-            $reply = 'Hola, soy Cami. Dime que necesitas crear o consultar.';
+            $reply = 'Hola, soy SUKI. Dime que necesitas crear o consultar.';
             $state = $this->updateState($state, $raw, $reply, null, null, [], null);
             $this->saveState($tenantId, $userId, $state);
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('greeting', true));

@@ -22,7 +22,7 @@ $entityName = 'demo_clientes_' . $runId;
 $conversation = [
     [
         'user' => 'hola',
-        'expect_contains' => 'Hola, soy Cami',
+        'expect_contains' => 'Hola, soy SUKI',
     ],
     [
         'user' => 'no se nada de sistemas, ayudame paso a paso',

@@ -23,7 +23,7 @@ $conversations = [
     [
         'name' => 'builder_greeting',
         'steps' => [
-            ['mode' => 'builder', 'message' => 'hola', 'contains' => 'Cami'],
+            ['mode' => 'builder', 'message' => 'hola', 'contains' => 'SUKI'],
         ],
     ],
     [

@@ -28,8 +28,20 @@ final class LLMRouter
         $prompt = $this->buildPrompt($capsule);
         $messages = [
             ['role' => 'system', 'content' => $this->systemPrompt($policy)],
-            ['role' => 'user', 'content' => $prompt],
         ];
+
+        if (!empty($capsule['last_messages']) && is_array($capsule['last_messages'])) {
+            foreach ($capsule['last_messages'] as $turn) {
+                if (isset($turn['u'])) {
+                    $messages[] = ['role' => 'user', 'content' => (string)$turn['u']];
+                }
+                if (isset($turn['a']) && trim((string)$turn['a']) !== '') {
+                    $messages[] = ['role' => 'assistant', 'content' => (string)$turn['a']];
+                }
+            }
+        }
+
+        $messages[] = ['role' => 'user', 'content' => $prompt];
 
         $lastError = null;
         $attempted = [];
