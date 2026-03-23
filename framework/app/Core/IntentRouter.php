@@ -1126,7 +1126,7 @@ final class IntentRouter
         ?SkillRegistry $skillsRegistry,
         array $existingTelemetry
     ): array {
-        if ($action !== 'send_to_llm') {
+        if ($action !== 'send_to_llm' && !in_array($action, ['respond_local', 'ask_user'], true)) {
             return [];
         }
 
@@ -1253,6 +1253,18 @@ final class IntentRouter
                     'semantic_intent_candidate_score' => $score,
                     'route_reason' => 'semantic_intent_candidate_before_llm',
                 ],
+            ];
+        }
+
+        // --- SPECIAL CASE: LOCAL INTENTS ---
+        if ($skillName === 'project_status_summary' && $score >= self::SEMANTIC_INTENT_STRONG_THRESHOLD) {
+            $statusReport = $this->buildLocalProjectStatusReport();
+            return [
+                'action' => 'respond_local',
+                'reply' => $statusReport,
+                'telemetry' => $semanticTelemetry + [
+                    'semantic_intent_status' => 'local_intercept',
+                ]
             ];
         }
 
@@ -1713,6 +1725,9 @@ final class IntentRouter
         }
 
         $tokens = preg_split('/\s+/', $normalized) ?: [];
+        if (count($tokens) >= 3 && str_starts_with($normalized, 'que ')) {
+            return false;
+        }
         return count($tokens) <= 2 && preg_match('/^(hola|gracias|ok|si|no|dale|vale|adios)/u', $normalized) === 1;
     }
 
@@ -2291,7 +2306,7 @@ final class IntentRouter
             }
 
             $type = strtolower(trim((string) ($hit['type'] ?? '')));
-            if (!str_starts_with($type, 'intent_utterance_') && $type !== 'intent_dataset_utterance') {
+            if (!str_contains($type, 'intent_utterance') && $type !== 'intent_dataset_utterance') {
                 continue;
             }
 
@@ -2483,5 +2498,37 @@ final class IntentRouter
         }
 
         return 'Bloqueado por contrato (strict): falta evidencia minima. Confirma el dato critico faltante. Motivo: ' . $reason . '.';
+    }
+
+    private function buildLocalProjectStatusReport(): string
+    {
+        $contractsDir = $this->contracts->getContractsDir();
+        $entitiesDir = $contractsDir . '/entities';
+        $formsDir = $contractsDir . '/forms';
+        
+        $entities = is_dir($entitiesDir) ? (glob($entitiesDir . '/*.json') ?: []) : [];
+        $forms = is_dir($formsDir) ? (glob($formsDir . '/*.json') ?: []) : [];
+        
+        $entityNames = array_map(function($path) {
+            return str_replace('.json', '', basename($path));
+        }, $entities);
+        
+        $formNames = array_map(function($path) {
+            return str_replace('.json', '', basename($path));
+        }, $forms);
+
+        $lines = [];
+        $lines[] = 'En esta app puedes trabajar con:';
+        $lines[] = '- Listas: ' . (count($entityNames) ? implode(', ', array_slice($entityNames, 0, 5)) : 'ninguna lista activa');
+        $lines[] = '- Formularios: ' . (count($formNames) ? implode(', ', array_slice($formNames, 0, 5)) : 'ningun formulario activo');
+        
+        if (!empty($entityNames)) {
+            $e = $entityNames[0];
+            $lines[] = 'Ejemplos: crear ' . $e . ' nombre=valor, listar ' . $e;
+        } else {
+            $lines[] = 'No hay listas activas. Pide al creador agregar una tabla.';
+        }
+        
+        return implode("\n", $lines);
     }
 }

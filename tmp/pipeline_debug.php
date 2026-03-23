@@ -49,7 +49,7 @@ try {
     $start = microtime(true);
     $result = $orchestrator->handle('demo', 'admin', 'hola mundo', 'builder', 'default');
     $ms = round((microtime(true) - $start) * 1000);
-    echo "RESULT (${ms}ms): " . json_encode(['action' => $result['action'] ?? '?', 'reply' => substr($result['reply'] ?? '', 0, 100)]) . "\n";
+    echo "RESULT ({$ms}ms): " . json_encode(['action' => $result['action'] ?? '?', 'reply' => substr($result['reply'] ?? '', 0, 100)]) . "\n";
 } catch (\Throwable $e) {
     echo "ORCHESTRATOR ERROR: " . $e->getMessage() . "\n";
     echo "FILE: " . $e->getFile() . " L:" . $e->getLine() . "\n";

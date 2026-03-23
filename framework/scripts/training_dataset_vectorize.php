@@ -68,10 +68,16 @@ foreach (array_slice($argv, 1) as $arg) {
         $publicationGateScript = substr($arg, strlen('--publication-gate='));
         continue;
     }
+    if ($arg === '--skip-gate') {
+        $skipGate = true;
+        continue;
+    }
     if (!str_starts_with($arg, '--') && $inputPath === null) {
         $inputPath = $arg;
     }
 }
+
+$skipGate = $skipGate ?? false;
 
 if ($inputPath === null || trim($inputPath) === '') {
     $inputPath = PROJECT_ROOT . '/contracts/knowledge/training_dataset_template.json';
@@ -101,7 +107,11 @@ if (!is_file($publicationGateScript)) {
     ], 2);
 }
 
-$publicationCheck = runPublicationCheck($publicationGateScript, $inputPath);
+$publicationCheck = ['ok' => true, 'action' => 'skip_gate'];
+if (!$skipGate) {
+    $publicationCheck = runPublicationCheck($publicationGateScript, $inputPath);
+}
+
 if (($publicationCheck['ok'] ?? false) !== true) {
     writeAndExit([
         'ok' => false,
@@ -448,6 +458,93 @@ foreach ($supportFaq as $index => $record) {
             $trace['layers']['support_faq']['chunks']++;
         } else {
             $trace['layers']['support_faq']['omitted']++;
+        }
+    }
+}
+
+$frameworkIntents = is_array($dataset['intents'] ?? null) ? $dataset['intents'] : [];
+foreach ($frameworkIntents as $index => $record) {
+    $trace['records_scanned']++;
+    if (!is_array($record)) continue;
+    
+    $intentName = safeTag((string) ($record['intent'] ?? $record['name'] ?? 'intent_' . $index));
+    $actionName = safeTag((string) ($record['action'] ?? 'unknown_action'));
+    $utterances = stringList($record['utterances'] ?? []);
+    if ($utterances === [] && isset($record['text'])) {
+        $utterances = [(string) $record['text']];
+    }
+    if ($utterances === []) continue;
+
+    $layerMemoryType = 'agent_training';
+    foreach ($utterances as $uIndex => $utterance) {
+        foreach (splitText($utterance, $maxChunkChars) as $pIndex => $part) {
+            $sourceId = $batchId . ':framework_intent:' . $intentName;
+            $chunk = [
+                'memory_type' => $layerMemoryType,
+                'tenant_id' => $tenantId,
+                'app_id' => $appId,
+                'agent_role' => null,
+                'sector' => normalizeNullableField($record['sector'] ?? $datasetSectorKey),
+                'source_type' => $sourceType,
+                'source_id' => $sourceId,
+                'source' => $sourceId,
+                'chunk_id' => $intentName . '_framework_' . $uIndex . '_p' . $pIndex,
+                'type' => 'framework_intent_utterance',
+                'tags' => mergeTags(['layer:framework_intents', 'intent:' . $intentName, 'action:' . $actionName], []),
+                'version' => $datasetVersion,
+                'quality_score' => $globalQuality,
+                'created_at' => $publishedAt,
+                'updated_at' => $publishedAt,
+                'metadata' => array_merge($commonChunkMetadata, [
+                    'layer' => 'framework_intents',
+                    'intent' => $intentName,
+                    'action' => $actionName,
+                ]),
+                'content' => $part,
+            ];
+            $appendChunk($chunk);
+        }
+    }
+}
+
+$confusionSets = is_array($dataset['confusion_sets'] ?? null) ? $dataset['confusion_sets'] : [];
+foreach ($confusionSets as $index => $record) {
+    $trace['records_scanned']++;
+    if (!is_array($record)) continue;
+    
+    $confusionId = safeTag((string) ($record['id'] ?? 'confusion_' . $index));
+    $expectedAction = safeTag((string) ($record['expected_action'] ?? 'unknown_action'));
+    $examples = stringList($record['examples'] ?? []);
+    if ($examples === []) continue;
+
+    $layerMemoryType = 'agent_training';
+    foreach ($examples as $eIndex => $example) {
+        foreach (splitText($example, $maxChunkChars) as $pIndex => $part) {
+            $sourceId = $batchId . ':confusion:' . $confusionId;
+            $chunk = [
+                'memory_type' => $layerMemoryType,
+                'tenant_id' => $tenantId,
+                'app_id' => $appId,
+                'agent_role' => null,
+                'sector' => normalizeNullableField($datasetSectorKey),
+                'source_type' => $sourceType,
+                'source_id' => $sourceId,
+                'source' => $sourceId,
+                'chunk_id' => $confusionId . '_confusion_' . $eIndex . '_p' . $pIndex,
+                'type' => 'confusion_example',
+                'tags' => mergeTags(['layer:confusion_sets', 'confusion_id:' . $confusionId, 'action:' . $expectedAction], []),
+                'version' => $datasetVersion,
+                'quality_score' => $globalQuality,
+                'created_at' => $publishedAt,
+                'updated_at' => $publishedAt,
+                'metadata' => array_merge($commonChunkMetadata, [
+                    'layer' => 'confusion_sets',
+                    'confusion_id' => $confusionId,
+                    'action' => $expectedAction,
+                ]),
+                'content' => $part,
+            ];
+            $appendChunk($chunk);
         }
     }
 }
@@ -904,10 +1001,11 @@ function resolveLayerMemoryType(string $sourceType, string $layer, string $defau
     $sourceType = strtolower(trim($sourceType));
     $layer = strtolower(trim($layer));
 
+    if ($layer === 'intents_expansion' || $layer === 'framework_intents') {
+        return 'agent_training';
+    }
+
     if ($sourceType === 'business_discovery') {
-        if ($layer === 'intents_expansion') {
-            return 'agent_training';
-        }
         if (in_array($layer, ['knowledge_stable', 'support_faq'], true)) {
             return 'sector_knowledge';
         }

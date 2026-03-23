@@ -21,7 +21,7 @@ use RuntimeException;
  */
 final class IntentClassifier
 {
-    private const QDRANT_CONFIDENCE_THRESHOLD = 0.80;
+    private const QDRANT_CONFIDENCE_THRESHOLD = 0.72;
     private const LLM_ALLOWED_INTENTS = [
         'greeting', 'farewell', 'affirmation', 'negation', 'frustration',
         'create_request', 'business_description', 'scope_question',
