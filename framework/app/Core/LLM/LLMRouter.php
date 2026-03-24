@@ -30,6 +30,11 @@ final class LLMRouter
             ['role' => 'system', 'content' => $this->systemPrompt($policy)],
         ];
 
+        if (!empty($capsule['context_summary'])) {
+            $summaryText = "CONTEXTO ACTUAL:\n" . json_encode($capsule['context_summary'], JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            $messages[] = ['role' => 'system', 'content' => $summaryText];
+        }
+
         if (!empty($capsule['last_messages']) && is_array($capsule['last_messages'])) {
             foreach ($capsule['last_messages'] as $turn) {
                 if (isset($turn['u'])) {
@@ -239,7 +244,10 @@ final class LLMRouter
         if ($strict) {
             return 'Responde solo con JSON valido. No uses markdown.';
         }
-        return 'Responde breve y claro.';
+        return "Responde breve y claro.\n"
+            . "REGLA: Si un campo ya esta en 'confirmed', NO lo preguntes de nuevo.\n"
+            . "REGLA: Si el usuario ya respondio algo, acusa recibo y avanza.\n"
+            . "REGLA: Maximo 1 pregunta por turno.";
     }
 
     private function buildPrompt(array $capsule): string

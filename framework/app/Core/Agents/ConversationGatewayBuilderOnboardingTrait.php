@@ -866,10 +866,6 @@ trait ConversationGatewayBuilderOnboardingTrait
 
     private function resolveBuilderOnboardingStep(array $profile, array $state): string
     {
-        $currentStep = trim((string) ($state['onboarding_step'] ?? ''));
-        if ($currentStep !== '') {
-            return $currentStep;
-        }
 
         $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
         if ($businessType === '') {

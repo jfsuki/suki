@@ -8854,6 +8854,12 @@ declare(strict_types=1);
                 ],
                 'user_message' => $text,
                 'last_messages' => $state['last_messages'] ?? [],
+                'context_summary' => [
+                    'confirmed' => $state['collected'] ?? [],
+                    'missing' => $state['missing'] ?? [],
+                    'current_step' => $state['active_task'] ?? 'onboarding',
+                    'turns_in_session' => count($state['last_messages'] ?? []),
+                ],
                 'policy' => [
                     'requires_strict_json' => $requiresJson,
                     'latency_budget_ms' => (int) ($policy['latency_budget_ms'] ?? 1200),

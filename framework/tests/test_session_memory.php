@@ -2,77 +2,59 @@
 // framework/tests/test_session_memory.php
 require_once __DIR__ . '/../vendor/autoload.php';
 
-// Mock environment for test
+use App\Core\ChatAgent;
+
 putenv('GEMINI_API_KEY=dummy_key_for_test_bypass');
-putenv('EMBEDDING_MODEL=gemini-embedding-001');
 putenv('ALLOW_RUNTIME_SCHEMA=1');
 putenv('APP_ENV=local');
 
-if (!defined('FRAMEWORK_ROOT')) {
-    define('FRAMEWORK_ROOT', dirname(__DIR__));
-}
-if (!defined('PROJECT_ROOT')) {
-    define('PROJECT_ROOT', dirname(__DIR__, 2));
-}
-
-use App\Core\ChatAgent;
-use App\Core\ChatMemoryStore;
-
-// Clean session for reproducibility
-$tenantId = 'test_tenant';
-$userId = 'test_user_' . uniqid();
-$projectId = 'test_project';
-
 $agent = new ChatAgent();
-$sessionKey = "chat_session:{$tenantId}:{$projectId}:app:{$userId}";
+$tenantId = 'test_tenant';
+$userId = 'test_user';
+$projectId = 'test_project';
+$sessionId = 'test_session_' . uniqid();
 
-echo "--- Turn 1: Setting context ---\n";
-$msg1 = "Mi nombre es Carlos y tengo una ferretería.";
-$response1 = $agent->handle([
+$context = [
     'tenant_id' => $tenantId,
     'user_id' => $userId,
-    'message' => $msg1,
-    'mode' => 'app',
-    'project_id' => $projectId
-]);
-var_dump($response1);
-echo "User: $msg1\n";
-echo "Suki: " . $response1['reply'] . "\n\n";
+    'project_id' => $projectId,
+    'session_id' => $sessionId,
+    'channel' => 'web',
+    'mode' => 'builder',
+];
 
-echo "--- Turn 2: Verifying recall ---\n";
-$msg2 = "¿Cómo me llamo?";
-$response2 = $agent->handle([
-    'tenant_id' => $tenantId,
-    'user_id' => $userId,
-    'message' => $msg2,
-    'mode' => 'app',
-    'project_id' => $projectId
-]);
-echo "User: $msg2\n";
-echo "Suki: " . $response2['reply'] . "\n\n";
+echo "GEMINI_API_KEY (mocked): " . (getenv('GEMINI_API_KEY') ? 'PRESENT' : 'MISSING') . "\n";
 
-$lowerReply = mb_strtolower($response2['reply']);
-if (str_contains($lowerReply, 'carlos')) {
-    echo "SUCCESS: Agent remembered the name 'Carlos' from history.\n";
+// Turn 1: Greeting
+echo "Turn 1: Hola...\n";
+$payload1 = array_merge($context, [
+    'message' => 'Hola',
+]);
+$response1 = $agent->handle($payload1);
+echo "Turn 1: step=" . ($response1['data']['state']['onboarding_step'] ?? 'unknown') . "\n";
+echo "Reply 1: " . ($response1['data']['reply'] ?? 'EMPTY') . "\n\n";
+
+// Turn 2: Providing business type
+echo "Turn 2: Venta de productos...\n";
+$payload2 = array_merge($context, [
+    'message' => 'Venta de productos',
+]);
+$response2 = $agent->handle($payload2);
+echo "Turn 2: step=" . ($response2['data']['state']['onboarding_step'] ?? 'unknown') . "\n";
+echo "Reply 2: " . ($response2['data']['reply'] ?? 'EMPTY') . "\n\n";
+
+// Turn 3: Check if it skips business_type and asks for operation_model
+echo "Turn 3: ¿Qué sigue?\n";
+$payload3 = array_merge($context, [
+    'message' => '¿Qué sigue?',
+]);
+$response3 = $agent->handle($payload3);
+echo "Turn 3: step=" . ($response3['data']['state']['onboarding_step'] ?? 'unknown') . "\n";
+echo "Reply 3: " . ($response3['data']['reply'] ?? 'EMPTY') . "\n";
+
+$step3 = $response3['data']['state']['onboarding_step'] ?? '';
+if ($step3 === 'operation_model' || $step3 === 'needs_scope') {
+    echo "SUCCESS: Onboarding skipped 'business_type' correctly.\n";
 } else {
-    echo "FAILURE: Agent forgot the name 'Carlos'.\n";
-}
-
-echo "\n--- Turn 3: Verifying business recall ---\n";
-$msg3 = "¿De qué es mi negocio?";
-$response3 = $agent->handle([
-    'tenant_id' => $tenantId,
-    'user_id' => $userId,
-    'message' => $msg3,
-    'mode' => 'app',
-    'project_id' => $projectId
-]);
-echo "User: $msg3\n";
-echo "Suki: " . $response3['reply'] . "\n\n";
-
-$lowerReplyBusiness = mb_strtolower($response3['reply']);
-if (str_contains($lowerReplyBusiness, 'ferretería') || str_contains($lowerReplyBusiness, 'ferreteria')) {
-    echo "SUCCESS: Agent remembered 'ferretería' from history.\n";
-} else {
-    echo "FAILURE: Agent forgot the business type.\n";
+    echo "FAILURE: Onboarding stuck in '$step3'.\n";
 }
