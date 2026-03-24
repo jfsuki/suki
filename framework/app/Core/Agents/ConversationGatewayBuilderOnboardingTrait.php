@@ -1,4 +1,4 @@
-<?php
+﻿<?php
 declare(strict_types=1);
 // app/Core/Agents/ConversationGatewayBuilderOnboardingTrait.php
 
@@ -25,6 +25,19 @@ trait ConversationGatewayBuilderOnboardingTrait
             ? 'unknown_business_discovery'
             : 'builder_onboarding';
         $localState['onboarding_step'] = $currentStep;
+        
+        // Mapeo contextual para respuestas ambiguas (MisiÃ³n 2 - Paso 2D)
+        $normalizedText = strtolower(trim((string) ($text ?? '')));
+        if ($normalizedText === 'ambos' || $normalizedText === 'ambas' || $normalizedText === 'ambas cosas' || $normalizedText === 'ambos tipos') {
+            $lastContext = is_array($state['last_question_context'] ?? null) ? $state['last_question_context'] : [];
+            $lastField = (string) ($lastContext['field'] ?? '');
+            if ($lastField === 'operation_model') {
+                $text = 'mixto';
+            } elseif ($lastField === 'business_type' || $lastField === 'operation_channels') {
+                // Si dice ambas para tipo de negocio, asumimos el perfil mas completo o multicanal
+                $text = 'retail_tienda y ecommerce'; 
+            }
+        }
 
         if ($this->isBuilderUserFrustrated($text)) {
             $assist = $this->clarifyBuilderStepViaLlm($text, $currentStep, $localProfile, $localState);
@@ -853,10 +866,13 @@ trait ConversationGatewayBuilderOnboardingTrait
 
         if ($isOnboarding || $trigger || $businessHint) {
             $localState['active_task'] = 'builder_onboarding';
-            $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
+            $step = (string) $localState['onboarding_step'];
+            $reply = $this->buildBuilderOnboardingRecoveryReply($step, $localProfile);
+            $localState['last_question_context'] = $this->inferLastQuestionContext($step, $reply);
+            
             return [
                 'action' => 'ask_user',
-                'reply' => $this->buildBuilderOnboardingRecoveryReply((string) $localState['onboarding_step'], $localProfile),
+                'reply' => $reply,
                 'state' => $localState,
             ];
         }
@@ -1325,5 +1341,22 @@ trait ConversationGatewayBuilderOnboardingTrait
             }
         }
         return false;
+    }
+    private function inferLastQuestionContext(string $step, string $reply): array
+    {
+        $reply = strtolower($reply);
+        if ($step === 'operation_model' || str_contains($reply, 'contado') || str_contains($reply, 'credito')) {
+            return [
+                'field' => 'operation_model',
+                'options' => ['contado', 'credito', 'mixto']
+            ];
+        }
+        if ($step === 'business_type' || str_contains($reply, 'fisica') || str_contains($reply, 'online')) {
+            return [
+                'field' => 'operation_channels',
+                'options' => ['fisica', 'online', 'ambas']
+            ];
+        }
+        return ['field' => $step];
     }
 }

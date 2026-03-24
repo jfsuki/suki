@@ -154,6 +154,18 @@ final class IntentRouter
 
         try {
             $skillsCatalog = $this->contracts->getSkillsCatalog();
+            
+            // GUARD: Aislamiento de modo (Misión 2)
+            if (($context['mode'] ?? '') === 'builder') {
+                $skillsCatalog['catalog'] = array_filter($skillsCatalog['catalog'] ?? [], function($skill) {
+                    $name = strtolower((string) ($skill['name'] ?? ''));
+                    // Solo permitimos skills de construcción/onboarding
+                    return str_starts_with($name, 'builder_') || 
+                           str_starts_with($name, 'onboarding_') || 
+                           str_contains($name, 'ask_user');
+                });
+            }
+
             $skillsRegistry = new SkillRegistry($skillsCatalog);
             $contractVersions['skills_catalog'] = (string) ($skillsCatalog['version'] ?? 'unknown');
         } catch (\Throwable $e) {
@@ -697,39 +709,32 @@ final class IntentRouter
             $guardReason = 'router_steps_budget_exceeded';
             $guardStage = 'router';
         } elseif ($toolCallsCount > (int) ($runtimeBudget['max_tool_calls'] ?? 10)) {
-            echo "DEBUG: Guard triggered by tool_calls_budget_exceeded ($toolCallsCount)\n";
             $guardTriggered = true;
             $guardReason = 'tool_calls_budget_exceeded';
             $guardStage = 'orchestrator';
         } elseif ($retryCount > (int) ($runtimeBudget['max_retries'] ?? 0)) {
-            echo "DEBUG: Guard triggered by retry_budget_exceeded ($retryCount)\n";
             $guardTriggered = true;
             $guardReason = 'retry_budget_exceeded';
             $guardStage = 'orchestrator';
         } elseif ($semanticQueriesCount > (int) ($runtimeBudget['max_semantic_queries'] ?? 1)) {
-            echo "DEBUG: Guard triggered by semantic_query_budget_exceeded ($semanticQueriesCount)\n";
             $guardTriggered = true;
             $guardReason = 'semantic_query_budget_exceeded';
             $guardStage = 'rag';
         } elseif ($llmFallbackCount > (int) ($runtimeBudget['max_llm_fallbacks'] ?? 1)) {
-            echo "DEBUG: Guard triggered by llm_fallback_budget_exceeded ($llmFallbackCount)\n";
             $guardTriggered = true;
             $guardReason = 'llm_fallback_budget_exceeded';
             $guardStage = 'llm';
         } elseif (!$verifiedSemanticEvidence && !$shortConfirmationBudgetBypass && $routerLatencyMs > (int) ($runtimeBudget['max_execution_ms'] ?? 5000)) {
-            echo "DEBUG: Guard triggered by execution_time_budget_exceeded ($routerLatencyMs ms)\n";
             $guardTriggered = true;
             $guardReason = 'execution_time_budget_exceeded';
             $guardStage = 'router';
         } elseif ((bool) ($loopCheck['triggered'] ?? false)) {
-            echo "DEBUG: Guard triggered by repeated_route_without_progress\n";
             $guardTriggered = true;
             $guardReason = 'repeated_route_without_progress';
             $guardStage = 'router';
         }
 
         if ($guardTriggered) {
-            echo "\nDEBUG: Runtime Guard Triggered! Reason: $guardReason, Stage: $guardStage\n";
             $guardReply = $this->buildUserSafeRuntimeGuardReply($guardReason, $context);
         }
 
