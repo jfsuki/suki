@@ -1,0 +1,3 @@
+{"ts":"2026-03-24T02:09:01+00:00","event":"upload","tenant_id":"tenant_api","app_id":"media_app","entity_type":"product","entity_id":"900","user_id":"api_media_user","media_id":"244"}
+{"ts":"2026-03-24T02:09:01+00:00","event":"access","tenant_id":"tenant_api","app_id":"media_app","entity_type":"product","entity_id":"900","user_id":"token","media_id":"244","variant":"original"}
+{"ts":"2026-03-24T02:09:01+00:00","event":"delete","tenant_id":"tenant_api","app_id":"media_app","entity_type":"product","entity_id":"900","user_id":"api_media_user","media_id":"244"}

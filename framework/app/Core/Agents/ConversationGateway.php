@@ -1909,6 +1909,14 @@ declare(strict_types=1);
                 'mi empresa es',
                 'empresa de',
                 'tengo una empresa',
+                'tengo un negocio',
+                'vendo ',
+                'vendemos ',
+                'fabricamos ',
+                'produzco ',
+                'me dedico a',
+                'mi aplicacion es para',
+                'mi app es para',
             ];
             foreach ($patterns as $pattern) {
                 if (str_contains($text, $pattern)) {

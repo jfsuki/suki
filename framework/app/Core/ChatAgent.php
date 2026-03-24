@@ -1273,7 +1273,9 @@ final class ChatAgent
         ]);
         $failure = $this->controlTowerFailTask($task, [
             'error_type' => 'route_error',
-            'description' => 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123',
+            'description' => ($mode === 'builder')
+                ? 'No entendí. Cuéntame más sobre tu negocio o qué quieres crear en tu aplicación.'
+                : 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123',
             'created_at' => date('c'),
         ]);
         $task = $failure['task'];
@@ -1302,7 +1304,9 @@ final class ChatAgent
                 'error_flag' => true,
                 'error_type' => 'route_error',
                 'response_kind' => 'error',
-                'response_text' => 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123',
+                'response_text' => ($mode === 'builder')
+                    ? 'No entendí. Cuéntame más sobre tu negocio o qué quieres crear en tu aplicación.'
+                    : 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123',
                 'task_id' => (string) ($task['task_id'] ?? ''),
                 'conversation_id' => $conversationId,
             ]
@@ -1322,7 +1326,9 @@ final class ChatAgent
             // observability must not block chat response
         }
         return $this->annotateReplyWithControlTower(
-            $this->reply('No entendi. Puedes decir: crear cliente nombre=Juan nit=123', $channel, $sessionId, $userId, 'error'),
+            $this->reply(($mode === 'builder')
+                ? 'No entendí. Cuéntame más sobre tu negocio o qué quieres crear en tu aplicación.'
+                : 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123', $channel, $sessionId, $userId, 'error'),
             $task,
             $failure['incident']
         );

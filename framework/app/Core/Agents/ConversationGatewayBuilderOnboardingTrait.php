@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 declare(strict_types=1);
 // app/Core/Agents/ConversationGatewayBuilderOnboardingTrait.php
 
@@ -877,7 +877,23 @@ trait ConversationGatewayBuilderOnboardingTrait
             ];
         }
 
-        return null;
+        // Safety fallback: si estamos aca, no entendimos el paso pero estamos en flujo de construccion.
+        // NO retornamos null para evitar el fallback de ERP ("No entendi. Puedes decir: crear cliente...")
+        // EXCEPTO si es un mensaje de accion (crear tabla, etc) que debe manejar el IntentRouter.
+        if ($this->isBuilderActionMessage($text)) {
+            return null;
+        }
+
+        $localState['active_task'] = 'builder_onboarding';
+        $step = (string)($localState['onboarding_step'] ?? 'business_type');
+        $reply = $this->buildBuilderOnboardingRecoveryReply($step, $localProfile);
+        $localState['last_question_context'] = $this->inferLastQuestionContext($step, $reply);
+
+        return [
+            'action' => 'ask_user',
+            'reply' => $reply,
+            'state' => $localState,
+        ];
     }
 
     private function resolveBuilderOnboardingStep(array $profile, array $state): string
