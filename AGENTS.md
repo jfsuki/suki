@@ -44,21 +44,21 @@ No se permite patch ciego. Si no hay evidencia de test, el trabajo no esta compl
 
 ## 3) Protocolo de contexto (retrieval-led, obligatorio)
 Antes de tocar chat, DB kernel, contratos o integraciones:
-1) Leer `framework/docs/INDEX.md`.
+1) Leer `docs/INDEX.md`.
 2) Leer solo docs relevantes (targeted retrieval), no todo el repositorio.
 3) Tomar como fuente de verdad:
    - contratos activos (`project/contracts/*`)
    - registry real (`project/storage/meta/project_registry.sqlite`)
 
 Lectura minima recomendada:
-- `framework/docs/PROJECT_MEMORY.md`
-- `framework/docs/PROJECT_MEMORY_CANONICAL.md`
-- `framework/docs/08_WORK_PLAN.md`
-- `framework/docs/07_DATABASE_MODEL.md`
-- `framework/docs/AGENTS_CONVERSATION_GATEWAY.md`
-- `framework/docs/AGENT_SKILLS_MATRIX.md`
-- `framework/docs/HOSTING_MIGRATION_PLAN.md`
-- `framework/docs/CODEX_SELF_CHECKLIST.md`
+- `docs/PROJECT_MEMORY.md` (Memoria unificada)
+- `docs/memory/PROJECT_MEMORY_CANONICAL.md`
+- `docs/memory/08_WORK_PLAN.md`
+- `docs/technical/07_DATABASE_MODEL.md`
+- `docs/technical/AGENTS_CONVERSATION_GATEWAY.md`
+- `docs/technical/AGENT_SKILLS_MATRIX.md`
+- `docs/memory/HOSTING_MIGRATION_PLAN.md`
+- `docs/technical/CODEX_SELF_CHECKLIST.md`
 
 ## 3.1) Pre-check obligatorio antes de cada cambio
 Ejecutar siempre:
@@ -109,7 +109,7 @@ Si las pruebas generan artefactos:
 
 ## 8) Skills: como usarlas sin romper logica
 Orden de uso:
-1) Retrieval-led docs (`INDEX.md` + docs objetivo).
+1) Retrieval-led docs (`docs/INDEX.md` + docs objetivo).
 2) Memoria y contratos del repo.
 3) Skills puntuales (no reemplazan analisis).
 
@@ -153,9 +153,9 @@ Cuando se modifique un archivo de gobierno (AGENTS/docs):
 
 ## 12) Disciplina obligatoria de versionado (git)
 - Identificar archivos clave antes de cambiar:
-  - contratos (`framework/contracts/*`, `project/contracts/*`)
+  - contracts (`framework/contracts/*`, `project/contracts/*`)
   - kernel/engine (`framework/app/Core/*`)
-  - docs de gobierno (`framework/docs/*`, `AGENTS.md`)
+  - docs de gobierno (`docs/*`, `AGENTS.md`)
   - scripts QA (`framework/scripts/*`, `framework/tests/*`)
 - Todo cambio exitoso debe cerrar con:
   1) `git add` de archivos modificados,

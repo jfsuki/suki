@@ -1,49 +1,71 @@
 # PROJECT_MEMORY
 
-## Objective (short)
-Build a low-code "mother app" platform that generates business apps from JSON contracts. Users get a friendly UI; the engine hides complexity and keeps backward compatibility.
+## Objective
+Build a low-code/AI-first platform that generates business apps from JSON contracts.
+Core principle: chat-first usage, visual UI only when needed (tables, reports, charts).
+Users get a friendly UI; the engine hides complexity and keeps backward compatibility.
 
 ## Non-negotiable rules
-- No rewrite from scratch. Only incremental, backward-compatible changes.
-- JSON is the single source of truth (FormContract is canonical).
-- Do not break existing keys/behavior; only additive changes.
-- No SQL in app layer; persistence must go through Kernel/ORM.
-- Keep framework/project separation (framework = kernel, project = app).
-- Legacy fallback is allowed but new contracts live in /project/contracts.
+- **No rewrite from scratch**. Only incremental, backward-compatible changes.
+- **JSON is the single source of truth** (FormContract/EntityContract are canonical).
+- **Do not break existing keys/behavior**; only additive changes.
+- **No SQL in app layer**; persistence must go through Kernel/ORM/Repository.
+- **Keep framework/project separation** (framework = kernel, project = app).
+- **Tenant Isolation**: Every query must be index-friendly and tenant-scoped.
+- **Neuron IA Alignment**: Follow the 6-step message flow and semantic routing.
+
+## Canonical governance
+- Canonical memory source: `docs/PROJECT_MEMORY.md`.
+- Architecture laws: `docs/canon/`.
+- Mandatory developer pre-check: `php framework/scripts/codex_self_check.php --strict`.
+- Temporary testing artifacts policy: only under `framework/tests/tmp/`.
+
+## Vision (Neuron IA integrated)
+- **Meta**: Generar y operar apps ERP por conversación (chat-first) con panel visual para lo necesario.
+- **North Star**: Cero tecnicismos para el usuario final, IA como capa de razonamiento (no caja negra), cambios determinísticos preferidos.
+- **UX**: 1 pregunta mínima, chat para operar, panel visual para ver datos.
+- **Arquitectura**: Router multi-capa (Reglas -> Semántica -> LLM) + Command Bus + Repositorios tipados.
 
 ## Current modules and responsibilities
-- FormGenerator (framework/app/Core/FormGenerator.php): orchestrates form + grids + summary rendering.
-- FormBuilder (framework/app/Core/FormBuilder.php): input/select/textarea UI primitives.
-- TableGenerator (framework/app/Core/TableGenerator.php): table shell for API-driven lists.
-- Grid runtime JS (framework/public/assets/js/form-grid.js): grid rows, totals, formulas, summary graph, FORM_STORE/GRID_STORE in localStorage.
-- Legacy grid engine (framework/public/assets/js/grid-engine.php): older grid calculator.
-- Manifest validator (framework/app/Core/ManifestValidator.php): validates app.manifest.json at runtime.
-- Entity contract + registry (framework/contracts/schemas/entity.schema.json, framework/app/Core/EntityRegistry.php).
-- DB Kernel MVP (framework/app/Core/Database.php, QueryBuilder.php, BaseRepository.php, EntityMigrator.php, MigrationStore.php).
-- Editor JSON (framework/public/editor_json/formjson.html): dashboard + forms + DB/process editor.
-- Project routing (project/public/index.php, api.php, .htaccess).
+- **FormGenerator** (framework/app/Core/FormGenerator.php): orchestrates form + grids + summary rendering.
+- **ChatAgent** (framework/app/Core/ChatAgent.php): Orchestrator following Neuron IA 6-step flow.
+- **ConversationMemory** (framework/app/Core/ConversationMemory.php): Thread-based persistence (Tenant/Session).
+- **LLMRouter** (framework/app/Core/LLM/LLMRouter.php): Multi-provider failover and strict JSON enforcement.
+- **IntentRouter** (framework/app/Core/IntentRouter.php): Multi-layer intent classification.
+- **CommandBus** (framework/app/Core/CommandBus.php): Deterministic execution of module actions.
+- **Database Kernel** (Database.php, QueryBuilder.php, EntityMigrator.php): Multi-tenant persistence layer.
+
+## Checkpoint History (Detailed)
+
+### Checkpoint (2026-03-29, Neuron IA Integration)
+- Adopted `ConversationMemory` pattern for history persistence.
+- Implemented 6-step invariant message flow in `ChatAgent`.
+- Standardized `SystemPrompt` in external files.
+- Integrated `IntentClassifier` for strict JSON routing.
+
+### Checkpoint (2026-03-03, pre-P0 secrets hardening)
+- Baseline frozen for pending tracking before structural hardening.
+- Open blockers at snapshot time:
+  - `domain_training_sync` drift blocking full green in `run.php`.
+  - `project/.env` tracked in git (security risk).
+  - `ConversationGateway.php` still oversized and pending deeper split.
+
+### Canon consolidation (2026-03-02)
+- Recognized `docs/canon/*` and `docs/contracts/*` as official governance sources.
+- Mandates: Queue and idempotency, deterministic router, intent classes (EXECUTABLE|INFORMATIVE).
+
+*(... Historial previo de checkpoints de febrero truncado para brevedad, disponible en `docs/memory/PROJECT_MEMORY.md` si se requiere detalle profundo de la evolución inicial ...)*
 
 ## What works today
-- Form rendering from JSON (sections, grid, summary).
-- Grid formulas + totals + summary dependency ordering.
-- Select options (manual or API) in grids.
-- FORM_STORE/GRID_STORE snapshots in localStorage.
-- Manifest + Entity schema validation.
-- DB Kernel MVP with allowlist + tenant scope + create-if-missing migrations.
-- CLI migrator runner (project/bin/migrate.php) for real DB table creation.
-- Framework/project separation and routing conventions.
+- Forms + grids render desde JSON.
+- Entity contracts validados (schema).
+- DB Kernel MVP (QueryBuilder + Repository + tenant scope).
+- Onboarding builder determinístico con "Fast Path" para sectores comunes.
+- LLM Smoke Test exitoso en Mistral, Gemini, OpenRouter y DeepSeek.
+- Limpieza profunda de artefactos temporales y logs.
 
-## What is missing / partial
-- Declarative validation engine (UI + backend) is incomplete.
-- FORM_STORE/GRID_STORE persistence to DB (only localStorage now).
-- CRUD endpoints/controllers built on BaseRepository.
-- Migration diff/alter (only CREATE IF NOT EXISTS).
-- Import wizard (CSV/Excel/JSON -> DataContract + seeds).
-- Visual form builder (drag/drop, layout grid, tab order).
-- Process engine + async jobs + audit log.
-- Security hardening (CSRF, centralized sanitization).
-
-## Known risks / gaps
-- Two grid engines (form-grid.js + grid-engine.php) can drift.
-- Summary formulas use eval/new Function; needs sandboxing.
-- LocalStorage store is not durable or multi-user safe.
+## Missing / Partial
+- Manual testing end-to-end completo.
+- UI avanzada (drag & drop editor).
+- Migraciones `diff/alter` automáticas (actualmente solo CREATE IF NOT EXISTS).
+- Auditoría profunda de persistencia FORM_STORE/GRID_STORE.
