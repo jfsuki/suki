@@ -31,7 +31,9 @@ $geminiKey = trim((string) getenv('GEMINI_API_KEY'));
 $groqKey = trim((string) getenv('GROQ_API_KEY'));
 $openRouterKey = trim((string) getenv('OPENROUTER_API_KEY'));
 $claudeKey = trim((string) getenv('CLAUDE_API_KEY'));
-$preferredProvider = strtolower(trim((string) (getenv('LLM_SMOKE_PRIMARY') ?: 'gemini')));
+$mistralKey = trim((string) getenv('MISTRAL_API_KEY'));
+$deepSeekKey = trim((string) getenv('DEEPSEEK_API_KEY'));
+$preferredProvider = strtolower(trim((string) (getenv('LLM_SMOKE_PRIMARY') ?: 'mistral')));
 
 $providerCatalog = [];
 if ($geminiKey !== '') {
@@ -45,6 +47,12 @@ if ($openRouterKey !== '') {
 }
 if ($claudeKey !== '') {
     $providerCatalog['claude'] = \App\Core\LLM\Providers\ClaudeProvider::class;
+}
+if ($mistralKey !== '') {
+    $providerCatalog['mistral'] = \App\Core\LLM\Providers\MistralProvider::class;
+}
+if ($deepSeekKey !== '') {
+    $providerCatalog['deepseek'] = \App\Core\LLM\Providers\DeepSeekProvider::class;
 }
 if (empty($providerCatalog)) {
     $missingMessage = 'No hay proveedores LLM configurados (GEMINI/GROQ/OPENROUTER/CLAUDE).';
@@ -118,7 +126,7 @@ if (empty($failures) && !$skipped) {
         ];
     }
 
-    $modeForRouter = in_array($preferredProvider, ['gemini', 'groq', 'openrouter', 'claude'], true)
+    $modeForRouter = in_array($preferredProvider, ['gemini', 'groq', 'openrouter', 'claude', 'mistral', 'deepseek'], true)
         ? $preferredProvider
         : $mode;
 
@@ -128,8 +136,10 @@ if (empty($failures) && !$skipped) {
             'default' => [
                 'gemini' => (string) (getenv('GEMINI_MODEL') ?: 'gemini-2.5-flash-lite'),
                 'groq' => (string) (getenv('GROQ_MODEL') ?: 'llama-3.1-8b-instant'),
-                'openrouter' => (string) (getenv('OPENROUTER_MODEL') ?: 'openrouter/free'),
+                'openrouter' => (string) (getenv('OPENROUTER_MODEL') ?: 'qwen/qwen-2.5-coder-32b-instruct'),
                 'claude' => (string) (getenv('CLAUDE_MODEL') ?: 'claude-3-5-haiku-latest'),
+                'mistral' => (string) (getenv('MISTRAL_MODEL') ?: 'pixtral-large-latest'),
+                'deepseek' => (string) (getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat'),
             ],
         ],
         'limits' => [
