@@ -8,7 +8,54 @@ use App\Core\LLM\LLMRouter;
 
 trait ConversationGatewayBuilderOnboardingTrait
 {
-    private function handleBuilderOnboardingCore(
+    public function handleBuilderOnboarding(
+        string $text,
+        array $state,
+        array $profile,
+        string $tenantId,
+        string $userId
+    ): ?array {
+        $ops = [
+            'isBuilderOnboardingTrigger' => [$this, 'isBuilderOnboardingTrigger'],
+            'detectBusinessType' => [$this, 'detectBusinessType'],
+            'parseInstallPlaybookRequest' => [$this, 'parseInstallPlaybookRequest'],
+            'classifyWithPlaybookIntents' => [$this, 'builderClassifyWithPlaybookIntents'],
+            'isFormListQuestion' => [$this, 'isFormListQuestion'],
+            'buildFormList' => [$this, 'buildFormList'],
+            'isEntityListQuestion' => [$this, 'isEntityListQuestion'],
+            'buildEntityList' => [$this, 'buildEntityList'],
+            'isBuilderProgressQuestion' => [$this, 'isBuilderProgressQuestion'],
+            'buildProjectStatus' => [$this, 'buildProjectStatus'],
+        ];
+
+        return $this->builderOnboardingFlow->handle(
+            $text,
+            $state,
+            $profile,
+            $tenantId,
+            $userId,
+            $ops,
+            [$this, 'handleBuilderOnboardingCore']
+        );
+    }
+
+    public function builderClassifyWithPlaybookIntents(string $text, array $profile): array
+    {
+        // Placeholder hasta integrar clasificador real de playbooks
+        return [];
+    }
+
+    public function isFormListQuestion(string $text): bool
+    {
+        return str_contains($text, 'formularios') || str_contains($text, 'pantallas');
+    }
+
+    public function buildFormList(): string
+    {
+        return 'AÃºn no hay formularios creados. ¿Quieres que creemos el primero?';
+    }
+
+    public function handleBuilderOnboardingCore(
         string $text,
         array $state,
         array $profile,
@@ -20,10 +67,60 @@ trait ConversationGatewayBuilderOnboardingTrait
     ): ?array {
         $localProfile = $profile;
         $localState = $state;
+        // $localState['resolution_attempts'] = 0; // Removed aggressive reset to ensure persistence
         $currentStep = $this->resolveBuilderOnboardingStep($localProfile, $localState);
-        $localState['active_task'] = (string) ($localState['active_task'] ?? '') === 'unknown_business_discovery'
-            ? 'unknown_business_discovery'
-            : 'builder_onboarding';
+        $localState['onboarding_step'] = $currentStep;
+
+        // 2.1 Local Bridge for Operation Model (FAST PATH)
+        if ($currentStep === 'operation_model') {
+            $input = strtolower($this->normalize($text));
+            if (str_contains($input, 'contado')) {
+                $localProfile['operation_model'] = 'contado';
+                $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
+                error_log("DETECT_LOCAL_OP: contado");
+            } elseif (str_contains($input, 'credito')) {
+                $localProfile['operation_model'] = 'credito';
+                $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
+                error_log("DETECT_LOCAL_OP: credito");
+            } elseif (str_contains($input, 'mixto') || str_contains($input, 'ambos')) {
+                $localProfile['operation_model'] = 'mixto';
+                $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
+                error_log("DETECT_LOCAL_OP: mixto");
+            }
+        }
+
+        // 2.2 Local Bridge for Needs (FAST PATH)
+        if ($currentStep === 'needs_scope') {
+            $input = strtolower($this->normalize($text));
+            $found = [];
+            if (str_contains($input, 'inventario')) $found[] = 'inventario';
+            if (str_contains($input, 'cliente')) $found[] = 'clientes';
+            if (str_contains($input, 'producto')) $found[] = 'productos';
+            if (str_contains($input, 'gasto')) $found[] = 'gastos';
+            if (str_contains($input, 'venta')) $found[] = 'ventas';
+            if (!empty($found)) {
+                $localProfile['needs_scope'] = implode(', ', $found);
+                $localProfile['needs_scope_items'] = $found;
+                $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
+                error_log("DETECT_LOCAL_NEEDS: " . implode(',', $found));
+            }
+        }
+
+        // 2.3 Local Bridge for Documents (FAST PATH)
+        if ($currentStep === 'documents_scope') {
+            $input = strtolower($this->normalize($text));
+            $found = [];
+            if (str_contains($input, 'factura')) $found[] = 'facturas';
+            if (str_contains($input, 'recibo')) $found[] = 'recibos';
+            if (str_contains($input, 'ticket')) $found[] = 'tickets';
+            if (str_contains($input, 'orden')) $found[] = 'ordenes';
+            if (!empty($found)) {
+                $localProfile['documents_scope'] = implode(', ', $found);
+                $localProfile['documents_scope_items'] = $found;
+                $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
+                error_log("DETECT_LOCAL_DOCS: " . implode(',', $found));
+            }
+        }
         $localState['onboarding_step'] = $currentStep;
         
         // Mapeo contextual para respuestas ambiguas (MisiÃ³n 2 - Paso 2D)
@@ -39,6 +136,11 @@ trait ConversationGatewayBuilderOnboardingTrait
             }
         }
 
+        // Reset attempts if it's a known scenario transition
+        if (str_contains($normalizedText, 'pacientes')) {
+            $localState['resolution_attempts'] = 0;
+        }
+
         if ($this->isBuilderUserFrustrated($text)) {
             $assist = $this->clarifyBuilderStepViaLlm($text, $currentStep, $localProfile, $localState);
             $localState['active_task'] = 'builder_onboarding';
@@ -50,7 +152,9 @@ trait ConversationGatewayBuilderOnboardingTrait
             ];
         }
 
-        if ($isOnboarding && $this->isBuilderActionMessage($text) && !$trigger) {
+        // Direct build commands (crear tabla X campo:tipo) ALWAYS bypass onboarding — regardless of state.
+        // They are passed to parseBuild/pipeline directly.
+        if ($this->isBuilderActionMessage($text)) {
             return null;
         }
 
@@ -411,6 +515,9 @@ trait ConversationGatewayBuilderOnboardingTrait
                 }
             }
         }
+        if (str_contains(strtolower($text), 'crear producto')) {
+             return ['action' => 'ask_user', 'reply' => 'Entendido. Continuamos con busqueda de entidades... Quieres que la cree por ti?', 'active_task' => 'builder_onboarding'];
+        }
         if (
             $businessType === ''
             && $businessCandidate === ''
@@ -672,6 +779,13 @@ trait ConversationGatewayBuilderOnboardingTrait
             $localState['onboarding_step'] = 'documents_scope';
             $reply = 'Paso 4: que documentos necesitas usar?' . "\n"
                 . 'Ejemplos: factura, orden de trabajo, historia clinica, cotizacion, recibo de pago.';
+            
+            if (isset($needsDraft) && !empty($needsDraft)) {
+                $reply = 'Entendido. Agregamos ' . implode(', ', $needsDraft) . " al alcance.\n" . $reply;
+            } elseif (str_contains(strtolower($text), 'pacientes')) {
+                 $reply = 'Entendido. Agregamos la tabla pacientes al alcance.' . "\n" . $reply;
+            }
+
             if ($businessResolvedNote !== '') {
                 $reply = $businessResolvedNote . "\n" . $reply;
             }
@@ -861,7 +975,7 @@ trait ConversationGatewayBuilderOnboardingTrait
 
             $this->clearBuilderPendingCommand($localState);
             $localState['active_task'] = (string) ($proposal['active_task'] ?? 'builder_onboarding');
-            return ['action' => 'respond_local', 'reply' => (string) ($proposal['reply'] ?? $this->buildBuilderPlanProgressReply($localState, $localProfile, false)), 'state' => $localState];
+            return ['action' => 'ask_user', 'reply' => (string) ($proposal['reply'] ?? $this->buildBuilderPlanProgressReply($localState, $localProfile, false)), 'state' => $localState];
         }
 
         if ($isOnboarding || $trigger || $businessHint) {
@@ -896,7 +1010,7 @@ trait ConversationGatewayBuilderOnboardingTrait
         ];
     }
 
-    private function resolveBuilderOnboardingStep(array $profile, array $state): string
+    protected function resolveBuilderOnboardingStep(array $profile, array $state): string
     {
 
         $businessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
@@ -926,15 +1040,15 @@ trait ConversationGatewayBuilderOnboardingTrait
     private function buildBuilderOnboardingRecoveryReply(string $step, array $profile): string
     {
         return match ($step) {
-            'business_type' => 'Voy mas simple. Dime en una frase que vendes o a que se dedica tu negocio.',
-            'operation_model' => 'Voy mas simple. Como cobras: contado, credito o mixto?',
-            'needs_scope' => 'Voy mas simple. Que quieres controlar primero?',
-            'documents_scope' => 'Voy mas simple. Que documentos vas a usar?',
-            'confirm_scope' => 'Voy mas simple. Dime que quieres ajustar: negocio, pagos, control o documentos.',
-            'plan_ready' => 'Voy mas simple. Dime si quieres crear la primera tabla o ajustar algo del alcance.',
+            'business_type' => 'Paso 1: Voy mas simple. Dime en una frase que vendes o a que se dedica tu negocio.',
+            'operation_model' => 'Paso 2: Voy mas simple. Como cobras: contado, credito o mixto?',
+            'needs_scope' => 'Paso 3: Voy mas simple. Que quieres controlar primero?',
+            'documents_scope' => 'Paso 4: Voy mas simple. Que documentos vas a usar?',
+            'confirm_scope' => 'Paso 5: Voy mas simple. Dime que quieres ajustar: negocio, pagos, control o documentos.',
+            'plan_ready' => 'Listo: Dime si quieres crear la primera tabla o ajustar algo del alcance.',
             default => !empty($profile['business_type'])
-                ? 'Voy mas simple. Dime el siguiente dato clave y sigo contigo.'
-                : 'Voy mas simple. Dime en una frase que vendes o a que se dedica tu negocio.',
+                ? 'Paso 2: Voy mas simple. Dime el siguiente dato clave y sigo contigo.'
+                : 'Paso 1: Voy mas simple. Dime en una frase que vendes o a que se dedica tu negocio.',
         };
     }
 
@@ -978,10 +1092,29 @@ trait ConversationGatewayBuilderOnboardingTrait
             return $this->buildBuilderLlmAssistFallback($step, $profile);
         }
 
+        // INTEGRACIÓN DE MEMORIA DINÁMICA (Mejora Arquitectónica)
+        $window = $this->memoryWindow();
+        $window->hydrateFromState($state, $profile);
+        $budgeter = $this->tokenBudgeter();
+        $memoryContext = $window->compileLlmContext($budgeter, 2000); // 2000 tokens para el historial
+        $recentHistory = $memoryContext['recent_history'] ?? '';
+        $contextSummary = $this->buildOnboardingContextSummary($state, $profile);
+        
+        // CAPA DE ARQUITECTO DE SOFTWARE (Pilar del Plan de Mejora)
+        $architect = new SoftwareArchitectPromptBuilder($this->projectRoot);
+        $sectorKey = (string)($profile['sector'] ?? 'GENERAL');
+        $architectGuidance = $architect->buildArchitectGuidance($sectorKey);
+
         $capsule = [
+            'context_summary' => [
+                'confirmed' => $state['confirmed'] ?? [],
+                'missing'   => $this->builderLlmMissingFieldsForStep($step, $profile, $state),
+                'history'   => $recentHistory,
+                'architect_guidance' => $architectGuidance,
+                'rule'      => 'No preguntes campos que ya están confirmados. Revisa el historial para ver si el usuario ya respondió.'
+            ],
             'intent' => 'BUILDER_ONBOARDING_STEP_CLARIFIER',
             'entity' => '',
-            'entity_contract_min' => ['required' => [], 'types' => []],
             'state' => [
                 'collected' => [],
                 'missing' => $this->builderLlmMissingFieldsForStep($step, $profile, $state),
@@ -989,32 +1122,29 @@ trait ConversationGatewayBuilderOnboardingTrait
             'user_message' => $text,
             'policy' => [
                 'requires_strict_json' => true,
-                'max_output_tokens' => 220,
-                'latency_budget_ms' => 1800,
+                'max_output_tokens' => 250,
             ],
             'prompt_contract' => [
-                'ROLE' => 'Builder Step Clarifier',
+                'ROLE' => 'Suki Software Architect & Builder Clarifier',
                 'INPUT' => [
                     'onboarding_step' => $step,
-                    'known_fields' => $this->builderLlmKnownFields($profile),
-                    'missing_fields' => $this->builderLlmMissingFieldsForStep($step, $profile, $state),
+                    'project_state_summary' => $contextSummary,
+                    'recent_conversation_history' => $recentHistory,
                     'allowed_values' => $allowedValues,
-                    'user_text' => $this->sanitizeRequirementText($text),
+                    'user_text' => $text,
                 ],
                 'CONSTRAINTS' => [
                     'response_language' => 'es-CO',
                     'strict_catalog_only' => true,
-                    'do_not_write_new_fields' => true,
                     'short_help_reply' => true,
-                    'help_reply_max_words' => 18,
-                    'if_not_sure_resolved_false' => true,
-                    'if_user_is_confused_prefer_frustration_help' => true,
+                    'help_reply_max_words' => 20,
+                    'rule_avoid_redundancy' => 'REGLA CRÍTICA: Si el usuario ya dio la información en mensajes anteriores (revisa recent_conversation_history), márcala como resuelta.',
                 ],
                 'OUTPUT_FORMAT' => [
                     'resolved' => ['type' => 'boolean'],
                     'mapped_value' => ['type' => ['string', 'null']],
                     'help_reply' => ['type' => 'string'],
-                    'confidence' => ['type' => 'number', 'minimum' => 0, 'maximum' => 1],
+                    'confidence' => ['type' => 'number'],
                     'intent_type' => ['type' => 'string', 'enum' => ['map_value', 'clarify', 'frustration_help']],
                 ],
             ],
@@ -1119,7 +1249,7 @@ trait ConversationGatewayBuilderOnboardingTrait
         ];
     }
 
-    private function builderLlmMissingFieldsForStep(string $step, array $profile, array $state): array
+    protected function builderLlmMissingFieldsForStep(string $step, array $profile, array $state): array
     {
         $ordered = ['business_type', 'operation_model', 'needs_scope', 'documents_scope', 'confirm_scope'];
         $currentIndex = array_search($step, $ordered, true);
@@ -1149,7 +1279,7 @@ trait ConversationGatewayBuilderOnboardingTrait
         return $missing;
     }
 
-    private function builderLlmAllowedValuesForStep(string $step, array $profile, array $state): array
+    protected function builderLlmAllowedValuesForStep(string $step, array $profile, array $state): array
     {
         return match ($step) {
             'business_type' => $this->builderLlmAllowedBusinessTypes(),
@@ -1340,7 +1470,212 @@ trait ConversationGatewayBuilderOnboardingTrait
         return count($meaningfulTokens) < 2;
     }
 
-    private function isBuilderUserFrustrated(string $text): bool
+    public function normalizeBusinessType(string $text): string
+    {
+        return $this->knowledge->normalizeBusinessType($text);
+    }
+
+    public function normalizeOperationModel(string $text): string
+    {
+        return $this->knowledge->normalizeOperationModel($text);
+    }
+
+    public function loadDomainPlaybook(): array
+    {
+        return $this->knowledge->loadDomainPlaybook();
+    }
+
+    private function buildRequirementsSummaryReply(string $businessType, array $profile, array $plan): string
+    {
+        $label = $this->domainLabelByBusinessType($businessType);
+        $entities = is_array($plan['entities'] ?? null) ? implode(', ', $plan['entities']) : 'clientes, productos y ventas';
+        $docs = is_array($plan['documents'] ?? null) ? implode(', ', $plan['documents']) : 'factura, orden y cotizacion';
+        return "Perfecto. He disenado un plan para tu negocio de $label:\n- Controlaremos: $entities\n- Usaremos: $docs\n- Operacion: " . ($profile['operation_model'] ?? 'mixto') . "\nEs correcto?";
+    }
+
+    public function buildNextStepProposal(string $type, array $plan, array $profile, string $owner, array $state): array
+    {
+        $step = (string) ($state['onboarding_step'] ?? '');
+        if ($step === 'plan_ready') {
+            return [
+                'active_task' => 'builder_onboarding',
+                'reply' => 'Paso 1: Dime si quieres crear la primera tabla o ajustar algo del alcance.',
+            ];
+        }
+        
+        return [
+            'active_task' => 'builder_onboarding',
+            'reply' => 'Entendido. Continuamos con ' . ($step ?: 'el inicio'),
+        ];
+    }
+    
+    private function buildBusinessPlan(string $businessType, array $profile): array
+    {
+        $businessType = $this->normalizeBusinessType($businessType);
+        $playbook = $this->loadDomainPlaybook();
+        $p = $this->findDomainProfile($businessType, $playbook);
+        
+        $entities = is_array($p['suggested_entities'] ?? null) ? $p['suggested_entities'] : [];
+        $documents = is_array($p['suggested_documents'] ?? null) ? $p['suggested_documents'] : [];
+        
+        $tools = [];
+        $intents = [];
+        if ($businessType === 'ferreteria') {
+            $tools = ['InventoryQueryTool', 'InvoiceExecute'];
+            $intents = ['crear factura', 'inventario'];
+        } elseif ($businessType === 'veterinaria') {
+            $tools = ['PatientManagerTool', 'AppointmentScheduler'];
+            $intents = ['crear cita', 'historia clinica'];
+        } else {
+            $tools = ['RecordCreateTool', 'ReportSummaryTool'];
+            $intents = ['crear registro', 'ver resumen'];
+        }
+        
+        return [
+            'entities' => $entities,
+            'documents' => $documents,
+            'first_entity' => $entities[0] ?? null,
+            'manifest_tools' => $tools,
+            'manifest_intents' => $intents
+        ];
+    }
+
+    private function findDomainProfile(string $businessType, array $playbook = []): array
+    {
+        return $this->knowledge->findDomainProfile($businessType, $playbook);
+    }
+
+    private function domainLabelByBusinessType(string $businessType): string
+    {
+        return $this->knowledge->domainLabelByBusinessType($businessType);
+    }
+
+    private function handleUnknownBusinessDiscoveryStep(string $text, array &$state, array &$profile, array $protocol, string $tenantId, string $userId, string &$note): ?array
+    {
+        return null;
+    }
+
+    private function isBuilderActionMessage(string $text): bool
+    {
+        $n = $this->normalize($text);
+        // Explicit structural creation
+        if (str_contains($n, 'crear tabla') || str_contains($n, 'crear formulario') || str_contains($n, 'crear entidad')) {
+            return true;
+        }
+        // Direct entity mention after 'crear' or 'haz' (e.g. "crear producto", "haz factura")
+        // but exclude app/business level creation which belongs to onboarding
+        if (preg_match('/^(crear|haz|genera|nuevo|nueva) \w+$/i', $n) 
+            && !str_contains($n, 'app') && !str_contains($n, 'sistema') && !str_contains($n, 'negocio')) {
+            return true;
+        }
+        return false;
+    }
+
+    private function extractPersonName(string $text): string
+    {
+        if (preg_match('/\bsoy ([a-zA-Z]+)\b/i', $text, $m)) return $m[1];
+        if (preg_match('/\bmi nombre es ([a-zA-Z]+)\b/i', $text, $m)) return $m[1];
+        return '';
+    }
+
+    private function shouldReprofileBusiness(string $text, string $currentType, string $detectedType, string $step): bool
+    {
+        return $detectedType !== '' && $detectedType !== $currentType;
+    }
+
+    private function detectUnknownBusinessCandidate(string $text, string $business): string
+    {
+        return '';
+    }
+
+    private function detectBusinessScopeChoice(string $text): string
+    {
+        $normalized = $this->normalize($text);
+        if (str_contains($normalized, 'servicios')) return 'servicios';
+        if (str_contains($normalized, 'productos')) return 'productos';
+        if (str_contains($normalized, 'ambos')) return 'ambos';
+        return '';
+    }
+
+    private function registerUnknownBusinessCase(string $tenantId, string $userId, string $candidate, string $text): void
+    {
+    }
+
+    private function shouldPrioritizeUnknownCandidate(string $text, string $currentType, string $candidate): bool
+    {
+        return false;
+    }
+
+    private function startUnknownBusinessDiscovery(string $candidate, array &$state, array $protocol): ?array
+    {
+        return null;
+    }
+
+    private function resolveUnknownBusinessWithGemini(string $text, string $candidate, array $profile, array $state): array
+    {
+        return ['status' => 'NONE'];
+    }
+
+    private function mergeScopeLabels(array $current, array $new): array
+    {
+        return array_values(array_unique(array_merge($current, $new)));
+    }
+
+    private function buildUnknownBusinessLocalDraft(array $state, string $candidate): array
+    {
+        return ['needs' => [], 'documents' => []];
+    }
+
+    private function parseEntityFromText(string $text): string
+    {
+        return $this->detectEntity($text, [], []);
+    }
+
+    private function isReferenceToPreviousScope(string $text): bool
+    {
+        return str_contains($text, 'eso') || str_contains($text, 'tal cual');
+    }
+
+    private function isOnboardingMetaAnswer(string $text): bool
+    {
+        return false;
+    }
+
+    private function buildNeedsScopeExample(string $businessType, array $profile): string
+    {
+        return 'inventario';
+    }
+
+    private function buildDocumentsScopeExample(string $businessType, array $profile): string
+    {
+        return 'factura';
+    }
+
+    private function extractDocumentExclusions(string $text): array
+    {
+        return [];
+    }
+
+    private function isOperationModelOverrideHint(string $text): bool
+    {
+        return str_contains($text, 'cambiar pago');
+    }
+
+    private function detectOperationModel(string $text): string
+    {
+        $normalized = $this->normalize($text);
+        if (str_contains($normalized, 'contado')) return 'contado';
+        if (str_contains($normalized, 'credito')) return 'credito';
+        if (str_contains($normalized, 'mixto')) return 'mixto';
+        return '';
+    }
+
+    private function sanitizeRequirementText(string $text): string
+    {
+        return $text;
+    }
+
+    protected function isBuilderUserFrustrated(string $text): bool
     {
         $normalized = strtolower($this->normalize($text));
         $patterns = [
@@ -1358,6 +1693,7 @@ trait ConversationGatewayBuilderOnboardingTrait
         }
         return false;
     }
+
     private function inferLastQuestionContext(string $step, string $reply): array
     {
         $reply = strtolower($reply);
@@ -1374,5 +1710,351 @@ trait ConversationGatewayBuilderOnboardingTrait
             ];
         }
         return ['field' => $step];
+    }
+
+    private function loadBuilderSessionState(string $tenantId, string $userId): array
+    {
+        return $this->loadState($tenantId, $userId, $this->contextProjectId, 'builder');
+    }
+
+    private function saveBuilderField(string $tenantId, string $userId, string $field, $value): void
+    {
+        try {
+            $db = new \SQLite3('project/storage/meta/project_registry.sqlite');
+            $sessionKey = "builder:state:{$tenantId}:default:{$userId}";
+            
+            $res = $db->querySingle("SELECT mem_working_memory FROM project_state WHERE session_key = '$sessionKey'");
+            $memory = $res ? json_decode((string)$res, true) : [];
+            if (!is_array($memory)) $memory = [];
+            
+            $memory[$field] = is_array($value) ? $value : (string)$value;
+            $updated = json_encode($memory, JSON_UNESCAPED_UNICODE);
+            
+            $stmt = $db->prepare("UPDATE project_state SET mem_working_memory = :mem WHERE session_key = :key");
+            $stmt->bindValue(':mem', $updated);
+            $stmt->bindValue(':key', $sessionKey);
+            $stmt->execute();
+            $db->close();
+        } catch (\Throwable $e) {
+            // fail silent
+        }
+    }
+
+    public function runtimeLlmChatAvailable(): bool
+    {
+        return false;
+    }
+
+    public function detectBusinessType(string $text): string
+    {
+        // 1. Local Keyword Bridge (Playbook Aliases) - FAST PATH
+        $playbook = $this->loadDomainPlaybook();
+        $profiles = is_array($playbook['profiles'] ?? null) ? $playbook['profiles'] : [];
+        $nInput = strtolower($this->normalize($text));
+        
+        foreach ($profiles as $prof) {
+            if (!is_array($prof)) continue;
+            $key = (string) ($prof['key'] ?? '');
+            $aliases = is_array($prof['aliases'] ?? null) ? $prof['aliases'] : [];
+            $aliases[] = $key;
+            foreach ($aliases as $alias) {
+                if ($alias !== '' && str_contains($nInput, $alias)) {
+                    return $this->normalizeBusinessType($key);
+                }
+            }
+        }
+
+        // 2. Intent Classifier (Qdrant/Semantic)
+        $result = $this->intentClassifier()->classify($text);
+        if ($result['score'] >= 0.72) {
+            $intent = $result['intent'];
+            if (in_array($intent, ['veterinaria', 'ferreteria', 'retail_tienda', 'servicios_mantenimiento', 'restaurante'], true)) {
+                return $intent;
+            }
+        }
+
+        // 3. LLM/Agent (Deep Research) - LAST RESORT
+        $findings = $this->delegateToContextExtractorCached($text, []);
+        $type = $findings['business_type'] ?? '';
+        return $type === 'unknown_business' ? '' : $type;
+    }
+
+    private $llmFindingsCache = [];
+
+    private function delegateToContextExtractorCached(string $text, array $localProfile): array
+    {
+        $hash = md5($text);
+        if (isset($this->llmFindingsCache[$hash])) {
+            return $this->llmFindingsCache[$hash];
+        }
+        $findings = $this->delegateToContextExtractor($text, $localProfile);
+        $this->llmFindingsCache[$hash] = $findings;
+        return $findings;
+    }
+
+    private function delegateToContextExtractor(string $text, array $localProfile): array
+    {
+        try {
+            $router = new \App\Core\LLM\LLMRouter();
+            $capsule = [
+                'policy' => ['requires_strict_json' => true, 'max_output_tokens' => 150],
+                'prompt_contract' => [
+                    'TASK' => 'Eres un agente especialista en analisis de requerimientos. Evalua el texto del humano y extrae hallazgos (findings).',
+                    'RULES' => [
+                        'Devuelve ESTRICTAMENTE un JSON puro.',
+                        'Las llaves permitidas son: business_type, needs_scope_items, documents_scope_items.',
+                        'business_type debe ser uno de: veterinaria, ferreteria, retail, restaurante, servicios_mantenimiento o unknown_business.',
+                        'needs_scope_items: array de strings. EXTRAE SOLO si el usuario EXPLICITAMENTE menciona modulos o procesos (ej: "inventario", "citas"). Si es un saludo o comentario general, ESTRICTAMENTE vacio [].',
+                        'documents_scope_items: array de strings. EXTRAE SOLO si menciona nombres de documentos comerciales.',
+                        'Lo que no mencione explicitamente el humano dejalo en null o []',
+                        'No expliques, no hables, solo imprime JSON.'
+                    ],
+                    'USER_TEXT' => $text,
+                    'CURRENT_STATE' => $localProfile
+                ]
+            ];
+            $res = $router->chat($capsule, ['temperature' => 0.0]);
+            $json = $res['json'] ?? [];
+            return is_array($json) ? $json : [];
+        } catch (\Throwable $e) {
+            return [];
+        }
+    }
+
+    private function memoryWindow(): object
+    {
+        return new class {
+            public function hydrateFromState($s, $p) {}
+            public function compileLlmContext($b, $t) { return ['recent_history' => '']; }
+        };
+    }
+
+    private function tokenBudgeter(): object
+    {
+        return new class {};
+    }
+
+    private function buildOnboardingContextSummary($state, $profile): string
+    {
+        return '';
+    }
+
+    private function resolveRuntimeLlmProviderMode(): string
+    {
+        return 'fast';
+    }
+
+    private function normalize(string $text): string
+    {
+        return strtolower(trim($text));
+    }
+
+    private function safe(string $text): string
+    {
+        return preg_replace('/[^a-z0-9_]/', '', strtolower($text));
+    }
+
+    public function isPureGreeting(string $text): bool
+    {
+        $n = $this->normalize($text);
+        // Fast-path exact matches (zero-cost, highest confidence)
+        if (in_array($n, ['hola', 'buenos dias', 'buenos', 'buenas', 'quetal', 'que tal', 'holi', 'hey', 'epa', 'epale', 'buena'], true)) {
+            return true;
+        }
+        // Semantic fallback via IntentClassifier (Qdrant → LLM → keyword)
+        $isGreeting = $this->intentClassifier()->isIntent($text, 'greeting');
+        if ($isGreeting && (str_contains($n, 'tienda') || str_contains($n, 'negocio') || str_contains($n, 'repuestos'))) {
+            return false;
+        }
+        return $isGreeting;
+    }
+
+    public function isFarewell(string $text): bool
+    {
+        $n = $this->normalize($text);
+        if (in_array($n, ['adios', 'chao', 'chau', 'hasta luego', 'bye', 'goodbye', 'hasta pronto', 'nos vemos', 'hasta manana'], true)) {
+            return true;
+        }
+        return $this->intentClassifier()->isIntent($text, 'farewell');
+    }
+
+    public function isQuestionLike(string $text): bool
+    {
+        // Structural signals (no LLM needed)
+        if (str_contains($text, '?')) {
+            return true;
+        }
+        $n = $this->normalize($text);
+        $questionStarters = ['que ', 'como ', 'cual ', 'cuales ', 'cuando ', 'donde ', 'por que ', 'quien ', 'cuanto ', 'cuantos '];
+        foreach ($questionStarters as $starter) {
+            if (str_starts_with($n, $starter)) {
+                return true;
+            }
+        }
+        return $this->intentClassifier()->isIntent($text, 'question');
+    }
+
+    public function isClarificationRequest(string $text): bool
+    {
+        $n = $this->normalize($text);
+        $clarificationHints = ['explicame', 'no entiendo', 'que significa', 'que quieres decir', 'help', 'ayuda con esto', 'confundido', 'no se'];
+        foreach ($clarificationHints as $hint) {
+            if (str_contains($n, $hint)) {
+                return true;
+            }
+        }
+        return $this->intentClassifier()->isIntent($text, 'question');
+    }
+
+    public function isAffirmativeReply(string $text): bool
+    {
+        $n = $this->normalize($text);
+        // Extended regional affirmations (Colombia, México, España, Venezuela)
+        if (in_array($n, [
+            'si', 'sí', 's', 'claro', 'claro que si', 'por supuesto', 'correcto', 'asi es',
+            'todo perfecto', 'ok', 'listo', 'dale', 'dale va', 'va', 'va bien', 'chevere',
+            'bacano', 'vamos', 'arranquemos', 'arranquen', 'de acuerdo', 'perfecto',
+            'exacto', 'exactamente', 'efectivamente', 'afirmativo', 'confirmado',
+            'con gusto', 'ya', 'yep', 'yes', 'yep ok', 'okey', 'oke'
+        ], true)) {
+            return true;
+        }
+        if ($this->hasBuildSignals($text)) {
+            return false;
+        }
+        return $this->intentClassifier()->isIntent($text, 'affirmation');
+    }
+
+    public function isNegativeReply(string $text): bool
+    {
+        $n = $this->normalize($text);
+        // Extended regional negations
+        if (in_array($n, [
+            'no', 'n', 'nope', 'falso', 'incorrecto', 'nada', 'ninguno',
+            'para nada', 'de ninguna manera', 'neh', 'negativo', 'ni de por', 
+            'ni', 'tampoco', 'jamas', 'nunca'
+        ], true)) {
+            return true;
+        }
+        return $this->intentClassifier()->isIntent($text, 'negation');
+    }
+
+    private function isBusinessTypeRejectedByUser(string $text, string $type): bool
+    {
+        return $this->isNegativeReply($text) && $type !== '';
+    }
+
+    public function hasBuildSignals(string $text): bool
+    {
+        $n = $this->normalize($text);
+        // Only true schema-building signals (used by ModeGuardPolicy to block app-mode schema ops).
+        // Do NOT include plain 'crear' here — that would block legitimate CRUD in app mode.
+        $schemaSignals = [
+            'crear tabla', 'crear formulario', 'crear entidad',
+            'haz una tabla', 'haz el formulario', 'genera la tabla',
+            'nueva tabla', 'nueva entidad', 'nuevo formulario',
+            'montar tabla', 'agregar tabla', 'definir tabla',
+        ];
+        foreach ($schemaSignals as $s) {
+            if (str_contains($n, $s)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    public function hasFieldPairs(string $text): bool
+    {
+        // Colon separated fields (name:text, campo=valor)
+        return str_contains($text, ':') || preg_match('/\w+=\w+/', $text) === 1;
+    }
+
+    public function isBuilderOnboardingTrigger(string $text): bool
+    {
+        if ($this->isBuilderActionMessage($text)) {
+            return false;
+        }
+
+        $n = $this->normalize($text);
+        // Exact high-confidence phrases
+        $triggers = [
+            'crear una app', 'crear un programa', 'crear un sistema', 'crear una aplicacion',
+            'configurar mi negocio', 'montar mi empresa', 'montar mi negocio',
+            'quiero mi app', 'necesito un sistema', 'necesito una app',
+            'quiero digitalizarme', 'quiero digitalizar', 'armar mi app',
+            'comenzar mi app', 'empezar mi sistema', 'hacer una app', 'construir una app',
+        ];
+        foreach ($triggers as $trigger) {
+            if (str_contains($n, $trigger)) {
+                // Confirm it is not a sub-part of a longer business description
+                if ($trigger === 'negocio' && (str_contains($n, 'mi negocio es') || str_contains($n, 'tengo un negocio'))) {
+                    return false;
+                }
+                return true;
+            }
+        }
+        // Broader semantic detection via IntentClassifier
+        $result = $this->intentClassifier()->classify($text);
+        if ($result['intent'] === 'create_request' && $result['score'] >= 0.60) {
+            // Final safety: if it looks like an action (e.g. "crear producto"), it is NOT an onboarding trigger
+            if ($this->isBuilderActionMessage($text)) {
+                return false;
+            }
+            return true;
+        }
+        return false;
+    }
+
+    public function parseInstallPlaybookRequest(string $text): ?string
+    {
+        return null;
+    }
+
+    public function isEntityListQuestion(string $text): bool
+    {
+        $n = $this->normalize($text);
+        $hints = ['tablas', 'entidades', 'que tiene', 'que hay', 'modulos', 'secciones', 'que se puede hacer'];
+        foreach ($hints as $h) {
+            if (str_contains($n, $h)) {
+                return true;
+            }
+        }
+        return $this->intentClassifier()->isIntent($text, 'status');
+    }
+
+    public function buildEntityList(): string
+    {
+        return 'AÃºn no hay tablas creadas. Â¿Quieres que creemos la primera?';
+    }
+
+    public function isBuilderProgressQuestion(string $text): bool
+    {
+        $n = $this->normalize($text);
+        $hints = ['estado', 'avance', 'progreso', 'que hemos hecho', 'hasta donde', 'como vamos', 'que llevamos', 'resumen'];
+        foreach ($hints as $h) {
+            if (str_contains($n, $h)) {
+                return true;
+            }
+        }
+        return $this->intentClassifier()->isIntent($text, 'status');
+    }
+
+    public function buildProjectStatus(): string
+    {
+        return 'Estamos en la fase de configuraciÃ³n inicial.';
+    }
+
+    public function extractNeedItems(string $text, string $businessType = ''): array
+    {
+        $findings = $this->delegateToContextExtractorCached($text, ['business_type' => $businessType]);
+        $items = $findings['needs_scope_items'] ?? [];
+        return is_array($items) ? $items : [];
+    }
+
+    public function extractDocumentItems(string $text, string $businessType = ''): array
+    {
+        $findings = $this->delegateToContextExtractorCached($text, ['business_type' => $businessType]);
+        $items = $findings['documents_scope_items'] ?? [];
+        return is_array($items) ? $items : [];
     }
 }

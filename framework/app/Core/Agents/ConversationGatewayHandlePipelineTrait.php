@@ -40,7 +40,7 @@ trait ConversationGatewayHandlePipelineTrait
         $policy = $this->loadPolicy($tenantId);
         $confusionBase = $this->loadConfusionBase();
 
-        if ($this->isPureGreeting($normalizedBase)) {
+        if ($this->isPureGreeting($normalizedBase) && !$this->isStatusQuestion($normalizedBase)) {
             if ($mode === 'builder') {
                 $this->clearBuilderPendingCommand($state);
                 $state['active_task'] = 'builder_onboarding';
@@ -51,6 +51,13 @@ trait ConversationGatewayHandlePipelineTrait
             $state = $this->updateState($state, $raw, $reply, null, null, [], null);
             $this->saveState($tenantId, $userId, $state);
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('greeting', true));
+        }
+
+        if ($this->isBuilderOnboardingTrigger($normalizedBase) && $mode === 'builder' && ($state['active_task'] ?? '') !== 'builder_onboarding') {
+             $state['active_task'] = 'builder_onboarding';
+             $state['onboarding_step'] = 'business_type';
+             $this->saveState($tenantId, $userId, $state);
+             // NO RETURN: Let it fall through to handleBuilderOnboarding orchestrator for immediate processing.
         }
 
         if ($mode === 'builder' && $this->isFarewell($normalizedBase)) {
@@ -86,6 +93,28 @@ trait ConversationGatewayHandlePipelineTrait
             $telemetry['builder_context_profile_cleared'] = $mustClearBusinessProfile;
             return $this->result('ask_user', $reply, null, null, $state, $telemetry);
         }
+
+        // Authoritative Onboarding Orchestrator
+        if ($mode === 'builder') {
+            $onboarding = $this->handleBuilderOnboarding($normalizedBase, $state, $profile, $tenantId, $userId);
+            if ($onboarding !== null) {
+                $reply = (string) ($onboarding['reply'] ?? 'Listo.');
+                $nextState = is_array($onboarding['state'] ?? null) ? $onboarding['state'] : $state;
+                $action = (string) ($onboarding['action'] ?? 'ask_user');
+                $nextState = $this->updateState(
+                    $nextState,
+                    $raw,
+                    $reply,
+                    'builder_onboarding',
+                    null,
+                    [],
+                    $nextState['active_task'] ?? 'builder_onboarding'
+                );
+                $this->saveState($tenantId, $userId, $nextState);
+                return $this->result($action, $reply, null, null, $nextState, $this->telemetry('builder_onboarding', true));
+            }
+        }
+
 
         if ($mode === 'builder' && $this->isAmbiguousBuilderCreateRequest($normalizedBase)) {
             if (
@@ -354,7 +383,7 @@ trait ConversationGatewayHandlePipelineTrait
                         return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('builder_confirm', true));
                     }
                 }
-                if ($this->isAffirmativeReply($normalizedBase)) {
+                if ($this->isAffirmativeReply($normalizedBase) && !$this->hasBuildSignals($normalizedBase)) {
                     $command = $state['builder_pending_command'];
                     $commandName = (string) ($command['command'] ?? '');
                     $commandEntity = $this->normalizeEntityForSchema((string) ($command['entity'] ?? ''));
@@ -594,30 +623,10 @@ trait ConversationGatewayHandlePipelineTrait
             );
         }
 
-        if ($mode === 'builder') {
-            $onboarding = $this->handleBuilderOnboarding($normalizedBase, $state, $profile, $tenantId, $userId);
-            if ($onboarding !== null) {
-                $reply = (string) ($onboarding['reply'] ?? 'Listo.');
-                $nextState = is_array($onboarding['state'] ?? null) ? $onboarding['state'] : $state;
-                $action = (string) ($onboarding['action'] ?? 'ask_user');
-                $nextState = $this->updateState(
-                    $nextState,
-                    $raw,
-                    $reply,
-                    'builder_onboarding',
-                    null,
-                    [],
-                    $nextState['active_task'] ?? 'builder_onboarding'
-                );
-                $this->saveState($tenantId, $userId, $nextState);
-                return $this->result($action, $reply, null, null, $nextState, $this->telemetry('builder_onboarding', true));
-            }
-        }
-
         $trainingRoute = $this->routeTraining($normalized, $training, $profile, $tenantId, $userId, $state, $lexicon, $mode);
         if (
             $mode === 'builder'
-            && in_array((string) ($state['active_task'] ?? ''), ['create_table', 'create_form'], true)
+            && in_array((string) ($state['active_task'] ?? ''), ['create_table', 'create_form', 'crud'], true)
             && !empty($trainingRoute)
             && in_array((string) ($trainingRoute['action'] ?? ''), ['respond_local'], true)
         ) {
@@ -729,7 +738,14 @@ trait ConversationGatewayHandlePipelineTrait
             }
         }
 
-        if (in_array($classification, ['greeting', 'thanks', 'confirm', 'faq'], true)) {
+        if ($classification === 'greeting' && ($state['active_task'] ?? '') !== 'builder_onboarding') {
+            $reply = $this->handleLocalReply($classification, $mode);
+            $state = $this->updateState($state, $raw, $reply, null, null, [], null);
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry($classification, true));
+        }
+
+        if (in_array($classification, ['thanks', 'confirm', 'faq'], true)) {
             $reply = $this->localReply($classification, $mode);
             $state = $this->updateState($state, $raw, $reply, null, null, [], null);
             $this->saveState($tenantId, $userId, $state);

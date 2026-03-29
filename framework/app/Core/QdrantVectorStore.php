@@ -378,6 +378,30 @@ final class QdrantVectorStore
     }
 
     /**
+     * @return array{ok:bool,result:array<string,mixed>}
+     */
+    public function scroll(int $limit = 10, ?string $offset = null, bool $withPayload = true): array
+    {
+        $payload = [
+            'limit' => $limit,
+            'with_payload' => $withPayload,
+            'with_vector' => false,
+        ];
+        if ($offset !== null) {
+            $payload['offset'] = $offset;
+        }
+
+        $path = '/collections/' . rawurlencode($this->collection) . '/points/scroll';
+        $response = $this->request('POST', $path, $payload, true);
+        $data = is_array($response['data'] ?? null) ? (array) $response['data'] : [];
+
+        return [
+            'ok' => ($response['status'] >= 200 && $response['status'] < 300),
+            'result' => $data['result'] ?? [],
+        ];
+    }
+
+    /**
      * @return array<string,mixed>|null
      */
     private function describeCollection(bool $allowMissing): ?array

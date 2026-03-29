@@ -1,0 +1,104 @@
+{
+  "version": "1.0",
+  "description": "Regional intent training base for SUKI NLP pipeline. Covers Colombia, Mexico, Espana, Venezuela variants.",
+  "intents": {
+    "greeting": [
+      "hola", "buenas", "buenos dias", "buenos tardes", "buenas noches",
+      "buen dia", "holi", "hey", "epa", "epale", "que mas", "como estas",
+      "como va todo", "que hay", "que hubo", "bien dia", "buena", "ola",
+      "hey como estas", "hola que tal", "buenas como le va", "saludos",
+      "un saludo", "hi", "hello", "hola suki", "hola buen dia"
+    ],
+    "farewell": [
+      "adios", "chao", "chau", "hasta luego", "hasta pronto", "bye",
+      "goodbye", "nos vemos", "hasta manana", "hasta mañana", "cuídate",
+      "cuidade", "hasta la proxima", "que este bien", "que le vaya bien",
+      "hasta pronto amigo", "buenas noches adios", "bye bye", "asta luego"
+    ],
+    "affirmation": [
+      "si", "sí", "claro", "claro que si", "por supuesto", "correcto",
+      "asi es", "todo perfecto", "ok", "listo", "dale", "dale va",
+      "va", "va bien", "chevere", "bacano", "vamos", "arranquemos",
+      "de acuerdo", "perfecto", "exacto", "exactamente", "afirmativo",
+      "confirmado", "con gusto", "ya", "yep", "yes", "okey", "oke",
+      "de una", "de una vez", "venga", "eso mismo", "eso es",
+      "exactamente eso", "todo bien", "genial", "excelente", "super",
+      "me parece bien", "suena bien", "esta bien", "me late", "sale",
+      "sale y vale", "ahi va", "quedo", "quedo bien"
+    ],
+    "negation": [
+      "no", "nope", "falso", "incorrecto", "nada", "ninguno",
+      "para nada", "de ninguna manera", "neh", "negativo",
+      "ni", "tampoco", "jamas", "nunca", "no gracias",
+      "no es asi", "no aplica", "no quiero", "paso",
+      "no funciona", "eso no", "no me sirve", "diferente"
+    ],
+    "create_request": [
+      "quiero crear una app", "crear una aplicacion", "crear un programa",
+      "necesito un sistema", "necesito una app", "quiero mi app",
+      "montar mi empresa", "montar mi negocio", "configurar mi negocio",
+      "quiero digitalizarme", "quiero digitalizar mi empresa",
+      "armar mi app", "armar un sistema", "comenzar mi app",
+      "hacer una app", "construir una app", "hacer un software",
+      "montar mi sistema", "poner online mi negocio",
+      "llevar mi negocio a digital", "tener mi propio software",
+      "hacer el sistema de mi negocio", "armar mi programa",
+      "necesito una aplicacion para mi negocio",
+      "quiero una herramienta para gestionar mi negocio",
+      "me gustaria tener un sistema", "puedo hacer una app aqui",
+      "como creo mi app", "ayudame a crear mi sistema",
+      "voy a montar mi empresa en digital",
+      "quero hacer una app para mi tienda",
+      "crear plataforma para mi negocio",
+      "construir sistema de gestion", "crear mi gestor"
+    ],
+    "business_description": [
+      "tengo una tienda", "soy dueno de una ferreteria", "vendo ropa",
+      "tengo un restaurante", "manejo una clinica", "tengo una empresa",
+      "somos una pyme", "soy comerciante", "vendo al por mayor",
+      "tengo un negocio de tecnologia", "soy emprendedor",
+      "tengo una farmacia", "vendo productos naturales",
+      "manejo una veterinaria", "tengo una papeleria",
+      "soy tendero", "vendo en linea", "hago deliveries",
+      "ofrezco servicios profesionales", "soy freelance",
+      "tengo un taller mecanico", "manejo una guarderia",
+      "tengo una peluqueria", "ofrezco servicios de aseo"
+    ],
+    "status": [
+      "como vamos", "que hemos hecho", "cual es el avance",
+      "hasta donde llegamos", "que llevamos hasta ahora",
+      "muéstrame el resumen", "dame el estado", "que hay hecho",
+      "cuanto llevamos", "que falta", "como esta el proyecto",
+      "que hemos avanzado", "resumen de lo configurado",
+      "que esta configurado", "que modulos tenemos",
+      "cuales son las tablas", "que hay en el sistema",
+      "dame un reporte del avance", "cuanto falta"
+    ],
+    "out_of_scope": [
+      "quien es el presidente", "que pasa con petro",
+      "como esta el clima", "dame las noticias", "quien gano el partido",
+      "me cuentas un chiste", "hazme un poema", "quien eres tu",
+      "donde queda colombia", "cuanto vale el dolar",
+      "recomiendame una pelicula", "que puedo cocinar hoy",
+      "como se dice hello en frances", "dame la hora actual",
+      "sabes de historia", "cual es la capital de peru"
+    ],
+    "frustration": [
+      "esto no funciona", "no entiendo nada", "estoy confundido",
+      "esto es muy complicado", "no me esta ayudando",
+      "que mal esto", "no sirve", "estoy perdido",
+      "no sigue mis instrucciones", "se equivoco",
+      "esto falla mucho", "por que no entiende",
+      "me tiene dando vueltas", "no avanzamos",
+      "sigue repitiendo lo mismo", "que fastidio"
+    ],
+    "question": [
+      "como funciona esto", "que significa eso", "para que sirve",
+      "como hago esto", "puedes explicarme", "no entiendo ese paso",
+      "que quieres decir con", "como se usa", "que hace esa opcion",
+      "me puedes aclarar", "tengo una duda", "una pregunta",
+      "me explicas", "como configuro", "que pasa si",
+      "cual es la diferencia", "como se llama esa funcion"
+    ]
+  }
+}

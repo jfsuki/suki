@@ -71,7 +71,9 @@ final class BuilderFastPathParser
         string $step,
         array $known,
         array $missing,
-        array $allowed
+        array $allowed,
+        string $tenantId = 'default',
+        string $userId = 'anon'
     ): array {
         // ── Guard: skip fast-path for zero-value inputs.
         $text = trim($text);
@@ -106,7 +108,16 @@ final class BuilderFastPathParser
                 return $this->fallback($step, 'empty_json_from_' . ($result['provider'] ?? 'llm'));
             }
 
-            return $this->validate($json, $step);
+            $parsed = $this->validate($json, $step);
+
+            // PERSISTIR CAMPOS CONFIRMADOS INMEDIATAMENTE (Surgical Fix Paso 5)
+            if (!empty($parsed['mapped_fields']) && ($parsed['confidence'] ?? 0) >= 0.72) {
+                foreach ($parsed['mapped_fields'] as $field => $value) {
+                    $this->saveBuilderField($tenantId, $userId, $field, $value);
+                }
+            }
+
+            return $parsed;
         } catch (RuntimeException $e) {
             // Any LLM failure returns deterministic fallback — never null, never exception up.
             return $this->fallback($step, 'llm_error');
@@ -262,5 +273,31 @@ final class BuilderFastPathParser
             $decoded = (array) $decoded[$step];
         }
         return $this->validate($decoded, $step);
+    }
+
+    /**
+     * PERSISTENCIA QUIRÚRGICA: Guarda un campo en el registry sqlite.
+     */
+    private function saveBuilderField(string $tenantId, string $userId, string $field, $value): void
+    {
+        try {
+            $db = new \SQLite3('project/storage/meta/project_registry.sqlite');
+            $sessionKey = "builder:state:{$tenantId}:default:{$userId}";
+            
+            $res = $db->querySingle("SELECT mem_working_memory FROM project_state WHERE session_key = '$sessionKey'");
+            $memory = $res ? json_decode((string)$res, true) : [];
+            if (!is_array($memory)) $memory = [];
+            
+            $memory[$field] = $vValue = is_array($value) ? $value : (string)$value;
+            $updated = json_encode($memory, JSON_UNESCAPED_UNICODE);
+            
+            $stmt = $db->prepare("UPDATE project_state SET mem_working_memory = :mem WHERE session_key = :key");
+            $stmt->bindValue(':mem', $updated);
+            $stmt->bindValue(':key', $sessionKey);
+            $stmt->execute();
+            $db->close();
+        } catch (\Throwable $e) {
+            // fail silent in builder persistence
+        }
     }
 }

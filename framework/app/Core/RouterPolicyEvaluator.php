@@ -153,6 +153,7 @@ final class RouterPolicyEvaluator
         $hardGateFailures = $this->collectHardGateFailures($gateResults, $action);
         if (!empty($hardGateFailures)) {
             foreach ($hardGateFailures as $hardFailure) {
+                error_log("AcidTest DEBUG: Hard gate failure: " . $hardFailure . " for action: " . $action);
                 $tag = 'hard_gate_failed:' . $hardFailure;
                 if (!in_array($tag, $violations, true)) {
                     $violations[] = $tag;

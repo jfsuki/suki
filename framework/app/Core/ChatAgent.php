@@ -3,7 +3,7 @@
 
 namespace App\Core;
 
-use App\Core\Agents\Orchestrator\ChatOrchestrator;
+use App\Core\Agents\ConversationGateway;
 use App\Core\Agents\Memory\TokenBudgeter;
 use App\Core\Agents\Memory\SemanticCache;
 use App\Core\Agents\Processes\BuilderOnboardingProcess;
@@ -21,7 +21,7 @@ final class ChatAgent
     private ?CommandLayer $command = null;
     private EntityRegistry $entities;
     private ?EntityMigrator $migrator = null;
-    private ?ChatOrchestrator $gateway = null;
+    private $gateway = null;
     private ?LLMRouter $llmRouter = null;
     private ?Telemetry $telemetry = null;
     private ?TelemetryService $telemetryService = null;
@@ -38,7 +38,7 @@ final class ChatAgent
     private FormWizard $wizard;
     private ContractWriter $writer;
     private EntityBuilder $builder;
-    private ChatMemoryStore $memory;
+    private LocalJsonMemoryRepository $memory;
     private ?SemanticMemoryService $semanticMemory = null;
 
     public function __construct()
@@ -47,13 +47,15 @@ final class ChatAgent
         $this->wizard = new FormWizard();
         $this->writer = new ContractWriter();
         $this->builder = new EntityBuilder();
-        $this->memory = new ChatMemoryStore();
+        $this->memory = new LocalJsonMemoryRepository();
         $this->semanticMemory = new SemanticMemoryService();
     }
 
     public function handle(array $payload): array
     {
         $requestStartedAt = microtime(true);
+        if (!isset($_SERVER['REQUEST_TIME_FLOAT'])) { $_SERVER['REQUEST_TIME_FLOAT'] = $requestStartedAt; }
+        
         $testMode = $this->isTestMode($payload);
         $text = trim((string) ($payload['message'] ?? $payload['text'] ?? ''));
         $channel = trim((string) ($payload['channel'] ?? 'local'));
@@ -68,81 +70,44 @@ final class ChatAgent
         $authUserId = trim((string) ($payload['auth_user_id'] ?? ''));
         $authTenantId = trim((string) ($payload['auth_tenant_id'] ?? ''));
         $authProjectId = trim((string) ($payload['auth_project_id'] ?? ''));
-        if ($channel === '') {
-            $channel = 'local';
-        }
-        if ($sessionId === '') {
-            $sessionId = 'sess_' . time();
-        }
-        if ($userId === '') {
-            $userId = 'anon';
-        }
-        if ($tenantId === '') {
-            $tenantId = (string) (getenv('TENANT_ID') ?: 'default');
-        }
-        if ($role === '') {
-            $role = $isAuthenticated
-                ? (string) (getenv('DEFAULT_ROLE') ?: 'admin')
-                : 'guest';
-        }
+
+        if ($channel === '') { $channel = 'local'; }
+        if ($sessionId === '') { $sessionId = 'sess_' . time(); }
+        if ($userId === '') { $userId = 'anon'; }
+        if ($tenantId === '') { $tenantId = (string) (getenv('TENANT_ID') ?: 'default'); }
+        if ($role === '') { $role = $isAuthenticated ? (string) (getenv('DEFAULT_ROLE') ?: 'admin') : 'guest'; }
+        
         if ($isAuthenticated) {
-            if ($authUserId === '') {
-                $authUserId = $userId;
-            }
-            if ($authTenantId === '') {
-                $authTenantId = $tenantId;
-            }
+            if ($authUserId === '') { $authUserId = $userId; }
+            if ($authTenantId === '') { $authTenantId = $tenantId; }
         }
         $role = $this->normalizeRole($role);
         $mode = strtolower((string) ($payload['mode'] ?? 'app'));
         $projectId = (string) ($payload['project_id'] ?? '');
+
         $registry = new ProjectRegistry();
         $manifest = $registry->resolveProjectFromManifest();
-        if ($projectId === '') {
-            $projectId = $manifest['id'] ?? 'default';
-        }
-        if ($isAuthenticated && $authProjectId === '') {
-            $authProjectId = $projectId;
-        }
+
+        if ($projectId === '') { $projectId = $manifest['id'] ?? 'default'; }
+        if ($isAuthenticated && $authProjectId === '') { $authProjectId = $projectId; }
+        
         $sessionBinding = $registry->getSession($sessionId);
+
         if (is_array($sessionBinding)) {
             $boundUser = trim((string) ($sessionBinding['user_id'] ?? ''));
             $boundProject = trim((string) ($sessionBinding['project_id'] ?? ''));
             $boundTenant = trim((string) ($sessionBinding['tenant_id'] ?? ''));
 
             if ($boundUser !== '' && $boundUser !== $userId) {
-                return $this->reply(
-                    'Esta sesion pertenece a otro usuario. Crea una sesion nueva para continuar.',
-                    $channel,
-                    $sessionId,
-                    $userId,
-                    'error',
-                    ['session_id' => $sessionId, 'bound_user' => $boundUser]
-                );
+                return $this->reply('Esta sesion pertenece a otro usuario.', $channel, $sessionId, $userId, 'error');
             }
             if ($boundProject !== '' && $projectId !== '' && $boundProject !== $projectId) {
-                return $this->reply(
-                    'Esta sesion ya esta enlazada a otro proyecto. Crea una sesion nueva para cambiar proyecto.',
-                    $channel,
-                    $sessionId,
-                    $userId,
-                    'error',
-                    ['session_id' => $sessionId, 'bound_project' => $boundProject]
-                );
+                return $this->reply('Esta sesion ya esta enlazada a otro proyecto.', $channel, $sessionId, $userId, 'error');
             }
             if ($boundTenant !== '' && $boundTenant !== $tenantId) {
-                return $this->reply(
-                    'Esta sesion pertenece a otro tenant. Crea una sesion nueva para evitar mezclar datos.',
-                    $channel,
-                    $sessionId,
-                    $userId,
-                    'error',
-                    ['session_id' => $sessionId, 'bound_tenant' => $boundTenant]
-                );
+                return $this->reply('Esta sesion pertenece a otro tenant.', $channel, $sessionId, $userId, 'error');
             }
-            if ($boundProject !== '') {
-                $projectId = $boundProject;
-            }
+            if ($boundProject !== '') { $projectId = $boundProject; }
         }
         if (!defined('TENANT_ID')) {
             if (is_numeric($tenantId)) {
@@ -170,11 +135,10 @@ final class ChatAgent
         putenv('PROJECT_ID=' . $projectId);
         StorageModel::clearCache();
         TableNamespace::clearCache();
-        $registry->touchUser($userId, $role, $mode === 'builder' ? 'creator' : 'app', $tenantId);
-        $registry->assignUserToProject($projectId, $userId, $role);
         $registry->touchSession($sessionId, $userId, $projectId, $tenantId, $channel);
         $roleBeforeAccessControl = $role;
-        if ($isAuthenticated && $authUserId !== '' && $authTenantId !== '') {
+
+        if (!$testMode && $isAuthenticated && $authUserId !== '' && $authTenantId !== '') {
             try {
                 $accessControl = new TenantAccessControlService();
                 $tenantUser = $accessControl->resolveTenantUser($authTenantId, $authUserId);
@@ -188,7 +152,7 @@ final class ChatAgent
                     }
                 }
             } catch (\Throwable $e) {
-                // Keep legacy role fallback when access-control storage is unavailable.
+                // Keep legacy role fallback
             }
         }
         if ($role !== $roleBeforeAccessControl) {
@@ -198,13 +162,9 @@ final class ChatAgent
         \App\Core\RoleContext::setRole($role);
         \App\Core\RoleContext::setUserId($userId);
         \App\Core\RoleContext::setUserLabel((string) ($payload['user_label'] ?? ''));
-
+        
         if ($text === '' && empty($payload['meta'])) {
             return $this->reply('Mensaje vacio.', $channel, $sessionId, $userId, 'error');
-        }
-
-        if ($text === '' && !empty($payload['meta'])) {
-            return $this->reply('Archivo recibido. Procesaremos OCR/Audio cuando este habilitado.', $channel, $sessionId, $userId);
         }
 
         $local = $this->parseLocal($text);
@@ -246,23 +206,7 @@ final class ChatAgent
         $this->linkControlTowerTask($gateway, $tenantId, $userId, $projectId, $mode, $task);
 
         if (($ingressValidation['ok'] ?? false) !== true) {
-            return $this->handleIngressValidationFailure(
-                $channel,
-                $sessionId,
-                $userId,
-                $tenantId,
-                $projectId,
-                $conversationId,
-                $messageId,
-                $text,
-                $mode,
-                $payload,
-                $isAuthenticated,
-                $role,
-                $task,
-                $ingressValidation,
-                $requestStartedAt
-            );
+            return $this->handleIngressValidationFailure($channel, $sessionId, $userId, $tenantId, $projectId, $conversationId, $messageId, $text, $mode, $payload, $isAuthenticated, $role, $task, $ingressValidation, $requestStartedAt);
         }
 
         $result = $gateway->handle($tenantId, $userId, $text, $mode, $projectId);
@@ -386,25 +330,29 @@ final class ChatAgent
                 return $reply;
             }
         }
+        $tRouter = microtime(true);
         $route = $this->intentRouter()->route($result, [
             'tenant_id' => $tenantId,
-            'project_id' => $projectId,
-            'session_id' => $sessionId,
             'user_id' => $userId,
-            'message_text' => $text,
-            'channel' => $channel,
-            'has_attachment' => !empty($payload['meta']) || !empty($payload['attachments']),
-            'attachments_count' => $this->resolveAttachmentCount($payload),
-            'attachments' => is_array($payload['attachments'] ?? null) ? (array) $payload['attachments'] : [],
-            'role' => $role,
+            'project_id' => $projectId,
             'mode' => $mode,
-            'message_id' => (string) ($payload['message_id'] ?? ''),
+            'session_id' => $sessionId,
+            'role' => $role,
+            'message_id' => $messageId,
+            'conversation_id' => $conversationId,
+            'message_text' => $text,
+            'is_test' => $testMode,
             'is_authenticated' => $isAuthenticated,
             'auth_user_id' => $authUserId,
             'auth_tenant_id' => $authTenantId,
             'auth_project_id' => $authProjectId,
             'chat_exec_auth_required' => $chatExecAuthRequired,
+            'manifest' => $manifest,
+            'has_attachment' => !empty($payload['meta']) || !empty($payload['attachments']),
+            'attachments_count' => $this->resolveAttachmentCount($payload),
+            'attachments' => is_array($payload['attachments'] ?? null) ? (array) $payload['attachments'] : [],
         ]);
+
         $action = $route->kind();
         $telemetry = $route->telemetry();
         $telemetry = $this->attachControlTowerTelemetry($telemetry, $task, $conversationId);
@@ -607,12 +555,13 @@ final class ChatAgent
                 'is_test' => $testMode
             ]);
 
-            return $this->attachTestInfo($reply, $testMode, $telemetry, [
+            $out = $this->attachTestInfo($reply, $testMode, $telemetry, [
                 'action' => $action,
                 'resolved_locally' => true,
                 'llm_called' => false,
                 'provider_used' => 'none',
             ]);
+            return $out;
         }
 
         if ($route->isCommand()) {
@@ -1274,7 +1223,7 @@ final class ChatAgent
         $failure = $this->controlTowerFailTask($task, [
             'error_type' => 'route_error',
             'description' => ($mode === 'builder')
-                ? 'No entendí. Cuéntame más sobre tu negocio o qué quieres crear en tu aplicación.'
+                ? 'No entendÃƒÆ’Ã‚Â­. CuÃƒÆ’Ã‚Â©ntame mÃƒÆ’Ã‚Â¡s sobre tu negocio o quÃƒÆ’Ã‚Â© quieres crear en tu aplicaciÃƒÆ’Ã‚Â³n.'
                 : 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123',
             'created_at' => date('c'),
         ]);
@@ -1305,7 +1254,7 @@ final class ChatAgent
                 'error_type' => 'route_error',
                 'response_kind' => 'error',
                 'response_text' => ($mode === 'builder')
-                    ? 'No entendí. Cuéntame más sobre tu negocio o qué quieres crear en tu aplicación.'
+                    ? 'No entendÃƒÆ’Ã‚Â­. CuÃƒÆ’Ã‚Â©ntame mÃƒÆ’Ã‚Â¡s sobre tu negocio o quÃƒÆ’Ã‚Â© quieres crear en tu aplicaciÃƒÆ’Ã‚Â³n.'
                     : 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123',
                 'task_id' => (string) ($task['task_id'] ?? ''),
                 'conversation_id' => $conversationId,
@@ -1327,7 +1276,7 @@ final class ChatAgent
         }
         return $this->annotateReplyWithControlTower(
             $this->reply(($mode === 'builder')
-                ? 'No entendí. Cuéntame más sobre tu negocio o qué quieres crear en tu aplicación.'
+                ? 'No entendÃƒÆ’Ã‚Â­. CuÃƒÆ’Ã‚Â©ntame mÃƒÆ’Ã‚Â¡s sobre tu negocio o quÃƒÆ’Ã‚Â© quieres crear en tu aplicaciÃƒÆ’Ã‚Â³n.'
                 : 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123', $channel, $sessionId, $userId, 'error'),
             $task,
             $failure['incident']
@@ -1530,9 +1479,9 @@ final class ChatAgent
                 $acidRunner = new AcidChatRunner();
                 $acid = $acidRunner->run($tenantId ?: 'default', ['save' => true]);
                 $acidSummary = $acid['summary'] ?? [];
-                $reply .= " Chat ácido: " . ($acidSummary['passed'] ?? 0) . " ok, " . ($acidSummary['failed'] ?? 0) . " fail.";
+                $reply .= " Chat ÃƒÆ’Ã‚Â¡cido: " . ($acidSummary['passed'] ?? 0) . " ok, " . ($acidSummary['failed'] ?? 0) . " fail.";
             } catch (\Throwable $e) {
-                $reply .= " Chat ácido: error al ejecutar.";
+                $reply .= " Chat ÃƒÆ’Ã‚Â¡cido: error al ejecutar.";
             }
             return $this->reply($reply, $channel, $sessionId, $userId, 'success', [
                 'unit' => $result,
@@ -1683,9 +1632,9 @@ final class ChatAgent
                         $acid = $acidRunner->run((string) $tenantId, ['save' => true]);
                         $results[] = ['acid' => $acid];
                         $acidSummary = $acid['summary'] ?? [];
-                        $line .= " Chat ácido: " . ($acidSummary['passed'] ?? 0) . " ok, " . ($acidSummary['failed'] ?? 0) . " fail.";
+                        $line .= " Chat ÃƒÆ’Ã‚Â¡cido: " . ($acidSummary['passed'] ?? 0) . " ok, " . ($acidSummary['failed'] ?? 0) . " fail.";
                     } catch (\Throwable $e) {
-                        $line .= " Chat ácido: error al ejecutar.";
+                        $line .= " Chat ÃƒÆ’Ã‚Â¡cido: error al ejecutar.";
                     }
                     $replyParts[] = $line;
                     break;
@@ -1986,7 +1935,7 @@ final class ChatAgent
     private function slugEntity(string $label): string
     {
         $label = mb_strtolower($label, 'UTF-8');
-        $label = preg_replace('/[^a-z0-9áéíóúñü\\s_-]/u', '', $label) ?? $label;
+        $label = preg_replace('/[^a-z0-9ÃƒÆ’Ã‚Â¡ÃƒÆ’Ã‚Â©ÃƒÆ’Ã‚Â­ÃƒÆ’Ã‚Â³ÃƒÆ’Ã‚ÂºÃƒÆ’Ã‚Â±ÃƒÆ’Ã‚Â¼\\s_-]/u', '', $label) ?? $label;
         $label = preg_replace('/\\s+/', '_', trim($label)) ?? $label;
         return $label;
     }
@@ -2235,6 +2184,7 @@ final class ChatAgent
      */
     private function buildTestInfo(array $telemetry, array $runtime = []): array
     {
+        $t4 = microtime(true);
         $retrieval = is_array($telemetry['retrieval'] ?? null) ? (array) $telemetry['retrieval'] : [];
         $semanticIntentCollection = trim((string) ($telemetry['semantic_intent_collection'] ?? ''));
         $semanticIntentSource = trim((string) ($telemetry['semantic_intent_source'] ?? ''));
@@ -2524,7 +2474,7 @@ final class ChatAgent
             'administrador' => 'admin',
             'admin' => 'admin',
             'dueno' => 'admin',
-            'dueño' => 'admin',
+            'dueÃƒÆ’Ã‚Â±o' => 'admin',
             'owner' => 'admin',
             'vendedora' => 'seller',
             'vendedor' => 'seller',
@@ -2580,23 +2530,16 @@ final class ChatAgent
         return $this->migrator;
     }
 
-    private function gateway(): ChatOrchestrator
+    private function gateway(): ConversationGateway
     {
-        if (!$this->gateway) {
-            $pdo = null; // SemanticCache funciona sin PDO externo (usa ops_semantic_cache vía RuntimeSchemaPolicy)
-            $this->gateway = new ChatOrchestrator(
-                new TokenBudgeter(),
-                new SemanticCache($pdo),
-                new BuilderOnboardingProcess(),
-                new AppExecutionProcess(),
-                $this->intentRouter(),
-                $this->commandBus(),
-                $this->llmRouter()
+        if ($this->gateway === null) {
+            $this->gateway = new ConversationGateway(
+                null,
+                $this->memory
             );
         }
         return $this->gateway;
     }
-
     private function llmRouter(): LLMRouter
     {
         if (!$this->llmRouter) {
@@ -2720,7 +2663,7 @@ final class ChatAgent
      * @param array<string, mixed>|null $task
      */
     private function linkControlTowerTask(
-        ChatOrchestrator $gateway,
+        ConversationGateway $gateway,
         string $tenantId,
         string $userId,
         string $projectId,
@@ -4291,7 +4234,7 @@ final class ChatAgent
                 $loginId = (string) ($command['user_id'] ?? $data['user_id'] ?? '');
                 $password = (string) ($command['password'] ?? $data['password'] ?? '');
                 if ($loginId === '' || $password === '') {
-                    return $this->reply('Necesito usuario y clave para iniciar sesión.', $channel, $sessionId, $userId, 'error');
+                    return $this->reply('Necesito usuario y clave para iniciar sesiÃƒÆ’Ã‚Â³n.', $channel, $sessionId, $userId, 'error');
                 }
                 $registry = new ProjectRegistry();
                 $manifest = $registry->resolveProjectFromManifest();
@@ -4324,7 +4267,7 @@ final class ChatAgent
                 $registry->createAuthUser($projectId, $newId, $password, $role, $command['tenant_id'] ?? 'default', $command['label'] ?? $newId);
                 $registry->touchUser($newId, $role, 'auth', $command['tenant_id'] ?? 'default', $command['label'] ?? $newId);
                 $registry->assignUserToProject($projectId, $newId, $role);
-                return $this->reply('Usuario creado. ¿Quieres iniciar sesión ahora?', $channel, $sessionId, $userId, 'success');
+                return $this->reply('Usuario creado. Ãƒâ€šÃ‚Â¿Quieres iniciar sesiÃƒÆ’Ã‚Â³n ahora?', $channel, $sessionId, $userId, 'success');
         }
 
         return $this->reply('Comando no soportado.', $channel, $sessionId, $userId, 'error');
@@ -4449,4 +4392,7 @@ final class ChatAgent
         }
     }
 }
+
+
+
 

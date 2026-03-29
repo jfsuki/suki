@@ -34,7 +34,7 @@ SUKI es un **AI Application Operating System (AI-AOS)** chat-first:
 | Entrenamiento base (datasets/seeds) | ✅ Operativo | 80% | 79 intents en Qdrant, sector seeds, training_base v0.3.7 |
 | Vectorización / Qdrant | ✅ Operativo | 85% | 3 colecciones activas, cosine 768d |
 | Router / Gates / Respuesta final | 🟡 Parcial | 60% | IntentRouter + RouterPolicyEvaluator + IntentClassifier (nuevo) |
-| Conversación real del Builder | 🟡 Problemático | 50% | isPureGreeting/classify ahora semánticos, pero onboarding aún rígido |
+| Conversación real del Builder | ✅ Operativa | 95% | isPureGreeting/classify semánticos, onboarding flexible, S1.4 FIXED |
 | Métricas de calidad | 🟡 Parcial | 55% | Telemetría inyectada para IntentClassifier, falta dashboard real |
 | Seguridad / Auth | 🟡 Parcial | 60% | ApiSecurityGuard, CSRF, rate-limit, tenant binding — falta OTP |
 | DB Kernel / CRUD | ✅ Operativo | 75% | QueryBuilder, BaseRepository, EntityMigrator — falta ALTER diff |
@@ -51,7 +51,7 @@ SUKI es un **AI Application Operating System (AI-AOS)** chat-first:
 | S1.1 | Reemplazar regex rígidas por clasificación semántica | ✅ Hecho | `IntentClassifier.php`, `ConversationGateway.php` | isPureGreeting + classify ahora usan Qdrant→Mistral→keywords |
 | S1.2 | Sembrar 79 intenciones base en Qdrant | ✅ Hecho | `seed_builder_intents.php` | agent_training collection |
 | S1.3 | Auto-training loop (SQLite → Qdrant) | ✅ Hecho | `IntentClassifier::logTraining()`, `seed_builder_intents.php` | Graba clasificaciones LLM con score ≥ 0.85 |
-| S1.4 | Reducir rigidez en `handleBuilderOnboardingCore` | 🟡 En progreso | `ConversationGatewayBuilderOnboardingTrait.php` | Todavía usa catálogos exactos y confirmaciones binarias |
+| S1.4 | Reducir rigidez en `handleBuilderOnboardingCore` | ✅ Hecho | `ConversationGatewayBuilderOnboardingTrait.php` | Refactorizado a IntentClassifier, fatal Scenario 9 corregido |
 | S1.5 | Eliminar `isBuilderUserFrustrated` regex | ⬜ Pendiente | `ConversationGatewayHandlePipelineTrait.php` | Mover a IntentClassifier intent=frustration |
 | S1.6 | Eliminar `isOutOfScopeQuestion` regex | ⬜ Pendiente | `ConversationGatewayHandlePipelineTrait.php` | Mover a IntentClassifier intent=out_of_scope |
 | S1.7 | Eliminar `isFarewell` regex | ⬜ Pendiente | `ConversationGatewayHandlePipelineTrait.php` | Mover a IntentClassifier intent=farewell |

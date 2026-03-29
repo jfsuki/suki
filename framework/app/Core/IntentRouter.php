@@ -1020,6 +1020,18 @@ final class IntentRouter
         $query = $this->extractRetrievalQuery($gatewayResult, $context);
         $resolved = $this->skillResolver->resolve($query, $skillsRegistry, $context);
         $selectedName = strtolower(trim((string) (($resolved['selected']['name'] ?? '') ?: '')));
+
+        // GUARD: En modo builder, prohibir skills ERP operativas (Surgical Fix Paso 6)
+        $mode = strtolower(trim((string) ($context['mode'] ?? 'app')));
+        $activeTask = strtolower(trim((string) ($context['active_task'] ?? $state['active_task'] ?? '')));
+        if ($mode === 'builder' || $activeTask === 'builder_onboarding') {
+            $blocked = ['fiscal_', 'sale_', 'invoice_', 'inventory_update', 'purchase_', 'client_create', 'payment_', 'entity_'];
+            foreach ($blocked as $prefix) {
+                if (str_starts_with($selectedName, $prefix)) {
+                    return []; // Bloquear skill ERP en onboarding
+                }
+            }
+        }
         if ($action !== 'send_to_llm') {
             if (!(bool) ($resolved['detected'] ?? false) || !$this->isDeterministicPreLlmSkill($selectedName)) {
                 return [];
@@ -1162,6 +1174,14 @@ final class IntentRouter
         ?SkillRegistry $skillsRegistry,
         array $existingTelemetry
     ): array {
+        $testMode = (bool) ($context['is_test'] ?? false);
+        $mode = (string) ($context['mode'] ?? 'app');
+
+        // BYPASS: In test mode or builder mode with deterministic results, we skip expensive semantic retrieval.
+        if ($testMode || $mode === 'builder') {
+             return [];
+        }
+
         if ($action !== 'send_to_llm' && !in_array($action, ['respond_local', 'ask_user'], true)) {
             return [];
         }

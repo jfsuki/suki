@@ -29,3 +29,9 @@ credentials/
 /project/storage/meta/project_registry.sqlite
 /project/storage/cache/*.cache.json
 *.tar.gz
+
+# Temporary and Session Data (added by cleanup)
+/framework/storage/meta/memory/
+/tmp/
+/project/storage/tenants/*/*.log.jsonl
+.vscode/

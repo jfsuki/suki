@@ -188,7 +188,7 @@ final class IntentClassifier
         if (str_contains($text, 'gracias') || str_contains($text, 'adios') || str_contains($text, 'chao')) {
             return 'farewell';
         }
-        if (str_contains($text, 'hola') || str_contains($text, 'buenos') || str_contains($text, 'saludos')) {
+        if (str_contains($text, 'hola') || str_contains($text, 'buenos dias') || str_contains($text, 'saludos')) {
             return 'greeting';
         }
         if (str_contains($text, 'crear') || str_contains($text, 'nuevo') || str_contains($text, 'agregar')) {

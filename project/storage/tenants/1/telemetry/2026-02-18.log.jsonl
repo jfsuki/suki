@@ -1,7 +1,0 @@
-{"classification":"status","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"estado del proyecto","mode":"builder","ts":1771381480}
-{"classification":"crud","resolved_locally":true,"intent":"list","entity":"cliente","missing":[],"message":"listar cliente","mode":"app","ts":1771381586}
-{"classification":"crud","resolved_locally":true,"intent":"create","entity":"cliente","missing":[],"message":"crear cliente nombre=Juan nit=123 email=juan@mail.com saldo=100","mode":"app","ts":1771381642}
-{"classification":"crud","resolved_locally":true,"intent":"list","entity":"cliente","missing":[],"message":"listar cliente","mode":"app","ts":1771381642}
-{"classification":"status","resolved_locally":true,"intent":null,"entity":null,"missing":[],"message":"estado del proyecto","mode":"builder","ts":1771381920}
-{"classification":"crud","resolved_locally":true,"intent":"create","entity":"cliente","missing":[],"message":"crear cliente nombre=Juan nit=123 email=juan@mail.com saldo=100","mode":"app","ts":1771381920}
-{"classification":"crud","resolved_locally":true,"intent":"list","entity":"cliente","missing":[],"message":"listar cliente","mode":"app","ts":1771381920}

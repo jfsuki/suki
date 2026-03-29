@@ -550,21 +550,20 @@ final class SemanticMemoryService
             ],
         ];
 
-        // Shared memory logic: agent_training and sector_knowledge can be shared from 'system'
+        // Shared memory logic: agent_training and sector_knowledge can be shared from 'system' or '1' (Master)
         if ($memoryType === 'agent_training' || $memoryType === 'sector_knowledge') {
-            if ($tenantId !== 'system') {
-                $must[] = [
-                    'should' => [
-                        ['key' => 'tenant_id', 'match' => ['value' => $tenantId]],
-                        ['key' => 'tenant_id', 'match' => ['value' => 'system']],
-                    ],
-                ];
-            } else {
-                $must[] = [
-                    'key' => 'tenant_id',
-                    'match' => ['value' => 'system'],
-                ];
+            $sharedSources = [
+                ['key' => 'tenant_id', 'match' => ['value' => 'system']],
+                ['key' => 'tenant_id', 'match' => ['value' => '1']],
+            ];
+            
+            if (!in_array($tenantId, ['system', '1'], true)) {
+                $sharedSources[] = ['key' => 'tenant_id', 'match' => ['value' => $tenantId]];
             }
+
+            $must[] = [
+                'should' => $sharedSources,
+            ];
         } else {
             // Strict isolation for other types (e.g., user_memory)
             $must[] = [

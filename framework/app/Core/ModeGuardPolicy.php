@@ -14,7 +14,7 @@ final class ModeGuardPolicy
         if ($mode !== 'builder' && $hasBuildSignals) {
             return [
                 'telemetry' => 'build_guard',
-                'reply' => 'Eso se hace en el Creador de apps. Abre el chat creador para crear tablas o formularios.',
+                'reply' => 'Esa tabla no existe en esta app. Eso se hace en el Creador de apps. Abre el chat creador para crear tablas o formularios.',
             ];
         }
 
