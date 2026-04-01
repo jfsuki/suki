@@ -52,7 +52,7 @@ trait ConversationGatewayBuilderOnboardingTrait
 
     public function buildFormList(): string
     {
-        return 'AÃºn no hay formularios creados. ¿Quieres que creemos el primero?';
+        return 'Aún no hay formularios creados. ¿Quieres que creemos el primero?';
     }
 
     public function handleBuilderOnboardingCore(

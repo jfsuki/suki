@@ -37,9 +37,9 @@ final class ChatAgent
     private bool $controlTowerAvailable = false;
     private FormWizard $wizard;
     private ContractWriter $writer;
-    private EntityBuilder $builder;
     private LocalJsonMemoryRepository $memory;
     private ?SemanticMemoryService $semanticMemory = null;
+    private AuthService $auth;
 
     public function __construct()
     {
@@ -49,6 +49,7 @@ final class ChatAgent
         $this->builder = new EntityBuilder();
         $this->memory = new LocalJsonMemoryRepository();
         $this->semanticMemory = new SemanticMemoryService();
+        $this->auth = new AuthService();
     }
 
     public function handle(array $payload): array
@@ -59,21 +60,29 @@ final class ChatAgent
         $testMode = $this->isTestMode($payload);
         $text = trim((string) ($payload['message'] ?? $payload['text'] ?? ''));
         $channel = trim((string) ($payload['channel'] ?? 'local'));
-        $sessionId = trim((string) ($payload['session_id'] ?? 'sess_' . time()));
-        $userId = trim((string) ($payload['user_id'] ?? 'anon'));
-        $tenantId = trim((string) ($payload['tenant_id'] ?? getenv('TENANT_ID') ?? 'default'));
-        $role = trim((string) ($payload['role'] ?? $payload['user_role'] ?? ''));
+        $sessionId = trim((string) ($payload['session_id'] ?? ''));
+        if ($sessionId === '') {
+             $sessionId = 'sess_' . bin2hex(random_bytes(8));
+        }
+        
+        $userId = trim((string) ($payload['user_id'] ?? ''));
         $chatExecAuthRequired = (bool) ($payload['chat_exec_auth_required'] ?? false);
         $isAuthenticated = array_key_exists('is_authenticated', $payload)
             ? (bool) $payload['is_authenticated']
             : !$chatExecAuthRequired;
+
+        if ($userId === '') {
+            $userId = $isAuthenticated ? 'user_unknown' : 'guest_' . $sessionId;
+        }
+
+        $tenantId = trim((string) ($payload['tenant_id'] ?? getenv('TENANT_ID') ?? 'default'));
+        $role = trim((string) ($payload['role'] ?? $payload['user_role'] ?? ''));
+        
         $authUserId = trim((string) ($payload['auth_user_id'] ?? ''));
         $authTenantId = trim((string) ($payload['auth_tenant_id'] ?? ''));
         $authProjectId = trim((string) ($payload['auth_project_id'] ?? ''));
 
         if ($channel === '') { $channel = 'local'; }
-        if ($sessionId === '') { $sessionId = 'sess_' . time(); }
-        if ($userId === '') { $userId = 'anon'; }
         if ($tenantId === '') { $tenantId = (string) (getenv('TENANT_ID') ?: 'default'); }
         if ($role === '') { $role = $isAuthenticated ? (string) (getenv('DEFAULT_ROLE') ?: 'admin') : 'guest'; }
         
@@ -1254,7 +1263,7 @@ final class ChatAgent
         $failure = $this->controlTowerFailTask($task, [
             'error_type' => 'route_error',
             'description' => ($mode === 'builder')
-                ? 'No entendÃƒÆ’Ã‚Â­. CuÃƒÆ’Ã‚Â©ntame mÃƒÆ’Ã‚Â¡s sobre tu negocio o quÃƒÆ’Ã‚Â© quieres crear en tu aplicaciÃƒÆ’Ã‚Â³n.'
+                ? 'No entendí. Cuéntame más sobre tu negocio o qué quieres crear en tu aplicación.'
                 : 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123',
             'created_at' => date('c'),
         ]);
@@ -1285,7 +1294,7 @@ final class ChatAgent
                 'error_type' => 'route_error',
                 'response_kind' => 'error',
                 'response_text' => ($mode === 'builder')
-                    ? 'No entendÃƒÆ’Ã‚Â­. CuÃƒÆ’Ã‚Â©ntame mÃƒÆ’Ã‚Â¡s sobre tu negocio o quÃƒÆ’Ã‚Â© quieres crear en tu aplicaciÃƒÆ’Ã‚Â³n.'
+                    ? 'No entendí. Cuéntame más sobre tu negocio o qué quieres crear en tu aplicación.'
                     : 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123',
                 'task_id' => (string) ($task['task_id'] ?? ''),
                 'conversation_id' => $conversationId,
@@ -1307,7 +1316,7 @@ final class ChatAgent
         }
         return $this->annotateReplyWithControlTower(
             $this->reply(($mode === 'builder')
-                ? 'No entendÃƒÆ’Ã‚Â­. CuÃƒÆ’Ã‚Â©ntame mÃƒÆ’Ã‚Â¡s sobre tu negocio o quÃƒÆ’Ã‚Â© quieres crear en tu aplicaciÃƒÆ’Ã‚Â³n.'
+                ? 'No entendí. Cuéntame más sobre tu negocio o qué quieres crear en tu aplicación.'
                 : 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123', $channel, $sessionId, $userId, 'error'),
             $task,
             $failure['incident']
@@ -1515,9 +1524,9 @@ final class ChatAgent
                 $acidRunner = new AcidChatRunner();
                 $acid = $acidRunner->run($tenantId ?: 'default', ['save' => true]);
                 $acidSummary = $acid['summary'] ?? [];
-                $reply .= " Chat ÃƒÆ’Ã‚Â¡cido: " . ($acidSummary['passed'] ?? 0) . " ok, " . ($acidSummary['failed'] ?? 0) . " fail.";
+                $reply .= " Chat ácido: " . ($acidSummary['passed'] ?? 0) . " ok, " . ($acidSummary['failed'] ?? 0) . " fail.";
             } catch (\Throwable $e) {
-                $reply .= " Chat ÃƒÆ’Ã‚Â¡cido: error al ejecutar.";
+                $reply .= " Chat ácido: error al ejecutar.";
             }
             return $this->reply($reply, $channel, $sessionId, $userId, 'success', [
                 'unit' => $result,
@@ -1971,7 +1980,7 @@ final class ChatAgent
     private function slugEntity(string $label): string
     {
         $label = mb_strtolower($label, 'UTF-8');
-        $label = preg_replace('/[^a-z0-9ÃƒÆ’Ã‚Â¡ÃƒÆ’Ã‚Â©ÃƒÆ’Ã‚Â­ÃƒÆ’Ã‚Â³ÃƒÆ’Ã‚ÂºÃƒÆ’Ã‚Â±ÃƒÆ’Ã‚Â¼\\s_-]/u', '', $label) ?? $label;
+        $label = preg_replace('/[^a-z0-9áéíóúñü\\s_-]/u', '', $label) ?? $label;
         $label = preg_replace('/\\s+/', '_', trim($label)) ?? $label;
         return $label;
     }
@@ -2510,7 +2519,7 @@ final class ChatAgent
             'administrador' => 'admin',
             'admin' => 'admin',
             'dueno' => 'admin',
-            'dueÃƒÆ’Ã‚Â±o' => 'admin',
+            'dueño' => 'admin',
             'owner' => 'admin',
             'vendedora' => 'seller',
             'vendedor' => 'seller',
@@ -4277,12 +4286,17 @@ final class ChatAgent
                 $loginId = (string) ($command['user_id'] ?? $data['user_id'] ?? '');
                 $password = (string) ($command['password'] ?? $data['password'] ?? '');
                 if ($loginId === '' || $password === '') {
-                    return $this->reply('Necesito usuario y clave para iniciar sesiÃƒÆ’Ã‚Â³n.', $channel, $sessionId, $userId, 'error');
+                    return $this->reply('Necesito usuario y clave para iniciar sesión.', $channel, $sessionId, $userId, 'error');
                 }
-                $registry = new ProjectRegistry();
-                $manifest = $registry->resolveProjectFromManifest();
-                $projectId = (string) ($command['project_id'] ?? $_SESSION['current_project_id'] ?? $manifest['id'] ?? 'default');
-                $user = $registry->verifyAuthUser($projectId, $loginId, $password);
+                
+                $projectId = (string) ($command['project_id'] ?? $_SESSION['current_project_id'] ?? 'default');
+                // Auto-resolve project from manifest if default was passed but we have a manifest
+                if ($projectId === 'default') {
+                    $manifest = (new ProjectRegistry())->resolveProjectFromManifest();
+                    $projectId = $manifest['id'] ?? 'default';
+                }
+
+                $user = $this->auth->login($projectId, $loginId, $password);
                 if (!$user) {
                     return $this->reply('Usuario o clave incorrecta.', $channel, $sessionId, $userId, 'error');
                 }
@@ -4296,7 +4310,12 @@ final class ChatAgent
                     ];
                     $_SESSION['current_project_id'] = $projectId;
                 }
+
+                // Link the current session to this authenticated user
+                $this->auth->linkSession($sessionId, $user['id'], $projectId, $user['tenant_id'] ?? 'default', $channel);
+
                 return $this->reply('Login listo. Ya puedes usar la app.', $channel, $sessionId, $userId, 'success', ['user' => $user]);
+
             case 'AuthCreateUser':
                 $newId = (string) ($command['user_id'] ?? $data['user_id'] ?? '');
                 $role = (string) ($command['role'] ?? $data['role'] ?? 'seller');
@@ -4304,13 +4323,26 @@ final class ChatAgent
                 if ($newId === '' || $password === '') {
                     return $this->reply('Necesito usuario y clave para crear la cuenta.', $channel, $sessionId, $userId, 'error');
                 }
-                $registry = new ProjectRegistry();
-                $manifest = $registry->resolveProjectFromManifest();
-                $projectId = (string) ($command['project_id'] ?? $_SESSION['current_project_id'] ?? $manifest['id'] ?? 'default');
-                $registry->createAuthUser($projectId, $newId, $password, $role, $command['tenant_id'] ?? 'default', $command['label'] ?? $newId);
-                $registry->touchUser($newId, $role, 'auth', $command['tenant_id'] ?? 'default', $command['label'] ?? $newId);
-                $registry->assignUserToProject($projectId, $newId, $role);
-                return $this->reply('Usuario creado. Ãƒâ€šÃ‚Â¿Quieres iniciar sesiÃƒÆ’Ã‚Â³n ahora?', $channel, $sessionId, $userId, 'success');
+
+                $projectId = (string) ($command['project_id'] ?? $_SESSION['current_project_id'] ?? 'default');
+                if ($projectId === 'default') {
+                    $manifest = (new ProjectRegistry())->resolveProjectFromManifest();
+                    $projectId = $manifest['id'] ?? 'default';
+                }
+
+                try {
+                    $this->auth->register(
+                        $projectId, 
+                        $newId, 
+                        $password, 
+                        $role, 
+                        $command['tenant_id'] ?? 'default', 
+                        $command['label'] ?? $newId
+                    );
+                    return $this->reply('Usuario creado. ¿Quieres iniciar sesión ahora?', $channel, $sessionId, $userId, 'success');
+                } catch (\Exception $e) {
+                    return $this->reply($e->getMessage(), $channel, $sessionId, $userId, 'error');
+                }
         }
 
         return $this->reply('Comando no soportado.', $channel, $sessionId, $userId, 'error');

@@ -23,7 +23,7 @@ class SoftwareArchitectPromptBuilder
     {
         $template = $this->loadTemplateForSector($sectorKey);
         if ($template === null) {
-            return "Eres un Arquitecto de Software Experto. Tu meta es diseÃ±ar una app robusta y escalable.";
+            return "Eres un Arquitecto de Software Experto. Tu meta es diseñar una app robusta y escalable.";
         }
 
         $sectorLabel = $template['sector_label'] ?? 'General';
