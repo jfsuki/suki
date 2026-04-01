@@ -163,6 +163,39 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
         return $out;
     }
 
+    public function getSession(string $sessionId): array
+    {
+        $stmt = $this->db->prepare('SELECT data_json FROM mem_sessions WHERE session_id = :session_id LIMIT 1');
+        $stmt->execute([':session_id' => $sessionId]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $this->decodeValue($row['data_json'] ?? null, []);
+    }
+
+    public function saveSession(string $sessionId, array $data): void
+    {
+        $updatedAt = date('Y-m-d H:i:s');
+        $driver = $this->driver();
+        if ($driver === 'sqlite') {
+            $stmt = $this->db->prepare(
+                'INSERT INTO mem_sessions (session_id, data_json, updated_at)
+                 VALUES (:session_id, :data_json, :updated_at)
+                 ON CONFLICT(session_id)
+                 DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at'
+            );
+        } else {
+            $stmt = $this->db->prepare(
+                'INSERT INTO mem_sessions (session_id, data_json, updated_at)
+                 VALUES (:session_id, :data_json, :updated_at)
+                 ON DUPLICATE KEY UPDATE data_json = VALUES(data_json), updated_at = VALUES(updated_at)'
+            );
+        }
+        $stmt->execute([
+            ':session_id' => $sessionId,
+            ':data_json' => $this->encodeValue($data),
+            ':updated_at' => $updatedAt,
+        ]);
+    }
+
     /**
      * Legacy KV support for ConversationGatewayStubsTrait.
      * Maps to mem_global using category 'legacy_kv'.
@@ -244,6 +277,16 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
                 KEY idx_chat_user (tenant_id, user_id, created_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
+
+        $this->db->exec(
+            "CREATE TABLE IF NOT EXISTS mem_sessions (
+                session_id VARCHAR(190) NOT NULL,
+                data_json JSON NOT NULL,
+                updated_at DATETIME NOT NULL,
+                PRIMARY KEY (session_id),
+                KEY idx_mem_sessions_updated (updated_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        );
     }
 
     private function ensureTablesSqlite(): void
@@ -295,8 +338,17 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
                 created_at TEXT NOT NULL
             )'
         );
-        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_chat_session ON chat_log (tenant_id, session_id, created_at)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_log (tenant_id, user_id, created_at)');
+
+        $this->db->exec(
+            'CREATE TABLE IF NOT EXISTS mem_sessions (
+                session_id TEXT NOT NULL,
+                data_json TEXT NOT NULL,
+                updated_at TEXT NOT NULL,
+                PRIMARY KEY (session_id)
+            )'
+        );
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_mem_sessions_updated ON mem_sessions (updated_at)');
     }
 
     /**
@@ -304,7 +356,7 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
      */
     private function requiredTables(): array
     {
-        return ['mem_global', 'mem_tenant', 'mem_user', 'chat_log'];
+        return ['mem_global', 'mem_tenant', 'mem_user', 'chat_log', 'mem_sessions'];
     }
 
     /**
@@ -317,6 +369,7 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
             'mem_tenant' => ['idx_mem_tenant_updated'],
             'mem_user' => ['idx_mem_user_updated'],
             'chat_log' => ['idx_chat_session', 'idx_chat_user'],
+            'mem_sessions' => ['idx_mem_sessions_updated'],
         ];
     }
 

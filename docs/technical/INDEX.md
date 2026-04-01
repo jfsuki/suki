@@ -1,62 +1,48 @@
-# Docs Index (Read this first)
-- AI_ONBOARDING_PROMPT.md
-- 00_SYSTEM_OVERVIEW.md
-- 01_RULES_NO_BREAK.md
-- 02_ARCHITECTURE.md
-- 03_FORM_CONTRACT.md
-- 04_GRID_CONTRACT.md
-- 05_VALIDATION_ENGINE.md
-- 06_PERSISTENCE_PLAN.md
-- 07_DATABASE_MODEL.md
-- 08_WORK_PLAN.md
-- WORKFLOW_BUILDER_PROGRAM.md
-- 09_MONETIZATION_PRODUCT_VISION.md
-- 10_AI_OPERATING_PROCEDURE.md
-- 11_FRAMEWORK_BOUNDARY.md
-- 12_INTEGRATIONS_AUTOMATION.md
-- 13_APP_MANIFEST_CONTRACT.md
-- 14_ENTITY_CONTRACT.md
-- 15_INTEGRATIONS_ALANUBE.md
-- 16_INVOICE_CONTRACT.md
-- CLOUD_SCALE_MEMORY.md
-- MULTIMODAL_PLAN.md
-- DB_INDEX_CHECKLIST.md
-- BACKUP_AND_RECOVERY.md
-- SQL_MEMORY_TABLES.sql
-- OPENCLAW_NOTES.md
-- AGENTS_CONVERSATION_GATEWAY.md
-- AGENT_SKILLS_MATRIX.md
-- AGENT_BENCHMARK_KORE_VERCEL_RASA_2026_02_21.md
-- IMPLEMENTATION_GAP_MATRIX_2026_02_20.md
-- DOMAIN_PLAYBOOKS_PROMPT_BASE.md
-- TESTING_MANUAL.md
-- PREPROD_RELEASE_CHECKLIST.md
-- AGENT_TRAINING_PLAN.md
-- ERP_TRAINING_DATASET_PIPELINE.md
-- BUSINESS_DISCOVERY_TEMPLATE.md
-- TRAINING_DATASET_TEMPLATE.md
-- TRAINING_DATA_REQUEST_CONTEXT.md
-- TRAINING_AUDIT_ESCO_ERP6INTENTS_V1.md
-- GLOBAL_BUSINESS_ONTOLOGY.md
-- BUSINESS_EVENT_GRAPH.md
-- BUSINESS_AUDIT_AGENT.md
-- RESEARCH_POLICY.md
-- GOVERNANCE_DIFF_AGENTS_2026_02_21.md
-- PROJECT_MEMORY.md
-- PROJECT_MEMORY_CANONICAL.md
-- CODEX_SELF_CHECKLIST.md
-- PROJECT_MAP.md
-- ROUTING_MAP.md
-- ROADMAP_USER_FIRST.md
-- PERFORMANCE.md
-- SECURITY.md
-- SMOKE_TESTS.md
-- Canonical architecture cross-reference in `/docs/canon/`:
-- SUKI_ARCHITECTURE_CANON.md
-- BUSINESS_SIMULATION_ENGINE.md
-- SPECIALIZED_AGENTS_ARCHITECTURE.md
-- PRODUCTION_LEARNING_PIPELINE.md
-- AGENT_COLLABORATION_ENGINE.md
-- SUKI_CONTROL_TOWER.md
-- CONTROL_TOWER_DASHBOARD.md
-- INCIDENT_MANAGEMENT.md
+# SUKI Technical Documentation Index
+
+This directory contains the deep technical specifications, architectural blueprints, and operational guides for the SUKI platform.
+
+## 🏗️ Core Architecture
+- [00_SYSTEM_OVERVIEW.md](file:///c:/laragon/www/suki/docs/technical/00_SYSTEM_OVERVIEW.md) - High-level system design.
+- [01_RULES_NO_BREAK.md](file:///c:/laragon/www/suki/docs/technical/01_RULES_NO_BREAK.md) - Non-negotiable architectural rules.
+- [02_ARCHITECTURE.md](file:///c:/laragon/www/suki/docs/technical/02_ARCHITECTURE.md) - Deep dive into core modules.
+- [11_FRAMEWORK_BOUNDARY.md](file:///c:/laragon/www/suki/docs/technical/11_FRAMEWORK_BOUNDARY.md) - Division between Framework and Application.
+- [ARCH_API_MICROSERVICES.md](file:///c:/laragon/www/suki/docs/technical/ARCH_API_MICROSERVICES.md) - API and service layer design.
+
+## 📄 Contracts & Schemas
+- [13_APP_MANIFEST_CONTRACT.md](file:///c:/laragon/www/suki/docs/technical/13_APP_MANIFEST_CONTRACT.md) - The "DNA" of a SUKI app.
+- [14_ENTITY_CONTRACT.md](file:///c:/laragon/www/suki/docs/technical/14_ENTITY_CONTRACT.md) - Data entity definitions.
+- [03_FORM_CONTRACT.md](file:///c:/laragon/www/suki/docs/technical/03_FORM_CONTRACT.md) - UI Form specifications.
+- [04_GRID_CONTRACT.md](file:///c:/laragon/www/suki/docs/technical/04_GRID_CONTRACT.md) - Data Grid specifications.
+- [16_INVOICE_CONTRACT.md](file:///c:/laragon/www/suki/docs/technical/16_INVOICE_CONTRACT.md) - Fiscal and invoice data formats.
+
+## 🤖 Agents & Intelligence
+- [AGENTS_CONVERSATION_GATEWAY.md](file:///c:/laragon/www/suki/docs/technical/AGENTS_CONVERSATION_GATEWAY.md) - Main interface between LLM and Kernel.
+- [AGENT_MEMORY_ARCHITECTURE.md](file:///c:/laragon/www/suki/docs/technical/AGENT_MEMORY_ARCHITECTURE.md) - How agents remember and learn.
+- [AGENT_SKILLS_MATRIX.md](file:///c:/laragon/www/suki/docs/technical/AGENT_SKILLS_MATRIX.md) - Map of available agent capabilities.
+- [AI_ONBOARDING_PROMPT.md](file:///c:/laragon/www/suki/docs/technical/AI_ONBOARDING_PROMPT.md) - System prompts for onboarding.
+
+## 🔌 Integrations
+- [12_INTEGRATIONS_AUTOMATION.md](file:///c:/laragon/www/suki/docs/technical/12_INTEGRATIONS_AUTOMATION.md) - Automation engine and webhooks.
+- [15_INTEGRATIONS_ALANUBE.md](file:///c:/laragon/www/suki/docs/technical/15_INTEGRATIONS_ALANUBE.md) - Alanube fiscal provider integration.
+
+## 💾 Persistence & Data
+- [07_DATABASE_MODEL.md](file:///c:/laragon/www/suki/docs/technical/07_DATABASE_MODEL.md) - Relational and vector schema.
+- [06_PERSISTENCE_PLAN.md](file:///c:/laragon/www/suki/docs/technical/06_PERSISTENCE_PLAN.md) - Storage strategy and migration paths.
+- [SQL_MEMORY_TABLES.sql](file:///c:/laragon/www/suki/docs/technical/SQL_MEMORY_TABLES.sql) - Schema for agent memory.
+
+## 🛡️ Operations & Security
+- [SECURITY.md](file:///c:/laragon/www/suki/docs/technical/SECURITY.md) - Security layers and guardrails.
+- [BACKUP_AND_RECOVERY.md](file:///c:/laragon/www/suki/docs/technical/BACKUP_AND_RECOVERY.md) - Data protection policies.
+- [PERFORMANCE.md](file:///c:/laragon/www/suki/docs/technical/PERFORMANCE.md) - Latency and throughput benchmarks.
+- [SMOKE_TESTS.md](file:///c:/laragon/www/suki/docs/technical/SMOKE_TESTS.md) - Stability verification protocols.
+- [CODEX_SELF_CHECKLIST.md](file:///c:/laragon/www/suki/docs/technical/CODEX_SELF_CHECKLIST.md) - Pre-check rules for agents.
+
+## 📊 Business Logic
+- [BUSINESS_AUDIT_AGENT.md](file:///c:/laragon/www/suki/docs/technical/BUSINESS_AUDIT_AGENT.md) - Audit and compliance engine.
+- [BUSINESS_DISCOVERY_TEMPLATE.md](file:///c:/laragon/www/suki/docs/technical/BUSINESS_DISCOVERY_TEMPLATE.md) - Probing questions for new apps.
+- [BUSINESS_EVENT_GRAPH.md](file:///c:/laragon/www/suki/docs/technical/BUSINESS_EVENT_GRAPH.md) - Logical flow of business events.
+- [GLOBAL_BUSINESS_ONTOLOGY.md](file:///c:/laragon/www/suki/docs/technical/GLOBAL_BUSINESS_ONTOLOGY.md) - Shared business terms and concepts.
+
+## 📈 Benchmarks
+- [benchmarks/](file:///c:/laragon/www/suki/docs/technical/benchmarks/) - Detailed performance and accuracy comparisons.

@@ -8,7 +8,7 @@ Bienvenido a la documentación centralizada de SUKI (AI-AOS). Toda la autoridad 
 - [SUKI_ARCHITECTURE_CANON](file:///c:/laragon/www/suki/docs/canon/SUKI_ARCHITECTURE_CANON.md)
 - [ROUTER_CANON](file:///c:/laragon/www/suki/docs/canon/ROUTER_CANON.md)
 - [ACTION_CONTRACTS](file:///c:/laragon/www/suki/docs/canon/ACTION_CONTRACTS.md)
-- [AGENT_MEMORY_ARCHITECTURE](file:///c:/laragon/www/suki/docs/AGENT_MEMORY_ARCHITECTURE.md) (Neuron IA implementation)
+- [AGENT_MEMORY_ARCHITECTURE](file:///c:/laragon/www/suki/docs/technical/AGENT_MEMORY_ARCHITECTURE.md) (Neuron IA implementation)
 
 ## 2. Memoria del Proyecto (`/docs/memory/`)
 *Estado actual, hitos y planes de trabajo.*
@@ -25,7 +25,18 @@ Bienvenido a la documentación centralizada de SUKI (AI-AOS). Toda la autoridad 
 - [CODEX_SELF_CHECKLIST](file:///c:/laragon/www/suki/docs/technical/CODEX_SELF_CHECKLIST.md)
 - [Índice Técnico Detallado](file:///c:/laragon/www/suki/docs/technical/INDEX.md)
 
-## 4. Seguimiento de Sprints (`/docs/sprints/`)
+## 4. Contratos y Estándares (`/docs/contracts/`)
+*Definiciones formales de intercambio de datos.*
+- [Action Catalog](file:///c:/laragon/www/suki/docs/contracts/action_catalog.json)
+- [Skills Catalog](file:///c:/laragon/www/suki/docs/contracts/skills_catalog.json)
+- [AgentOps Metrics](file:///c:/laragon/www/suki/docs/contracts/agentops_metrics_contract.json)
+
+## 5. Entrenamiento y Dataset (`/docs/training/`)
+*Recursos para el aprendizaje del modelo.*
+- [ERP_INTENTS_DATASET](file:///c:/laragon/www/suki/docs/training/ERP_INTENTS_DATASET.md)
+- [AGENT_TRAINING_PLAN](file:///c:/laragon/www/suki/docs/training/AGENT_TRAINING_PLAN.md)
+
+## 6. Seguimiento de Sprints (`/docs/sprints/`)
 *Planificación y tracking activo.*
 - [SUKI_SPRINT_TRACKER](file:///c:/laragon/www/suki/docs/sprints/SUKI_SPRINT_TRACKER.md)
 - [SUKI_SPRINT_PLAN_AGENTE_VIVO](file:///c:/laragon/www/suki/docs/sprints/SUKI_SPRINT_PLAN_AGENTE_VIVO.md)

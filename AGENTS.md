@@ -51,14 +51,15 @@ Antes de tocar chat, DB kernel, contratos o integraciones:
    - registry real (`project/storage/meta/project_registry.sqlite`)
 
 Lectura minima recomendada:
-- `docs/PROJECT_MEMORY.md` (Memoria unificada)
+- `docs/memory/PROJECT_MEMORY.md` (Memoria unificada)
 - `docs/memory/PROJECT_MEMORY_CANONICAL.md`
 - `docs/memory/08_WORK_PLAN.md`
 - `docs/technical/07_DATABASE_MODEL.md`
 - `docs/technical/AGENTS_CONVERSATION_GATEWAY.md`
 - `docs/technical/AGENT_SKILLS_MATRIX.md`
-- `docs/memory/HOSTING_MIGRATION_PLAN.md`
+- `docs/technical/AGENT_MEMORY_ARCHITECTURE.md`
 - `docs/technical/CODEX_SELF_CHECKLIST.md`
+- `docs/memory/HOSTING_MIGRATION_PLAN.md`
 
 ## 3.1) Pre-check obligatorio antes de cada cambio
 Ejecutar siempre:

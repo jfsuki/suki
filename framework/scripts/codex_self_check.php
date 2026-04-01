@@ -20,7 +20,7 @@ if ($repoRoot === false) {
 $requiredFiles = [
     'AGENTS.md',
     'docs/INDEX.md',
-    'docs/PROJECT_MEMORY.md',
+    'docs/memory/PROJECT_MEMORY.md',
     'docs/memory/PROJECT_MEMORY_CANONICAL.md',
     'docs/technical/CODEX_SELF_CHECKLIST.md',
     'docs/technical/AGENT_SKILLS_MATRIX.md',
