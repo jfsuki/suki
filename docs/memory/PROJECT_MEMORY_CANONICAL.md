@@ -181,3 +181,17 @@ If a decision conflicts with a higher level, it is invalid.
 ## 19) Secrets Policy (2026-03-03)
 - Secrets never in git; rotate immediately if exposed.
 - `.env` is local runtime state only; commit only `.env.example` with placeholders.
+
+## 20) 3-World Isolation Architecture (2026-04-01)
+- **World 1: Framework (Gateway/Marketplace)**
+  - Managed by `framework/public/index.php`.
+  - Roles: Central auth portal, Marketplace, Creator onboarding.
+- **World 2: Tower (Admin NOC)**
+  - Managed by `tower/public/index.php`.
+  - Roles: Master administration, Creator approval, Enterprise activation.
+  - Access: Stealth route, protected by Master Key session.
+- **World 3: Project (Builder / App)**
+  - Managed by `project/public/index.php`.
+  - Roles: AI Builder (Creation Tool), Chat App (End-user interface).
+  - Security: Guarded by world-specific session logic; direct file access is strictly blocked.
+- **Canonical Law:** Strict isolation between worlds. Sessions are not shared between World 2 and World 3 to prevent privilege escalation. Routers serve as the sole execution gatekeepers.

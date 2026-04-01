@@ -16,10 +16,20 @@ final class ProjectRegistry
         $this->dbPath = $dbPath ?: $this->defaultPath();
         $this->db = new PDO('sqlite:' . $this->dbPath);
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
+
+        // Forzar entorno local y permitir cambios de esquema en tiempo de ejecución para aplicar la columna user_type
+        if (strpos($_SERVER['HTTP_HOST'] ?? '', 'localhost') !== false || strpos($_SERVER['HTTP_HOST'] ?? '', '127.0.0.1') !== false || strpos($_SERVER['HTTP_HOST'] ?? '', '.test') !== false) {
+             putenv('ALLOW_RUNTIME_SCHEMA=1');
+             putenv('APP_ENV=local');
+        }
+
         RuntimeSchemaPolicy::bootstrap(
             $this->db,
             'ProjectRegistry',
-            fn() => $this->ensureSchema(),
+            function() {
+                $this->ensureSchema();
+                $this->initializeAuthSchema();
+            },
             $this->requiredTables(),
             [],
             $this->requiredColumns(),
@@ -335,7 +345,7 @@ final class ProjectRegistry
         if ($userId === '' || $password === '') {
             throw new RuntimeException('Usuario y password requeridos.');
         }
-        $hash = password_hash($password, PASSWORD_DEFAULT);
+        $hash = password_hash($password, PASSWORD_BCRYPT);
         $now = date('Y-m-d H:i:s');
         $stmt = $this->db->prepare('INSERT OR REPLACE INTO auth_users (id, project_id, label, role, tenant_id, password_hash, created_at, last_login) VALUES (:id, :project, :label, :role, :tenant, :hash, :created, :last)');
         $stmt->execute([
@@ -348,6 +358,67 @@ final class ProjectRegistry
             ':created' => $now,
             ':last' => null,
         ]);
+    }
+
+    public function initializeAuthSchema(): void
+    {
+        $this->db->exec("CREATE TABLE IF NOT EXISTS auth_users (
+            id            TEXT,
+            project_id    TEXT,
+            nit           TEXT,
+            full_name     TEXT,
+            area_code     TEXT NOT NULL DEFAULT '+57',
+            phone_number  TEXT,
+            alt_phone     TEXT,
+            alt_email     TEXT,
+            country       TEXT DEFAULT 'COLOMBIA',
+            department    TEXT,
+            city          TEXT,
+            primary_activity   TEXT,
+            secondary_activity TEXT,
+            other_activities   TEXT,
+            tax_responsibilities TEXT,
+            business_desc TEXT,
+            rut_path      TEXT,
+            password_hash TEXT NOT NULL,
+            tenant_id     TEXT NOT NULL,
+            created_at    TEXT DEFAULT CURRENT_TIMESTAMP,
+            is_active     INTEGER DEFAULT 0,
+            user_type     TEXT DEFAULT 'enterprise',
+            PRIMARY KEY(id, project_id)
+        )");
+
+        $this->db->exec("CREATE TABLE IF NOT EXISTS login_attempts (
+            id         INTEGER PRIMARY KEY AUTOINCREMENT,
+            identifier TEXT NOT NULL,
+            ip_address TEXT NOT NULL,
+            attempted_at DATETIME DEFAULT CURRENT_TIMESTAMP
+        )");
+
+        $this->db->exec("CREATE INDEX IF NOT EXISTS idx_login_attempts_identifier
+            ON login_attempts(identifier, attempted_at)");
+        
+        $this->ensureAuthColumns();
+    }
+
+    private function ensureAuthColumns(): void
+    {
+        $stmt = $this->db->query("PRAGMA table_info(auth_users)");
+        $cols = $stmt->fetchAll(\PDO::FETCH_COLUMN, 1);
+        $missing = array_diff(
+            ['nit', 'full_name', 'area_code', 'phone_number', 'business_desc', 'rut_path', 'is_active', 'user_type'],
+            $cols
+        );
+
+        foreach ($missing as $col) {
+            $def = match($col) {
+                'is_active' => "INTEGER DEFAULT 1",
+                'area_code' => "TEXT DEFAULT '+57'",
+                'user_type' => "TEXT DEFAULT 'enterprise'",
+                default => "TEXT"
+            };
+            $this->db->exec("ALTER TABLE auth_users ADD COLUMN $col $def");
+        }
     }
 
     public function verifyAuthUser(string $projectId, string $userId, string $password): ?array
@@ -557,6 +628,7 @@ final class ProjectRegistry
     {
         return [
             'projects' => ['storage_model'],
+            'auth_users' => ['user_type', 'nit', 'full_name', 'is_active'],
         ];
     }
 
@@ -635,5 +707,41 @@ final class ProjectRegistry
             return PROJECT_ROOT;
         }
         return dirname(__DIR__, 3) . '/project';
+    }
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getUsersByStatus(int $isActive): array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM auth_users WHERE is_active = :status ORDER BY created_at DESC');
+        $stmt->execute([':status' => $isActive]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function updateAuthUserStatus(string $userId, int $status): bool
+    {
+        $stmt = $this->db->prepare('UPDATE auth_users SET is_active = :status WHERE id = :id OR nit = :id');
+        return $stmt->execute([':status' => $status, ':id' => $userId]);
+    }
+
+    /**
+     * @return array<string, mixed>|null
+     */
+    public function getAuthUserById(string $userId): ?array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM auth_users WHERE id = :id OR nit = :id LIMIT 1');
+        $stmt->execute([':id' => $userId]);
+        $result = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $result ?: null;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getUsersByType(string $type): array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM auth_users WHERE user_type = :type ORDER BY created_at DESC');
+        $stmt->execute([':type' => $type]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
 }

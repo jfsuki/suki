@@ -146,6 +146,13 @@ class ComposerStaticInit5f5aa19595099c5bc17fb40b43863c9b
     );
 
     public static $prefixesPsr0 = array (
+        'S' =>
+        array (
+            'Smalot\\PdfParser\\' =>
+            array (
+                0 => __DIR__ . '/..' . '/smalot/pdfparser/src',
+            ),
+        ),
         'P' =>
         array (
             'PHPMD\\' =>

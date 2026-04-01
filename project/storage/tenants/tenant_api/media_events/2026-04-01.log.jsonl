@@ -1,3 +1,6 @@
 {"ts":"2026-04-01T00:01:47+00:00","event":"upload","tenant_id":"tenant_api","app_id":"media_app","entity_type":"product","entity_id":"900","user_id":"api_media_user","media_id":"271"}
 {"ts":"2026-04-01T00:01:48+00:00","event":"access","tenant_id":"tenant_api","app_id":"media_app","entity_type":"product","entity_id":"900","user_id":"token","media_id":"271","variant":"original"}
 {"ts":"2026-04-01T00:01:48+00:00","event":"delete","tenant_id":"tenant_api","app_id":"media_app","entity_type":"product","entity_id":"900","user_id":"api_media_user","media_id":"271"}
+{"ts":"2026-04-01T18:30:34+00:00","event":"upload","tenant_id":"tenant_api","app_id":"media_app","entity_type":"product","entity_id":"900","user_id":"api_media_user","media_id":"272"}
+{"ts":"2026-04-01T18:30:34+00:00","event":"access","tenant_id":"tenant_api","app_id":"media_app","entity_type":"product","entity_id":"900","user_id":"token","media_id":"272","variant":"original"}
+{"ts":"2026-04-01T18:30:35+00:00","event":"delete","tenant_id":"tenant_api","app_id":"media_app","entity_type":"product","entity_id":"900","user_id":"api_media_user","media_id":"272"}
