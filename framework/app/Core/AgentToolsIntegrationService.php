@@ -107,6 +107,39 @@ final class AgentToolsIntegrationService
     }
 
     /**
+     * @param string $tenantId
+     * @param string $userId
+     * @param string $moduleKey
+     * @param string|null $projectId
+     * @return array<string, mixed>
+     */
+    public function getCoachingContext(string $tenantId, string $userId, string $moduleKey, ?string $projectId = null): array
+    {
+        $tenantId = $this->requireString($tenantId, 'tenant_id');
+        $moduleKey = $this->normalizeModuleKey($moduleKey);
+        $definition = $this->requireModuleDefinition($moduleKey);
+        $planState = $this->resolveModulePlanState($tenantId, $definition, $projectId);
+
+        $actions = [];
+        foreach ($this->moduleActionEntries($definition) as $entry) {
+            $actions[] = [
+                'action_key' => $entry['action_key'],
+                'skill_name' => $entry['skill_name'],
+                'risk' => $entry['risk_level'],
+            ];
+        }
+
+        return [
+            'module' => $definition['module_key'],
+            'label' => $definition['label'],
+            'description' => $definition['description'] ?? '',
+            'enabled' => (bool)($planState['enabled'] ?? false),
+            'actions' => array_slice($actions, 0, 5), // Top 5 actions
+            'aliases' => $definition['aliases'] ?? [],
+        ];
+    }
+
+    /**
      * @param array<string, mixed> $options
      * @return array<string, mixed>
      */
@@ -912,6 +945,7 @@ final class AgentToolsIntegrationService
                 'module_key' => 'media',
                 'tool_group' => 'media',
                 'label' => 'Media/Documents',
+                'description' => 'Gestión de archivos, documentos adjuntos y almacenamiento multimedia.',
                 'catalog_prefix' => 'media.',
                 'permission_module_key' => 'media',
                 'plan_managed' => true,
@@ -922,6 +956,7 @@ final class AgentToolsIntegrationService
                 'module_key' => 'entity_search',
                 'tool_group' => 'entity_search',
                 'label' => 'Entity Search',
+                'description' => 'Búsqueda global y resolución de referencias entre tablas y registros.',
                 'catalog_prefix' => 'entity.',
                 'permission_module_key' => 'entity',
                 'plan_managed' => false,
@@ -932,6 +967,7 @@ final class AgentToolsIntegrationService
                 'module_key' => 'pos',
                 'tool_group' => 'pos',
                 'label' => 'POS',
+                'description' => 'Punto de venta, facturación rápida, manejo de tickets y cierres de caja.',
                 'catalog_prefix' => 'pos.',
                 'permission_module_key' => 'pos',
                 'plan_managed' => true,
@@ -942,6 +978,7 @@ final class AgentToolsIntegrationService
                 'module_key' => 'purchases',
                 'tool_group' => 'purchases',
                 'label' => 'Purchases',
+                'description' => 'Gestión de compras, órdenes a proveedores y control de entrada de mercancía.',
                 'catalog_prefix' => 'purchases.',
                 'permission_module_key' => 'purchases',
                 'plan_managed' => true,
@@ -952,6 +989,7 @@ final class AgentToolsIntegrationService
                 'module_key' => 'fiscal',
                 'tool_group' => 'fiscal',
                 'label' => 'Fiscal',
+                'description' => 'Facturación electrónica (DIAN), notas crédito y cumplimiento normativo fiscal.',
                 'catalog_prefix' => 'fiscal.',
                 'permission_module_key' => 'fiscal',
                 'plan_managed' => true,
@@ -962,6 +1000,7 @@ final class AgentToolsIntegrationService
                 'module_key' => 'ecommerce',
                 'tool_group' => 'ecommerce',
                 'label' => 'Ecommerce',
+                'description' => 'Integración con tiendas online como WooCommerce, PrestaShop y Shopify.',
                 'catalog_prefix' => 'ecommerce.',
                 'permission_module_key' => 'ecommerce',
                 'plan_managed' => true,
@@ -972,6 +1011,7 @@ final class AgentToolsIntegrationService
                 'module_key' => 'access_control',
                 'tool_group' => 'access_control',
                 'label' => 'Access Control',
+                'description' => 'Seguridad multiusuario, roles (RBAC) y gestión de permisos detallados.',
                 'catalog_prefix' => 'users.',
                 'permission_module_key' => 'users',
                 'plan_managed' => true,
@@ -982,6 +1022,7 @@ final class AgentToolsIntegrationService
                 'module_key' => 'saas_plan',
                 'tool_group' => 'saas_plan',
                 'label' => 'SaaS Plan',
+                'description' => 'Gestión de suscripciones, límites de módulos y estados de cuenta del plan.',
                 'catalog_prefix' => 'saas.',
                 'permission_module_key' => 'saas',
                 'plan_managed' => false,
@@ -992,6 +1033,7 @@ final class AgentToolsIntegrationService
                 'module_key' => 'usage_metering',
                 'tool_group' => 'usage_metering',
                 'label' => 'Usage Metering',
+                'description' => 'Métricas de consumo de recursos, almacenamiento y límites de cuotas.',
                 'catalog_prefix' => 'usage.',
                 'permission_module_key' => 'usage',
                 'plan_managed' => false,

@@ -110,13 +110,6 @@ final class BuilderFastPathParser
 
             $parsed = $this->validate($json, $step);
 
-            // PERSISTIR CAMPOS CONFIRMADOS INMEDIATAMENTE (Surgical Fix Paso 5)
-            if (!empty($parsed['mapped_fields']) && ($parsed['confidence'] ?? 0) >= 0.72) {
-                foreach ($parsed['mapped_fields'] as $field => $value) {
-                    $this->saveBuilderField($tenantId, $userId, $field, $value);
-                }
-            }
-
             return $parsed;
         } catch (RuntimeException $e) {
             // Any LLM failure returns deterministic fallback — never null, never exception up.
@@ -254,10 +247,6 @@ final class BuilderFastPathParser
         ];
     }
 
-    /**
-     * Test/stub support via env var SUKI_BUILDER_FAST_PATH_STUB_JSON.
-     * Format: {"intent":"set_business_type","mapped_fields":{"business_type":"ferreteria_minorista"},"reply":"ok","confidence":1.0,"needs_clarification":false}
-     */
     private function tryStub(string $step): ?array
     {
         $raw = trim((string) (getenv('SUKI_BUILDER_FAST_PATH_STUB_JSON') ?: ''));
@@ -273,31 +262,5 @@ final class BuilderFastPathParser
             $decoded = (array) $decoded[$step];
         }
         return $this->validate($decoded, $step);
-    }
-
-    /**
-     * PERSISTENCIA QUIRÚRGICA: Guarda un campo en el registry sqlite.
-     */
-    private function saveBuilderField(string $tenantId, string $userId, string $field, $value): void
-    {
-        try {
-            $db = new \SQLite3('project/storage/meta/project_registry.sqlite');
-            $sessionKey = "builder:state:{$tenantId}:default:{$userId}";
-            
-            $res = $db->querySingle("SELECT mem_working_memory FROM project_state WHERE session_key = '$sessionKey'");
-            $memory = $res ? json_decode((string)$res, true) : [];
-            if (!is_array($memory)) $memory = [];
-            
-            $memory[$field] = $vValue = is_array($value) ? $value : (string)$value;
-            $updated = json_encode($memory, JSON_UNESCAPED_UNICODE);
-            
-            $stmt = $db->prepare("UPDATE project_state SET mem_working_memory = :mem WHERE session_key = :key");
-            $stmt->bindValue(':mem', $updated);
-            $stmt->bindValue(':key', $sessionKey);
-            $stmt->execute();
-            $db->close();
-        } catch (\Throwable $e) {
-            // fail silent in builder persistence
-        }
     }
 }

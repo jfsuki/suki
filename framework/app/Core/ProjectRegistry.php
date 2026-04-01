@@ -27,6 +27,12 @@ final class ProjectRegistry
         );
     }
 
+    public function db(): PDO
+    {
+        return $this->db;
+    }
+
+
     public function ensureProject(
         string $projectId,
         string $name,

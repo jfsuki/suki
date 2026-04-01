@@ -20,12 +20,6 @@ final class LLMRouter
     public function chat(array $capsule, array $options = []): array
     {
         $policy = $capsule['policy'] ?? [];
-        $providers = $this->providerOrder($policy, $options);
-        $this->enforceSessionQuota($options);
-        $requiresStrictJson = !empty($policy['requires_strict_json']);
-        $responseSchema = $this->deriveResponseSchema($capsule);
-
-        $prompt = $this->buildPrompt($capsule);
         $messages = [
             ['role' => 'system', 'content' => $this->systemPrompt($policy)],
         ];
@@ -46,13 +40,40 @@ final class LLMRouter
             }
         }
 
-        $messages[] = ['role' => 'user', 'content' => $prompt];
+        $messages[] = ['role' => 'user', 'content' => $this->buildPrompt($capsule)];
+
+        return $this->executeWithProviders($messages, $policy, $options);
+    }
+
+    /**
+     * Completes a conversation using a raw list of messages.
+     * Useful for manual history management.
+     *
+     * @param array $messages List of ['role' => ..., 'content' => ...]
+     * @param array $options Routing and provider options.
+     * @return array Standard LLM response.
+     */
+    public function complete(array $messages, array $options = []): array
+    {
+        return $this->executeWithProviders($messages, $options['policy'] ?? [], $options);
+    }
+
+    /**
+     * Core execution loop with provider failover.
+     */
+    private function executeWithProviders(array $messages, array $policy, array $options): array
+    {
+        $providers = $this->providerOrder($policy, $options);
+        $this->enforceSessionQuota($options);
+        $requiresStrictJson = !empty($policy['requires_strict_json']);
+        $responseSchema = $this->deriveResponseSchema(['policy' => $policy]); // Adapt for direct policy usage
 
         $lastError = null;
         $attempted = [];
         $providerErrors = [];
         $providerStatuses = [];
         $failoverReason = 'none';
+
         foreach ($providers as $providerName) {
             if ($this->isCircuitOpen($providerName)) {
                 $providerStatuses[$providerName] = 'circuit_open';
@@ -540,7 +561,8 @@ final class LLMRouter
 
     private function deriveResponseSchema(array $capsule): ?array
     {
-        $output = $capsule['prompt_contract']['OUTPUT_FORMAT'] ?? null;
+        $policy = $capsule['policy'] ?? $capsule['prompt_contract'] ?? [];
+        $output = $policy['OUTPUT_FORMAT'] ?? null;
         if (!is_array($output) || $output === []) {
             return null;
         }

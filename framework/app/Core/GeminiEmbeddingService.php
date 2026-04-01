@@ -41,7 +41,9 @@ final class GeminiEmbeddingService
     ) {
         $this->apiKey = trim((string) ($apiKey ?? getenv('GEMINI_API_KEY') ?? ''));
         if ($this->apiKey === '') {
-            throw new RuntimeException('GEMINI_API_KEY requerido para embeddings.');
+            $cwd = getcwd();
+            $envExists = file_exists($cwd . '/.env') ? 'encontrado' : 'no encontrado';
+            throw new RuntimeException("GEMINI_API_KEY requerido para embeddings. CWD: {$cwd}, .env: {$envExists}.");
         }
 
         $resolvedModel = strtolower(trim((string) ($model ?? getenv('EMBEDDING_MODEL') ?: self::CANONICAL_MODEL)));

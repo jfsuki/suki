@@ -38,15 +38,33 @@ class SoftwareArchitectPromptBuilder
         $prompt .= "4. Si el usuario no menciona uno de estos procesos, PREGUNTA si lo necesita.\n";
         
         if (!empty($template['accounting_rules']['chart_of_accounts_min'])) {
-            $prompt .= "5. Estructura el plan de cuentas base usando estÃ¡ndares locales (ej. " . 
+            $prompt .= "5. Estructura el plan de cuentas base usando estándares locales (ej. " . 
                        ($template['country_or_regulation'] ?? 'PUC') . ").\n";
         }
 
+        // --- ENFOQUE EN LÓGICA DE NEGOCIO (Senior Upgrade) ---
+        $logic = $this->loadBusinessLogicPlaybook();
+        if ($logic) {
+            $prompt .= "\nREGLAS DE LÓGICA DE NEGOCIO (PLAYBOOK 2026):\n";
+            $prompt .= "- FÓRMULA DE PRECIO: Usar " . ($logic['rules']['pricing']['formula_base'] ?? '') . ".\n";
+            $prompt .= "- REDONDEO: Aplica redondeo comercial (ej: múltiplos de 5000).\n";
+            $prompt .= "- FISCAL: Si el total supera " . ($logic['rules']['tax_logic']['ica_alert_threshold'] ?? '') . ", sugiere una alerta de ICA.\n";
+            $prompt .= "- EXTRACCIÓN: Extrae siempre 'margin' (float, ej: 0.25) y 'rounding' (int, ej: 5000) si el usuario los menciona.\n";
+        }
+
         $prompt .= "\nTU MISIÓN EN ESTE TURNO:\n";
-        $prompt .= "Guía al usuario para completar el alcance técnico. No aceptes respuestas vagas. ";
-        $prompt .= "Si el usuario dice 'venta', aclara si es 'contado' o 'crédito' basándote en los operational_flows indicados.";
+        $prompt .= "Guía al usuario para completar el alcance técnico y la lógica de negocio. ";
+        $prompt .= "Sugiere proactivamente fórmulas de margen (ej: 25%) y redondeo si el usuario pide 'precios' o 'descuentos'.";
 
         return $prompt;
+    }
+
+    private function loadBusinessLogicPlaybook(): ?array
+    {
+        $path = $this->projectRoot . '/contracts/logic/business_logic_playbook.contract.json';
+        if (!file_exists($path)) return null;
+        $data = json_decode((string)file_get_contents($path), true);
+        return is_array($data) ? $data : null;
     }
 
     private function loadTemplateForSector(string $sectorKey): ?array

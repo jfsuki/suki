@@ -24,6 +24,7 @@ final class WorkflowCompiler
 
         $hasInput = $this->hasNodeType($contract, 'input');
         $hasGenerate = $this->hasNodeType($contract, 'generate');
+        $hasTool = $this->hasNodeType($contract, 'tool');
         $hasOutput = $this->hasNodeType($contract, 'output');
 
         if (!$hasInput) {
@@ -47,6 +48,16 @@ final class WorkflowCompiler
                     $changes[] = ['op' => 'update_node', 'id' => (string) ($contract['nodes'][$index]['id'] ?? ''), 'field' => 'promptTemplate'];
                 }
             }
+        }
+
+        if (!$hasTool && preg_match('/\b(margen|redondeo|iva|ica|impuesto|calc|calculadora)\b/i', $text)) {
+            $node = $this->buildNode('n_calc', 'tool', 'Cálculo Lógico');
+            $node['modelConfig'] = ['tool' => 'calculator', 'op' => 'margin_price'];
+            if (str_contains($text, 'iva') || str_contains($text, 'ica')) {
+                $node['modelConfig']['op'] = 'tax_projection';
+            }
+            $contract['nodes'][] = $node;
+            $changes[] = ['op' => 'add_node', 'id' => 'n_calc', 'type' => 'tool', 'tool' => 'calculator', 'logic' => 'business_rules'];
         }
 
         if (!$hasOutput) {
@@ -173,6 +184,12 @@ final class WorkflowCompiler
         }
         if (preg_match('/\b(factura|facturacion|facturación)\b/u', $text) === 1) {
             return 'Genera el texto final de factura para {{input.cliente}} y total {{input.total}}.';
+        }
+        if (preg_match('/\b(margen|precio|venta|utilidad|margin|rounding|redondeo)\b/u', $text) === 1) {
+            return 'Calculando precio con margen y redondeo: {{input.costo}} + {{input.margen}}.';
+        }
+        if (preg_match('/\b(iva|ica|simple|impuesto|impuestos|fiscal|declaracion|alerta)\b/u', $text) === 1) {
+            return 'Proyectando impuestos ICA/IVA para total {{input.total}}.';
         }
         return 'Genera una salida clara usando los datos de entrada: {{input.descripcion}}.';
     }

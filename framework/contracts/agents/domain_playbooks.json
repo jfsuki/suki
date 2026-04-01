@@ -4573,5 +4573,32 @@
                 "timesheet + gastos + facturacion habilitados"
             ]
         }
-    ]
+    ],
+    "tool_setup_playbooks": [
+        {
+            "tool": "POS",
+            "steps": [
+                "Carga de inventario base (Importar Excel)",
+                "Configuración de cajas y medios de pago",
+                "Asignación de impresoras/ticket standar",
+                "Prueba de primer ticket"
+            ],
+            "coaching_tip": "Si el cliente tiene más de 100 productos, sugiere siempre la importación por lote."
+        },
+        {
+            "tool": "Fiscal",
+            "steps": [
+                "Validación de NIT y Régimen",
+                "Vinculación de certificado digital (Alanube/Siigo)",
+                "Configuración de resolución DIAN",
+                "Prueba de envío técnico"
+            ],
+            "coaching_tip": "Pregunta si el cliente ya tiene proveedor tecnológico para evitar duplicidad."
+        }
+    ],
+    "active_learning_protocols": {
+        "on_tool_failure": "Registrar métrica en ImprovementMemory y ofrecer disculpa constructiva.",
+        "on_intent_confusion": "Guardar candidato en LearningCenter y pedir aclaración al usuario.",
+        "feedback_loop": "Una vez al día o tras 10 interacciones, resumir hallazgos en el Centro de Aprendizaje."
+    }
 }

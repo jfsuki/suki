@@ -22,6 +22,7 @@ class KnowledgeProvider
     private ?array $latamLexiconCache = null;
     private ?array $countryOverridesCache = null;
     private ?array $confusionBaseCache = null;
+    private ?array $fiscalPlaybookCache = null;
     private ?object $workingMemorySchemaCache = null;
 
     public function __construct(string $projectRoot, MemoryRepositoryInterface $memory)
@@ -91,6 +92,22 @@ class KnowledgeProvider
         $decoded = json_decode($raw, true);
         $this->accountingKnowledgeCache = is_array($decoded) ? $decoded : [];
         return $this->accountingKnowledgeCache;
+    }
+
+    public function loadFiscalPlaybook(): array
+    {
+        if ($this->fiscalPlaybookCache !== null) {
+            return $this->fiscalPlaybookCache;
+        }
+        
+        $path = $this->projectRoot . '/contracts/playbooks/colombian_fiscal_playbook_2026.contract.json';
+        if (!is_file($path)) {
+            return [];
+        }
+        
+        $decoded = $this->readJson($path, []);
+        $this->fiscalPlaybookCache = $decoded;
+        return $decoded;
     }
 
     public function loadUnspscCommon(): array

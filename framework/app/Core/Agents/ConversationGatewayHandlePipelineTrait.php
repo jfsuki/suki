@@ -16,7 +16,7 @@ trait ConversationGatewayHandlePipelineTrait
         $this->contextTenantId = $tenantId;
         $this->contextUserId = $userId;
         $this->contextSessionId = $this->sessionKey($tenantId, $this->contextProjectId, $mode, $userId);
-        $this->contextProfileUser = $this->profileUserKey($userId);
+        $this->contextProfileUser = $this->profileUserKey($tenantId, $this->contextProjectId, $userId);
         $this->scopedEntityNamesCache = null;
         $this->scopedFormNamesCache = null;
 
@@ -29,6 +29,25 @@ trait ConversationGatewayHandlePipelineTrait
         $normalizedBase = $this->normalize($raw);
 
         $state = $this->loadState($tenantId, $userId, $this->contextProjectId, $mode);
+
+        // --- BACKEND CONCURRENCY LOCK (Wait loop) ---
+        $retries = 0;
+        $isBusy = !empty($state['active_turn_busy']);
+        while ($isBusy && $retries < 5) {
+            usleep(100000); // 100ms
+            $state = $this->loadState($tenantId, $userId, $this->contextProjectId, $mode);
+            $isBusy = !empty($state['active_turn_busy']);
+            $retries++;
+        }
+
+        if ($isBusy) {
+            $busyReply = 'Un momento por favor, sigo procesando tu mensaje anterior...';
+            return $this->result('respond_local', $busyReply, null, null, $state, $this->telemetry('busy_lock', true));
+        }
+
+        $state['active_turn_busy'] = true;
+        $this->saveState($tenantId, $userId, $state);
+        // --------------------------------------------
         $lexicon = $this->loadLexicon($tenantId);
         $glossary = $this->getGlossary($tenantId);
         if (!empty($glossary)) {
@@ -39,6 +58,18 @@ trait ConversationGatewayHandlePipelineTrait
         $normalized = $this->normalizeWithTraining($raw, $training, $tenantId, $profile, $mode);
         $policy = $this->loadPolicy($tenantId);
         $confusionBase = $this->loadConfusionBase();
+
+        // --- MEDIA & FILE INGESTION SIGNALS (Global Bridge) ---
+        if ($mode === 'builder' && preg_match('/\b(subir|enviar|adjuntar|importar|leer|cargar|excel|csv|pdf|xml|rut|foto|imagen|archivo)\b/i', $raw)) {
+            $mediaSkill = new \App\Core\Skills\MediaIngestionSkill();
+            $res = $mediaSkill->handle($raw, $state, $profile);
+            if (!empty($res['reply'])) {
+                $reply = (string)$res['reply'];
+                $state = $this->updateState($state, $raw, $reply, 'media_signal', null, [], 'builder_onboarding');
+                $this->saveState($tenantId, $userId, $state);
+                return $this->result('ask_user', $reply, null, null, $state, $this->telemetry('media_signal', true));
+            }
+        }
 
         if ($this->isPureGreeting($normalizedBase) && !$this->isStatusQuestion($normalizedBase)) {
             if ($mode === 'builder') {
@@ -82,7 +113,7 @@ trait ConversationGatewayHandlePipelineTrait
             $state['builder_plan'] = null;
             if ($mustClearBusinessProfile) {
                 $profile = $this->resetBuilderBusinessProfile($profile);
-                $this->saveProfile($tenantId, $this->profileUserKey($userId), $profile);
+                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $profile);
             }
 
             $reply = 'Entendido. A que se dedica tu negocio?';
@@ -94,9 +125,38 @@ trait ConversationGatewayHandlePipelineTrait
             return $this->result('ask_user', $reply, null, null, $state, $telemetry);
         }
 
-        // Authoritative Onboarding Orchestrator
-        if ($mode === 'builder') {
-            $onboarding = $this->handleBuilderOnboarding($normalizedBase, $state, $profile, $tenantId, $userId);
+        // Authoritative Onboarding Orchestrator (Neuron IA / Layer 3)
+        if ($mode === 'builder' && ($state['active_task'] ?? '') === 'builder_onboarding') {
+            $currentStep = $state['onboarding_step'] ?? 'business_type';
+            $fastPath = $this->builderFastPath(
+                $raw,
+                $currentStep,
+                $profile,
+                $state,
+                $this->builderAllowedValuesForStep($currentStep, $profile, $state)
+            );
+
+            // If Agent is confident, take the fast path
+            if (($fastPath['confidence'] ?? 0) >= 0.6) {
+                if (!empty($fastPath['mapped_fields'])) {
+                    foreach ($fastPath['mapped_fields'] as $f => $v) {
+                        $profile[$f] = is_array($v) ? $v : (string)$v;
+                    }
+                    $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $profile);
+                }
+                
+                $onboarding = [
+                    'action' => 'respond_local',
+                    'reply' => $fastPath['reply'],
+                    'state' => $state,
+                    'profile' => $profile
+                ];
+                $onboarding['state']['onboarding_step'] = $this->resolveBuilderOnboardingStep($profile, $state);
+            } else {
+                // Heuristic Fallback
+                $onboarding = $this->handleBuilderOnboarding($tenantId, $userId, $normalizedBase, $profile, $state);
+            }
+
             if ($onboarding !== null) {
                 $reply = (string) ($onboarding['reply'] ?? 'Listo.');
                 $nextState = is_array($onboarding['state'] ?? null) ? $onboarding['state'] : $state;
@@ -111,6 +171,10 @@ trait ConversationGatewayHandlePipelineTrait
                     $nextState['active_task'] ?? 'builder_onboarding'
                 );
                 $this->saveState($tenantId, $userId, $nextState);
+                if (isset($onboarding['profile']) && is_array($onboarding['profile'])) {
+                    $profile = array_merge($profile, $onboarding['profile']);
+                }
+                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $profile);
                 return $this->result($action, $reply, null, null, $nextState, $this->telemetry('builder_onboarding', true));
             }
         }
@@ -128,39 +192,68 @@ trait ConversationGatewayHandlePipelineTrait
                 $state['requested_slot'] = null;
             }
             $state['active_task'] = 'builder_onboarding';
-            $currentStep = $this->resolveBuilderOnboardingStep($profile, $state);
-            $state['onboarding_step'] = $currentStep;
-
-            // ── FAST PATH: LLM-first translation instead of static canned reply.
-            // BuilderFastPathParser sends a compact payload (no history, no RAG) and returns strict JSON.
-            // PHP validates the JSON and picks the reply. Fallback is always a safe hardcoded string.
+            
+            // NEURON IA: Use Fast Path Parser (Layer 2) for immediate Turn 1 response
             $fastPath = $this->builderFastPath(
-                $normalizedBase,
-                $currentStep,
+                $raw,
+                'business_type',
                 $profile,
                 $state,
-                $this->builderAllowedValuesForStep($currentStep, $profile, $state)
+                $this->builderAllowedValuesForStep('business_type', $profile, $state)
             );
 
-            // If the LLM mapped a real value (e.g. business_type), persist it now.
-            if (
-                $fastPath['intent'] === 'set_business_type'
-                && !empty($fastPath['mapped_fields']['business_type'])
-            ) {
-                $profile['business_type'] = (string) $fastPath['mapped_fields']['business_type'];
-                $this->saveProfile($tenantId, $this->profileUserKey($userId), $profile);
+            // Layer 3: Kernel updates base on Parser output (JSON slots)
+            if (!empty($fastPath['mapped_fields'])) {
+                foreach ($fastPath['mapped_fields'] as $f => $v) {
+                   $v = is_array($v) ? $v : (string)$v;
+                   $profile[$f] = $v;
+                   
+                   // Sync special array fields
+                   if ($f === 'needs_scope_items') {
+                       $profile['needs_scope'] = implode(', ', (array)$v);
+                   }
+                   if ($f === 'documents_scope_items') {
+                       $profile['documents_scope'] = implode(', ', (array)$v);
+                   }
+                }
+                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $profile);
             }
 
-            $reply = $fastPath['reply'];
-            $state = $this->updateState($state, $raw, $reply, 'builder_clarify', null, [], 'builder_onboarding');
+            $reply = (string) ($fastPath['reply'] ?: '¿En qué puedo ayudarte con tu negocio?');
+            $state['onboarding_step'] = $this->resolveBuilderOnboardingStep($profile, $state);
             $this->saveState($tenantId, $userId, $state);
-            $telemetry = $this->telemetry('builder_clarify', true);
-            $telemetry['builder_ambiguity_guard'] = true;
-            $telemetry['builder_onboarding_step'] = $currentStep;
-            $telemetry['fast_path_intent'] = $fastPath['intent'];
-            $telemetry['fast_path_confidence'] = $fastPath['confidence'];
-            $telemetry['fast_path_via'] = $fastPath['via'];
-            return $this->result('ask_user', $reply, null, null, $state, $telemetry);
+
+            return $this->result(
+                'respond_local', 
+                $reply, 
+                null, 
+                null, 
+                $state, 
+                $this->telemetry('builder_fast_path_t1', true)
+            );
+        }
+
+        // NEURON IA: Operational App Fast Path (Layer 2/3)
+        if ($mode === 'app') {
+            $appPath = $this->appFastPath($raw, $state, $profile, $lexicon);
+            // If Agent is confident in the operational intent, execute it.
+            if (($appPath['confidence'] ?? 0) >= 0.70) {
+                 $reply = (string) ($appPath['reply'] ?: 'Entendido, procedo con tu solicitud.');
+                 $state = $this->updateState($state, $raw, $reply, $appPath['intent'] ?? null, null, $appPath['mapped_fields'] ?? [], $state['active_task'] ?? null);
+                 $this->saveState($tenantId, $userId, $state);
+                 
+                 // Note: Actual CommandBus execution happens in Layer 3 (Command Layer) 
+                 // if mapped_fields contain a valid command. 
+                 // For now, we provide the Agentic response.
+                 return $this->result(
+                     'respond_local', 
+                     $reply, 
+                     null, 
+                     null, 
+                     $state, 
+                     $this->telemetry('app_fast_path', true, $appPath)
+                 );
+            }
         }
 
         if ($mode === 'builder' && $this->shouldRestartBuilderOnboarding($normalizedBase, $state)) {

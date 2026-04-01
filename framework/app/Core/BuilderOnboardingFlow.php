@@ -10,8 +10,8 @@ final class BuilderOnboardingFlow
      */
     public function handle(
         string $text,
-        array $state,
-        array $profile,
+        array &$state,
+        array &$profile,
         string $tenantId,
         string $userId,
         array $ops,
@@ -41,10 +41,10 @@ final class BuilderOnboardingFlow
         }
 
         if ((bool) ($ops['isFormListQuestion'])($text)) {
-            return ['action' => 'respond_local', 'reply' => (string) ($ops['buildFormList'])(), 'state' => $state];
+            return ['action' => 'respond_local', 'reply' => (string) ($ops['buildFormList'])(), 'state' => $state, 'profile' => $profile];
         }
         if ((bool) ($ops['isEntityListQuestion'])($text)) {
-            return ['action' => 'respond_local', 'reply' => (string) ($ops['buildEntityList'])(), 'state' => $state];
+            return ['action' => 'respond_local', 'reply' => (string) ($ops['buildEntityList'])(), 'state' => $state, 'profile' => $profile];
         }
         if (
             (bool) ($ops['isBuilderProgressQuestion'])($text)
@@ -53,14 +53,14 @@ final class BuilderOnboardingFlow
             || str_contains($text, 'estatus del proyecto')
             || str_contains($text, 'resumen del proyecto')
         ) {
-            return ['action' => 'respond_local', 'reply' => (string) ($ops['buildProjectStatus'])(), 'state' => $state];
+            return ['action' => 'respond_local', 'reply' => (string) ($ops['buildProjectStatus'])(), 'state' => $state, 'profile' => $profile];
         }
 
         if (!$isOnboarding && !$isUnknownDiscovery && !$trigger) {
             return null;
         }
 
-        return $coreHandler(
+        $result = $coreHandler(
             $text,
             $state,
             $profile,
@@ -70,5 +70,12 @@ final class BuilderOnboardingFlow
             $trigger,
             $businessHint
         );
+
+        if (is_array($result)) {
+            if (isset($result['state'])) $state = $result['state'];
+            if (isset($result['profile'])) $profile = $result['profile'];
+        }
+
+        return $result;
     }
 }

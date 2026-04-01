@@ -10,9 +10,9 @@ trait ConversationGatewayStubsTrait
         return "sess_{$tenantId}_{$projectId}_{$mode}_{$userId}";
     }
 
-    public function profileUserKey(string $userId): string
+    public function profileUserKey(string $tenantId, string $projectId, string $userId): string
     {
-        return "prof_{$userId}";
+        return "prof_{$tenantId}_{$projectId}_{$userId}";
     }
 
     public function appendShortTermLog(string $event, $data = null, array $meta = []): void
@@ -117,6 +117,12 @@ trait ConversationGatewayStubsTrait
 
     public function result(string $action, string $reply, $command = null, $data = null, array $state = [], array $telemetry = []): array
     {
+        // Released Concurrency Lock
+        if (isset($state['active_turn_busy'])) {
+            $state['active_turn_busy'] = false;
+            $this->saveState($this->contextTenantId ?? 'default', $this->contextUserId ?? 'anon', $state);
+        }
+
         return [
             'action' => $action,
             'reply' => $reply,
@@ -180,21 +186,51 @@ trait ConversationGatewayStubsTrait
 
     public function isAmbiguousBuilderCreateRequest(string $text): bool
     {
-        return (str_contains($text, 'crear') || str_contains($text, 'hacer')) 
-            && (!str_contains($text, 'tabla') && !str_contains($text, 'formulario'));
+        $text = strtolower($text);
+        $triggers = ['crear', 'hacer', 'negocio', 'tengo un', 'tengo una', 'vendo', 'ayuda', 'mi empresa', 'mi emprendimiento'];
+        foreach ($triggers as $t) {
+            if (str_contains($text, $t)) {
+                return !str_contains($text, 'tabla') && !str_contains($text, 'formulario');
+            }
+        }
+        return false;
     }
 
 
     public function builderFastPath(string $text, ?string $step, array $profile, array $state, array $allowed): array
     {
-        return [
-            'action' => 'respond_local',
-            'reply' => 'Entendido. Continuamos con ' . ($step ?? 'el inicio') . '.',
-            'intent' => 'builder_clarify',
-            'confidence' => 0.9,
-            'via' => 'stub',
-            'mapped_fields' => []
-        ];
+        try {
+            $parser = new \App\Core\Agents\BuilderFastPathParser();
+            $missing = $this->builderLlmMissingFieldsForStep($step ?: 'business_type', $profile, $state);
+            
+            $results = $parser->parse(
+                $text,
+                (string) ($step ?: 'business_type'),
+                $this->builderLlmKnownFields($profile),
+                $missing,
+                $allowed,
+                (string) ($this->contextTenantId ?? 'default'),
+                (string) ($this->contextUserId ?? 'anon')
+            );
+
+            return [
+                'action' => 'respond_local',
+                'reply' => $results['reply'] ?? '',
+                'intent' => $results['intent'] ?? 'unknown',
+                'confidence' => (float) ($results['confidence'] ?? 0.0),
+                'mapped_fields' => (array) ($results['mapped_fields'] ?? []),
+                'via' => $results['via'] ?? 'fast_path_core'
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'action' => 'respond_local',
+                'reply' => 'Entendido. Cuéntame un poco más.',
+                'intent' => 'unknown',
+                'confidence' => 0.0,
+                'via' => 'fast_path_error:' . $e->getMessage(),
+                'mapped_fields' => []
+            ];
+        }
     }
 
     public function builderAllowedValuesForStep(?string $step, array $profile, array $state): array
@@ -649,5 +685,38 @@ trait ConversationGatewayStubsTrait
 
     public function autoLearnGlossary(string $tenantId, string $text, string $entity, array $lexicon): void
     {
+    }
+
+    public function appFastPath(string $text, array $state, array $profile, array $lexicon): array
+    {
+        try {
+            $parser = new \App\Core\Agents\AppFastPathParser();
+            $results = $parser->parse(
+                $text,
+                $state,
+                $profile,
+                $lexicon,
+                (string) ($this->contextTenantId ?? 'default'),
+                (string) ($this->contextUserId ?? 'anon')
+            );
+
+            return [
+                'action' => 'respond_local',
+                'reply' => $results['reply'] ?? '',
+                'intent' => $results['intent'] ?? 'unknown',
+                'confidence' => (float) ($results['confidence'] ?? 0.0),
+                'mapped_fields' => (array) ($results['mapped_fields'] ?? []),
+                'via' => $results['via'] ?? 'app_fast_path_core'
+            ];
+        } catch (\Throwable $e) {
+            return [
+                'action' => 'respond_local',
+                'reply' => 'Entendido. Cuéntame un poco más sobre lo que quieres hacer.',
+                'intent' => 'unknown',
+                'confidence' => 0.0,
+                'via' => 'app_fast_path_error:' . $e->getMessage(),
+                'mapped_fields' => []
+            ];
+        }
     }
 }

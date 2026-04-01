@@ -136,6 +136,47 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
         return $out;
     }
 
+    /**
+     * Standardized load() method for Neuron IA.
+     * Expects $threadId as "tenant_id:session_id".
+     * Maps direction 'in' to 'user' and 'out' to 'assistant'.
+     * Returns array of ['role' => string, 'content' => string]
+     */
+    public function load(string $threadId, int $limit = 20): array
+    {
+        $parts = explode(':', $threadId, 2);
+        $tenantId = $parts[0] ?? 'default';
+        $sessionId = $parts[1] ?? 'default';
+
+        $rows = $this->getShortTermMemory($tenantId, $sessionId, $limit);
+        error_log("SQLMEMORY_LOAD: Found " . count($rows) . " rows for thread $threadId (tenant: $tenantId, session: $sessionId)");
+        $out = [];
+        foreach ($rows as $row) {
+            $out[] = [
+                'role' => (string) ($row['direction'] === 'out' ? 'assistant' : 'user'),
+                'content' => (string) ($row['message'] ?? ''),
+                'meta' => $row['meta'] ?? [],
+                'created_at' => $row['created_at'] ?? '',
+            ];
+        }
+
+        return $out;
+    }
+
+    /**
+     * Legacy KV support for ConversationGatewayStubsTrait.
+     * Maps to mem_global using category 'legacy_kv'.
+     */
+    public function get(string $key, array $default = []): array
+    {
+        return $this->getGlobalMemory('legacy_kv', $key, $default);
+    }
+
+    public function save(string $key, array $value): void
+    {
+        $this->saveGlobalMemory('legacy_kv', $key, $value);
+    }
+
     private function ensureTables(): void
     {
         if ($this->tablesEnsured) {
