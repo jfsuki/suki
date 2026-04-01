@@ -1,0 +1,53 @@
+{
+    "playbook_name": "Colombian Fiscal & ERP Domain 2026",
+    "version": "1.0.0",
+    "market": "Colombia",
+    "sectors": {
+        "taxation": {
+            "regimes": {
+                "SIMPLE": {
+                    "label": "Régimen Simple de Tributación (RST)",
+                    "description": "Modelo de tributación unificado que sustituye renta e integra IVA e ICA.",
+                    "requirements": ["CIIU valid", "Ingresos < 100k UVT", "Personas naturales o jurídicas residentess"],
+                    "document_impact": ["Factura Electrónica con sello RST"]
+                },
+                "ORDINARIO": {
+                    "label": "Régimen Ordinario",
+                    "description": "Responsable de IVA y Retención en la Fuente.",
+                    "document_impact": ["Factura Electrónica", "Retención"]
+                }
+            },
+            "activity_codes": {
+                "4791": {
+                    "label": "Comercio al por menor realizado a través de Internet",
+                    "ica_implications": "Grava en el municipio donde se realice el despacho o donde se ubique el vendedor (según jurisdicción).",
+                    "suggested_tables": ["ventas_online", "guias_despacho", "clientes_ecommerce"]
+                }
+            },
+            "municipalities": {
+                "Soledad_Atlantico": {
+                    "ica_periodicity": "Bimestral",
+                    "rules": "Sujeto a normas de la Secretaría de Hacienda de Soledad."
+                }
+            }
+        },
+        "erp_integrations": {
+            "Siigo": {
+                "type": "Cloud ERP",
+                "auth": "OAuth2 / API Key",
+                "mapping": {
+                    "invoice_header": "FacturaVenta",
+                    "customer": "Tercero"
+                }
+            },
+            "Alegra": {
+                "type": "Cloud ERP",
+                "auth": "Basic Auth / Token",
+                "mapping": {
+                    "invoice_header": "invoices",
+                    "customer": "contacts"
+                }
+            }
+        }
+    }
+}

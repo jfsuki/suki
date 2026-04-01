@@ -1,0 +1,53 @@
+{
+  "id": "business_logic_playbook_2026",
+  "name": "Admin & Business Logic Biblia",
+  "version": "1.0.0",
+  "domain": "administration",
+  "scope": "Colombia Retail & Services",
+  "rules": {
+    "pricing": {
+      "margin_standards": {
+        "hardware_store": 0.25,
+        "retail_general": 0.30,
+        "services": 0.40,
+        "food_beverage": 0.35
+      },
+      "formula_base": "Price = Cost / (1 - Margin)",
+      "rounding_presets": {
+        "closest_50": 50,
+        "closest_100": 100,
+        "closest_500": 500,
+        "closest_1000": 1000,
+        "closest_5000": 5000
+      }
+    },
+    "documents": {
+      "lifecycle": [
+        {"from": "quote", "to": "order", "trigger": "approval"},
+        {"from": "order", "to": "delivery", "trigger": "dispatch"},
+        {"from": "delivery", "to": "invoice", "trigger": "acceptance"},
+        {"from": "invoice", "to": "payment", "trigger": "collection"}
+      ],
+      "required_fields": ["client_id", "date", "items", "subtotal", "tax", "total"]
+    },
+    "tax_logic": {
+      "iva": 0.19,
+      "ica_alert_threshold": 1000000,
+      "regimen_simple_benefits": [
+        "Replacement of income tax with fixed rates",
+        "Integration of ICA into the simple payment",
+        "Reduction of administrative costs"
+      ]
+    },
+    "accounting_base": {
+      "puc_retail_essential": {
+        "1105": "Caja",
+        "1110": "Bancos",
+        "1305": "Clientes",
+        "1435": "Mercancías no fabricadas por la empresa",
+        "2205": "Proveedores nacionales",
+        "4135": "Comercio al por mayor y al por menor"
+      }
+    }
+  }
+}
