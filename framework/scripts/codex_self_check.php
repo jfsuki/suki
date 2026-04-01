@@ -19,12 +19,12 @@ if ($repoRoot === false) {
 
 $requiredFiles = [
     'AGENTS.md',
-    'framework/docs/INDEX.md',
-    'framework/docs/PROJECT_MEMORY.md',
-    'framework/docs/PROJECT_MEMORY_CANONICAL.md',
-    'framework/docs/CODEX_SELF_CHECKLIST.md',
-    'framework/docs/AGENT_SKILLS_MATRIX.md',
-    'framework/docs/DOMAIN_PLAYBOOKS_PROMPT_BASE.md',
+    'docs/INDEX.md',
+    'docs/PROJECT_MEMORY.md',
+    'docs/memory/PROJECT_MEMORY_CANONICAL.md',
+    'docs/technical/CODEX_SELF_CHECKLIST.md',
+    'docs/technical/AGENT_SKILLS_MATRIX.md',
+    'docs/technical/DOMAIN_PLAYBOOKS_PROMPT_BASE.md',
     'framework/contracts/agents/WORKING_MEMORY_SCHEMA.json',
     'framework/contracts/agents/conversation_training_base.json',
     'framework/contracts/agents/domain_playbooks.json',

@@ -759,6 +759,11 @@
     addMsg('user', text);
     const typing = addTyping();
     resetPipeline();
+    
+    // Concurrency Lock: Disable inputs while processing
+    input.disabled = true;
+    sendBtn.disabled = true;
+    input.classList.add('opacity-50');
 
     const t0 = Date.now();
     // Animate pipeline visually (steps simulados hasta tener telemetría real)
@@ -838,10 +843,13 @@
     } catch (err) {
       removeTyping();
       resetPipeline();
-      addMsg('bot', '⚠️ Error de conexión: ' + err.message);
+      addMsg('bot', '⚠️ Error de conexión: ' + (err.message || 'Fallo de red'));
       console.error(err);
     } finally {
+      // Release Concurrency Lock
+      input.disabled = false;
       sendBtn.disabled = false;
+      input.classList.remove('opacity-50');
       input.focus();
     }
   }

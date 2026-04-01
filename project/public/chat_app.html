@@ -614,6 +614,8 @@
     const text=input.value.trim(); if(!text) return;
     input.value=''; input.style.height='auto';
     sendBtn.disabled=true;
+    input.disabled=true;
+    input.classList.add('opacity-50');
     addMsg('user',text);
     addTyping();
     addRecent(text);
@@ -649,7 +651,9 @@
       removeTyping();
       addMsg('bot','⚠️ Error: '+e.message);
     }finally{
+      input.disabled=false;
       sendBtn.disabled=false;
+      input.classList.remove('opacity-50');
       input.focus();
     }
   }
