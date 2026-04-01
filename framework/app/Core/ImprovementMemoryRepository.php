@@ -136,7 +136,9 @@ final class ImprovementMemoryRepository
                      confidence = :confidence,
                      review_status = :review_status,
                      processed_at = :processed_at,
-                     proposal_id = :proposal_id
+                     proposal_id = :proposal_id,
+                     sentiment_score = :sentiment_score,
+                     feedback_type = :feedback_type
                  WHERE tenant_id = :tenant_id AND candidate_id = :candidate_id'
             );
             $stmt->execute([
@@ -151,15 +153,17 @@ final class ImprovementMemoryRepository
                 ':review_status' => $reviewStatus,
                 ':processed_at' => $processedAt,
                 ':proposal_id' => $proposalId,
+                ':sentiment_score' => $normalized['sentiment_score'],
+                ':feedback_type' => $normalized['feedback_type'],
                 ':tenant_id' => $normalized['tenant_id'],
                 ':candidate_id' => $normalized['candidate_id'],
             ]);
         } else {
             $stmt = $this->db->prepare(
                 'INSERT INTO learning_candidates (
-                    candidate_id, tenant_id, source_metric, module, problem_type, severity, evidence, description, frequency, confidence, review_status, processed_at, proposal_id, created_at
+                    candidate_id, tenant_id, source_metric, module, problem_type, severity, evidence, description, frequency, confidence, review_status, processed_at, proposal_id, sentiment_score, feedback_type, created_at
                  ) VALUES (
-                    :candidate_id, :tenant_id, :source_metric, :module, :problem_type, :severity, :evidence, :description, :frequency, :confidence, :review_status, :processed_at, :proposal_id, :created_at
+                    :candidate_id, :tenant_id, :source_metric, :module, :problem_type, :severity, :evidence, :description, :frequency, :confidence, :review_status, :processed_at, :proposal_id, :sentiment_score, :feedback_type, :created_at
                  )'
             );
             $stmt->execute([
@@ -176,6 +180,8 @@ final class ImprovementMemoryRepository
                 ':review_status' => $normalized['review_status'],
                 ':processed_at' => $normalized['processed_at'],
                 ':proposal_id' => $normalized['proposal_id'],
+                ':sentiment_score' => $normalized['sentiment_score'],
+                ':feedback_type' => $normalized['feedback_type'],
                 ':created_at' => $normalized['created_at'],
             ]);
         }
@@ -354,6 +360,25 @@ final class ImprovementMemoryRepository
         ]);
 
         return $this->findLearningCandidate($tenantId, $candidateId);
+    }
+
+    /**
+     * Promote an approved candidate to specific knowledge (e.g. Semantic Memory)
+     * 
+     * @return array<string, mixed>|null
+     */
+    public function promoteToKnowledge(string $tenantId, string $candidateId, string $targetMemoryType = 'sector_knowledge'): ?array
+    {
+        $candidate = $this->findLearningCandidate($tenantId, $candidateId);
+        if (!$candidate) {
+            return null;
+        }
+
+        if ((string) ($candidate['review_status'] ?? 'pending') !== 'approved') {
+            throw new RuntimeException('CANDIDATE_NOT_APPROVED_FOR_PROMOTION');
+        }
+
+        return $this->markLearningCandidateProcessed($tenantId, $candidateId, 'promoted_' . $targetMemoryType);
     }
 
     /**
@@ -637,6 +662,8 @@ final class ImprovementMemoryRepository
         $this->ensureColumn('learning_candidates', 'evidence', 'ALTER TABLE learning_candidates ADD COLUMN evidence TEXT NULL');
         $this->ensureColumn('learning_candidates', 'processed_at', 'ALTER TABLE learning_candidates ADD COLUMN processed_at TEXT NULL');
         $this->ensureColumn('learning_candidates', 'proposal_id', 'ALTER TABLE learning_candidates ADD COLUMN proposal_id TEXT NULL');
+        $this->ensureColumn('learning_candidates', 'sentiment_score', 'ALTER TABLE learning_candidates ADD COLUMN sentiment_score REAL DEFAULT 0.5');
+        $this->ensureColumn('learning_candidates', 'feedback_type', 'ALTER TABLE learning_candidates ADD COLUMN feedback_type TEXT DEFAULT "general"');
     }
 
     private function ensureSchemaMySql(): void
@@ -674,6 +701,8 @@ final class ImprovementMemoryRepository
                 review_status VARCHAR(16) NOT NULL DEFAULT 'pending',
                 processed_at DATETIME NULL,
                 proposal_id VARCHAR(64) NULL,
+                sentiment_score DECIMAL(5,4) NOT NULL DEFAULT 0.5,
+                feedback_type VARCHAR(32) NOT NULL DEFAULT 'general',
                 created_at DATETIME NOT NULL,
                 PRIMARY KEY (candidate_id),
                 KEY idx_learning_candidates_scope (tenant_id, review_status, created_at),
@@ -836,6 +865,8 @@ final class ImprovementMemoryRepository
         if ($proposalId === '') {
             $proposalId = null;
         }
+        $sentimentScore = round(max(0.0, min(1.0, (float) ($record['sentiment_score'] ?? 0.5))), 4);
+        $feedbackType = $this->normText($record['feedback_type'] ?? '', 'general');
         $createdAt = $this->createdAt($record['created_at'] ?? null);
         $candidateId = trim((string) ($record['candidate_id'] ?? ''));
         if ($candidateId === '') {
@@ -856,6 +887,8 @@ final class ImprovementMemoryRepository
             'review_status' => $reviewStatus,
             'processed_at' => $processedAt,
             'proposal_id' => $proposalId,
+            'sentiment_score' => $sentimentScore,
+            'feedback_type' => $feedbackType,
             'created_at' => $createdAt,
         ];
     }
@@ -951,6 +984,8 @@ final class ImprovementMemoryRepository
             'review_status' => (string) ($row['review_status'] ?? 'pending'),
             'processed_at' => ($row['processed_at'] ?? null) !== null ? (string) $row['processed_at'] : null,
             'proposal_id' => ($row['proposal_id'] ?? null) !== null ? (string) $row['proposal_id'] : null,
+            'sentiment_score' => (float) ($row['sentiment_score'] ?? 0.5),
+            'feedback_type' => (string) ($row['feedback_type'] ?? 'general'),
             'created_at' => (string) ($row['created_at'] ?? ''),
         ];
     }
