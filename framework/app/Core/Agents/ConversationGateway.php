@@ -72,11 +72,27 @@ class ConversationGateway
     protected $contextProfileUser;
     protected $scopedEntityNamesCache = [];
     protected $scopedFormNamesCache = [];
+    protected $conversationMemory;
 
     public function __construct($projectRoot = null, $memory = null, ?KnowledgeProvider $knowledgeProvider = null)
     {
         $this->projectRoot = $projectRoot
-            ?? (defined('PROJECT_ROOT') ? PROJECT_ROOT : dirname(__DIR__, 3) . '/project');
+            ?? (defined('PROJECT_ROOT') ? PROJECT_ROOT : dirname(__DIR__, 4) . '/project');
+
+        // Ensure Environment is loaded for LLM/Embeddings AND DB
+        if (!getenv('GEMINI_API_KEY') || !getenv('DB_USER')) {
+            $envPath = $this->projectRoot . '/.env';
+            if (file_exists($envPath)) {
+                $loaderPath = $this->projectRoot . '/config/env_loader.php';
+                if (file_exists($loaderPath)) {
+                    require_once $loaderPath;
+                    if (function_exists('loadEnv')) {
+                        loadEnv($envPath);
+                    }
+                }
+            }
+        }
+
         $this->entities = new EntityRegistry();
         $this->catalog = new ContractsCatalog($this->projectRoot);
         $this->memory = $memory ?? new SqlMemoryRepository();
@@ -88,6 +104,11 @@ class ConversationGateway
         // Explicit initialization to prevent trait-induced NULLs
         $this->scopedEntityNamesCache = [];
         $this->scopedFormNamesCache = [];
+    }
+
+    public function setConversationMemory($memory): void
+    {
+        $this->conversationMemory = $memory;
     }
 
     private function intentClassifier(): IntentClassifier
@@ -191,4 +212,33 @@ class ConversationGateway
     public function logClassification(string $tenantId, string $userId, array $classification): void
     {
     }
+
+    public function rememberAgentOpsTrace(
+        string $tenantId,
+        string $userId,
+        string $projectId,
+        string $mode,
+        array $trace
+    ): void
+    {
+        // Snapshot logic for production readiness
+        $trace['tenant_id'] = $tenantId;
+        $trace['user_id'] = $userId;
+        $trace['project_id'] = $projectId;
+        $trace['mode'] = $mode;
+        $trace['ts'] = $trace['ts'] ?? date('c');
+
+        $logDir = defined('APP_ROOT') ? APP_ROOT . '/storage/logs/agentops' : sys_get_temp_dir();
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0775, true);
+        }
+        
+        $logFile = $logDir . '/trace_' . date('Y-m-d') . '.jsonl';
+        @file_put_contents(
+            $logFile,
+            json_encode($trace, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n",
+            FILE_APPEND | LOCK_EX
+        );
+    }
 }
+

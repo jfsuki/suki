@@ -168,9 +168,24 @@ final class ChatAgent
         }
 
         $local = $this->parseLocal($text);
+        
+        // --- MEMORY FLOW STEP 1: thread_id ---
+        $threadId = $tenantId . ':' . $sessionId;
+        $memory = $this->conversationMemory();
+
+        // --- MEMORY FLOW STEP 10: Clear Memory Command ---
+        if (($local['command'] ?? '') === 'ClearMemory') {
+            $memory->clear($threadId);
+            return $this->reply('Memoria limpia. He olvidado nuestro contexto actual.', $channel, $sessionId, $userId, 'success');
+        }
+
+        // --- MEMORY FLOW STEP 4: Persist User Message ---
+        $memory->append($threadId, 'user', $text);
+
         $messageId = $this->resolveMessageId($payload, $sessionId, $text);
         $conversationId = $this->resolveConversationId($sessionId, $payload);
         $gateway = $this->gateway();
+        $gateway->setConversationMemory($memory);
         $ingressValidation = $gateway->validateIngressEnvelope([
             'tenant_id' => $tenantId,
             'user_id' => $userId,
@@ -912,12 +927,24 @@ final class ChatAgent
                 'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown'),
             ]);
             try {
-                $llmResult = $this->llmRouter()->chat($route->llmRequest(), [
+                // --- MEMORY FLOW STEP 3, 5, 6: Load and Build Context ---
+                $history = $memory->load($threadId);
+                $systemPrompt = @file_get_contents(dirname(__DIR__, 2) . '/prompts/builder_system_prompt.txt') 
+                    ?: "Eres SUKI. Responde breve y claro.";
+                
+                $messages = [['role' => 'system', 'content' => $systemPrompt]];
+                foreach ($history as $msg) {
+                    $messages[] = ['role' => $msg['role'], 'content' => $msg['content']];
+                }
+
+                // --- MEMORY FLOW STEP 7: Call LLM with Memory ---
+                $llmResult = $this->llmRouter()->complete($messages, [
                     'mode' => $mode,
                     'tenant_id' => $tenantId,
                     'project_id' => $projectId,
                     'session_id' => $sessionId,
                     'user_id' => $userId,
+                    'policy' => $route->llmRequest()['policy'] ?? [],
                 ]);
             } catch (\Throwable $e) {
                 $llmFailure = $this->extractLlmFailureDetails($e);
@@ -1126,6 +1153,10 @@ final class ChatAgent
                 }
                 $reply = $this->reply($responseText, $channel, $sessionId, $userId);
             }
+
+            // --- MEMORY FLOW STEP 8: Persist Assistant Response ---
+            $memory->append($threadId, 'assistant', $responseText);
+
             $task = $this->controlTowerCompleteTask($task, [
                 'result_status' => 'success',
                 'response_kind' => $responseKind,
@@ -1441,6 +1472,11 @@ final class ChatAgent
         if (in_array($first, ['probar', 'test', 'diagnostico', 'diagnosticar'], true)) {
             return ['command' => 'RunTests'];
         }
+
+        if (in_array($normalized, ['limpiar memoria', 'olvida todo', 'reiniciar contexto', 'clear memory'], true)) {
+            return ['command' => 'ClearMemory'];
+        }
+
 
         if ($first === 'crear' && isset($tokens[1]) && in_array(strtolower($tokens[1]), ['tabla', 'entidad'], true)) {
             $entity = $tokens[2] ?? '';
@@ -2548,6 +2584,13 @@ final class ChatAgent
         return $this->llmRouter;
     }
 
+    private function conversationMemory(): ConversationMemory
+    {
+        $registry = new ProjectRegistry();
+        return new ConversationMemory($registry->db());
+    }
+
+
     private function telemetry(): Telemetry
     {
         if (!$this->telemetry) {
@@ -3186,7 +3229,6 @@ final class ChatAgent
             'skill_group' => $runtimeObservability['skill_group'],
             'draft_id' => $runtimeObservability['draft_id'],
             'purchase_draft_id' => $runtimeObservability['purchase_draft_id'],
-            'session_id' => $runtimeObservability['session_id'],
             'product_id' => $runtimeObservability['product_id'],
             'matched_product_id' => $runtimeObservability['matched_product_id'],
             'matched_by' => $runtimeObservability['matched_by'],
@@ -4095,6 +4137,7 @@ final class ChatAgent
             $this->commandBus->register(new UsageMeteringCommandHandler());
             $this->commandBus->register(new AgentToolsIntegrationCommandHandler());
             $this->commandBus->register(new AgentOpsObservabilityCommandHandler());
+            $this->commandBus->register(new LearningCenterCommandHandler());
             $this->commandBus->register(new MapCommandHandler(
                 ['AuthLogin', 'AuthCreateUser'],
                 function (array $command, array $context): array {
@@ -4174,7 +4217,7 @@ final class ChatAgent
                 'playbook_installer' => new PlaybookInstaller(),
                 'openapi_importer' => new OpenApiIntegrationImporter(),
                 'workflow_repository' => new WorkflowRepository(),
-                'workflow_executor' => new WorkflowExecutor(),
+                'workflow_executor' => $this->workflowExecutor(),
                 'workflow_compiler' => new WorkflowCompiler(),
                 'register_entity' => function (string $entityName, string $ctxUserId): void {
                     try {
@@ -4391,7 +4434,17 @@ final class ChatAgent
             // Memory ingestion should not block chat
         }
     }
+
+    private function workflowExecutor(): \App\Core\WorkflowExecutor
+    {
+        $calculator = new \App\Core\Skills\CalculatorSkill();
+        return new \App\Core\WorkflowExecutor([
+            'calculator' => fn(array $in, array $ctx) => $calculator->handle($in, $ctx)
+        ]);
+    }
 }
+
+
 
 
 

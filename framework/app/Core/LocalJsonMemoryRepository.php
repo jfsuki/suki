@@ -80,4 +80,14 @@ class LocalJsonMemoryRepository implements MemoryRepositoryInterface
         $path = $this->storagePath . '/' . md5($key) . '.json';
         file_put_contents($path, json_encode($value));
     }
+
+    public function getSession(string $sessionId): array
+    {
+        return $this->get('session_' . $sessionId);
+    }
+
+    public function saveSession(string $sessionId, array $data): void
+    {
+        $this->save('session_' . $sessionId, $data);
+    }
 }
