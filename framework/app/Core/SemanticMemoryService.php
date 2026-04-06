@@ -133,30 +133,45 @@ final class SemanticMemoryService
         $store->ensureCollection();
         $store->ensurePayloadIndexes((bool) ($options['wait'] ?? true));
 
-        $points = [];
-        foreach ($accepted as $chunk) {
-            $payload = SemanticChunkContract::buildPayload($chunk);
-            $embedding = $this->embeddingService->embed((string) $payload['content'], [
-                'task_type' => 'RETRIEVAL_DOCUMENT',
-                'title' => (string) $payload['source'],
-            ]);
-            $points[] = [
-                'id' => SemanticChunkContract::buildPointId($chunk),
-                'vector' => $embedding['vector'],
-                'payload' => $payload,
-            ];
-        }
+        $totalUpserted = 0;
+        $batchSize = 50;
+        $batches = array_chunk($accepted, $batchSize);
 
-        $upsertResult = $store->upsertPoints(
-            $points,
-            (bool) ($options['wait'] ?? true)
-        );
+        foreach ($batches as $batch) {
+            $texts = array_map(static fn(array $c): string => (string) ($c['content'] ?? ''), $batch);
+            $embeddings = $this->embeddingService->embedMany($texts, [
+                'task_type' => 'RETRIEVAL_DOCUMENT',
+            ]);
+
+            $points = [];
+            foreach ($batch as $index => $chunk) {
+                $payload = SemanticChunkContract::buildPayload($chunk);
+                $vector = $embeddings[$index]['vector'] ?? null;
+                if ($vector === null) {
+                    continue;
+                }
+
+                $points[] = [
+                    'id' => SemanticChunkContract::buildPointId($chunk),
+                    'vector' => $vector,
+                    'payload' => $payload,
+                ];
+            }
+
+            if ($points !== []) {
+                $upsertResult = $store->upsertPoints(
+                    $points,
+                    (bool) ($options['wait'] ?? true)
+                );
+                $totalUpserted += (int) ($upsertResult['upserted'] ?? 0);
+            }
+        }
 
         return [
             'ok' => true,
             'received' => $received,
             'accepted' => count($accepted),
-            'upserted' => (int) ($upsertResult['upserted'] ?? 0),
+            'upserted' => $totalUpserted,
             'deduped' => $deduped,
             'dropped' => $dropped,
             'memory_type' => $memoryType,
@@ -196,6 +211,48 @@ final class SemanticMemoryService
     public function ingestSectorKnowledge(array $chunks, array $options = []): array
     {
         return $this->ingestToMemoryType('sector_knowledge', $chunks, $options);
+    }
+
+    /**
+     * @param array<string,mixed> $metadata
+     * @return array<string,mixed>
+     */
+    public function ingestRawSectorKnowledge(string $sector, string $content, array $metadata = []): array
+    {
+        $sector = trim($sector) ?: 'general';
+        $content = trim($content);
+        if ($content === '') {
+            throw new RuntimeException('El contenido no puede estar vacío.');
+        }
+
+        // Chunker v1.0: Dividir por párrafos (doble salto de línea)
+        $paragraphs = preg_split('/\n\s*\n/', $content, -1, PREG_SPLIT_NO_EMPTY);
+        $chunks = [];
+        $sourceId = 'upload_' . bin2hex(random_bytes(4));
+
+        foreach ($paragraphs as $index => $para) {
+            $para = trim($para);
+            if (strlen($para) < 20) continue; // Ignorar fragmentos muy cortos
+
+            $chunks[] = [
+                'memory_type' => 'sector_knowledge',
+                'tenant_id' => 'system', // El conocimiento sectorial suele ser global
+                'sector' => $sector,
+                'source' => 'training_portal',
+                'source_id' => $sourceId,
+                'chunk_id' => $sourceId . '_p' . $index,
+                'content' => $para,
+                'metadata' => $metadata,
+                'quality_score' => (float)($metadata['trust_score'] ?? 0.8),
+                'version' => '1.0',
+            ];
+        }
+
+        if ($chunks === []) {
+             throw new RuntimeException('No se encontraron fragmentos válidos para ingerir.');
+        }
+
+        return $this->ingestSectorKnowledge($chunks);
     }
 
     /**

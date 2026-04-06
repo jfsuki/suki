@@ -1,4 +1,4 @@
-﻿# Work Plan (Updated)
+# Work Plan (Updated)
 
 ## Current maturity (assessment)
 - Core runtime (forms + grids) : DONE
@@ -340,6 +340,29 @@
 ## Siguiente bloque recomendado
 - WB-3 full visual graph: drag/drop real, conexiones con mouse y referencias tipadas `@` en inspector.
 - WB-4 advanced: diff visual entre revisiones y restauracion selectiva por nodo.
+
+### Fase 11 — Agentic Training & Sectorial Depth
+1) Inyección masiva de Playbooks por verticales en "rojo". (pending)
+2) Entrenamiento de sectores críticos (RRHH, Contabilidad, Tributario). (pending)
+3) Optimización de enrutamiento multitenant 100+ concurrentes. (pending)
+
+### Fase 12 — Cognitive Observability & Loop
+1) Integración de feedback visual (tickets) a vectores de Qdrant. (pending)
+2) Recalibración automática del Atlas de Conocimiento. (pending)
+3) Worker de auto-etiquetado semántico de flujos conversacionales. (pending)
+
+### Fase 13 — Production Hardening & Global Scale
+1) Auditoría de seguridad P2P y encriptación de memoria sensitiva. (pending)
+2) Despliegue en Marketplace Internacional (Multi-región). (pending)
+3) Compliance legal/fiscal regional automatizado. (pending)
+
+### Fase 14 — Marketplace & Liquidación
+1) Pasarela de monetización integrada por uso de apps. (pending)
+2) Panel de analítica de ingresos para creadores. (pending)
+
+### Fase 15 — Neural Ops Predictivas
+1) Predicción de fallos de infraestructura basada en telemetría histórica. (pending)
+2) Escalado neuronal automático (Ajuste de temperatura/modelo por contexto). (pending)
 
 ## Execution checklist
 - [x] Summary dependency ordering stable

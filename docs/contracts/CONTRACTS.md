@@ -66,5 +66,15 @@ Keys:
 - WorkflowContract v1: triggers, actions, permissions, async.
 - ChatContract v1: intents -> commands, slot policy, display policy.
 
+## KnowledgeTrainingContract (new)
+Location: /docs/contracts/knowledge_training_contract.json
+Scope: Ingestion, source reliability, and self-learning for the Builder.
+Keys:
+- contract_id, version, status, scope
+- knowledge_sources[]: { source_id, type, uri, trust_score, last_verified_at }
+- learning_directives: { mode, extraction_targets[], auto_discovery, cross_sector_reusability }
+- quality_gate: { min_trust_threshold, max_noise_ratio, semantic_overlap_policy }
+- vector_mapping: { collection_target, embedding_model, chunk_strategy }
+
 ## Fallback rule
 If DataContract/AppContract missing, use current FormContract + EntityContract.

@@ -40,6 +40,7 @@ final class ChatAgent
     private LocalJsonMemoryRepository $memory;
     private ?SemanticMemoryService $semanticMemory = null;
     private AuthService $auth;
+    private ?EntityBuilder $builder = null;
 
     public function __construct()
     {
@@ -233,7 +234,10 @@ final class ChatAgent
             return $this->handleIngressValidationFailure($channel, $sessionId, $userId, $tenantId, $projectId, $conversationId, $messageId, $text, $mode, $payload, $isAuthenticated, $role, $task, $ingressValidation, $requestStartedAt);
         }
 
+        $frustration = $this->handleFrustration($text, $tenantId, $userId, $projectId, $sessionId, $conversationId);
+        
         $result = $gateway->handle($tenantId, $userId, $text, $mode, $projectId);
+
         if (!empty($local['command']) && in_array($local['command'], ['RunTests', 'LLMUsage'], true)) {
             $utilityTelemetry = $this->buildLocalUtilityTelemetry(
                 (string) ($local['command'] ?? 'local_utility'),
@@ -579,7 +583,11 @@ final class ChatAgent
                 'is_test' => $testMode
             ]);
 
+            $reply = $this->annotateReplyWithFrustration($reply, $frustration);
+            $reply = $this->annotateReplyWithTrainingHint($reply, $telemetry, $mode);
+
             $out = $this->attachTestInfo($reply, $testMode, $telemetry, [
+
                 'action' => $action,
                 'resolved_locally' => true,
                 'llm_called' => false,
@@ -842,7 +850,10 @@ final class ChatAgent
             } catch (\Throwable $e) {
                 // observability must not block chat response
             }
+            $reply = $this->annotateReplyWithFrustration($reply, $frustration);
+
             return $this->attachTestInfo($reply, $testMode, $commandTelemetry, [
+
                 'action' => $action,
                 'resolved_locally' => true,
                 'llm_called' => false,
@@ -4296,7 +4307,13 @@ final class ChatAgent
                     $projectId = $manifest['id'] ?? 'default';
                 }
 
-                $user = $this->auth->login($projectId, $loginId, $password);
+                $ipAddress = (string) ($_SERVER['REMOTE_ADDR'] ?? '127.0.0.1');
+                $loginResult = $this->auth->login($projectId, $loginId, $password, $ipAddress);
+                
+                if (!($loginResult['success'] ?? false)) {
+                    return $this->reply($loginResult['error'] ?? 'Usuario o clave incorrecta.', $channel, $sessionId, $userId, 'error');
+                }
+                $user = $loginResult['user'] ?? null;
                 if (!$user) {
                     return $this->reply('Usuario o clave incorrecta.', $channel, $sessionId, $userId, 'error');
                 }
@@ -4315,6 +4332,7 @@ final class ChatAgent
                 $this->auth->linkSession($sessionId, $user['id'], $projectId, $user['tenant_id'] ?? 'default', $channel);
 
                 return $this->reply('Login listo. Ya puedes usar la app.', $channel, $sessionId, $userId, 'success', ['user' => $user]);
+
 
             case 'AuthCreateUser':
                 $newId = (string) ($command['user_id'] ?? $data['user_id'] ?? '');
@@ -4467,7 +4485,76 @@ final class ChatAgent
         }
     }
 
+    private function handleFrustration(string $text, string $tenantId, string $userId, string $projectId, string $sessionId, string $conversationId): ?array
+    {
+        $signal = $this->telemetryService()->detectSignals($text, []);
+        if (!$signal || $signal['signal'] !== 'frustration') {
+            return null;
+        }
+
+        $ticketId = 'tk_' . bin2hex(random_bytes(4));
+        $this->telemetryService()->recordSupportTicket([
+            'id' => $ticketId,
+            'tenant_id' => $tenantId,
+            'project_id' => $projectId,
+            'session_id' => $sessionId,
+            'user_id' => $userId,
+            'subject' => 'Frustración detectada en chat',
+            'message' => $text,
+            'sentiment' => 'frustration',
+            'status' => 'open',
+            'metadata' => [
+                'conversation_id' => $conversationId,
+                'detected_signal' => $signal['message']
+            ]
+        ]);
+
+        return $signal;
+    }
+
+    private function annotateReplyWithTrainingHint(array $reply, array $telemetry, string $mode): array
+    {
+        $isGap = ($telemetry['rag_hit'] ?? true) === false && ($telemetry['classification'] ?? '') === 'informational';
+        $isBuilder = $mode === 'builder';
+
+        if (!$isGap && !$isBuilder) {
+            return $reply;
+        }
+
+        // Si es builder, siempre es bueno recordar que puede entrenar
+        // Si es app y hay gap, es obligatorio
+        $hint = "\n\n--- 🧠 AI Training Center ---\n"
+            . "Parece que me falta información específica sobre este tema. Como Arquitecto, puedes entrenarme subiendo fuentes oficiales en la **Torre de Control > Entrenamiento AI** para mejorar mi precisión.";
+
+        if (isset($reply['data']['reply'])) {
+            $reply['data']['reply'] .= $hint;
+        } elseif (isset($reply['message'])) {
+            $reply['message'] .= $hint;
+        }
+
+        return $reply;
+    }
+
+    private function annotateReplyWithFrustration(array $reply, ?array $frustration): array
+    {
+        if (!$frustration) {
+            return $reply;
+        }
+
+        $apology = "\n\n--- ⚠️ NOTA DEL SISTEMA ---\n"
+            . "Siento mucho que estés teniendo una mala experiencia. He detectado tu frustración y he creado un TICKET DE SOPORTE prioritario para que nuestro equipo lo revise. Estamos trabajando para mejorar.";
+        
+        if (isset($reply['data']['reply'])) {
+            $reply['data']['reply'] .= $apology;
+        } elseif (isset($reply['message'])) {
+            $reply['message'] .= $apology;
+        }
+        
+        return $reply;
+    }
+
     private function workflowExecutor(): \App\Core\WorkflowExecutor
+
     {
         $calculator = new \App\Core\Skills\CalculatorSkill();
         return new \App\Core\WorkflowExecutor([
