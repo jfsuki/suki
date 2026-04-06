@@ -652,6 +652,79 @@ final class ProjectRegistry
             status TEXT,
             created_at TEXT
         )');
+        $this->db->exec('CREATE TABLE IF NOT EXISTS ai_agents (
+            agent_id TEXT PRIMARY KEY,
+            tenant_id TEXT,
+            project_id TEXT,
+            role TEXT,
+            area TEXT,
+            status TEXT,
+            config_json TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )');
+        $this->db->exec('CREATE TABLE IF NOT EXISTS ai_agent_events (
+            id           INTEGER PRIMARY KEY AUTOINCREMENT,
+            agent_id     TEXT,
+            tenant_id    TEXT,
+            event_type   TEXT,
+            details      TEXT,
+            status       TEXT,
+            created_at   TEXT
+        )');
+    }
+
+    public function logAgentEvent(string $agentId, string $tenantId, string $type, string $details, string $status = 'INFO'): void
+    {
+        $stmt = $this->db->prepare('INSERT INTO ai_agent_events (agent_id, tenant_id, event_type, details, status, created_at) VALUES (?, ?, ?, ?, ?, ?)');
+        $stmt->execute([$agentId, $tenantId, $type, $details, $status, date('Y-m-d H:i:s')]);
+    }
+
+    public function getAgentEvents(string $tenantId, int $limit = 20): array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM ai_agent_events WHERE tenant_id = ? ORDER BY created_at DESC LIMIT ?');
+        $stmt->execute([$tenantId, $limit]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC);
+    }
+
+    /**
+     * @param array<string, mixed> $config
+     */
+    public function createAgent(string $tenantId, string $role, string $area, array $config = [], string $projectId = 'default'): string
+    {
+        $agentId = 'agnt_' . bin2hex(random_bytes(4));
+        $now = date('Y-m-d H:i:s');
+        $stmt = $this->db->prepare('INSERT INTO ai_agents (agent_id, tenant_id, project_id, role, area, status, config_json, created_at, updated_at) 
+                                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt->execute([
+            $agentId,
+            $tenantId,
+            $projectId,
+            $role,
+            $area,
+            'IDLE',
+            json_encode($config),
+            $now,
+            $now
+        ]);
+        return $agentId;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getAgentsByTenant(string $tenantId): array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM ai_agents WHERE tenant_id = ? ORDER BY created_at DESC');
+        $stmt->execute([$tenantId]);
+        return $stmt->fetchAll(\PDO::FETCH_ASSOC);
+    }
+
+    public function updateAgentStatus(string $agentId, string $status): bool
+    {
+        $now = date('Y-m-d H:i:s');
+        $stmt = $this->db->prepare('UPDATE ai_agents SET status = ?, updated_at = ? WHERE agent_id = ?');
+        return $stmt->execute([$status, $now, $agentId]);
     }
 
     /**
@@ -668,6 +741,8 @@ final class ProjectRegistry
             'auth_users',
             'auth_codes',
             'deploys',
+            'ai_agents',
+            'ai_agent_events',
         ];
     }
 

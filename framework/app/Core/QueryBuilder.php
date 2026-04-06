@@ -24,6 +24,11 @@ class QueryBuilder
         $this->table = $this->sanitizeIdentifier(TableNamespace::resolve($table));
     }
 
+    public static function table(PDO $db, string $table): self
+    {
+        return new self($db, $table);
+    }
+
     public function setAllowedColumns(array $columns): self
     {
         $this->allowedColumns = array_values(array_filter($columns, function ($col) {
@@ -59,6 +64,16 @@ class QueryBuilder
         $param = $this->newParamName($col);
         $this->wheres[] = "{$col} {$operator} :{$param}";
         $this->bindings[$param] = $value;
+        return $this;
+    }
+
+    public function whereRaw(string $sql, array $bindings = []): self
+    {
+        $this->wheres[] = $sql;
+        foreach ($bindings as $key => $value) {
+            $param = ltrim($key, ':');
+            $this->bindings[$param] = $value;
+        }
         return $this;
     }
 

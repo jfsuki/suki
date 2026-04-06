@@ -4415,6 +4415,256 @@
         "chat"
       ],
       "context_hints": {}
+    },
+    {
+      "name": "inventory_adjust_stock",
+      "description": "Ajusta el stock de un producto (entrada/salida).",
+      "intent_patterns": [
+        "ajusta stock",
+        "agrega inventario",
+        "quita de inventario",
+        "mueve stock",
+        "entrada de producto",
+        "salida de producto"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "priority": 100,
+      "memory_type": "transactional",
+      "input_schema": {
+        "required": [
+          "sku",
+          "qty"
+        ],
+        "optional": [
+          "motivo"
+        ]
+      }
+    },
+    {
+      "name": "inventory_create_product",
+      "description": "Crea un nuevo producto en el catálogo.",
+      "intent_patterns": [
+        "crea producto",
+        "nuevo producto",
+        "registra producto"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "priority": 100,
+      "memory_type": "transactional",
+      "input_schema": {
+        "required": [
+          "nombre"
+        ],
+        "optional": [
+          "sku",
+          "precio"
+        ]
+      }
+    },
+    {
+      "name": "inventory_check_stock",
+      "description": "Consulta el stock actual de un producto.",
+      "intent_patterns": [
+        "cuanto stock hay",
+        "revisa stock",
+        "stock de",
+        "existencias de"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "priority": 100,
+      "memory_type": "informative",
+      "input_schema": {
+        "required": [
+          "sku"
+        ]
+      }
+    },
+    {
+      "name": "inventory_list_products",
+      "description": "Lista productos del catálogo con filtros.",
+      "intent_patterns": [
+        "lista productos",
+        "muestra inventario",
+        "que productos hay"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "priority": 90,
+      "memory_type": "informative",
+      "input_schema": {
+        "optional": [
+          "nombre",
+          "sku"
+        ]
+      }
+    },
+    {
+      "name": "crm_register_lead",
+      "description": "Registra un nuevo lead o cliente potencial.",
+      "intent_patterns": [
+        "registra lead",
+        "nuevo prospecto",
+        "anota cliente",
+        "toma datos de cliente"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "priority": 100,
+      "memory_type": "transactional",
+      "input_schema": {
+        "required": [
+          "nombre"
+        ],
+        "optional": [
+          "email",
+          "empresa",
+          "telefono"
+        ]
+      }
+    },
+    {
+      "name": "crm_update_customer",
+      "description": "Actualiza la información de un cliente existente.",
+      "intent_patterns": [
+        "actualiza cliente",
+        "cambia datos del cliente",
+        "modifica prospecto"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "priority": 100,
+      "memory_type": "transactional",
+      "input_schema": {
+        "required": [
+          "id"
+        ],
+        "optional": [
+          "status",
+          "email",
+          "telefono"
+        ]
+      }
+    },
+    {
+      "name": "crm_search_customers",
+      "description": "Busca clientes o leads por nombre o empresa.",
+      "intent_patterns": [
+        "busca cliente",
+        "encuentra a",
+        "quien es",
+        "lista leads"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "priority": 90,
+      "memory_type": "informative",
+      "input_schema": {
+        "optional": [
+          "nombre",
+          "empresa"
+        ]
+      }
+    },
+    {
+      "name": "crm_stats",
+      "description": "Muestra estadísticas del CRM (embudo de ventas).",
+      "intent_patterns": [
+        "estadisticas crm",
+        "como van las ventas",
+        "resumen de clientes",
+        "cuantos leads hay"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "priority": 80,
+      "memory_type": "informative",
+      "input_schema": {}
+    },
+    {
+      "name": "accounting_record_entry",
+      "description": "Registra un asiento contable manual.",
+      "intent_patterns": [
+        "registra asiento",
+        "anota contabilidad",
+        "pago recibido",
+        "gasto realizado"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "priority": 100,
+      "memory_type": "transactional",
+      "input_schema": {
+        "required": [
+          "monto"
+        ],
+        "optional": [
+          "referencia",
+          "glosa",
+          "debe_cuenta",
+          "haber_cuenta"
+        ]
+      }
+    },
+    {
+      "name": "accounting_balance_sheet",
+      "description": "Muestra el balance de sumas y saldos.",
+      "intent_patterns": [
+        "muestra balance",
+        "estado financiero",
+        "como esta la plata",
+        "resumen contable"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "priority": 80,
+      "memory_type": "informative",
+      "input_schema": {}
+    },
+    {
+      "name": "accounting_record_sale",
+      "description": "Contabiliza una venta automáticamente.",
+      "intent_patterns": [
+        "contabiliza venta",
+        "registra ingreso por venta"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "priority": 100,
+      "memory_type": "transactional",
+      "input_schema": {
+        "required": [
+          "monto"
+        ],
+        "optional": [
+          "ref"
+        ]
+      }
     }
   ]
 }
+

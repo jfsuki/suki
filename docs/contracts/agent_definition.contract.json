@@ -1,0 +1,48 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Suki Agent Definition Contract",
+  "description": "Defines the blueprint for specialized agents in the multi-agent network.",
+  "type": "object",
+  "required": ["agent_id", "role", "area", "capabilities"],
+  "properties": {
+    "agent_id": {
+      "type": "string",
+      "description": "Unique identifier for the agent blueprint (e.g., finance_specialist_v1)."
+    },
+    "role": {
+      "type": "string",
+      "description": "The professional persona of the agent (e.g., Accountant, Sales Manager)."
+    },
+    "area": {
+      "type": "string",
+      "enum": ["FINANCES", "SALES", "INVENTORY", "PURCHASES", "HR", "LOGISTICS", "SUPERVISOR", "ARCHITECT"],
+      "description": "The business domain of the agent."
+    },
+    "capabilities": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of functional capabilities (e.g., invoice_creation, stock_audit)."
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      },
+      "description": "List of allowed framework tools (CommandBus handlers)."
+    },
+    "memory_scope": {
+      "type": "object",
+      "properties": {
+        "isolate_by_tenant": { "type": "boolean", "default": true },
+        "isolate_by_project": { "type": "boolean", "default": true },
+        "use_shared_sector_knowledge": { "type": "boolean", "default": true }
+      }
+    },
+    "prompt_base": {
+      "type": "string",
+      "description": "The core system instruction for this specific agent role."
+    }
+  }
+}

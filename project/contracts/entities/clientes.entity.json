@@ -1,13 +1,13 @@
 {
     "type": "entity",
     "name": "clientes",
-    "label": "Clientes",
-    "version": "1.0",
+    "label": "Clientes / CRM",
+    "version": "1.1",
     "table": {
         "name": "clientes",
         "primaryKey": "id",
         "timestamps": true,
-        "softDelete": false,
+        "softDelete": true,
         "tenantScoped": true
     },
     "fields": [
@@ -20,29 +20,55 @@
         {
             "name": "nombre",
             "type": "string",
-            "label": "Nombre",
+            "label": "Nombre Completo",
+            "required": true,
+            "source": "form"
+        },
+        {
+            "name": "empresa",
+            "type": "string",
+            "label": "Empresa",
             "required": false,
             "source": "form"
+        },
+        {
+            "name": "email",
+            "type": "string",
+            "label": "Correo Electrónico",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "telefono",
+            "type": "string",
+            "label": "Teléfono / WhatsApp",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "calificacion",
+            "type": "int",
+            "label": "Calificación (1-5)",
+            "required": false,
+            "default": 3,
+            "source": "form"
+        },
+        {
+            "name": "status",
+            "type": "string",
+            "label": "Estado",
+            "required": true,
+            "default": "LEAD",
+            "enum": ["LEAD", "PROSPECTO", "CLIENTE", "INACTIVO"]
         }
     ],
     "grids": [],
     "relations": [],
     "rules": [],
     "permissions": {
-        "read": [
-            "admin",
-            "seller"
-        ],
-        "create": [
-            "admin",
-            "seller"
-        ],
-        "update": [
-            "admin",
-            "seller"
-        ],
-        "delete": [
-            "admin"
-        ]
+        "read": ["admin", "seller", "support"],
+        "create": ["admin", "seller"],
+        "update": ["admin", "seller"],
+        "delete": ["admin"]
     }
 }

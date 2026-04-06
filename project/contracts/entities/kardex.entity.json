@@ -1,0 +1,78 @@
+{
+    "type": "entity",
+    "name": "kardex",
+    "label": "Movimientos de Inventario",
+    "version": "1.0",
+    "table": {
+        "name": "kardex",
+        "primaryKey": "id",
+        "timestamps": true,
+        "softDelete": false,
+        "tenantScoped": true
+    },
+    "fields": [
+        {
+            "name": "id",
+            "type": "int",
+            "primary": true,
+            "source": "system"
+        },
+        {
+            "name": "producto_id",
+            "type": "int",
+            "label": "Producto ID",
+            "required": true,
+            "index": true
+        },
+        {
+            "name": "tipo",
+            "type": "string",
+            "label": "Tipo de Movimiento",
+            "required": true,
+            "enum": ["ENTRADA", "SALIDA", "AJUSTE", "DEVOLUCION"]
+        },
+        {
+            "name": "cantidad",
+            "type": "decimal",
+            "label": "Cantidad",
+            "required": true
+        },
+        {
+            "name": "costo_unitario",
+            "type": "decimal",
+            "label": "Costo Unitario",
+            "required": false
+        },
+        {
+            "name": "referencia_externa",
+            "type": "string",
+            "label": "Ref. (Factura/Orden)",
+            "required": false
+        },
+        {
+            "name": "motivo",
+            "type": "text",
+            "label": "Motivo / Notas",
+            "required": false
+        },
+        {
+            "name": "usuario_id",
+            "type": "string",
+            "label": "Usuario Ejecutor",
+            "required": true
+        }
+    ],
+    "relations": [
+        {
+            "name": "producto",
+            "type": "belongsTo",
+            "entity": "productos"
+        }
+    ],
+    "permissions": {
+        "read": ["admin", "inventory_manager"],
+        "create": ["admin", "inventory_manager"],
+        "update": [],
+        "delete": []
+    }
+}

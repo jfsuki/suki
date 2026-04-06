@@ -585,6 +585,14 @@ final class POSCommandHandler implements CommandHandlerInterface
             'source_ref' => (string) ($sale['id'] ?? ''),
         ]);
 
+        // Dispatch internal event for ERP coordination
+        InternalEventBus::getInstance()->dispatch('sale.finalized', [
+            'tenant_id' => $tenantId,
+            'app_id' => $appId,
+            'sale' => $sale,
+            'user_id' => $userId
+        ]);
+
         return $this->withReplyText($reply(
             'Venta POS finalizada: sale_number=' . (string) ($sale['sale_number'] ?? '') . '.',
             $channel,

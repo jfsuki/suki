@@ -51,6 +51,9 @@ final class ChatAgent
         $this->memory = new LocalJsonMemoryRepository();
         $this->semanticMemory = new SemanticMemoryService();
         $this->auth = new AuthService();
+        
+        // Boot ERP coordination if needed
+        AgentCoordinationService::boot();
     }
 
     public function handle(array $payload): array

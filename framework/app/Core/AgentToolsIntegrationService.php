@@ -697,6 +697,15 @@ final class AgentToolsIntegrationService
      */
     private function runModuleSkillParser(string $skillName, array $context): ?array
     {
+        if (str_starts_with($skillName, 'inventory_')) {
+            return (new InventoryMessageParser())->parse($skillName, $context);
+        }
+        if (str_starts_with($skillName, 'crm_')) {
+            return (new CRMMessageParser())->parse($skillName, $context);
+        }
+        if (str_starts_with($skillName, 'accounting_')) {
+            return (new AccountingMessageParser())->parse($skillName, $context);
+        }
         if (str_starts_with($skillName, 'media_')) {
             return (new MediaMessageParser())->parse($skillName, $context);
         }
@@ -1040,6 +1049,39 @@ final class AgentToolsIntegrationService
                 'plan_module_key' => '',
                 'aliases' => ['consumo', 'uso del tenant', 'metrica de uso', 'limite de uso', 'cuota'],
             ],
+            'inventory' => [
+                'module_key' => 'inventory',
+                'tool_group' => 'inventory',
+                'label' => 'Inventory',
+                'description' => 'Gestión de productos, stock, kardex y almacenes.',
+                'catalog_prefix' => 'inventory.',
+                'permission_module_key' => 'inventory',
+                'plan_managed' => true,
+                'plan_module_key' => 'inventory',
+                'aliases' => ['inventario', 'stock', 'producto', 'kardex', 'almacen', 'existencias'],
+            ],
+            'crm' => [
+                'module_key' => 'crm',
+                'tool_group' => 'crm',
+                'label' => 'CRM',
+                'description' => 'Gestión de clientes, prospectos, leads y seguimiento comercial.',
+                'catalog_prefix' => 'crm.',
+                'permission_module_key' => 'crm',
+                'plan_managed' => true,
+                'plan_module_key' => 'crm',
+                'aliases' => ['crm', 'cliente', 'lead', 'prospecto', 'ventas', 'seguimiento'],
+            ],
+            'accounting' => [
+                'module_key' => 'accounting',
+                'tool_group' => 'accounting',
+                'label' => 'Accounting',
+                'description' => 'Contabilidad general, asientos, plan de cuentas y reportes financieros.',
+                'catalog_prefix' => 'accounting.',
+                'permission_module_key' => 'accounting',
+                'plan_managed' => true,
+                'plan_module_key' => 'accounting',
+                'aliases' => ['contabilidad', 'asiento', 'balance', 'pya', 'financiero', 'libro mayor'],
+            ],
         ];
     }
 
@@ -1105,6 +1147,14 @@ final class AgentToolsIntegrationService
             'consumo' => 'usage_metering',
             'uso del tenant' => 'usage_metering',
             'limite de uso' => 'usage_metering',
+            'inventory' => 'inventory',
+            'inventario' => 'inventory',
+            'stock' => 'inventory',
+            'crm' => 'crm',
+            'clientes' => 'crm',
+            'accounting' => 'accounting',
+            'contabilidad' => 'accounting',
+            'asientos' => 'accounting',
         ];
 
         return $aliases[$normalized] ?? (array_key_exists($normalized, $this->moduleDefinitions()) ? $normalized : '');

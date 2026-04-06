@@ -13,6 +13,7 @@ use App\Core\SqlMetricsRepository;
 use App\Core\ProjectRegistry;
 use App\Core\KnowledgeRegistryRepository;
 use App\Core\QdrantVectorStore;
+use App\Core\TrainingPortalController;
 
 // 1. Auth & Context
 if (session_status() === PHP_SESSION_NONE) session_start();
@@ -83,6 +84,63 @@ try {
             $error = $res['message'];
         }
     }
+
+    // 2.2 Agent Lifecycle Actions
+    if ($action === 'create_agent' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $area = trim((string) ($_POST['area'] ?? 'GENERAL'));
+        $role = trim((string) ($_POST['role'] ?? 'Specialist'));
+        $tenantId = trim((string) ($_POST['tenant_id'] ?? 'default'));
+        
+        $persona = \App\Core\Agents\Registry\SpecialistPersonas::getPersona($area);
+        $config = [
+            'persona_name' => $persona['name'],
+            'prompt_base' => $persona['prompt_base'],
+            'capabilities' => $persona['capabilities']
+        ];
+
+        $agentId = $registry->createAgent($tenantId, $role, $area, $config);
+        header('Location: ?tab=mission&agent_created=1&agent_id=' . $agentId); exit;
+    }
+
+    if ($action === 'research_topic' && $_SERVER['REQUEST_METHOD'] === 'POST') {
+        $agentId = trim((string) ($_POST['agent_id'] ?? ''));
+        $topic = trim((string) ($_POST['topic'] ?? ''));
+        $tenantId = trim((string) ($_POST['tenant_id'] ?? 'default'));
+
+        $trainingController = new \App\Core\TrainingPortalController();
+        $res = $trainingController->handleAutonomousResearch($agentId, $topic, $tenantId);
+        
+        if (isset($_POST['ajax'])) {
+            header('Content-Type: application/json');
+            echo json_encode($res);
+            exit;
+        }
+
+        if ($res['success']) {
+            header('Location: ?tab=mission&research_started=1&topic=' . urlencode($topic)); exit;
+        } else {
+            $error = $res['message'];
+        }
+    }
+
+    if ($action === 'get_live_events') {
+        header('Content-Type: application/json');
+        $tenantId = $_GET['tenant_id'] ?? 'default';
+        $limit = (int)($_GET['limit'] ?? 10);
+        echo json_encode($registry->getAgentEvents($tenantId, $limit));
+        exit;
+    }
+
+    if ($action === 'trace_knowledge') {
+        header('Content-Type: application/json');
+        $query = $_GET['query'] ?? '';
+        $trainingController = new \App\Core\TrainingPortalController();
+        echo json_encode($trainingController->traceKnowledge($query));
+        exit;
+    }
+
+    // Fetch Agents for Mission Control
+    $activeAgents = $registry->getAgentsByTenant('default'); 
 } catch (\Exception $e) {
     $error = "Fallo crítico en telemetría: " . $e->getMessage();
 }
@@ -161,6 +219,32 @@ function safeStr($s): string {
         .sector-header { margin-top: 40px; margin-bottom: 20px; font-size: 20px; font-weight: 800; color: #fff; display: flex; align-items: center; gap: 15px; }
         .sector-header::after { content:''; flex:1; height:1px; background: linear-gradient(90deg, var(--border), transparent); }
 
+        /* NEURAL CONSOLE & TRACER */
+        .neural-console { 
+            background: #000; 
+            border: 1px solid var(--border); 
+            border-radius: 12px; 
+            padding: 20px; 
+            font-family: 'JetBrains Mono', monospace; 
+            font-size: 12px; 
+            height: 300px; 
+            overflow-y: auto; 
+            margin-top: 20px;
+            box-shadow: inset 0 0 20px rgba(56, 189, 248, 0.1);
+        }
+        .console-entry { margin-bottom: 8px; display: flex; gap: 10px; animation: fadeIn 0.3s ease-out; }
+        .console-time { color: var(--accent); opacity: 0.7; }
+        .console-type { font-weight: 800; padding: 2px 6px; border-radius: 4px; background: rgba(255,255,255,0.05); }
+        .console-msg { color: var(--text-dim); }
+        @keyframes fadeIn { from { opacity: 0; transform: translateX(-5px); } to { opacity: 1; transform: translateX(0); } }
+
+        .tracer-io {
+            background: var(--surface-light);
+            border-radius: 16px;
+            padding: 20px;
+            margin-top: 20px;
+            border-left: 4px solid var(--success);
+        }
     </style>
 </head>
 <body>
@@ -169,6 +253,7 @@ function safeStr($s): string {
         <div class="brand"><span>Neural Engine</span><h1>SUKI TOWER</h1></div>
         <nav>
             <a href="?tab=executive" class="<?= $tab==='executive'?'active':'' ?>">Control Principal</a>
+            <a href="?tab=mission" class="<?= $tab==='mission'?'active':'' ?>">🛰️ Misión Control</a>
             <a href="?tab=library" class="<?= $tab==='library'?'active':'' ?>">Biblioteca Conocimiento</a>
             <a href="?tab=catalog" class="<?= $tab==='catalog'?'active':'' ?>">Catálogo Apps</a>
             <a href="?tab=creators" class="<?= $tab==='creators'?'active':'' ?>">Creators Hub</a>
@@ -224,6 +309,88 @@ function safeStr($s): string {
                     </div>
                     <?php endforeach; ?>
                 </div>
+            </div>
+        </div>
+
+        <!-- TAB: MISSION CONTROL (PHASE 11.4 + 12.4) -->
+        <div id="mission" class="tab-pane <?= $tab === 'mission' ? 'active' : '' ?>">
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:40px;">
+                <div>
+                    <h2 style="font-size:32px; font-weight:800; margin-bottom:8px;">Satellite Mission Control</h2>
+                    <p style="color:var(--text-dim); font-size:14px;">Gestión de agentes especialistas y entrenamiento autónomo.</p>
+                </div>
+                <div style="display:flex; gap:10px;">
+                    <button onclick="document.getElementById('modalCreateAgent').style.display='flex'" class="btn btn-primary" style="background:var(--accent); color:#000;">+ Crear Especialista</button>
+                    <div class="stat-badge badge-success">SISTEMA NOMINAL</div>
+                </div>
+            </div>
+
+            <!-- SPECIALIST AGENTS LIST (PHASE 12.4) -->
+            <div class="section-title">🤖 Red de Agentes Activos (Especialistas)</div>
+            <div class="k-library-grid" style="margin-bottom:40px;">
+                <?php if (empty($activeAgents)): ?>
+                    <p style="color:var(--text-dim); padding:20px;">No hay agentes especializados creados para este tenant móvil aún.</p>
+                <?php else: foreach($activeAgents as $agt): 
+                    $conf = json_decode($agt['config_json'] ?? '{}', true);
+                ?>
+                    <div class="k-node-card" style="border-left: 4px solid var(--accent);">
+                        <div class="k-node-header">
+                             <div class="k-domain-tag"><?= safeStr($agt['area']) ?></div>
+                             <div class="dot" style="background:var(--success); box-shadow: 0 0 10px var(--success);"></div>
+                        </div>
+                        <div style="font-weight:800; margin-bottom:5px; font-size:16px;"><?= safeStr($conf['persona_name'] ?? 'Neural Agent') ?></div>
+                        <div style="font-size:11px; color:var(--text-dim); margin-bottom:15px; font-family:'JetBrains Mono';">ID: <?= $agt['agent_id'] ?></div>
+                        
+                        <p style="font-size:12px; color:var(--text-dim); line-height:1.4; margin-bottom:20px;">
+                            <?= safeStr(substr($conf['prompt_base'] ?? '', 0, 100)) ?>...
+                        </p>
+
+                        <div style="display:flex; gap:10px;">
+                            <button onclick="openResearchModal('<?= $agt['agent_id'] ?>', '<?= $agt['area'] ?>')" class="btn" style="flex:1; font-size:10px; padding:8px; background:rgba(255,255,255,0.05); border:1px solid var(--border);">🧠 Entrenar</button>
+                            <button class="btn" style="font-size:10px; padding:8px; border:1px solid var(--border);">⚙️ Config</button>
+                        </div>
+                    </div>
+                <?php endforeach; endif; ?>
+            </div>
+
+            <!-- LIVE ACTIVITY FEED -->
+            <div class="section-title">🛰️ Neural Activity Feed (Last 20 Events)</div>
+            <div class="card" style="padding:0; overflow:hidden; border:1px solid rgba(56,189,248,0.2);">
+                <table style="width:100%; border-collapse:collapse; font-size:12px; font-family:'JetBrains Mono', monospace;">
+                    <thead style="background:rgba(0,0,0,0.2);">
+                        <tr style="text-align:left; color:var(--text-dim);">
+                            <th style="padding:15px; border-bottom:1px solid var(--border);">TIMESTAMP</th>
+                            <th style="padding:15px; border-bottom:1px solid var(--border);">AGENT</th>
+                            <th style="padding:15px; border-bottom:1px solid var(--border);">EVENT TYPE</th>
+                            <th style="padding:15px; border-bottom:1px solid var(--border);">DETAILS</th>
+                            <th style="padding:15px; border-bottom:1px solid var(--border);">STATUS</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php
+                            $entries = $registry->getAgentEvents('default', 20);
+                            if (empty($entries)):
+                        ?>
+                            <tr>
+                                <td colspan="5" style="padding:40px; text-align:center; color:var(--text-dim);">No hay actividad registrada en la red multi-agente todavía.</td>
+                            </tr>
+                        <?php else: 
+                            foreach($entries as $data): 
+                        ?>
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.03);">
+                                <td style="padding:12px 15px; color:var(--accent);"><?= substr($data['created_at'] ?? '', 11, 8) ?></td>
+                                <td style="padding:12px 15px; font-weight:800;"><?= safeStr($data['agent_id'] ?? '???') ?></td>
+                                <td style="padding:12px 15px;"><span style="color:#fff; background:rgba(255,255,255,0.05); padding:2px 6px; border-radius:4px;"><?= safeStr($data['event_type'] ?? 'EVENT') ?></span></td>
+                                <td style="padding:12px 15px; color:var(--text-dim);"><?= safeStr($data['details'] ?? '') ?></td>
+                                <td style="padding:12px 15px;">
+                                    <span style="color:<?= ($data['status'] ?? '') === 'SUCCESS' || ($data['status'] ?? '') === 'INFO' ? 'var(--success)' : 'var(--danger)' ?>;">
+                                        <?= ($data['status'] ?? '') === 'SUCCESS' || ($data['status'] ?? '') === 'INFO' ? '● OK' : '○ BLOCK' ?>
+                                    </span>
+                                </td>
+                            </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
             </div>
         </div>
 
@@ -356,18 +523,57 @@ function safeStr($s): string {
         <!-- TAB: AI TRAINING CENTER v1.0 [KTC ENGINE] -->
         <div id="training" class="tab-pane <?= $tab==='training'?'active':'' ?>">
              <div class="section-title">🧠 Centro de Entrenamiento AI (KTC Engine)</div>
+             
+             <div style="display:grid; grid-template-columns: 1fr 1fr; gap:30px; margin-bottom:30px;">
+                 <!-- LADO IZQUIERDO: CONSOLA DE INVESTIGACIÓN -->
+                 <div class="card" style="margin-bottom:0;">
+                    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:15px;">
+                        <h3 style="font-size:16px; font-weight:800;">Neural Research Console</h3>
+                        <span id="neural-pulse" class="dot" style="background:var(--accent); display:none;"></span>
+                    </div>
+                    <p style="font-size:12px; color:var(--text-dim); margin-bottom:15px;">Seguimiento en tiempo real del proceso de búsqueda, síntesis y vectorización.</p>
+                    <div id="neural-console" class="neural-console">
+                        <div class="console-entry">
+                            <span class="console-time">[SISTEMA]</span>
+                            <span class="console-msg">Esperando comando de entrenamiento...</span>
+                        </div>
+                    </div>
+                    <button onclick="clearConsole()" style="margin-top:15px; background:none; border:1px solid var(--border); color:var(--text-dim); padding:5px 10px; border-radius:8px; cursor:pointer; font-size:10px;">Limpiar Consola</button>
+                 </div>
+
+                 <!-- LADO DERECHO: PRUEBA DE RAZONAMIENTO (RAG TRACER) -->
+                 <div class="card" style="margin-bottom:0;">
+                    <h3 style="font-size:16px; font-weight:800; margin-bottom:15px;">Knowledge Tracer (Prueba RAG)</h3>
+                    <p style="font-size:12px; color:var(--text-dim); margin-bottom:15px;">Verifica en tiempo real si el nuevo conocimiento está disponible en producción.</p>
+                    
+                    <div style="display:flex; gap:10px; margin-bottom:15px;">
+                        <input type="text" id="trace-query" class="input" style="flex:1; font-size:12px;" placeholder="Haz una pregunta al cerebro neural...">
+                        <button onclick="traceKnowledge()" class="btn btn-primary" style="background:var(--accent); color:#000; padding:0 15px; font-size:11px; font-weight:800;">TEST</button>
+                    </div>
+
+                    <div id="trace-result" class="tracer-io" style="display:none; font-size:12px; line-height:1.6;">
+                        <div style="color:var(--accent); font-weight:800; margin-bottom:10px;">RESPUESTA NEURAL:</div>
+                        <div id="trace-response-text" style="margin-bottom:15px; color:#fff;"></div>
+                        <div style="color:var(--success); font-weight:800; margin-bottom:5px;">FUENTES RECUPERADAS (RAG):</div>
+                        <div id="trace-sources" style="font-size:10px; font-family:'JetBrains Mono'; color:var(--text-dim);"></div>
+                    </div>
+                    <div id="trace-empty" style="padding:40px; text-align:center; color:var(--text-dim); font-size:12px; border:1px dashed var(--border); border-radius:12px;">
+                        Ingresa una pregunta para trazar el razonamiento.
+                    </div>
+                 </div>
+             </div>
+
              <div class="card" style="border-left: 4px solid var(--accent); background: linear-gradient(135deg, var(--surface), rgba(56, 189, 248, 0.05));">
                  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:30px;">
                      <div>
-                        <h2 style="font-size:20px; font-weight:800; margin-bottom:8px;">Inyección de Conocimiento Autoratativo</h2>
+                        <h2 style="font-size:20px; font-weight:800; margin-bottom:8px;">Inyección de Conocimiento Manual</h2>
                         <p style="font-size:14px; color:var(--text-dim); line-height:1.6; max-width: 600px;">
-                            Sube documentos (Markdown, JSON) para alimentar la memoria semántica de SUKI.
-                            Solo fuentes confiables (Libros, Manuales, Leyes) son aceptadas por el <b>Knowledge Training Contract (KTC)</b>.
+                            Sube documentos seleccionados para alimentar la memoria sectorial sin búsqueda autónoma.
                         </p>
                      </div>
                      <div style="text-align:right;">
-                        <span class="stat-badge badge-success">SISTEMA ACTIVO</span>
-                        <div style="font-family:'JetBrains Mono'; font-size:10px; margin-top:10px; color:var(--accent);">VECTOR_ENGINE: QDRANT_0.16.x</div>
+                        <span class="stat-badge badge-success">SISTEMA NOMINAL</span>
+                        <div style="font-family:'JetBrains Mono'; font-size:10px; margin-top:10px; color:var(--accent);">KTC_PROTOCOL: v1.0_SECURE</div>
                      </div>
                  </div>
 
@@ -533,6 +739,197 @@ function safeStr($s): string {
             } else {
                 label.innerText = 'Seleccionar archivo (MD, JSON)';
                 label.style.color = 'inherit';
+            }
+        }
+    </script>
+    <!-- MODAL: CREATE AGENT (PHASE 12.4) -->
+    <div id="modalCreateAgent" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center;">
+        <div class="card" style="width:500px; padding:30px; position:relative;">
+            <button onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute; top:15px; right:15px; background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:20px;">&times;</button>
+            <h2 style="margin-bottom:20px;">Instanciar Agente Especialista</h2>
+            <form action="?action=create_agent" method="POST">
+                <input type="hidden" name="tenant_id" value="default">
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; font-size:11px; color:var(--text-dim); margin-bottom:8px; text-transform:uppercase;">Área de Especialidad</label>
+                    <select name="area" class="input" style="width:100%;">
+                        <option value="FINANCES">Finanzas & Fiscalidad</option>
+                        <option value="SALES">Ventas & E-commerce</option>
+                        <option value="ARCHITECT">Arquitectura de Sistema</option>
+                        <option value="ACCOUNTING">Contabilidad & Auditoría</option>
+                        <option value="INVENTORY">Inventario & Logística</option>
+                        <option value="PURCHASES">Compras & Proveedores</option>
+                        <option value="SUPPORT">Soporte General</option>
+                    </select>
+                </div>
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; font-size:11px; color:var(--text-dim); margin-bottom:8px; text-transform:uppercase;">Rol / Nombre del Agente</label>
+                    <input type="text" name="role" class="input" style="width:100%;" placeholder="Ej: Auditor Fiscal Senior" required>
+                </div>
+                <button type="submit" class="btn btn-primary" style="width:100%; height:45px; background:var(--accent); color:#000; font-weight:800;">ACTIVAR AGENTE</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- MODAL: AUTONOMOUS RESEARCH (PHASE 12.4) -->
+    <div id="modalResearch" class="modal-overlay" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.8); z-index:1000; justify-content:center; align-items:center;">
+        <div class="card" style="width:500px; padding:30px; position:relative;">
+            <button onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute; top:15px; right:15px; background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:20px;">&times;</button>
+            <h2 style="margin-bottom:10px;">Entrenamiento Autónomo</h2>
+            <p style="color:var(--text-dim); font-size:12px; margin-bottom:20px;">El agente buscará fuentes académicas y leyes oficiales para auto-instruirse.</p>
+            <form id="researchForm" onsubmit="event.preventDefault(); startNeuralResearch();">
+                <input type="hidden" name="tenant_id" value="default">
+                <input type="hidden" id="research_agent_id" name="agent_id" value="">
+                <div style="margin-bottom:20px;">
+                    <label style="display:block; font-size:11px; color:var(--text-dim); margin-bottom:8px; text-transform:uppercase;">Tema de Investigación</label>
+                    <input type="text" name="topic" id="research_topic_input" class="input" style="width:100%;" placeholder="Ej: Ley de Facturación Electrónica 2024 Colombia" required>
+                </div>
+                <button type="submit" id="btn-start-research" class="btn btn-primary" style="width:100%; height:45px; background:var(--success); color:#000; font-weight:800;">INICIAR INVESTIGACIÓN NEURAL</button>
+            </form>
+        </div>
+    </div>
+
+    <script>
+        function openResearchModal(agentId, area) {
+            document.getElementById('research_agent_id').value = agentId;
+            let topic = "Mejores prácticas en " + area;
+            if (area === 'FINANCES') topic = "Leyes de Facturación y Fiscalidad Colombia 2025";
+            if (area === 'SALES') topic = "Estrategias de Growth y conversión E-commerce";
+            if (area === 'ACCOUNTING') topic = "Normas NIA y gestión de balances en ERP";
+            if (area === 'INVENTORY') topic = "Optimización de stock y métodos FIFO/LIFO";
+            if (area === 'PURCHASES') topic = "Gestión estratégica de proveedores y reducción de costos";
+            document.getElementById('research_topic_input').value = topic;
+            document.getElementById('modalResearch').style.display = 'flex';
+        }
+
+        let isPolling = false;
+        window.processedEvents = new Set();
+
+        async function startNeuralResearch() {
+            const agentId = document.getElementById('research_agent_id').value;
+            const topic = document.getElementById('research_topic_input').value;
+            const btn = document.getElementById('btn-start-research');
+
+            btn.disabled = true;
+            btn.innerText = 'CONECTANDO CON CEREBRO...';
+
+            try {
+                // Ir a la pestaña de entrenamiento automáticamente
+                showTab('training');
+                document.getElementById('modalResearch').style.display = 'none';
+                
+                // Limpiar consola anterior
+                clearConsole();
+                addLog('INFO', 'SUKI_LINK', 'Iniciando túnel de investigación neural para especialista: ' + agentId);
+                
+                // Iniciar Polling
+                if(!isPolling) startPolling();
+
+                const response = await fetch('?action=research_topic', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                    body: `agent_id=${agentId}&topic=${topic}&tenant_id=default&ajax=1`
+                });
+
+                const result = await response.json();
+                if(result.success) {
+                    addLog('SUCCESS', 'TASK_DONE', result.message);
+                } else {
+                    addLog('ERROR', 'FAIL', result.message || 'Error desconocido');
+                }
+            } catch (e) {
+                addLog('ERROR', 'CRITICAL', 'Túnel neural interrumpido o tiempo de espera excedido.');
+            } finally {
+                btn.disabled = false;
+                btn.innerText = 'INICIAR INVESTIGACIÓN NEURAL';
+            }
+        }
+
+        function showTab(tabId) {
+            document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+            document.querySelectorAll('nav a').forEach(a => {
+                a.classList.remove('active');
+                if(a.getAttribute('href').includes(tabId)) a.classList.add('active');
+            });
+            document.getElementById(tabId).classList.add('active');
+        }
+
+        function addLog(type, code, msg) {
+            const consoleBox = document.getElementById('neural-console');
+            const entry = document.createElement('div');
+            entry.className = 'console-entry';
+            const time = new Date().toLocaleTimeString();
+            
+            let color = 'var(--accent)';
+            if(type === 'SUCCESS') color = 'var(--success)';
+            if(type === 'ERROR') color = 'var(--danger)';
+
+            entry.innerHTML = `
+                <span class="console-time">[${time}]</span>
+                <span class="console-type" style="color:${color}">${code}</span>
+                <span class="console-msg">${msg}</span>
+            `;
+            consoleBox.appendChild(entry);
+            consoleBox.scrollTop = consoleBox.scrollHeight;
+        }
+
+        function clearConsole() {
+            document.getElementById('neural-console').innerHTML = '';
+            window.processedEvents = new Set();
+        }
+
+        function startPolling() {
+            isPolling = true;
+            document.getElementById('neural-pulse').style.display = 'inline-block';
+            const pollId = setInterval(async () => {
+                try {
+                    const res = await fetch('?action=get_live_events&tenant_id=default&limit=10');
+                    const events = await res.json();
+                    
+                    events.forEach(ev => {
+                        const key = ev.created_at + ev.event_type;
+                        if(!window.processedEvents.has(key)) {
+                            addLog(ev.status, ev.event_type, ev.details);
+                            window.processedEvents.add(key);
+                        }
+                    });
+                } catch(e) {}
+            }, 3000);
+            
+            // Detener sesión después de 3 minutos
+            setTimeout(() => {
+                clearInterval(pollId);
+                isPolling = false;
+                document.getElementById('neural-pulse').style.display = 'none';
+            }, 180000);
+        }
+
+        async function traceKnowledge() {
+            const query = document.getElementById('trace-query').value;
+            const resBox = document.getElementById('trace-result');
+            const emptyBox = document.getElementById('trace-empty');
+            
+            if(!query) return;
+
+            emptyBox.style.display = 'none';
+            resBox.style.display = 'block';
+            document.getElementById('trace-response-text').innerText = 'Recuperando vectores de QDRANT...';
+            document.getElementById('trace-sources').innerHTML = '';
+
+            try {
+                const response = await fetch('?action=trace_knowledge&query=' + encodeURIComponent(query));
+                const result = await response.json();
+                
+                document.getElementById('trace-response-text').innerText = result.answer || 'Consultando a la IA con los fragmentos recuperados...';
+                
+                if(result.sources && result.sources.length > 0) {
+                    document.getElementById('trace-sources').innerHTML = result.sources.map(s => 
+                        `• [VECTOR_${s.id.substring(0,8)}] Score: ${s.score.toFixed(4)} <br> <span style="opacity:0.6; font-size:9px;">${s.content.substring(0,60)}...</span><br>`
+                    ).join('<br>');
+                } else {
+                    document.getElementById('trace-sources').innerText = 'Sin coincidencias en la memoria vectorial.';
+                }
+            } catch(e) {
+                document.getElementById('trace-response-text').innerText = 'Error en la traza de conocimiento.';
             }
         }
     </script>

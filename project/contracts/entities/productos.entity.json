@@ -1,0 +1,83 @@
+{
+    "type": "entity",
+    "name": "productos",
+    "label": "Productos / Inventario",
+    "version": "1.0",
+    "table": {
+        "name": "productos",
+        "primaryKey": "id",
+        "timestamps": true,
+        "softDelete": true,
+        "tenantScoped": true
+    },
+    "fields": [
+        {
+            "name": "id",
+            "type": "int",
+            "primary": true,
+            "source": "system"
+        },
+        {
+            "name": "sku",
+            "type": "string",
+            "label": "SKU / Código",
+            "required": true,
+            "unique": true,
+            "source": "form"
+        },
+        {
+            "name": "nombre",
+            "type": "string",
+            "label": "Nombre del Producto",
+            "required": true,
+            "source": "form"
+        },
+        {
+            "name": "descripcion",
+            "type": "text",
+            "label": "Descripción",
+            "required": false,
+            "source": "form"
+        },
+        {
+            "name": "precio_venta",
+            "type": "decimal",
+            "label": "Precio de Venta",
+            "required": true,
+            "source": "form",
+            "params": {
+                "precision": 10,
+                "scale": 2
+            }
+        },
+        {
+            "name": "stock_actual",
+            "type": "decimal",
+            "label": "Stock Actual",
+            "required": false,
+            "default": 0,
+            "source": "system"
+        },
+        {
+            "name": "stock_minimo",
+            "type": "decimal",
+            "label": "Stock Mínimo",
+            "required": false,
+            "default": 5,
+            "source": "form"
+        },
+        {
+            "name": "categoria",
+            "type": "string",
+            "label": "Categoría",
+            "required": false,
+            "source": "form"
+        }
+    ],
+    "permissions": {
+        "read": ["admin", "seller", "inventory_manager"],
+        "create": ["admin", "inventory_manager"],
+        "update": ["admin", "inventory_manager"],
+        "delete": ["admin"]
+    }
+}
