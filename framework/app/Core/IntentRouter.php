@@ -80,6 +80,11 @@ final class IntentRouter
         $this->effectiveAppEnv = (string) ($resolved['app_env'] ?? 'dev');
     }
 
+    public function executeSkill(string $name, array $args, array $context = []): array
+    {
+        return $this->skillExecutor->executeWithExplicitArgs($name, $args, $context);
+    }
+
     public function route(array $gatewayResult, array $context = []): IntentRouteResult
     {
         $routeStartedAt = microtime(true);

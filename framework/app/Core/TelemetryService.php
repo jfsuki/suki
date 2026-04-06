@@ -32,7 +32,34 @@ final class TelemetryService
         $this->metrics->saveTokenUsage($usage);
     }
 
+    public function recordSupportTicket(array $ticket): void
+    {
+        $this->metrics->saveSupportTicket($ticket);
+    }
+
+    public function detectSignals(string $text, array $context): ?array
+    {
+        $text = strtolower(trim($text));
+        $frustrationKeywords = [
+            'no sirve', 'estafa', 'basura', 'no funciona', 'odio', 'horrible', 'asco', 
+            'malo', 'pesimo', 'perder tiempo', 'quiero mi dinero', 'no me ayuda'
+        ];
+
+        foreach ($frustrationKeywords as $keyword) {
+            if (str_contains($text, $keyword)) {
+                return [
+                    'signal' => 'frustration',
+                    'message' => 'El usuario muestra frustración: ' . $keyword,
+                    'severity' => 'warning'
+                ];
+            }
+        }
+
+        return null;
+    }
+
     public function summary(string $tenantId, string $projectId, int $days = 7): array
+
     {
         return $this->metrics->summary($tenantId, $projectId, $days);
     }

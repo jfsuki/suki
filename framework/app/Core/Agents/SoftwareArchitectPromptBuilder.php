@@ -27,36 +27,84 @@ class SoftwareArchitectPromptBuilder
         }
 
         $sectorLabel = $template['sector_label'] ?? 'General';
-        $processes = array_keys($template['business_processes'] ?? []);
-        $docs = array_keys($template['business_documents'] ?? []);
-
-        $prompt = "ACTÚA COMO UN ARQUITECTO DE SOFTWARE EXPERTO EN EL SECTOR: '$sectorLabel'.\n";
-        $prompt .= "REGLAS DE DISEÑO TÉCNICO:\n";
-        $prompt .= "1. Toda app debe tener soporte para: " . implode(', ', $processes) . ".\n";
-        $prompt .= "2. Los documentos transaccionales obligatorios son: " . implode(', ', $docs) . ".\n";
-        $prompt .= "3. Prioriza el aislamiento multitenant y la integridad de datos.\n";
-        $prompt .= "4. Si el usuario no menciona uno de estos procesos, PREGUNTA si lo necesita.\n";
         
-        if (!empty($template['accounting_rules']['chart_of_accounts_min'])) {
-            $prompt .= "5. Estructura el plan de cuentas base usando estándares locales (ej. " . 
-                       ($template['country_or_regulation'] ?? 'PUC') . ").\n";
-        }
-
+        $prompt = "ACTÚA COMO UN ARQUITECTO DE SOFTWARE EXPERTO EN EL SECTOR: '$sectorLabel'.\n";
+        $prompt .= "REGLAS DE DISEÑO TÉCNICO (RESUMEN):\n";
+        $prompt .= $this->summarizeSectorTemplate($template);
+        
         // --- ENFOQUE EN LÓGICA DE NEGOCIO (Senior Upgrade) ---
         $logic = $this->loadBusinessLogicPlaybook();
         if ($logic) {
-            $prompt .= "\nREGLAS DE LÓGICA DE NEGOCIO (PLAYBOOK 2026):\n";
-            $prompt .= "- FÓRMULA DE PRECIO: Usar " . ($logic['rules']['pricing']['formula_base'] ?? '') . ".\n";
-            $prompt .= "- REDONDEO: Aplica redondeo comercial (ej: múltiplos de 5000).\n";
-            $prompt .= "- FISCAL: Si el total supera " . ($logic['rules']['tax_logic']['ica_alert_threshold'] ?? '') . ", sugiere una alerta de ICA.\n";
-            $prompt .= "- EXTRACCIÓN: Extrae siempre 'margin' (float, ej: 0.25) y 'rounding' (int, ej: 5000) si el usuario los menciona.\n";
+            $prompt .= "\nREGLAS DE LÓGICA DE NEGOCIO (SUMMARIZED):\n";
+            $prompt .= $this->summarizeBusinessPlaybook($logic);
         }
 
         $prompt .= "\nTU MISIÓN EN ESTE TURNO:\n";
         $prompt .= "Guía al usuario para completar el alcance técnico y la lógica de negocio. ";
-        $prompt .= "Sugiere proactivamente fórmulas de margen (ej: 25%) y redondeo si el usuario pide 'precios' o 'descuentos'.";
+        $prompt .= "Sugiere proactivamente fórmulas de margen (ej: 25%) e integraciones sectoriales.";
 
         return $prompt;
+    }
+
+    /**
+     * Summarizes the sector template into a dense string to optimize token usage.
+     */
+    private function summarizeSectorTemplate(array $template): string
+    {
+        $summary = "";
+        
+        if (!empty($template['business_processes'])) {
+            $processes = [];
+            foreach ($template['business_processes'] as $key => $p) {
+                $processes[] = ($p['label'] ?? $key);
+            }
+            $summary .= "- Procesos Core: " . implode(', ', $processes) . ".\n";
+        }
+
+        if (!empty($template['business_documents'])) {
+            $docs = [];
+            foreach ($template['business_documents'] as $key => $d) {
+                $fields = isset($d['key_fields']) ? ("(" . implode(',', (array)$d['key_fields']) . ")") : "";
+                $docs[] = $key . $fields;
+            }
+            $summary .= "- Documentos: " . implode(' | ', $docs) . ".\n";
+        }
+
+        if (!empty($template['accounting_rules']['posting_rules'])) {
+            $rules = [];
+            foreach (array_slice($template['accounting_rules']['posting_rules'], 0, 4) as $r) {
+                $rules[] = ($r['trigger'] ?? 'upd') . ":" . ($r['debit_account'] ?? '?') . "/" . ($r['credit_account'] ?? '?');
+            }
+            $summary .= "- Contabilización: " . implode(', ', $rules) . ".\n";
+        }
+
+        return $summary;
+    }
+
+    /**
+     * Summarizes the business playbook rules.
+     */
+    private function summarizeBusinessPlaybook(array $logic): string
+    {
+        $rules = $logic['rules'] ?? [];
+        $summary = "";
+        
+        if (isset($rules['pricing'])) {
+            $summary .= "- Pricing: Formula=" . ($rules['pricing']['formula_base'] ?? 'N/A');
+            if (isset($rules['pricing']['margin_standards'])) {
+                $summary .= " | Margins=" . json_encode($rules['pricing']['margin_standards']);
+            }
+            $summary .= "\n";
+        }
+
+        if (isset($rules['tax_logic'])) {
+            $summary .= "- Tax: IVA=" . ($rules['tax_logic']['iva'] ?? '0.19');
+            $summary .= " | ICA_Threshold=" . ($rules['tax_logic']['ica_alert_threshold'] ?? '1M') . "\n";
+        }
+
+        $summary .= "- Extraction: Always capture 'margin' (float) & 'rounding' (int).\n";
+
+        return $summary;
     }
 
     private function loadBusinessLogicPlaybook(): ?array

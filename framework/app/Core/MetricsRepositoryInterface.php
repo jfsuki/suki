@@ -31,5 +31,8 @@ interface MetricsRepositoryInterface
      */
     public function listToolExecutionTraces(string $tenantId, string $projectId, array $filters = [], int $limit = 25): array;
 
+    public function saveSupportTicket(array $ticket): void;
+
     public function observabilitySummary(string $tenantId, string $projectId, int $days = 7): array;
+
 }

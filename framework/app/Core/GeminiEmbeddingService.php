@@ -113,17 +113,85 @@ final class GeminiEmbeddingService
      * @param array<string,mixed> $options
      * @return array<int,array{vector:array<int,float>,model:string,dimensions:int}>
      */
-    public function embedMany(array $texts, array $options = []): array
+    public function batchEmbed(array $texts, array $options = []): array
     {
-        $embeddings = [];
+        if ($texts === []) {
+            return [];
+        }
+
+        $requests = [];
+        $taskType = $this->normalizeTaskType((string) ($options['task_type'] ?? 'RETRIEVAL_DOCUMENT'));
+        $title = trim((string) ($options['title'] ?? ''));
+
         foreach ($texts as $text) {
             $text = trim((string) $text);
             if ($text === '') {
                 continue;
             }
-            $embeddings[] = $this->embed($text, $options);
+
+            $req = [
+                'model' => 'models/' . $this->model,
+                'content' => [
+                    'parts' => [
+                        ['text' => $text],
+                    ],
+                ],
+                'outputDimensionality' => $this->outputDimensionality,
+            ];
+            if ($taskType !== '') {
+                $req['taskType'] = $taskType;
+            }
+            if ($title !== '') {
+                $req['title'] = $title;
+            }
+            $requests[] = $req;
         }
-        return $embeddings;
+
+        if ($requests === []) {
+            return [];
+        }
+
+        $url = $this->baseUrl . '/models/' . rawurlencode($this->model) . ':batchEmbedContents';
+        $data = $this->request('POST', $url, ['requests' => $requests]);
+
+        if (!is_array($data['embeddings'] ?? null)) {
+            throw new RuntimeException('Respuesta de batch embeddings Gemini invalida (sin array embeddings).');
+        }
+
+        $results = [];
+        foreach ($data['embeddings'] as $index => $embData) {
+            $results[] = [
+                'vector' => $this->extractVector(['embedding' => $embData]),
+                'model' => $this->model,
+                'dimensions' => $this->outputDimensionality,
+            ];
+        }
+
+        return $results;
+    }
+
+    /**
+     * @param array<int,string> $texts
+     * @param array<string,mixed> $options
+     * @return array<int,array{vector:array<int,float>,model:string,dimensions:int}>
+     */
+    public function embedMany(array $texts, array $options = []): array
+    {
+        $batchSize = 100;
+        $totalTexts = count($texts);
+        if ($totalTexts <= $batchSize) {
+            return $this->batchEmbed($texts, $options);
+        }
+
+        $allEmbeddings = [];
+        $chunks = array_chunk($texts, $batchSize);
+        foreach ($chunks as $chunk) {
+            $batchResults = $this->batchEmbed($chunk, $options);
+            foreach ($batchResults as $res) {
+                $allEmbeddings[] = $res;
+            }
+        }
+        return $allEmbeddings;
     }
 
     /**

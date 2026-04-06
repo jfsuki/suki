@@ -124,6 +124,29 @@ trait ConversationGatewayHandlePipelineTrait
             $telemetry['builder_context_profile_cleared'] = $mustClearBusinessProfile;
             return $this->result('ask_user', $reply, null, null, $state, $telemetry);
         }
+        // --- EVOLUCIÓN FASE 7: TOOL-FIRST AUTONOMOUS LOOP ---
+        if ($mode === 'operation' && (getenv('SUKI_TOOL_FIRST') === '1' || ($state['use_autonomous_loop'] ?? false))) {
+            $autonomousProcess = new \App\Core\Agents\Processes\AutonomousExecutionProcess();
+            $autoResult = $autonomousProcess->execute(
+                $raw,
+                $this->memoryWindow($tenantId, $userId),
+                $this->router,
+                $this->llm,
+                $this->skills
+            );
+
+            $state = $this->updateState($state, $raw, $autoResult['reply'], 'autonomous_operation', null, [], null);
+            $this->saveState($tenantId, $userId, $state);
+
+            return $this->result(
+                $autoResult['action'] ?? 'respond_local',
+                $autoResult['reply'] ?? '',
+                $autoResult['command'] ?? null,
+                null,
+                $state,
+                $autoResult['telemetry'] ?? []
+            );
+        }
 
         // Authoritative Onboarding Orchestrator (Neuron IA / Layer 3)
         if ($mode === 'builder' && ($state['active_task'] ?? '') === 'builder_onboarding') {

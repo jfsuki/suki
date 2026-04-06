@@ -1,0 +1,73 @@
+{
+  "contract_id": "knowledge_train_contract",
+  "version": "1.0.0",
+  "effective_date": "2026-04-06",
+  "status": "canonical_draft",
+  "scope": "Architectural standard for knowledge ingestion, source reliability, and self-learning capabilities for the SUKI Builder via Neural Control Tower.",
+  
+  "structure": {
+    "metadata": {
+      "project_id": "string",
+      "tenant_id": "string",
+      "sector": "string",
+      "version": "string",
+      "author": "string"
+    },
+    
+    "knowledge_sources": {
+      "type": "array",
+      "items": {
+        "source_id": "string",
+        "type": {
+          "enum": ["legal_doc", "business_playbook", "expert_audit", "web_scraped", "manual_entry"]
+        },
+        "uri": "string",
+        "trust_score": {
+          "type": "float",
+          "minimum": 0.0,
+          "maximum": 1.0,
+          "description": "0.0: Unknown/Unreliable, 1.0: Canonical/Official Source"
+        },
+        "last_verified_at": "ISO8601",
+        "human_verified_by": "string|null"
+      }
+    },
+    
+    "learning_directives": {
+      "mode": {
+        "enum": ["foundational", "adaptive", "corrective", "specialized"]
+      },
+      "extraction_targets": ["array of strings (entities/concepts)"],
+      "auto_discovery": "boolean",
+      "cross_sector_reusability": {
+        "level": ["none", "low", "medium", "high"],
+        "inheritance_path": ["array of strings"]
+      }
+    },
+    
+    "quality_gate": {
+      "min_trust_threshold": 0.85,
+      "max_noise_ratio": 0.05,
+      "semantic_overlap_policy": ["warn", "reject", "merge"],
+      "contradiction_check": "boolean"
+    },
+    
+    "vector_mapping": {
+      "collection_target": ["agent_training", "sector_knowledge", "user_memory"],
+      "embedding_model": "gemini-embedding-001",
+      "chunk_strategy": {
+        "size": 512,
+        "overlap": 50,
+        "type": "semantic|token"
+      }
+    }
+  },
+  
+  "validation_rules": {
+    "scripts": [
+      "framework/scripts/validate_training_dataset.php",
+      "framework/scripts/quality_gate_knowledge.php"
+    ],
+    "required_if_low_trust": "human_audit_flag"
+  }
+}

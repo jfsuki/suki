@@ -4352,6 +4352,69 @@
         "requires_attachment": true,
         "media_type": "image"
       }
+    },
+    {
+      "name": "update_internal_memory",
+      "description": "Save autonomous learnings, technical rules, project context or user preferences into persistent internal memory.",
+      "intent_patterns": [
+        "re:(guarda|guardar|registra|registrar|aprender|aprende|memoriza|memorizar).*(memoria|aprendizaje|contexto|leccion|lección|preferencia)",
+        "re:(memoria|aprendizaje|contexto|leccion|lección|preferencia).*(guarda|guardar|registra|registrar|aprender|aprende|memoriza|memorizar)"
+      ],
+      "keywords": [
+        "guardar en memoria",
+        "registrar aprendizaje",
+        "memorizar regla",
+        "actualizar contexto"
+      ],
+      "execution_mode": "tool",
+      "allowed_tools": [
+        "internal_memory_updater"
+      ],
+      "priority": 200,
+      "input_schema": {
+        "required": [
+          "content"
+        ],
+        "optional": [
+          "memory_type",
+          "update_mode"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
+    },
+    {
+      "name": "playbook_executor",
+      "description": "Execute specialized business sector playbooks (Consultancy, Service, etc.) to guide the user in building their app.",
+      "intent_patterns": [
+        "re:APPLY_PLAYBOOK_.*"
+      ],
+      "keywords": [
+        "playbook",
+        "sector",
+        "guia de negocio",
+        "consultoria"
+      ],
+      "execution_mode": "hybrid",
+      "allowed_tools": [
+        "playbook_assistant"
+      ],
+      "priority": 180,
+      "memory_type": "agent_training",
+      "input_schema": {
+        "required": [
+          "sector_key"
+        ],
+        "optional": [
+          "business_goal"
+        ]
+      },
+      "channel_capabilities": [
+        "chat"
+      ],
+      "context_hints": {}
     }
   ]
 }

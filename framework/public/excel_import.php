@@ -12,6 +12,31 @@ require_once $frameworkRoot . '/vendor/autoload.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+// session_start() debe ir antes de cualquier salida
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// 1. Validar autenticación básica
+if (empty($_SESSION['auth_user'])) {
+    http_response_code(401);
+    echo json_encode(['ok' => false, 'error' => 'No autenticado. Inicie sesión primero.']);
+    exit;
+}
+
+// 2. Validar que el usuario tenga acceso al tenant solicitado
+// Nota: En SUKI, el creador puede saltar entre tenants si tiene permisos globales.
+$sessionTenant = (string)($_SESSION['tenant_id'] ?? '');
+$requestedTenant = trim((string)($_POST['tenant_id'] ?? ''));
+
+// Si no es admin/creator global, el tenant debe coincidir exactamente
+$userType = (string)($_SESSION['user_type'] ?? 'user');
+if ($userType !== 'admin' && $userType !== 'creator' && $sessionTenant !== $requestedTenant) {
+     http_response_code(403);
+     echo json_encode(['ok' => false, 'error' => 'Acceso denegado al tenant solicitado.']);
+     exit;
+}
+
 // Solo aceptar POST
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
     http_response_code(405);

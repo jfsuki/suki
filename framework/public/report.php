@@ -17,10 +17,34 @@ declare(strict_types = 1)
 $frameworkRoot = dirname(__DIR__);
 require_once $frameworkRoot . '/vendor/autoload.php';
 
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+$tenantId = trim((string)($_REQUEST['tenant_id'] ?? 'default'));
+
+// 1. Validar autenticación básica
+if (empty($_SESSION['auth_user'])) {
+    http_response_code(401);
+    header('Content-Type: application/json');
+    echo json_encode(['ok' => false, 'error' => 'No autenticado. Inicie sesión para ver reportes.']);
+    exit;
+}
+
+// 2. Validar acceso al tenant
+$sessionTenant = (string)($_SESSION['tenant_id'] ?? '');
+$userType = (string)($_SESSION['user_type'] ?? 'user');
+
+if ($userType !== 'admin' && $userType !== 'creator' && $sessionTenant !== $tenantId) {
+    http_response_code(403);
+    header('Content-Type: application/json');
+    echo json_encode(['ok' => false, 'error' => 'Acceso denegado al reporte de este tenant.']);
+    exit;
+}
+
 $formKey = trim((string)($_REQUEST['form'] ?? ''));
 $reportKey = trim((string)($_REQUEST['report'] ?? ''));
 $format = strtolower(trim((string)($_REQUEST['format'] ?? 'html')));
-$tenantId = trim((string)($_REQUEST['tenant_id'] ?? 'default'));
 
 // Leer filtros adicionales
 $reserved = ['form', 'report', 'format', 'tenant_id', '_'];

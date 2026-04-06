@@ -111,8 +111,8 @@
     <nav class="nav">
         <div class="logo">SUKI <span style="color: var(--accent)">OS</span></div>
         <div class="auth-links">
-            <a href="login">Login Creador</a>
-            <a href="register" style="background: white; color: black; padding: 10px 20px; border-radius: 10px;">Unirse como Creador</a>
+            <a href="login">Acceso Clientes</a>
+            <a href="../../project/public/register-enterprise" style="background: white; color: black; padding: 10px 20px; border-radius: 10px;">Registrar Empresa</a>
         </div>
     </nav>
 

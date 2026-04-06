@@ -3,6 +3,10 @@
 
 namespace App\Controller;
 
+
+defined('APP_ROOT') or die('Direct access denied.');
+
+
 use App\Core\Controller;
 use App\Core\Response;
 

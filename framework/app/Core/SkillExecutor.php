@@ -8,6 +8,24 @@ namespace App\Core;
 final class SkillExecutor
 {
     /**
+     * @param string $skillName
+     * @param array<string,mixed> $args
+     * @param array<string,mixed> $context
+     * @return array<string,mixed>
+     */
+    public function executeWithExplicitArgs(string $skillName, array $args, array $context): array
+    {
+        $context['explicit_args'] = $args;
+        // Simulamos un objeto skill mínimo para que SkillExecutor pueda procesarlo
+        $dummySkill = [
+            'name' => $skillName,
+            'execution_mode' => 'tool', // Forzamos modo tool para ir a los parsers
+        ];
+        
+        return $this->execute($dummySkill, [], $context, []);
+    }
+
+    /**
      * @param array<string,mixed> $skill
      * @param array<string,mixed> $gatewayResult
      * @param array<string,mixed> $context
@@ -196,6 +214,20 @@ final class SkillExecutor
                 }
                 if ($this->isAgentOpsObservabilitySkill($name)) {
                     $toolOutcome = $this->executeAgentOpsObservabilitySkill($name, $context);
+                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
+                    $reply = (string) ($toolOutcome['reply'] ?? '');
+                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
+                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
+                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
+                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
+                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
+                        ? (array) $toolOutcome['routing_hint_steps']
+                        : ['cache', 'rules', 'skills'];
+                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    break;
+                }
+                if ($this->isInternalMemorySkill($name)) {
+                    $toolOutcome = $this->executeInternalMemorySkill($name, $context);
                     $action = (string) ($toolOutcome['action'] ?? 'respond_local');
                     $reply = (string) ($toolOutcome['reply'] ?? '');
                     $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
@@ -981,6 +1013,66 @@ final class SkillExecutor
             'command' => [],
             'skill_result_status' => 'needs_input',
             'skill_fallback_reason' => 'missing_agentops_payload',
+            'skill_failed' => false,
+            'routing_hint_steps' => ['cache', 'rules', 'skills'],
+            'telemetry' => $telemetry,
+        ];
+    }
+
+    private function isInternalMemorySkill(string $name): bool
+    {
+        return $name === 'update_internal_memory';
+    }
+
+    /**
+     * @param array<string, mixed> $context
+     * @return array<string, mixed>
+     */
+    private function executeInternalMemorySkill(string $name, array $context): array
+    {
+        // En modo Tool-First, recibimos los argumentos directamente en explicit_args
+        $explicitArgs = $context['explicit_args'] ?? null;
+        
+        if (is_array($explicitArgs)) {
+            $tool = new \App\Core\Agents\Tools\UpdateInternalMemorySkill();
+            $result = $tool->execute($explicitArgs);
+
+            return [
+                'action' => 'respond_local',
+                'reply' => $result['message'] ?? 'Memoria actualizada.',
+                'command' => [],
+                'skill_result_status' => $result['status'] === 'success' ? 'resolved_local' : 'safe_fallback',
+                'skill_fallback_reason' => $result['status'] === 'success' ? 'none' : 'tool_execution_failed',
+                'skill_failed' => $result['status'] !== 'success',
+                'routing_hint_steps' => ['cache', 'rules', 'skills'],
+                'telemetry' => ['module_used' => 'internal_memory'],
+            ];
+        }
+
+        // Si no hay explicitArgs, intentamos con el parser (Legacy flow)
+        $parser = new InternalMemoryMessageParser();
+        $parsed = $parser->parse($name, $context);
+        $telemetry = is_array($parsed['telemetry'] ?? null) ? (array) $parsed['telemetry'] : [];
+
+        if ((string) ($parsed['kind'] ?? '') === 'command') {
+            return [
+                'action' => 'execute_command',
+                'reply' => '',
+                'command' => is_array($parsed['command'] ?? null) ? (array) $parsed['command'] : [],
+                'skill_result_status' => 'command_ready',
+                'skill_fallback_reason' => 'none',
+                'skill_failed' => false,
+                'routing_hint_steps' => ['cache', 'rules', 'skills'],
+                'telemetry' => $telemetry,
+            ];
+        }
+
+        return [
+            'action' => 'ask_user',
+            'reply' => (string) ($parsed['reply'] ?? 'Necesito mas detalles para guardar en memoria.'),
+            'command' => [],
+            'skill_result_status' => 'needs_input',
+            'skill_fallback_reason' => 'missing_memory_payload',
             'skill_failed' => false,
             'routing_hint_steps' => ['cache', 'rules', 'skills'],
             'telemetry' => $telemetry,

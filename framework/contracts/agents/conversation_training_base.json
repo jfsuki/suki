@@ -5,7 +5,7 @@
         "language": "es-CO",
         "timezone": "America/Bogota",
         "created": "2026-02-18",
-        "updated": "2026-03-03",
+        "updated": "2026-04-04",
         "notes": [
             "Base de entrenamiento para agentes del framework no-code/low-code en PHP+JS basado en contratos JSON.",
             "Incluye intents, entidades, sinónimos, errores comunes, patrones y reglas de enrutamiento a LLM cuando no haya match.",

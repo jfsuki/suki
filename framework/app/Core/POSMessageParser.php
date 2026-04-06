@@ -13,7 +13,9 @@ final class POSMessageParser
     public function parse(string $skillName, array $context): array
     {
         $message = trim((string) ($context['message_text'] ?? ''));
-        $pairs = $this->extractKeyValuePairs($message);
+        $pairs = is_array($context['explicit_args'] ?? null) 
+            ? $context['explicit_args'] 
+            : $this->extractKeyValuePairs($message);
         $telemetry = ['module_used' => 'pos', 'pos_action' => 'none'];
         $baseCommand = [
             'tenant_id' => trim((string) ($context['tenant_id'] ?? '')) ?: 'default',

@@ -9,27 +9,42 @@ use App\Core\ProjectRegistry;
 $error = '';
 $success = '';
 $appId = $_GET['app_id'] ?? 'suki_erp'; // Default to suki_erp if not provided
+$isCreator = ($appId === 'suki_builder');
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $registry = new ProjectRegistry();
     $pdfService = new PdfExtractorService();
     $regService = new RegistrationService($registry->db(), $pdfService);
 
-    $input = [
-        'project_id' => $appId,
-        'password'   => $_POST['password'] ?? '',
-        'phone_number' => $_POST['phone'] ?? '',
-        'business_desc' => $_POST['desc'] ?? '',
-    ];
-
-    $result = $regService->register($input, $_FILES['rut_file'] ?? []);
+    if ($isCreator) {
+        $input = [
+            'full_name'    => $_POST['full_name'] ?? '',
+            'password'     => $_POST['password'] ?? '',
+            'phone_number' => $_POST['phone'] ?? '',
+            'email'        => $_POST['email'] ?? '',
+        ];
+        $result = $regService->registerCreator($input);
+    } else {
+        $input = [
+            'project_id' => $appId,
+            'password'   => $_POST['password'] ?? '',
+            'phone_number' => $_POST['phone'] ?? '',
+            'business_desc' => $_POST['desc'] ?? '',
+        ];
+        $result = $regService->register($input, $_FILES['rut_file'] ?? []);
+    }
 
     if ($result['success']) {
-        $success = "¡Registro exitoso! Tu empresa ha sido vinculada a <strong>" . strtoupper(str_replace('_', ' ', $appId)) . "</strong>. Un supervisor activará tu cuenta tras validar el RUT.";
+        if ($isCreator) {
+            $success = "¡Felicidades! Tu cuenta de <strong>Creador</strong> ha sido activada.";
+        } else {
+            $success = "¡Registro exitoso! Tu empresa ha sido vinculada a <strong>" . strtoupper(str_replace('_', ' ', $appId)) . "</strong>. Un supervisor activará tu cuenta tras validar el RUT.";
+        }
     } else {
         $error = $result['error'];
     }
 }
+
 ?>
 <!DOCTYPE html>
 <html lang="es">
@@ -185,9 +200,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <div class="reg-card">
         <div class="header-area">
             <span class="badge-app">Aplicación: <?php echo str_replace('_', ' ', $appId); ?></span>
-            <h1>Configura tu Empresa</h1>
-            <p class="subtitle">Sube tu RUT para activar tu instancia inteligente</p>
+            <h1><?php echo $isCreator ? 'Habilitar Perfil Creador' : 'Configura tu Empresa'; ?></h1>
+            <p class="subtitle"><?php echo $isCreator ? 'Sincroniza tu identidad con el Neural Hub de SUKI' : 'Sube tu RUT para activar tu instancia inteligente'; ?></p>
         </div>
+
 
         <?php if ($error): ?>
             <div class="alert alert-error"><?php echo htmlspecialchars($error); ?></div>
@@ -201,12 +217,25 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php else: ?>
             <form action="" method="POST" enctype="multipart/form-data">
                 <div class="form-group">
+                    <label>Nombre Completo</label>
+                    <input type="text" name="full_name" placeholder="Ej: Juan Pérez" required>
+                </div>
+
+                <?php if (!$isCreator): ?>
+                <div class="form-group">
                     <label>Registro Único Tributario (RUT PDF)</label>
                     <input type="file" name="rut_file" id="rut_file" accept="application/pdf" required style="display:none;" onchange="document.getElementById('file-label').innerText = this.files[0].name">
                     <label for="rut_file" id="file-label" class="file-custom">
                         Haga clic o arrastre el PDF original aquí
                     </label>
                 </div>
+                <?php else: ?>
+                <div class="form-group">
+                    <label>Correo Electrónico</label>
+                    <input type="email" name="email" placeholder="creador@suki.os" required>
+                </div>
+                <?php endif; ?>
+
 
                 <div class="form-group">
                     <label>Teléfono de Contacto</label>
@@ -223,7 +252,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                     <textarea name="desc" placeholder="Breve descripción..." rows="2"></textarea>
                 </div>
 
-                <button type="submit" class="btn-submit">Finalizar Activación</button>
+                <button type="submit" class="btn-submit"><?php echo $isCreator ? 'Desplegar Perfil' : 'Finalizar Activación'; ?></button>
+
             </form>
         <?php endif; ?>
     </div>

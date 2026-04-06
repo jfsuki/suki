@@ -182,16 +182,25 @@ If a decision conflicts with a higher level, it is invalid.
 - Secrets never in git; rotate immediately if exposed.
 - `.env` is local runtime state only; commit only `.env.example` with placeholders.
 
-## 20) 3-World Isolation Architecture (2026-04-01)
-- **World 1: Framework (Gateway/Marketplace)**
-  - Managed by `framework/public/index.php`.
-  - Roles: Central auth portal, Marketplace, Creator onboarding.
-- **World 2: Tower (Admin NOC)**
-  - Managed by `tower/public/index.php`.
-  - Roles: Master administration, Creator approval, Enterprise activation.
-  - Access: Stealth route, protected by Master Key session.
-- **World 3: Project (Builder / App)**
-  - Managed by `project/public/index.php`.
-  - Roles: AI Builder (Creation Tool), Chat App (End-user interface).
-  - Security: Guarded by world-specific session logic; direct file access is strictly blocked.
-- **Canonical Law:** Strict isolation between worlds. Sessions are not shared between World 2 and World 3 to prevent privilege escalation. Routers serve as the sole execution gatekeepers.
+## 20) 4-World Production Architecture & Security (2026-04-02)
+SUKI OS operates under a **Unified Routing** model with four distinct "Worlds", three of which are isolated from public search engines and direct web access.
+
+### 20.1 World Subdomain Mapping (Production)
+| World | Production URL | Access Level | SEO Visibility |
+|-------|----------------|--------------|----------------|
+| **1. Marketplace** | `dominio.com` | Public | **Visible** |
+| **2. Builder** | `constructor.dominio.com` | Creator Session | Hidden (NoIndex) |
+| **3. Apps** | `apps.dominio.com` | User Session | Hidden (NoIndex) |
+| **4. Tower** | `x32tx.dominio.com` | Master Key | Ultra-Secret (NoIndex) |
+
+### 20.2 The Hidden Layer (Filesystem Hardening)
+To prevent source code exposure in commercial hosting environments:
+- **Public Entry Points**: Only `/framework/public/`, `/project/public/`, and `/tower/public/` contain web-accessible files.
+- **Kernel Isolation**: All logic (`framework/app/`), views (`framework/views/`), and contracts (`project/contracts/`) reside outside the public entry points.
+- **Root Enforcement**: A global `.htaccess` blocks direct access to all internal directories, using the routers as the ONLY valid gatekeepers.
+- **URL Masking**: All internal PHP extensions are masked; users access `domain/login` instead of `domain/auth/login.php`.
+
+### 20.3 Multi-World Routers
+- **World 1 & 2 Router**: `framework/public/index.php` (Marketplace + Builder).
+- **World 3 Router**: `project/public/index.php` (User Dashboard & Apps).
+- **World 4 Router**: `tower/public/index.php` (Master Command Center).

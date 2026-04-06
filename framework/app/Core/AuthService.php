@@ -39,6 +39,11 @@ class AuthService
         // 2. Verificar usuario (ProjectRegistry ya usa password_verify)
         $user = $this->registry->verifyAuthUser($projectId, $identifier, $password);
 
+        // Si no hay usuario en el proyecto pero es el proyecto default, buscar en maestros (Creadores/Arquitectos)
+        if (!$user && $projectId === 'default') {
+            $user = $this->registry->verifyMasterUser($identifier, $password);
+        }
+
         if (!$user) {
             $this->recordFailedAttempt($identifier, $ipAddress);
             return [
@@ -63,6 +68,7 @@ class AuthService
         if (session_status() === PHP_SESSION_ACTIVE) {
             session_regenerate_id(true);
             $_SESSION['user_id'] = $user['id'];
+            $_SESSION['role'] = $user['role'] ?? 'user';
             $_SESSION['tenant_id'] = $user['tenant_id'];
             $_SESSION['project_id'] = $projectId;
             $_SESSION['last_ip'] = $ipAddress;

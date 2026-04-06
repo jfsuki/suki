@@ -21,7 +21,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     $result = $auth->login('default', $identifier, $password, $ip);
 
     if ($result['success']) {
-        header('Location: ../../project/public/'); // Redirigir al mundo proyecto
+        // Redirigir al mundo proyecto detectando el subdirectorio /suki/
+        $uri = $_SERVER['REQUEST_URI'] ?? '';
+        $base = (strpos($uri, '/suki/') !== false) ? '/suki' : '';
+        
+        // Redirección inteligente por rol
+        $role = $_SESSION['role'] ?? 'user';
+        if ($role === 'creator' || $role === 'architect') {
+            header("Location: $base/builder");
+        } else {
+            header("Location: $base/apps/dashboard");
+        }
         exit;
     } else {
         $error = $result['error'];
@@ -204,8 +214,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
                 <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 2.18l7 3.12v5.7c0 4.66-3.14 8.98-7 10.12-3.86-1.14-7-5.46-7-10.12V6.3l7-3.12z"/>
                 <path d="M12 7c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.67 0-5 .83-5 2.5V17h10v-1.5c0-1.67-3.33-2.5-5-2.5z"/>
             </svg>
-            <h1>SUKI OS</h1>
-            <p class="subtitle">Acceso seguro al núcleo operativo</p>
+            <h1>Acceso Clientes</h1>
+            <p class="subtitle">Gestiona tu empresa con inteligencia neural</p>
         </div>
 
         <?php if ($error): ?>
@@ -214,7 +224,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <form method="POST" action="">
             <div class="form-group">
-                <label for="identifier">NIT o Usuario</label>
+                <label for="identifier">NIT o Usuario de Empresa</label>
                 <input type="text" id="identifier" name="identifier" required placeholder="Ej: 900.123.456-1" autofocus>
             </div>
             <div class="form-group">

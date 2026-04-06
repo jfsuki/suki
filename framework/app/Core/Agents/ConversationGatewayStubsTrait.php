@@ -518,6 +518,23 @@ trait ConversationGatewayStubsTrait
 
     public function routeTraining(string $text, array $training, array $profile, string $tenantId, string $userId, array $state, array $lexicon, string $mode): array
     {
+        $search = $this->intentClassifier()->search($text);
+        
+        // Si encontramos un hit de entrenamiento con buena confianza
+        if ($search['layer'] === 'qdrant' && $search['score'] >= 0.65) {
+            $payload = $search['payload'] ?? [];
+            $content = $payload['content'] ?? '';
+            
+            if ($content !== '') {
+                return [
+                    'action' => 'respond_local',
+                    'reply' => $content,
+                    'intent' => $search['intent'],
+                    'confidence' => $search['score']
+                ];
+            }
+        }
+
         return [];
     }
 
@@ -671,7 +688,13 @@ trait ConversationGatewayStubsTrait
 
     public function buildContextCapsule(string $text, array $state, array $lexicon, array $policy, string $intent): array
     {
-        return ['text' => $text, 'state' => $state, 'intent' => $intent];
+        $loader = new \App\Core\Agents\Memory\PersistentMemoryLoader();
+        return [
+            'text' => $text, 
+            'state' => $state, 
+            'intent' => $intent,
+            'autonomous_memory' => $loader->loadAll()
+        ];
     }
 
     public function isStatusQuestion(string $text): bool

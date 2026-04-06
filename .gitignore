@@ -33,5 +33,7 @@ credentials/
 # Temporary and Session Data (added by cleanup)
 /framework/storage/meta/memory/
 /tmp/
-/project/storage/tenants/*/*.log.jsonl
+/project/storage/tenants/**/*.log.jsonl
+/project/storage/tenants/**/*.jsonl
 .vscode/
+single_research.php

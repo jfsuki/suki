@@ -116,7 +116,7 @@ class ConversationGateway
         if ($this->intentClassifier === null) {
             try {
                 $embedder = new GeminiEmbeddingService();
-                $store = new QdrantVectorStore();
+                $store = (new QdrantVectorStore())->forMemoryType('agent_training');
                 $router = new LLMRouter();
             } catch (\Throwable $e) {
                 $embedder = null;

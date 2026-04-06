@@ -12,12 +12,26 @@
         :root {
             --ink: #0f172a;
             --muted: #64748b;
-            --accent: #10b981;
-            --accent-strong: #059669;
+            --accent: #8b5cf6; /* Unified with Builder purple */
+            --accent-strong: #7c3aed;
             --accent-warm: #f59e0b;
             --panel: rgba(255,255,255,0.92);
             --panel-border: #e2e8f0;
             --shadow-soft: 0 12px 32px rgba(15,23,42,0.08);
+            
+            /* Builder World Tokens for navbar compatibility */
+            --bg: #0a0f1e;
+            --surface: #111827;
+            --surface2: #1a2235;
+            --border: rgba(255,255,255,0.07);
+            --glow: rgba(139, 92, 246, 0.35);
+            --text: #f8fafc;
+            /* --muted: #64748b; already defined */
+            --teal: #14b8a6;
+            --teal-soft: rgba(20,184,166,0.12);
+            --accent-soft: rgba(139,92,246,0.12);
+            --transition: 0.22s cubic-bezier(0.4,0,0.2,1);
+            --font: 'Outfit', 'Inter', system-ui, sans-serif;
         }
         body { font-family: 'Outfit', 'Segoe UI', sans-serif; color: var(--ink); }
         .panel { background: var(--panel); border: 1px solid var(--panel-border); box-shadow: var(--shadow-soft); border-radius: 16px; }
@@ -78,34 +92,10 @@
 </head>
 <body class="bg-gradient-to-br from-slate-50 via-white to-emerald-50 h-screen overflow-hidden flex flex-col" x-data="formBuilder()" x-init="init()">
 
-    <header class="bg-slate-900/95 border-b border-slate-800 px-6 py-3 flex justify-between items-center shadow-sm z-10 h-16 text-white">
-        <div class="flex items-center gap-3">
-            <div class="bg-emerald-500 text-white p-2 rounded-lg shadow-md"><i class="fa-solid fa-layer-group"></i></div>
-            <div>
-                <h1 class="font-bold text-lg leading-tight">Suki Studio</h1>
-                <p class="text-[11px] text-slate-300 font-medium">Creador visual de apps (modo simple por defecto)</p>
-            </div>
-        </div>
-        <div class="flex gap-2">
-            <button @click="loadExample()" class="px-3 py-2 text-xs font-medium text-slate-200 hover:bg-slate-800 rounded border border-slate-700 transition">
-                <i class="fa-solid fa-upload mr-1"></i> Cargar JSON
-            </button>
-            <button @click="startGuided()" class="px-3 py-2 text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white rounded shadow transition">
-                <i class="fa-solid fa-person-walking-luggage mr-1"></i> Asistente rápido
-            </button>
-            <button @click="showAdvanced = !showAdvanced; if(!showAdvanced && activeTab === 'output') activeTab = 'general'; if(!showAdvanced && mainTab === 'database') mainTab = 'forms'" class="px-3 py-2 text-xs font-bold rounded border transition"
-                :class="showAdvanced ? 'bg-slate-800 text-white border-slate-700' : 'bg-white text-slate-700 border-slate-200'">
-                <i class="fa-solid fa-wand-magic-sparkles mr-1"></i>
-                <span x-text="showAdvanced ? 'Detalles técnicos' : 'Modo amigable'"></span>
-            </button>
-            <button @click="downloadJson()" class="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white text-xs font-bold uppercase rounded shadow transition flex items-center">
-                <i class="fa-solid fa-download mr-2"></i> Descargar JSON
-            </button>
-            <button @click="saveToProject()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded shadow transition flex items-center">
-                <i class="fa-solid fa-floppy-disk mr-2"></i> Guardar Proyecto
-            </button>
-        </div>
-    </header>
+    <?php 
+    $current_page = 'editor';
+    include __DIR__ . '/includes/navbar.php'; 
+    ?>
 
     <div class="fixed top-20 right-4 z-50 space-y-2">
         <template x-for="toast in toasts" :key="toast.id">
@@ -160,8 +150,6 @@
                                 <button @click="refreshProjectSnapshot()" class="px-3 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded shadow">
                                     Refrescar
                                 </button>
-                                <a href="/chat_builder.html" class="px-3 py-2 text-xs font-bold bg-white/10 text-white rounded shadow">Chat creador</a>
-                                <a href="/chat_app.html" class="px-3 py-2 text-xs font-bold bg-emerald-500 text-white rounded shadow">Chat app</a>
                             </div>
                         </div>
                         <div class="mt-2 text-[11px] muted">
@@ -1658,270 +1646,6 @@
                             </div>
                         </div>
                     </div>
-                    <div x-show="showWizardAdd" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-                        <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 space-y-4">
-                            <div class="flex items-center justify-between">
-                                <h4 class="font-bold text-gray-800">Agregar rapido</h4>
-                                <button @click="showWizardAdd = false" class="text-gray-400 hover:text-gray-700">&times;</button>
-                            </div>
-                            <div class="space-y-3">
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo</label>
-                                    <select x-model="wizardType" class="w-full border rounded px-3 py-2 text-sm bg-white">
-                                        <option value="field">Campo</option>
-                                        <option value="grid">Lista</option>
-                                        <option value="summary">Total</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
-                                    <input x-model="wizardLabel" class="w-full border rounded px-3 py-2 text-sm">
-                                </div>
-                                <div x-show="wizardType === 'field'">
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo de campo</label>
-                                    <select x-model="wizardFieldType" class="w-full border rounded px-3 py-2 text-sm bg-white">
-                                        <option value="text">Texto</option>
-                                        <option value="number">Numero</option>
-                                        <option value="email">Email</option>
-                                        <option value="date">Fecha</option>
-                                        <option value="select">Seleccion</option>
-                                    </select>
-                                </div>
-                                <div x-show="wizardType === 'summary'">
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo de total</label>
-                                    <select x-model="wizardSummaryType" class="w-full border rounded px-3 py-2 text-sm bg-white">
-                                        <option value="sum">Suma</option>
-                                        <option value="formula">Calculo</option>
-                                    </select>
-                                </div>
-                            </div>
-                            <div class="flex justify-end gap-2">
-                                <button @click="showWizardAdd = false" class="px-3 py-2 text-xs font-bold uppercase bg-slate-100 text-slate-600 rounded">Cancelar</button>
-                                <button @click="applyWizard()" class="px-3 py-2 text-xs font-bold uppercase bg-orange-600 text-white rounded">Crear</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div x-show="showGuided" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-                        <div class="bg-white rounded-xl shadow-lg w-full max-w-3xl p-6 space-y-4">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <h4 class="font-bold text-gray-800">Modo guiado</h4>
-                                    <div class="text-[11px] text-gray-500" x-text="'Paso ' + guidedStep + ' de ' + guidedSteps.length"></div>
-                                </div>
-                                <button @click="closeGuided()" class="text-gray-400 hover:text-gray-700">&times;</button>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                <template x-for="step in guidedSteps" :key="'guided-step-'+step.id">
-                                    <span class="px-2 py-1 rounded text-[10px] font-bold uppercase"
-                                        :class="guidedStep === step.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'">
-                                        <span x-text="step.label"></span>
-                                    </span>
-                                </template>
-                            </div>
-
-                            <div x-show="guidedStep === 1" class="space-y-3">
-                                <div class="text-xs text-gray-600">Elige una plantilla. Puedes ajustar todo despues.</div>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                    <button @click="guidedTemplate='blank'" class="px-3 py-2 text-xs font-bold border rounded">En blanco</button>
-                                    <button @click="guidedTemplate='invoice'" class="px-3 py-2 text-xs font-bold border rounded">Factura</button>
-                                    <button @click="guidedTemplate='inventory'" class="px-3 py-2 text-xs font-bold border rounded">Inventario</button>
-                                    <button @click="guidedTemplate='login'" class="px-3 py-2 text-xs font-bold border rounded">Acceso</button>
-                                    <button @click="guidedTemplate='users'" class="px-3 py-2 text-xs font-bold border rounded">Usuarios</button>
-                                    <button @click="guidedTemplate='company'" class="px-3 py-2 text-xs font-bold border rounded">Empresa</button>
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
-                                    <input x-model="data.title" class="w-full border rounded px-3 py-2 text-sm" placeholder="Mi app">
-                                </div>
-                                <button @click="applyGuidedTemplate()" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Aplicar plantilla</button>
-                            </div>
-
-                            <div x-show="guidedStep === 2" class="space-y-3">
-                                <div class="text-xs text-gray-600">Agrega campos rapido o importa desde CSV.</div>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                    <input x-model="quickFieldLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del campo">
-                                    <select x-model="quickFieldType" class="border rounded px-2 py-1 text-xs bg-white">
-                                        <option value="text">Texto</option>
-                                        <option value="number">Numero</option>
-                                        <option value="date">Fecha</option>
-                                        <option value="select">Seleccion</option>
-                                    </select>
-                                    <button @click="addQuickField()" class="px-3 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Agregar campo</button>
-                                </div>
-                                <button @click="showDataImport = true" class="px-3 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded">Importar datos</button>
-                            </div>
-
-                            <div x-show="guidedStep === 3" class="space-y-3">
-                                <div class="text-xs text-gray-600">Si tu app tiene detalle (items), agrega una lista.</div>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                    <input x-model="quickGridLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre de la lista">
-                                    <div class="hidden md:block"></div>
-                                    <button @click="addQuickGrid()" class="px-3 py-2 text-xs font-bold bg-orange-600 text-white rounded">Agregar lista</button>
-                                </div>
-                                <div class="text-[10px] text-gray-400" x-show="data.grids.length > 0">Detectamos Listas detalle: puedes crear un formulario maestro-detalle.</div>
-                            </div>
-
-                            <div x-show="guidedStep === 4" class="space-y-3">
-                                <div class="text-xs text-gray-600">Agrega Totales para resumenes automaticos.</div>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                    <input x-model="quickSummaryLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del total">
-                                    <div class="hidden md:block"></div>
-                                    <button @click="addQuickSummary()" class="px-3 py-2 text-xs font-bold bg-teal-600 text-white rounded">Agregar total</button>
-                                </div>
-                            </div>
-
-                            <div x-show="guidedStep === 5" class="space-y-3">
-                                <div class="text-xs text-gray-600">Crea Documentos (factura, cotizacion, PDF).</div>
-                                <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
-                                    <input x-model="quickReportLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del documento">
-                                    <div class="hidden md:block"></div>
-                                    <button @click="addQuickReport()" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Agregar documento</button>
-                                </div>
-                            </div>
-
-                            <div x-show="guidedStep === 6" class="space-y-3">
-                                <div class="text-xs text-gray-600">Guarda y prueba tu app.</div>
-                                <div class="flex flex-wrap gap-2">
-                                    <button @click="saveToProject()" class="px-3 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Guardar proyecto</button>
-                                    <button @click="downloadJson()" class="px-3 py-2 text-xs font-bold bg-orange-600 text-white rounded">Descargar JSON</button>
-                                    <button @click="mainTab = 'chat'; closeGuided()" class="px-3 py-2 text-xs font-bold bg-slate-800 text-white rounded">Probar por chat</button>
-                                </div>
-                            </div>
-
-                            <div class="flex items-center justify-between pt-2 border-t">
-                                <button @click="prevGuided()" :disabled="guidedStep === 1" class="px-3 py-2 text-xs font-bold bg-slate-100 text-slate-600 rounded disabled:opacity-50">Anterior</button>
-                                <button @click="nextGuided()" :disabled="guidedStep === guidedSteps.length" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded disabled:opacity-50">Siguiente</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div x-show="showDataImport" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-                        <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 space-y-4">
-                            <div class="flex items-center justify-between">
-                                <h4 class="font-bold text-gray-800">Importar datos (CSV/Excel)</h4>
-                                <button @click="showDataImport = false" class="text-gray-400 hover:text-gray-700">&times;</button>
-                            </div>
-                            <div class="text-xs text-gray-500">Sube un CSV (si tienes Excel, exporta a CSV) y creamos campos y tablas automaticamente.</div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Archivo CSV</label>
-                                    <input type="file" accept=".csv,text/csv" @change="handleCsvFile($event)" class="w-full border rounded px-3 py-2 text-xs bg-white">
-                                    <p class="text-[10px] text-gray-400 mt-1" x-text="csvImport.fileName || 'Sin archivo'"></p>
-                                </div>
-                                <div class="space-y-2">
-                                    <div>
-                                        <label class="text-[10px] font-bold text-gray-500 uppercase">Delimitador</label>
-                                        <input x-model="csvImport.delimiter" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="," maxlength="2">
-                                    </div>
-                                    <label class="flex items-center gap-2 text-xs text-gray-600">
-                                        <input type="checkbox" x-model="csvImport.firstRowHeader" class="rounded text-emerald-600">
-                                        Primera fila = encabezado
-                                    </label>
-                                    <label class="flex items-center gap-2 text-xs text-gray-600">
-                                        <input type="checkbox" x-model="csvImport.replaceFields" class="rounded text-emerald-600">
-                                        Reemplazar Datos existentes
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div class="border rounded p-3 bg-gray-50">
-                                <h5 class="text-[10px] font-bold text-gray-500 uppercase mb-2">Columnas detectadas</h5>
-                                <div class="space-y-2">
-                                    <template x-for="(col, idx) in csvImport.columns" :key="idx">
-                                        <div class="grid grid-cols-2 md:grid-cols-3 gap-2 items-center text-xs">
-                                            <input x-model="col.name" class="border rounded px-2 py-1 text-xs font-mono" placeholder="nombre_columna">
-                                            <select x-model="col.type" class="border rounded px-2 py-1 text-xs bg-white">
-                                                <option value="string">string</option>
-                                                <option value="int">int</option>
-                                                <option value="decimal">decimal</option>
-                                                <option value="bool">bool</option>
-                                                <option value="date">date</option>
-                                            </select>
-                                            <span class="text-[10px] text-gray-400" x-text="mapCsvTypeToFormType(col.type) + ' (form)'"></span>
-                                        </div>
-                                    </template>
-                                    <div x-show="csvImport.columns.length === 0" class="text-[10px] text-gray-400">Sin columnas detectadas</div>
-                                </div>
-                                <button @click="applyCsvToFields(); showDataImport=false" class="mt-3 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded">Crear Datos</button>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div x-show="showAlanubeWizard" class="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-                        <div class="bg-white rounded-xl shadow-lg w-full max-w-3xl p-6 space-y-4">
-                            <div class="flex items-center justify-between">
-                                <div>
-                                    <h4 class="font-bold text-gray-800">Facturacion electronica (Alanube)</h4>
-                                    <div class="text-[11px] text-gray-500">Configura pais + sandbox y genera la integracion sin tocar codigo.</div>
-                                </div>
-                                <button @click="showAlanubeWizard = false" class="text-gray-400 hover:text-gray-700">&times;</button>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">ID de integracion</label>
-                                    <input x-model="project.alanube.integrationId" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="alanube_main">
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Pais (codigo)</label>
-                                    <input x-model="project.alanube.country" @change="syncAlanubeBaseUrl()" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="CO">
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Entorno</label>
-                                    <select x-model="project.alanube.environment" @change="syncAlanubeBaseUrl()" class="w-full border rounded px-3 py-2 text-sm bg-white">
-                                        <option value="sandbox">sandbox (pruebas)</option>
-                                        <option value="production">produccion</option>
-                                    </select>
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Base URL</label>
-                                    <input x-model="project.alanube.baseUrl" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="https://sandbox.alanube.co/co/v1">
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Token en .env</label>
-                                    <input x-model="project.alanube.tokenEnv" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="ALANUBE_TOKEN">
-                                    <div class="text-[10px] text-gray-400 mt-1">No guardamos el token en JSON.</div>
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Contrato factura (nombre)</label>
-                                    <input x-model="project.alanube.invoiceContract" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="factura">
-                                    <div class="text-[10px] text-gray-400 mt-1">Se crea en /contracts/invoices</div>
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo documento (CO)</label>
-                                    <input x-model="project.alanube.documentType" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="INVOICE">
-                                    <div class="text-[10px] text-gray-400 mt-1">Opcional: ajusta segun tu pais.</div>
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Moneda</label>
-                                    <input x-model="project.alanube.currency" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="COP">
-                                </div>
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Resolucion / prefijo</label>
-                                    <input x-model="project.alanube.resolutionId" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="RESOLUTION_ID">
-                                    <div class="text-[10px] text-gray-400 mt-1">Si tu proveedor lo requiere, se envia en mapping.</div>
-                                </div>
-                            </div>
-                            <div class="flex flex-wrap gap-2">
-                                <button @click="testAlanubeConnection()" class="px-4 py-2 text-xs font-bold bg-slate-800 text-white rounded">Probar conexion</button>
-                                <button @click="saveAlanubeIntegration()" class="px-4 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Guardar integracion</button>
-                                <button @click="saveInvoiceContract()" class="px-4 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Crear contrato factura</button>
-                                <button @click="sendAlanubeSandbox()" class="px-4 py-2 text-xs font-bold bg-amber-600 text-white rounded">Enviar sandbox</button>
-                                <button @click="showAlanubeWizard = false" class="px-4 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded">Cerrar</button>
-                            </div>
-                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                <div>
-                                    <label class="text-[10px] font-bold text-gray-500 uppercase">Record ID (para prueba)</label>
-                                    <input x-model="project.alanube.testRecordId" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="1">
-                                    <div class="text-[10px] text-gray-400 mt-1">Usa un registro real del formulario.</div>
-                                </div>
-                            </div>
-                            <div x-show="alanubeStatus.message" class="text-xs rounded border px-3 py-2"
-                                :class="alanubeStatus.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'">
-                                <span x-text="alanubeStatus.message"></span>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 <div x-show="mainTab === 'forms' && showAdvanced" x-transition.opacity>
@@ -2591,6 +2315,272 @@
                         <button @click="showLoadModal = false" class="px-4 py-2 text-sm font-medium text-gray-600 hover:bg-gray-200 rounded transition">Cancelar</button>
                         <button @click="processLoad()" class="px-6 py-2 bg-blue-600 text-white text-sm font-bold rounded shadow hover:bg-blue-700 transition">Cargar al Editor</button>
                     </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modales Globales -->
+        <div x-show="showWizardAdd" class="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]" x-transition.opacity style="display: none;">
+            <div class="bg-white rounded-xl shadow-lg w-full max-w-md p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h4 class="font-bold text-gray-800">Agregar rapido</h4>
+                    <button @click="showWizardAdd = false" class="text-gray-400 hover:text-gray-700">&times;</button>
+                </div>
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo</label>
+                        <select x-model="wizardType" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                            <option value="field">Campo</option>
+                            <option value="grid">Lista</option>
+                            <option value="summary">Total</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
+                        <input x-model="wizardLabel" class="w-full border rounded px-3 py-2 text-sm">
+                    </div>
+                    <div x-show="wizardType === 'field'">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo de campo</label>
+                        <select x-model="wizardFieldType" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                            <option value="text">Texto</option>
+                            <option value="number">Numero</option>
+                            <option value="email">Email</option>
+                            <option value="date">Fecha</option>
+                            <option value="select">Seleccion</option>
+                        </select>
+                    </div>
+                    <div x-show="wizardType === 'summary'">
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo de total</label>
+                        <select x-model="wizardSummaryType" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                            <option value="sum">Suma</option>
+                            <option value="formula">Calculo</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2">
+                    <button @click="showWizardAdd = false" class="px-3 py-2 text-xs font-bold uppercase bg-slate-100 text-slate-600 rounded">Cancelar</button>
+                    <button @click="applyWizard()" class="px-3 py-2 text-xs font-bold uppercase bg-orange-600 text-white rounded">Crear</button>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="showGuided" class="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]" x-transition.opacity style="display: none;">
+            <div class="bg-white rounded-xl shadow-lg w-full max-w-3xl p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="font-bold text-gray-800">Modo guiado</h4>
+                        <div class="text-[11px] text-gray-500" x-text="'Paso ' + guidedStep + ' de ' + guidedSteps.length"></div>
+                    </div>
+                    <button @click="closeGuided()" class="text-gray-400 hover:text-gray-700">&times;</button>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <template x-for="step in guidedSteps" :key="'guided-step-'+step.id">
+                        <span class="px-2 py-1 rounded text-[10px] font-bold uppercase"
+                            :class="guidedStep === step.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'">
+                            <span x-text="step.label"></span>
+                        </span>
+                    </template>
+                </div>
+
+                <div x-show="guidedStep === 1" class="space-y-3">
+                    <div class="text-xs text-gray-600">Elige una plantilla. Puedes ajustar todo despues.</div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <button @click="guidedTemplate='blank'" class="px-3 py-2 text-xs font-bold border rounded">En blanco</button>
+                        <button @click="guidedTemplate='invoice'" class="px-3 py-2 text-xs font-bold border rounded">Factura</button>
+                        <button @click="guidedTemplate='inventory'" class="px-3 py-2 text-xs font-bold border rounded">Inventario</button>
+                        <button @click="guidedTemplate='login'" class="px-3 py-2 text-xs font-bold border rounded">Acceso</button>
+                        <button @click="guidedTemplate='users'" class="px-3 py-2 text-xs font-bold border rounded">Usuarios</button>
+                        <button @click="guidedTemplate='company'" class="px-3 py-2 text-xs font-bold border rounded">Empresa</button>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
+                        <input x-model="data.title" class="w-full border rounded px-3 py-2 text-sm" placeholder="Mi app">
+                    </div>
+                    <button @click="applyGuidedTemplate()" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Aplicar plantilla</button>
+                </div>
+
+                <div x-show="guidedStep === 2" class="space-y-3">
+                    <div class="text-xs text-gray-600">Agrega campos rapido o importa desde CSV.</div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <input x-model="quickFieldLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del campo">
+                        <select x-model="quickFieldType" class="border rounded px-2 py-1 text-xs bg-white">
+                            <option value="text">Texto</option>
+                            <option value="number">Numero</option>
+                            <option value="date">Fecha</option>
+                            <option value="select">Seleccion</option>
+                        </select>
+                        <button @click="addQuickField()" class="px-3 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Agregar campo</button>
+                    </div>
+                    <button @click="showDataImport = true" class="px-3 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded">Importar datos</button>
+                </div>
+
+                <div x-show="guidedStep === 3" class="space-y-3">
+                    <div class="text-xs text-gray-600">Si tu app tiene detalle (items), agrega una lista.</div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <input x-model="quickGridLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre de la lista">
+                        <div class="hidden md:block"></div>
+                        <button @click="addQuickGrid()" class="px-3 py-2 text-xs font-bold bg-orange-600 text-white rounded">Agregar lista</button>
+                    </div>
+                    <div class="text-[10px] text-gray-400" x-show="data.grids.length > 0">Detectamos Listas detalle: puedes crear un formulario maestro-detalle.</div>
+                </div>
+
+                <div x-show="guidedStep === 4" class="space-y-3">
+                    <div class="text-xs text-gray-600">Agrega Totales para resumenes automaticos.</div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <input x-model="quickSummaryLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del total">
+                        <div class="hidden md:block"></div>
+                        <button @click="addQuickSummary()" class="px-3 py-2 text-xs font-bold bg-teal-600 text-white rounded">Agregar total</button>
+                    </div>
+                </div>
+
+                <div x-show="guidedStep === 5" class="space-y-3">
+                    <div class="text-xs text-gray-600">Crea Documentos (factura, cotizacion, PDF).</div>
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+                        <input x-model="quickReportLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del documento">
+                        <div class="hidden md:block"></div>
+                        <button @click="addQuickReport()" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Agregar documento</button>
+                    </div>
+                </div>
+
+                <div x-show="guidedStep === 6" class="space-y-3">
+                    <div class="text-xs text-gray-600">Guarda y prueba tu app.</div>
+                    <div class="flex flex-wrap gap-2">
+                        <button @click="saveToProject()" class="px-3 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Guardar proyecto</button>
+                        <button @click="downloadJson()" class="px-3 py-2 text-xs font-bold bg-orange-600 text-white rounded">Descargar JSON</button>
+                        <button @click="mainTab = 'chat'; closeGuided()" class="px-3 py-2 text-xs font-bold bg-slate-800 text-white rounded">Probar por chat</button>
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between pt-2 border-t">
+                    <button @click="prevGuided()" :disabled="guidedStep === 1" class="px-3 py-2 text-xs font-bold bg-slate-100 text-slate-600 rounded disabled:opacity-50">Anterior</button>
+                    <button @click="nextGuided()" :disabled="guidedStep === guidedSteps.length" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded disabled:opacity-50">Siguiente</button>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="showDataImport" class="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]" x-transition.opacity style="display: none;">
+            <div class="bg-white rounded-xl shadow-lg w-full max-w-2xl p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <h4 class="font-bold text-gray-800">Importar datos (CSV/Excel)</h4>
+                    <button @click="showDataImport = false" class="text-gray-400 hover:text-gray-700">&times;</button>
+                </div>
+                <div class="text-xs text-gray-500">Sube un CSV (si tienes Excel, exporta a CSV) y creamos campos y tablas automaticamente.</div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Archivo CSV</label>
+                        <input type="file" accept=".csv,text/csv" @change="handleCsvFile($event)" class="w-full border rounded px-3 py-2 text-xs bg-white">
+                        <p class="text-[10px] text-gray-400 mt-1" x-text="csvImport.fileName || 'Sin archivo'"></p>
+                    </div>
+                    <div class="space-y-2">
+                        <div>
+                            <label class="text-[10px] font-bold text-gray-500 uppercase">Delimitador</label>
+                            <input x-model="csvImport.delimiter" class="w-full border rounded px-3 py-2 text-xs font-mono" placeholder="," maxlength="2">
+                        </div>
+                        <label class="flex items-center gap-2 text-xs text-gray-600">
+                            <input type="checkbox" x-model="csvImport.firstRowHeader" class="rounded text-emerald-600">
+                            Primera fila = encabezado
+                        </label>
+                        <label class="flex items-center gap-2 text-xs text-gray-600">
+                            <input type="checkbox" x-model="csvImport.replaceFields" class="rounded text-emerald-600">
+                            Reemplazar Datos existentes
+                        </label>
+                    </div>
+                </div>
+
+                <div class="border rounded p-3 bg-gray-50">
+                    <h5 class="text-[10px] font-bold text-gray-500 uppercase mb-2">Columnas detectadas</h5>
+                    <div class="space-y-2">
+                        <template x-for="(col, idx) in csvImport.columns" :key="idx">
+                            <div class="grid grid-cols-2 md:grid-cols-3 gap-2 items-center text-xs">
+                                <input x-model="col.name" class="border rounded px-2 py-1 text-xs font-mono" placeholder="nombre_columna">
+                                <select x-model="col.type" class="border rounded px-2 py-1 text-xs bg-white">
+                                    <option value="string">string</option>
+                                    <option value="int">int</option>
+                                    <option value="decimal">decimal</option>
+                                    <option value="bool">bool</option>
+                                    <option value="date">date</option>
+                                </select>
+                                <span class="text-[10px] text-gray-400" x-text="mapCsvTypeToFormType(col.type) + ' (form)'"></span>
+                            </div>
+                        </template>
+                        <div x-show="csvImport.columns.length === 0" class="text-[10px] text-gray-400">Sin columnas detectadas</div>
+                    </div>
+                    <button @click="applyCsvToFields(); showDataImport=false" class="mt-3 px-4 py-2 bg-emerald-600 text-white text-xs font-bold rounded">Crear Datos</button>
+                </div>
+            </div>
+        </div>
+
+        <div x-show="showAlanubeWizard" class="fixed inset-0 bg-black/40 flex items-center justify-center z-[100]" x-transition.opacity style="display: none;">
+            <div class="bg-white rounded-xl shadow-lg w-full max-w-3xl p-6 space-y-4">
+                <div class="flex items-center justify-between">
+                    <div>
+                        <h4 class="font-bold text-gray-800">Facturacion electronica (Alanube)</h4>
+                        <div class="text-[11px] text-gray-500">Configura pais + sandbox y genera la integracion sin tocar codigo.</div>
+                    </div>
+                    <button @click="showAlanubeWizard = false" class="text-gray-400 hover:text-gray-700">&times;</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">ID de integracion</label>
+                        <input x-model="project.alanube.integrationId" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="alanube_main">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Pais (codigo)</label>
+                        <input x-model="project.alanube.country" @change="syncAlanubeBaseUrl()" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="CO">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Entorno</label>
+                        <select x-model="project.alanube.environment" @change="syncAlanubeBaseUrl()" class="w-full border rounded px-3 py-2 text-sm bg-white">
+                            <option value="sandbox">sandbox (pruebas)</option>
+                            <option value="production">produccion</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Base URL</label>
+                        <input x-model="project.alanube.baseUrl" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="https://sandbox.alanube.co/co/v1">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Token en .env</label>
+                        <input x-model="project.alanube.tokenEnv" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="ALANUBE_TOKEN">
+                        <div class="text-[10px] text-gray-400 mt-1">No guardamos el token en JSON.</div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Contrato factura (nombre)</label>
+                        <input x-model="project.alanube.invoiceContract" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="factura">
+                        <div class="text-[10px] text-gray-400 mt-1">Se crea en /contracts/invoices</div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Tipo documento (CO)</label>
+                        <input x-model="project.alanube.documentType" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="INVOICE">
+                        <div class="text-[10px] text-gray-400 mt-1">Opcional: ajusta segun tu pais.</div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Moneda</label>
+                        <input x-model="project.alanube.currency" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="COP">
+                    </div>
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Resolucion / prefijo</label>
+                        <input x-model="project.alanube.resolutionId" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="RESOLUTION_ID">
+                        <div class="text-[10px] text-gray-400 mt-1">Si tu proveedor lo requiere, se envia en mapping.</div>
+                    </div>
+                </div>
+                <div class="flex flex-wrap gap-2">
+                    <button @click="testAlanubeConnection()" class="px-4 py-2 text-xs font-bold bg-slate-800 text-white rounded">Probar conexion</button>
+                    <button @click="saveAlanubeIntegration()" class="px-4 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Guardar integracion</button>
+                    <button @click="saveInvoiceContract()" class="px-4 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Crear contrato factura</button>
+                    <button @click="sendAlanubeSandbox()" class="px-4 py-2 text-xs font-bold bg-amber-600 text-white rounded">Enviar sandbox</button>
+                    <button @click="showAlanubeWizard = false" class="px-4 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded">Cerrar</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                        <label class="text-[10px] font-bold text-gray-500 uppercase">Record ID (para prueba)</label>
+                        <input x-model="project.alanube.testRecordId" class="w-full border rounded px-3 py-2 text-sm font-mono" placeholder="1">
+                        <div class="text-[10px] text-gray-400 mt-1">Usa un registro real del formulario.</div>
+                    </div>
+                </div>
+                <div x-show="alanubeStatus.message" class="text-xs rounded border px-3 py-2"
+                    :class="alanubeStatus.ok ? 'bg-emerald-50 border-emerald-200 text-emerald-900' : 'bg-rose-50 border-rose-200 text-rose-900'">
+                    <span x-text="alanubeStatus.message"></span>
                 </div>
             </div>
         </div>
@@ -3972,7 +3962,7 @@
                     const title = this.project.viewTitle || this.data.title || 'Formulario';
                     const fileName = this.normalizeFormFileName();
 
-                    return `<?php
+                    return `<${'?php'}
 /**
  * Vista: ${title}
  */
@@ -4013,10 +4003,10 @@ try {
 
 $formGenerator = new FormGenerator();
 
-?>
+${'?'}>
 <div class="max-w-6xl mx-auto">
     <h1 class="text-2xl font-bold text-gray-800 mb-6">${title}</h1>
-    <?php
+    <${'?php'}
     try {
         echo $formGenerator->render($formConfig);
     } catch (Exception $e) {
@@ -4024,7 +4014,7 @@ $formGenerator = new FormGenerator();
         echo "<strong>Error:</strong> " . htmlspecialchars($e->getMessage());
         echo "</div>";
     }
-    ?>
+    ${'?'}>
 </div>
 `;
                 },
@@ -5364,8 +5354,7 @@ $formGenerator = new FormGenerator();
             }
         }
     </script>
-</body>
-</html>
+<?php include __DIR__ . '/includes/footer.php'; ?>
 
 
 

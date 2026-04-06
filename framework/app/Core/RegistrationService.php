@@ -119,4 +119,50 @@ final class RegistrationService
             return ['success' => false, 'error' => 'Error interno en el registro: ' . $e->getMessage()];
         }
     }
+
+    /**
+
+     * Procesa el registro de un Creador (Perfil Builder) sin requerir RUT.
+     * 
+     * @param array{full_name: string, password: string, phone_number: string, email?: string} $input
+     * @return array{success: bool, user_id?: string, error?: string}
+     */
+    public function registerCreator(array $input): array
+    {
+        try {
+            $hash = password_hash($input['password'], PASSWORD_BCRYPT);
+            $userId = 'u_dev_' . bin2hex(random_bytes(4));
+            $tenantId = 't_dev_' . bin2hex(random_bytes(4));
+
+            $stmt = $this->db->prepare("
+                INSERT INTO auth_users
+                    (id, project_id, nit, full_name, area_code, phone_number, alt_email, 
+                     country, password_hash, tenant_id, is_active, business_desc)
+                VALUES
+                    (:id, :project_id, :nit, :full_name, :area_code, :phone_number, :alt_email,
+                     :country, :password_hash, :tenant_id, :is_active, :business_desc)
+            ");
+
+            $stmt->execute([
+                ':id'            => $userId,
+                ':project_id'    => 'suki_builder',
+                ':nit'           => 'BUILDER-DEV',
+                ':full_name'     => $input['full_name'],
+                ':area_code'     => '+57',
+                ':phone_number'  => preg_replace('/[^0-9]/', '', $input['phone_number']),
+                ':alt_email'     => strtolower($input['email'] ?? ''),
+                ':country'       => 'LOCAL',
+                ':password_hash' => $hash,
+                ':tenant_id'     => $tenantId,
+                ':is_active'     => 1, // Los creadores desde la torre nacen activos
+                ':business_desc' => 'Individual Developer / Creator',
+            ]);
+
+            return ['success' => true, 'user_id' => $userId, 'msg' => 'Creador registrado y activo.'];
+
+        } catch (\Throwable $e) {
+            return ['success' => false, 'error' => 'Error al crear creador: ' . $e->getMessage()];
+        }
+    }
 }
+

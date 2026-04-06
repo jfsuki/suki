@@ -1,11 +1,42 @@
+# .htaccess - SUKI OS Global Hardening & Routing
 Options -Indexes
+RewriteEngine On
 
-<IfModule mod_rewrite.c>
-    RewriteEngine On
+# 1. Bloquear acceso directo a CUALQUIER archivo .php
+# Solo se permite la ejecución a través de los index.php de cada mundo si son llamados internamente.
+# Si la petición HTTP termina en .php y no es uno de los index autorizados, 403 Forbidden.
+# (Enmascaramos para que no se sepa el nombre del archivo real)
+RewriteCond %{REQUEST_URI} !/index\.php$ [NC]
+RewriteRule \.php$ - [F,L,NC]
 
-    # Bloquear acceso directo a carpetas sensibles y dotfiles
-    # Permitir accesos cuando se usan vhosts dedicados
-    RewriteCond %{HTTP_HOST} !^(suki-fw\.test|suki\.test|localhost)(:\d+)?$ [NC]
-    RewriteRule ^(framework|project)/ - [F,L]
-    RewriteRule (^|/)\. - [F,L]
-</IfModule>
+# 2. Bloquear acceso a carpetas sensibles del "Hidden Layer"
+RewriteRule ^(docs|brain|\.agent|\.suki|storage|vendor|framework/(app|config|contracts|database|models|scripts|views)|project/(config|contracts|database|models|views)|tower/views) - [F,L,NC]
+
+# 3. Protección de archivos específicos (config, logs, db)
+<FilesMatch "^\.|\.(env|log|sqlite|json|md|sql|yaml|yml)$">
+    <IfModule mod_authz_core.c>
+        Require all denied
+    </IfModule>
+    <IfModule !mod_authz_core.c>
+        Order deny,allow
+        Deny from all
+    </IfModule>
+</FilesMatch>
+
+# 4. Enrutamiento enmascarado (Los 4 Mundos)
+# Marketplace -> framework/public
+RewriteRule ^marketplace(/.*)?$ framework/public/index.php?url=$1 [QSA,L]
+
+# Apps -> project/public
+RewriteRule ^apps(/.*)?$ project/public/index.php?url=$1 [QSA,L]
+
+# Torre de Control -> tower/public
+RewriteRule ^torre(/.*)?$ tower/public/index.php?url=$1 [QSA,L]
+
+# Builder/Editor (Alias globales para el mundo arquitectura)
+RewriteRule ^builder-login(/.*)?$ framework/public/index.php?url=builder-login [QSA,L]
+RewriteRule ^builder(/.*)?$ project/public/index.php?url=builder [QSA,L]
+RewriteRule ^editor(/.*)?$ project/public/index.php?url=editor [QSA,L]
+
+# Redirección por defecto al Marketplace
+RewriteRule ^$ marketplace/ [R=302,L]

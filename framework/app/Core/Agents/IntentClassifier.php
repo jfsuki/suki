@@ -21,11 +21,12 @@ use RuntimeException;
  */
 final class IntentClassifier
 {
-    private const QDRANT_CONFIDENCE_THRESHOLD = 0.72;
+    private const QDRANT_CONFIDENCE_THRESHOLD = 0.65;
     private const LLM_ALLOWED_INTENTS = [
         'greeting', 'farewell', 'affirmation', 'negation', 'frustration',
         'create_request', 'business_description', 'scope_question',
         'pricing_question', 'crud', 'status', 'out_of_scope', 'faq', 'question',
+        'solve_unit_conversion', 'builder_install_playbook',
     ];
 
     private ?GeminiEmbeddingService $embedder;
@@ -53,29 +54,49 @@ final class IntentClassifier
      */
     public function classify(string $text): array
     {
+        $res = $this->search($text);
+        return [
+            'intent' => $res['intent'],
+            'score' => $res['score'],
+            'layer' => $res['layer']
+        ];
+    }
+
+    /**
+     * Search for the most relevant semantic hit.
+     * 
+     * @return array{intent: string, score: float, layer: string, payload: array}
+     */
+    public function search(string $text): array
+    {
         $this->lastClassificationTelemetry = [];
         $text = strtolower(trim($text));
         if ($text === '') {
-            return ['intent' => 'faq', 'score' => 1.0, 'layer' => 'empty_guard'];
+            return ['intent' => 'faq', 'score' => 1.0, 'layer' => 'empty_guard', 'payload' => []];
         }
 
         // Layer 1: Qdrant semantic search
-        $qdrant = $this->queryQdrant($text);
+        $qdrant = $this->queryQdrant($text, true); // explicitly request full hit
         if ($qdrant !== null && $qdrant['score'] >= self::QDRANT_CONFIDENCE_THRESHOLD) {
-            $this->logTraining($text, $qdrant['intent'], $qdrant['score'], 'skip'); // already known
-            return ['intent' => $qdrant['intent'], 'score' => $qdrant['score'], 'layer' => 'qdrant'];
+            $this->logTraining($text, $qdrant['intent'], $qdrant['score'], 'skip');
+            return [
+                'intent' => $qdrant['intent'], 
+                'score' => $qdrant['score'], 
+                'layer' => 'qdrant',
+                'payload' => $qdrant['payload'] ?? []
+            ];
         }
 
-        // Layer 2: LLM Fast Path (Mistral JSON)
+        // Layer 2: LLM Fast Path
         $llm = $this->queryLLM($text);
         if ($llm !== null) {
-            $this->logTraining($text, $llm['intent'], $llm['score'], 'pending'); // log for auto-training
-            return ['intent' => $llm['intent'], 'score' => $llm['score'], 'layer' => 'llm'];
+            $this->logTraining($text, $llm['intent'], $llm['score'], 'pending');
+            return ['intent' => $llm['intent'], 'score' => $llm['score'], 'layer' => 'llm', 'payload' => []];
         }
 
         // Layer 3: PHP keyword fallback
         $fallback = $this->keywordFallback($text);
-        return ['intent' => $fallback, 'score' => 0.5, 'layer' => 'keyword_fallback'];
+        return ['intent' => $fallback, 'score' => 0.5, 'layer' => 'keyword_fallback', 'payload' => []];
     }
 
     public function isIntent(string $text, string $targetIntent): bool
@@ -91,8 +112,8 @@ final class IntentClassifier
 
     // --- Private helpers ---
 
-    /** @return array{intent:string,score:float}|null */
-    private function queryQdrant(string $text): ?array
+    /** @return array{intent:string,score:float,payload:array}|null */
+    private function queryQdrant(string $text, bool $includePayload = false): ?array
     {
         if ($this->embedder === null || $this->vectorStore === null) {
             return null;
@@ -120,9 +141,10 @@ final class IntentClassifier
             $results = $this->vectorStore->query(
                 $embedding['vector'],
                 ['must' => $must],
-                1,
+                3,
                 true
             );
+            
             if (empty($results[0])) {
                 return null;
             }
@@ -132,7 +154,11 @@ final class IntentClassifier
             if ($intent === '' || $score < 0.1) {
                 return null;
             }
-            return ['intent' => $intent, 'score' => $score];
+            return [
+                'intent' => $intent, 
+                'score' => $score,
+                'payload' => $includePayload ? ($hit['payload'] ?? []) : []
+            ];
         } catch (\Throwable $e) {
             // Graceful degradation: Qdrant is down or misconfigured
             return null;

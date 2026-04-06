@@ -1,114 +1,11 @@
-<!doctype html>
-<html lang="es" data-theme="dark">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="SUKI Builder — Crea tu app empresarial por conversación">
-  <title>SUKI Builder · Web App OS</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
-  <style>
-    /* ─── TOKENS ────────────────────────────────────────────────── */
-    :root {
-      --bg:            #0a0f1e;
-      --surface:       #111827;
-      --surface2:      #1a2235;
-      --border:        rgba(255,255,255,0.07);
-      --glow:          rgba(139, 92, 246, 0.35);
-      --text:          #e2e8f0;
-      --muted:         #64748b;
-      --accent:        #8b5cf6;
-      --accent-soft:   rgba(139,92,246,0.12);
-      --teal:          #14b8a6;
-      --teal-soft:     rgba(20,184,166,0.12);
-      --danger:        #ef4444;
-      --success:       #22c55e;
-      --warn:          #f59e0b;
-      --radius:        14px;
-      --radius-sm:     8px;
-      --shadow:        0 20px 60px rgba(0,0,0,0.5);
-      --font:          'Inter', system-ui, sans-serif;
-      --transition:    0.22s cubic-bezier(0.4,0,0.2,1);
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    html, body { height: 100%; }
-    body {
-      font-family: var(--font);
-      background: var(--bg);
-      color: var(--text);
-      display: flex;
-      flex-direction: column;
-      overflow: hidden;
-      background-image:
-        radial-gradient(ellipse 80% 60% at 10% -10%, rgba(139,92,246,0.18) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 40% at 90% 110%, rgba(20,184,166,0.12) 0%, transparent 50%);
-    }
-
-    /* ─── NAV ─────────────────────────────────────────────────── */
-    nav {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 0 22px;
-      height: 58px;
-      flex-shrink: 0;
-      border-bottom: 1px solid var(--border);
-      background: rgba(10,15,30,0.85);
-      backdrop-filter: blur(20px);
-      -webkit-backdrop-filter: blur(20px);
-      z-index: 100;
-    }
-    .nav-brand {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      font-weight: 700;
-      font-size: 15px;
-      letter-spacing: -0.3px;
-    }
-    .nav-logo {
-      width: 30px; height: 30px;
-      background: linear-gradient(135deg, var(--accent) 0%, var(--teal) 100%);
-      border-radius: 8px;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 14px;
-      box-shadow: 0 0 14px var(--glow);
-    }
-    .nav-badge {
-      background: var(--accent-soft);
-      color: var(--accent);
-      border: 1px solid rgba(139,92,246,0.25);
-      font-size: 10px;
-      font-weight: 600;
-      padding: 2px 8px;
-      border-radius: 999px;
-      letter-spacing: 0.5px;
-      text-transform: uppercase;
-    }
-    .nav-actions { display: flex; align-items: center; gap: 8px; }
-    .nav-btn {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      color: var(--text);
-      font-family: var(--font);
-      font-size: 12px;
-      font-weight: 500;
-      padding: 6px 14px;
-      border-radius: 999px;
-      cursor: pointer;
-      text-decoration: none;
-      transition: var(--transition);
-      display: flex; align-items: center; gap: 5px;
-    }
-    .nav-btn:hover { background: var(--surface); border-color: var(--accent); color: var(--accent); }
-    .nav-btn.primary {
-      background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
-      border-color: transparent; color: #fff;
-      box-shadow: 0 0 18px var(--glow);
-    }
-    .nav-btn.primary:hover { opacity: 0.88; }
-
-    /* ─── LAYOUT ──────────────────────────────────────────────── */
+<?php 
+$current_page = 'chat';
+$frameworkRoot = dirname(__DIR__, 3) . '/framework';
+include $frameworkRoot . '/views/builder/includes/header.php'; 
+include $frameworkRoot . '/views/builder/includes/navbar.php'; 
+?>
+<style>
+    /* ─── CHAT-SPECIFIC LAYOUT (PROJECT SYNC) ───────────────── */
     .layout {
       display: grid;
       grid-template-columns: 260px 1fr 300px;
@@ -430,18 +327,6 @@
 </head>
 <body>
 
-<!-- NAV -->
-<nav>
-  <div class="nav-brand">
-    <div class="nav-logo">⚡</div>
-    SUKI
-    <span class="nav-badge">Builder</span>
-  </div>
-  <div class="nav-actions">
-    <a href="chat_app.html" class="nav-btn">🚀 Ir al App</a>
-    <a href="#" class="nav-btn primary" id="testModeNav">🧪 Test Mode</a>
-  </div>
-</nav>
 
 <!-- MAIN LAYOUT -->
 <div class="layout">
@@ -872,5 +757,4 @@
 
 })();
 </script>
-</body>
-</html>
+<?php include $frameworkRoot . '/views/builder/includes/footer.php'; ?>

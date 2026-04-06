@@ -78,29 +78,77 @@ final class ProjectRegistry
         ]);
     }
 
-    public function touchUser(string $userId, string $role, string $type, string $tenantId, ?string $label = null): void
+    public function updateProjectStatus(string $projectId, string $status): bool
+    {
+        $stmt = $this->db->prepare('UPDATE projects SET status = :status, updated_at = :now WHERE id = :id');
+        return $stmt->execute([
+            ':status' => $status,
+            ':id' => $projectId,
+            ':now' => date('Y-m-d H:i:s')
+        ]);
+    }
+
+    public function touchUser(string $userId, string $role, string $type, string $tenantId, ?string $label = null, ?string $password = null): void
     {
         if ($userId === '') return;
         $now = date('Y-m-d H:i:s');
-        $stmt = $this->db->prepare('INSERT OR IGNORE INTO users (id, label, type, role, tenant_id, created_at, last_seen) VALUES (:id, :label, :type, :role, :tenant, :created, :last_seen)');
+        $hash = $password ? password_hash($password, PASSWORD_DEFAULT) : null;
+        
+        $stmt = $this->db->prepare('INSERT OR IGNORE INTO users (id, label, type, role, tenant_id, password_hash, created_at, last_seen) VALUES (:id, :label, :type, :role, :tenant, :hash, :created, :last_seen)');
         $stmt->execute([
             ':id' => $userId,
             ':label' => $label ?: $userId,
             ':type' => $type,
             ':role' => $role,
             ':tenant' => $tenantId,
+            ':hash' => $hash,
             ':created' => $now,
             ':last_seen' => $now,
         ]);
 
-        $stmt = $this->db->prepare('UPDATE users SET role = :role, type = :type, tenant_id = :tenant, last_seen = :last_seen WHERE id = :id');
-        $stmt->execute([
+        $sql = 'UPDATE users SET role = :role, type = :type, tenant_id = :tenant, last_seen = :last_seen WHERE id = :id';
+        $params = [
             ':id' => $userId,
             ':role' => $role,
             ':type' => $type,
             ':tenant' => $tenantId,
             ':last_seen' => $now,
-        ]);
+        ];
+        
+        if ($hash) {
+            $sql = 'UPDATE users SET role = :role, type = :type, tenant_id = :tenant, password_hash = :hash, last_seen = :last_seen WHERE id = :id';
+            $params[':hash'] = $hash;
+        }
+
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute($params);
+    }
+
+    public function updateMasterUser(string $userId, array $data): bool
+    {
+        $id = trim($userId);
+        if ($id === '') return false;
+        
+        $fields = [];
+        $params = [':id' => $id];
+        
+        foreach ($data as $key => $val) {
+            if ($key === 'password') {
+                $fields[] = "password_hash = :hash";
+                $params[':hash'] = password_hash($val, PASSWORD_DEFAULT);
+                continue;
+            }
+            if (in_array($key, ['label', 'role', 'type', 'tenant_id'])) {
+                $fields[] = "{$key} = :{$key}";
+                $params[":{$key}"] = $val;
+            }
+        }
+        
+        if (empty($fields)) return false;
+        
+        $sql = "UPDATE users SET " . implode(', ', $fields) . " WHERE id = :id";
+        $stmt = $this->db->prepare($sql);
+        return $stmt->execute($params);
     }
 
     public function assignUserToProject(string $projectId, string $userId, string $role): void
@@ -550,9 +598,11 @@ final class ProjectRegistry
             type TEXT,
             role TEXT,
             tenant_id TEXT,
+            password_hash TEXT,
             created_at TEXT,
             last_seen TEXT
         )');
+        $this->ensureUsersPasswordColumn();
         $this->db->exec('CREATE TABLE IF NOT EXISTS project_users (
             project_id TEXT,
             user_id TEXT,
@@ -735,13 +785,41 @@ final class ProjectRegistry
         return $result ?: null;
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
     public function getUsersByType(string $type): array
     {
         $stmt = $this->db->prepare('SELECT * FROM auth_users WHERE user_type = :type ORDER BY created_at DESC');
         $stmt->execute([':type' => $type]);
         return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function getMasterUsersByType(string $type): array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM users WHERE type = :type ORDER BY created_at DESC');
+        $stmt->execute([':type' => $type]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function verifyMasterUser(string $userId, string $password): ?array
+    {
+        $stmt = $this->db->prepare('SELECT * FROM users WHERE id = :id OR label = :id LIMIT 1');
+        $stmt->execute([':id' => $userId]);
+        $user = $stmt->fetch(PDO::FETCH_ASSOC);
+        if (!$user) return null;
+        if (!password_verify($password, (string) ($user['password_hash'] ?? ''))) {
+            return null;
+        }
+        return $user;
+    }
+
+    private function ensureUsersPasswordColumn(): void
+    {
+        $stmt = $this->db->query("PRAGMA table_info(users)");
+        $cols = $stmt->fetchAll(\PDO::FETCH_COLUMN, 1);
+        if (!in_array('password_hash', $cols)) {
+            $this->db->exec("ALTER TABLE users ADD COLUMN password_hash TEXT");
+        }
     }
 }

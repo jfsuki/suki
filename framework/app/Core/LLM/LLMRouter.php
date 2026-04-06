@@ -29,6 +29,10 @@ final class LLMRouter
             $messages[] = ['role' => 'system', 'content' => $summaryText];
         }
 
+        if (!empty($capsule['autonomous_memory'])) {
+            $messages[] = ['role' => 'system', 'content' => (string)$capsule['autonomous_memory']];
+        }
+
         if (!empty($capsule['last_messages']) && is_array($capsule['last_messages'])) {
             foreach ($capsule['last_messages'] as $turn) {
                 if (isset($turn['u'])) {
@@ -96,8 +100,11 @@ final class LLMRouter
                     'temperature' => $options['temperature'] ?? 0.2,
                     'strict_json' => $requiresStrictJson,
                     'response_schema' => $responseSchema,
+                    'tools' => $options['tools'] ?? $policy['tools'] ?? null,
+                    'tool_choice' => $options['tool_choice'] ?? $policy['tool_choice'] ?? null,
                 ]);
                 $text = $result['text'] ?? '';
+                $toolCalls = $result['tool_calls'] ?? [];
                 $json = $this->extractJson($text);
                 if ($requiresStrictJson && !is_array($json)) {
                     throw new RuntimeException(
@@ -109,6 +116,7 @@ final class LLMRouter
                     'provider' => $providerName,
                     'text' => $text,
                     'json' => $json,
+                    'tool_calls' => $toolCalls,
                     'usage' => $result['usage'] ?? [],
                     'raw' => $result['raw'] ?? null,
                     'attempted_providers' => $attempted,

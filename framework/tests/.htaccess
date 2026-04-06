@@ -1,0 +1,6 @@
+# framework/tests/.htaccess - Solo ejecucion CLI
+Options -Indexes
+
+# Negar todo acceso via HTTP. Los tests deben correr desde terminal (php run_all.php)
+Order deny,allow
+Deny from all
