@@ -112,6 +112,8 @@ use App\Core\Agents\ConversationQualityDashboard;
 use App\Core\DocumentRenderer;
 use App\Core\BusinessConfigService;
 use App\Core\ChartDataService;
+use App\Core\QuotationService;
+use App\Core\EmailService;
 
 $route = trim($_GET['route'] ?? '');
 $manifestError = null;
@@ -1142,6 +1144,155 @@ if (str_starts_with($route, 'contracts/')) {
         respondJson($response, 'success', 'Contrato cargado', $meta['data']);
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
+// ─── Cotizaciones ──────────────────────────────────────────────────────────────
+if (str_starts_with($route, 'quotation/')) {
+    $qAuth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($qAuth)) {
+        respondJson($response, 'error', 'Acceso denegado.', [], 401);
+        return;
+    }
+    $tenantId = (string) ($qAuth['tenant_id'] ?? '');
+    $userId   = (string) ($qAuth['id'] ?? 'system');
+    $userRole = strtolower(trim((string) ($qAuth['role'] ?? 'operator')));
+    $qAction  = str_replace('quotation/', '', $route);
+    $payload  = requestData();
+
+    try {
+        $qService = new QuotationService();
+
+        switch ($qAction) {
+            case 'create':
+                if ($method !== 'POST') { respondJson($response, 'error', 'POST requerido.', [], 405); return; }
+                $result = $qService->create($tenantId, $payload, $userId);
+                respondJson($response, 'success', "Cotización {$result['quotation_number']} creada.", $result);
+                break;
+
+            case 'update':
+                if ($method !== 'POST' && $method !== 'PUT') { respondJson($response, 'error', 'POST/PUT requerido.', [], 405); return; }
+                $qId = (string) ($payload['id'] ?? $_GET['id'] ?? '');
+                if ($qId === '') { respondJson($response, 'error', 'id requerido.', [], 400); return; }
+                $result = $qService->update($tenantId, $qId, $payload, $userId);
+                respondJson($response, 'success', 'Cotización actualizada.', $result);
+                break;
+
+            case 'get':
+                $qId = (string) ($_GET['id'] ?? $payload['id'] ?? '');
+                if ($qId === '') { respondJson($response, 'error', 'id requerido.', [], 400); return; }
+                $result = $qService->get($tenantId, $qId);
+                respondJson($response, 'success', 'Cotización encontrada.', $result);
+                break;
+
+            case 'list':
+                $filters = ['status' => $_GET['status'] ?? '', 'search' => $_GET['search'] ?? ''];
+                $limit   = (int) ($_GET['limit'] ?? 20);
+                $result  = $qService->list($tenantId, $filters, $limit);
+                respondJson($response, 'success', count($result) . ' cotizaciones.', ['items' => $result, 'count' => count($result)]);
+                break;
+
+            case 'approve':
+                $qId   = (string) ($payload['id'] ?? $_GET['id'] ?? '');
+                $notes = (string) ($payload['notes'] ?? '');
+                $result = $qService->approve($tenantId, $qId, $notes !== '' ? $notes : null);
+                respondJson($response, 'success', 'Cotización aprobada ✓', $result);
+                break;
+
+            case 'send':
+                $qId    = (string) ($payload['id'] ?? $_GET['id'] ?? '');
+                $result = $qService->markSent($tenantId, $qId);
+                respondJson($response, 'success', 'Cotización marcada como enviada.', $result);
+                break;
+
+            case 'send-email':
+                $qId    = (string) ($payload['id'] ?? $_GET['id'] ?? '');
+                $base   = (string) ($payload['base_url'] ?? $_SERVER['HTTP_ORIGIN'] ?? '');
+                $result = $qService->sendByEmail($tenantId, $qId, $base !== '' ? $base : null);
+                respondJson($response, 'success', $result['message'] ?? 'Email enviado.', $result);
+                break;
+
+            case 'reject':
+                $qId   = (string) ($payload['id'] ?? $_GET['id'] ?? '');
+                $reason = (string) ($payload['reason'] ?? $payload['notes'] ?? '');
+                $result = $qService->reject($tenantId, $qId, $reason !== '' ? $reason : null);
+                respondJson($response, 'success', 'Cotización rechazada.', $result);
+                break;
+
+            case 'cancel':
+                $qId = (string) ($payload['id'] ?? $_GET['id'] ?? '');
+                $result = $qService->cancel($tenantId, $qId);
+                respondJson($response, 'success', 'Cotización cancelada.', $result);
+                break;
+
+            case 'convert-invoice':
+                $qId = (string) ($payload['id'] ?? $_GET['id'] ?? '');
+                if (!in_array($userRole, ['admin', 'owner', 'accountant', 'supervisor'], true)) {
+                    respondJson($response, 'error', 'Solo admin/contadores pueden convertir a factura.', [], 403);
+                    return;
+                }
+                $result = $qService->convertToInvoice($tenantId, $qId, $payload);
+                respondJson($response, 'success', $result['message'] ?? 'Factura creada.', $result);
+                break;
+
+            case 'convert-remision':
+                $qId = (string) ($payload['id'] ?? $_GET['id'] ?? '');
+                $result = $qService->convertToRemision($tenantId, $qId, $payload);
+                respondJson($response, 'success', $result['message'] ?? 'Remisión creada.', $result);
+                break;
+
+            case 'add-line':
+                $qId  = (string) ($payload['quotation_id'] ?? $payload['id'] ?? $_GET['id'] ?? '');
+                $line = $qService->addLine($tenantId, $qId, $payload);
+                respondJson($response, 'success', 'Línea agregada.', $line);
+                break;
+
+            case 'remove-line':
+                $qId    = (string) ($payload['quotation_id'] ?? $_GET['quotation_id'] ?? '');
+                $lineId = (string) ($payload['line_id'] ?? $_GET['line_id'] ?? '');
+                $ok = $qService->removeLine($tenantId, $qId, $lineId);
+                respondJson($response, $ok ? 'success' : 'error', $ok ? 'Línea eliminada.' : 'Línea no encontrada.', [], $ok ? 200 : 404);
+                break;
+
+            default:
+                respondJson($response, 'error', "Acción de cotización no reconocida: {$qAction}", [], 400);
+        }
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+    }
+    return;
+}
+
+// ─── Email ─────────────────────────────────────────────────────────────────────
+if (str_starts_with($route, 'email/')) {
+    $eAuth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($eAuth)) {
+        respondJson($response, 'error', 'Acceso denegado.', [], 401);
+        return;
+    }
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'POST requerido.', [], 405);
+        return;
+    }
+    $tenantId  = (string) ($eAuth['tenant_id'] ?? '');
+    $eAction   = str_replace('email/', '', $route);
+    $payload   = requestData();
+
+    try {
+        $emailSvc = new EmailService();
+
+        if ($eAction === 'send-document') {
+            $result = $emailSvc->sendDocumentLink($tenantId, $payload);
+            respondJson($response, $result['ok'] ? 'success' : 'error', $result['message'] ?? 'Email procesado.', $result);
+        } elseif ($eAction === 'notify') {
+            $result = $emailSvc->sendNotification($tenantId, $payload);
+            respondJson($response, $result['ok'] ? 'success' : 'error', $result['message'] ?? 'Notificación procesada.', $result);
+        } else {
+            respondJson($response, 'error', "Acción email no reconocida: {$eAction}", [], 400);
+        }
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
     }
     return;
 }

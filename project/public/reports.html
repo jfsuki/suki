@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Reportes — SUKI ERP</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --border: rgba(255,255,255,0.08);
+    --text: #e2e8f0;
+    --muted: #64748b;
+    --accent: #8b5cf6;
+    --accent-soft: rgba(139,92,246,0.12);
+    --teal: #14b8a6;
+    --teal-soft: rgba(20,184,166,0.12);
+    --success: #22c55e;
+    --warn: #f59e0b;
+    --danger: #ef4444;
+    --radius: 12px;
+    --radius-sm: 8px;
+    --font: 'Inter', system-ui, -apple-system, sans-serif;
+    --transition: all 0.2s ease;
+    --glow: rgba(139,92,246,0.25);
+  }
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: var(--font); min-height: 100vh; }
+
+  /* ─── HEADER ───────────────────────────────────────────────────── */
+  .rpt-nav {
+    display: flex; align-items: center; gap: 12px;
+    padding: 14px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .rpt-nav .brand { font-size: 15px; font-weight: 700; color: var(--text); }
+  .rpt-nav .brand span { color: var(--accent); }
+  .rpt-nav .spacer { flex: 1; }
+  .btn-back {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); font-size: 12px; font-weight: 500;
+    padding: 6px 14px; border-radius: var(--radius-sm); cursor: pointer;
+    text-decoration: none; transition: var(--transition);
+  }
+  .btn-back:hover { border-color: var(--accent); color: var(--accent); }
+
+  /* ─── FILTERS ─────────────────────────────────────────────────── */
+  .filters-bar {
+    display: flex; gap: 10px; align-items: center; flex-wrap: wrap;
+    padding: 16px 24px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+  }
+  .filter-label { font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 4px; }
+  select, input[type=date] {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--text); font-family: var(--font); font-size: 12px;
+    padding: 7px 12px; border-radius: var(--radius-sm); cursor: pointer;
+    transition: var(--transition); outline: none;
+  }
+  select:hover, input[type=date]:hover { border-color: var(--accent); }
+  select:focus, input[type=date]:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+  .btn-run {
+    background: linear-gradient(135deg, var(--accent), #7c3aed);
+    border: none; color: #fff; font-weight: 600; font-size: 13px;
+    padding: 8px 20px; border-radius: var(--radius-sm); cursor: pointer;
+    box-shadow: 0 0 12px var(--glow); transition: var(--transition);
+    font-family: var(--font);
+  }
+  .btn-run:hover { transform: scale(1.03); box-shadow: 0 0 20px var(--glow); }
+  .btn-run:active { transform: scale(0.98); }
+  .btn-print {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--muted); font-size: 12px; font-weight: 500;
+    padding: 7px 14px; border-radius: var(--radius-sm); cursor: pointer;
+    transition: var(--transition); font-family: var(--font);
+  }
+  .btn-print:hover { border-color: var(--teal); color: var(--teal); }
+
+  /* ─── MAIN ─────────────────────────────────────────────────────── */
+  .main { padding: 24px; max-width: 1400px; margin: 0 auto; }
+
+  /* KPI Cards */
+  .kpi-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px; margin-bottom: 24px; }
+  .kpi-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 18px 20px;
+    transition: var(--transition); cursor: default;
+    position: relative; overflow: hidden;
+  }
+  .kpi-card::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(135deg, transparent 70%, rgba(139,92,246,0.06));
+    pointer-events: none;
+  }
+  .kpi-card:hover { border-color: rgba(139,92,246,0.35); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+  .kpi-icon { font-size: 26px; margin-bottom: 10px; display: block; }
+  .kpi-value { font-size: 28px; font-weight: 800; color: var(--text); line-height: 1; margin-bottom: 4px; }
+  .kpi-value.accent { color: var(--accent); }
+  .kpi-value.teal { color: var(--teal); }
+  .kpi-value.success { color: var(--success); }
+  .kpi-value.warn { color: var(--warn); }
+  .kpi-label { font-size: 11px; color: var(--muted); font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+  .kpi-sub { font-size: 11px; color: var(--muted); margin-top: 6px; }
+
+  /* Chart panel */
+  .chart-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 24px; }
+  @media (max-width: 900px) { .chart-grid { grid-template-columns: 1fr; } }
+  .chart-card {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: var(--radius); padding: 20px;
+    transition: var(--transition);
+  }
+  .chart-card:hover { border-color: rgba(139,92,246,0.2); }
+  .chart-card.full-width { grid-column: 1 / -1; }
+  .chart-title { font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+  .chart-wrap { position: relative; height: 260px; }
+
+  /* Data table */
+  .data-section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); overflow: hidden; }
+  .data-header { padding: 16px 20px; border-bottom: 1px solid var(--border); display: flex; align-items: center; justify-content: space-between; }
+  .data-header .title { font-size: 13px; font-weight: 600; }
+  table.data-table { width: 100%; border-collapse: collapse; }
+  table.data-table th { background: var(--surface2); color: var(--muted); font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; padding: 10px 16px; text-align: left; }
+  table.data-table td { padding: 10px 16px; font-size: 13px; border-bottom: 1px solid var(--border); }
+  table.data-table tr:last-child td { border-bottom: none; }
+  table.data-table tr:hover td { background: var(--surface2); }
+  .num { text-align: right; font-variant-numeric: tabular-nums; }
+  .badge { font-size: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 600; }
+  .badge.fe { background: rgba(34,197,94,0.15); color: var(--success); }
+  .badge.no-fe { background: rgba(245,158,11,0.15); color: var(--warn); }
+
+  /* Loading state */
+  .loading { display: flex; align-items: center; justify-content: center; gap: 12px; padding: 60px; color: var(--muted); }
+  .spinner { width: 20px; height: 20px; border: 2px solid var(--border); border-top-color: var(--accent); border-radius: 50%; animation: spin 0.7s linear infinite; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+  .error-state { text-align: center; padding: 40px; color: var(--danger); }
+  .empty-state { text-align: center; padding: 40px; color: var(--muted); font-size: 13px; }
+
+  /* Iframe doc viewer */
+  .doc-viewer {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.8); backdrop-filter: blur(4px);
+    display: none; align-items: center; justify-content: center;
+  }
+  .doc-viewer.open { display: flex; }
+  .doc-frame-wrap {
+    background: #fff; border-radius: var(--radius); overflow: hidden;
+    width: 900px; max-width: 95vw; height: 90vh; position: relative;
+    box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+  }
+  .doc-close {
+    position: absolute; top: 12px; right: 12px; z-index: 10;
+    background: rgba(0,0,0,0.8); border: none; color: #fff;
+    width: 32px; height: 32px; border-radius: 50%; cursor: pointer;
+    font-size: 16px; display: flex; align-items: center; justify-content: center;
+  }
+  .doc-frame { width: 100%; height: 100%; border: none; }
+
+  @media print { .rpt-nav, .filters-bar, .doc-viewer { display: none !important; } }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="rpt-nav">
+  <div class="brand">⚡ <span>SUKI</span> · Reportes</div>
+  <div class="spacer"></div>
+  <button class="btn-print" onclick="window.print()">🖨 Imprimir</button>
+  <a href="javascript:history.back()" class="btn-back">← Volver</a>
+</div>
+
+<!-- Filters -->
+<div class="filters-bar">
+  <span class="filter-label">Reporte</span>
+  <select id="selectReport">
+    <option value="ventas_resumen">Ventas — Resumen</option>
+    <option value="ventas_por_dia">Ventas por Día</option>
+    <option value="ventas_por_categoria">Ventas por Categoría</option>
+    <option value="kpi_dashboard">KPI Dashboard</option>
+    <option value="cuentas_cobrar">Cuentas por Cobrar</option>
+    <option value="inventario_bajo">Inventario bajo mínimo</option>
+  </select>
+
+  <span class="filter-label" style="margin-left:8px;">Desde</span>
+  <input type="date" id="filterDesde">
+
+  <span class="filter-label">Hasta</span>
+  <input type="date" id="filterHasta">
+
+  <button class="btn-run" id="btnRun">▶ Ejecutar</button>
+
+  <div style="margin-left:auto; display:flex; gap:8px;" id="docButtons" style="display:none!important;">
+    <button class="btn-print" id="btnOpenDoc" style="display:none;" onclick="openDoc()">📄 Ver Documento</button>
+  </div>
+</div>
+
+<!-- Main -->
+<div class="main" id="mainContent">
+  <div class="loading" id="loadingState" style="display:none;">
+    <div class="spinner"></div>
+    <span>Cargando datos del reporte...</span>
+  </div>
+
+  <!-- KPI Row -->
+  <div class="kpi-row" id="kpiRow"></div>
+
+  <!-- Charts -->
+  <div class="chart-grid" id="chartGrid"></div>
+
+  <!-- Data Table -->
+  <div class="data-section" id="dataSection" style="display:none;">
+    <div class="data-header">
+      <div class="title" id="tableTitle">Detalle</div>
+      <div style="font-size:11px;color:var(--muted);" id="tableCount"></div>
+    </div>
+    <div style="overflow-x:auto;">
+      <table class="data-table"><thead id="tableThead"></thead><tbody id="tableTbody"></tbody></table>
+    </div>
+  </div>
+
+  <!-- Welcome state -->
+  <div class="empty-state" id="welcomeState">
+    <div style="font-size:48px;margin-bottom:16px;">📊</div>
+    <div style="font-size:15px;font-weight:600;color:var(--text);margin-bottom:8px;">Centro de Reportes</div>
+    <div>Selecciona un reporte y el período para generar el análisis.</div>
+  </div>
+</div>
+
+<!-- Document inline viewer -->
+<div class="doc-viewer" id="docViewer">
+  <div class="doc-frame-wrap">
+    <button class="doc-close" onclick="closeDoc()">✕</button>
+    <iframe class="doc-frame" id="docFrame" title="Documento"></iframe>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+  'use strict';
+
+  // ─── Config ──────────────────────────────
+  const API_BASE = './';
+  const COLORS = [
+    { bg: 'rgba(139,92,246,0.75)',  b: '#8b5cf6' },
+    { bg: 'rgba(20,184,166,0.75)', b: '#14b8a6' },
+    { bg: 'rgba(245,158,11,0.75)', b: '#f59e0b' },
+    { bg: 'rgba(34,197,94,0.75)',  b: '#22c55e' },
+    { bg: 'rgba(239,68,68,0.75)',  b: '#ef4444' },
+    { bg: 'rgba(59,130,246,0.75)', b: '#3b82f6' },
+  ];
+
+  // ─── State ───────────────────────────────
+  let charts = {};
+  let lastData = null;
+
+  // ─── Init ────────────────────────────────
+  const today  = new Date().toISOString().slice(0, 10);
+  const first  = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+  document.getElementById('filterDesde').value = first;
+  document.getElementById('filterHasta').value = today;
+
+  document.getElementById('btnRun').addEventListener('click', runReport);
+
+  // ─── Run report ───────────────────────────
+  async function runReport() {
+    const type  = document.getElementById('selectReport').value;
+    const desde = document.getElementById('filterDesde').value;
+    const hasta = document.getElementById('filterHasta').value;
+
+    showLoading();
+
+    try {
+      const params = new URLSearchParams({ route: 'report/dynamic', report_type: type, desde, hasta, format: 'json' });
+      const res    = await fetch(`api.php?${params}`, { headers: { 'X-Requested-With': 'XMLHttpRequest' } });
+      const json   = await res.json();
+
+      if (!res.ok || json.status !== 'success') {
+        showError(json.message || 'Error al cargar el reporte.');
+        return;
+      }
+
+      lastData = json.data ?? {};
+      hideLoading();
+      document.getElementById('welcomeState').style.display = 'none';
+      renderReport(lastData, type);
+
+    } catch (err) {
+      showError('Error de red: ' + err.message);
+    }
+  }
+
+  // ─── Render ───────────────────────────────
+  function renderReport(data, type) {
+    // Destroy old charts
+    Object.values(charts).forEach(c => c.destroy());
+    charts = {};
+
+    renderKPIs(data);
+    renderCharts(data, type);
+    renderTable(data, type);
+  }
+
+  function renderKPIs(data) {
+    const row    = document.getElementById('kpiRow');
+    const summary = data.summary ?? {};
+    const kpis   = data.kpis ?? [];
+
+    // From summary object
+    const items = kpis.length > 0 ? kpis : Object.entries(summary).map(([k, v]) => ({
+      label: k.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+      value: v,
+      format: typeof v === 'number' && (k.includes('total') || k.includes('monto') || k.includes('venta')) ? 'currency' : 'number',
+      icon: '📊',
+      color: 'accent',
+    }));
+
+    if (!items.length) { row.innerHTML = ''; return; }
+
+    row.innerHTML = items.map((kpi, i) => {
+      const colors = ['accent', 'teal', 'success', 'warn'];
+      const color = kpi.color ?? colors[i % colors.length];
+      const val   = kpi.format === 'currency' ? formatCur(kpi.value) : formatNum(kpi.value);
+      return `<div class="kpi-card">
+        <span class="kpi-icon">${kpi.icon ?? '📊'}</span>
+        <div class="kpi-value ${color}">${val}</div>
+        <div class="kpi-label">${kpi.label}</div>
+        ${kpi.sub ? `<div class="kpi-sub">${kpi.sub}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  function renderCharts(data, type) {
+    const grid   = document.getElementById('chartGrid');
+    const labels = data.labels ?? [];
+    const datasets = data.datasets ?? [];
+    const chartType = data.chart_type ?? 'bar';
+
+    grid.innerHTML = '';
+
+    if (!labels.length || !datasets.length) return;
+
+    // Primary chart
+    const card1 = document.createElement('div');
+    card1.className = 'chart-card full-width';
+    card1.innerHTML = `<div class="chart-title">📈 ${data.chart_title ?? 'Gráfica'}</div><div class="chart-wrap"><canvas id="chartMain"></canvas></div>`;
+    grid.appendChild(card1);
+
+    charts.main = buildChart('chartMain', chartType, labels, datasets);
+
+    // If has secondary data (e.g. donut breakdown)
+    if (data.secondary_labels && data.secondary_datasets) {
+      const card2 = document.createElement('div');
+      card2.className = 'chart-card';
+      card2.innerHTML = `<div class="chart-title">🍩 Distribución</div><div class="chart-wrap"><canvas id="chartSec"></canvas></div>`;
+      grid.appendChild(card2);
+      charts.sec = buildChart('chartSec', 'doughnut', data.secondary_labels, data.secondary_datasets);
+      card1.className = 'chart-card'; // remove full-width
+    }
+  }
+
+  function buildChart(id, type, labels, datasets) {
+    const ctx = document.getElementById(id);
+    if (!ctx) return null;
+    const ds = datasets.map((d, i) => {
+      const c = COLORS[i % COLORS.length];
+      return {
+        label: d.label ?? '',
+        data: d.data ?? [],
+        backgroundColor: type === 'line' || type === 'scatter' ? c.bg : (d.data ?? []).map(() => c.bg),
+        borderColor: c.b,
+        borderWidth: 2,
+        tension: 0.4,
+        fill: type === 'line',
+        pointRadius: type === 'line' ? 4 : 0,
+      };
+    });
+    return new Chart(ctx, {
+      type: type === 'doughnut' ? 'doughnut' : (type === 'line' ? 'line' : 'bar'),
+      data: { labels, datasets: ds },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { color: '#94a3b8', font: { size: 11 } } },
+          tooltip: {
+            backgroundColor: '#1a1d27', borderColor: 'rgba(255,255,255,0.1)', borderWidth: 1,
+            titleColor: '#e2e8f0', bodyColor: '#94a3b8', padding: 10,
+            callbacks: { label: ctx => ` ${ctx.dataset.label}: ${formatNum(ctx.parsed.y ?? ctx.parsed)}` }
+          }
+        },
+        scales: type !== 'doughnut' ? {
+          x: { ticks: { color: '#64748b', font: { size: 11 } }, grid: { color: 'rgba(255,255,255,0.04)' } },
+          y: { ticks: { color: '#64748b', font: { size: 11 }, callback: v => formatNum(v) }, grid: { color: 'rgba(255,255,255,0.04)' } }
+        } : {}
+      }
+    });
+  }
+
+  function renderTable(data, type) {
+    const section = document.getElementById('dataSection');
+    const rows    = data.table_rows ?? [];
+    const cols    = data.table_columns ?? Object.keys(rows[0] ?? {});
+
+    if (!rows.length || !cols.length) { section.style.display = 'none'; return; }
+
+    document.getElementById('tableTitle').textContent = data.chart_title ?? 'Detalle del Reporte';
+    document.getElementById('tableCount').textContent = `${rows.length} registros`;
+
+    const numCols = new Set(['total', 'monto', 'subtotal', 'tax', 'valor', 'cantidad', 'count', 'ventas', 'compras', 'saldo']);
+    const isNum   = (col) => [...numCols].some(k => col.toLowerCase().includes(k));
+
+    document.getElementById('tableThead').innerHTML = `<tr>${cols.map(c => `<th class="${isNum(c) ? 'num' : ''}">${c.replace(/_/g,' ')}</th>`).join('')}</tr>`;
+    document.getElementById('tableTbody').innerHTML = rows.map(row =>
+      `<tr>${cols.map(c => {
+        const v = row[c] ?? '';
+        const isN = isNum(c);
+        const disp = (isN && typeof v === 'number') ? (c.includes('total') || c.includes('monto') || c.includes('ventas') ? formatCur(v) : formatNum(v)) : v;
+        if (c === 'tipo_doc' || c === 'is_electronic') {
+          return `<td><span class="badge ${v === 1 || v === 'FE' ? 'fe' : 'no-fe'}">${v === 1 || v === 'FE' ? 'FE' : 'No-FE'}</span></td>`;
+        }
+        return `<td class="${isN ? 'num' : ''}">${disp}</td>`;
+      }).join('')}</tr>`
+    ).join('');
+
+    section.style.display = '';
+  }
+
+  // ─── Document viewer ─────────────────────
+  window.openDoc = function(url) {
+    if (url) document.getElementById('docFrame').src = url;
+    document.getElementById('docViewer').classList.add('open');
+  };
+  window.closeDoc = function() {
+    document.getElementById('docViewer').classList.remove('open');
+    document.getElementById('docFrame').src = '';
+  };
+
+  // ─── Formatters ──────────────────────────
+  function formatCur(v) { return '$ ' + Number(v ?? 0).toLocaleString('es-CO', {minimumFractionDigits: 0}); }
+  function formatNum(v) { return Number(v ?? 0).toLocaleString('es-CO'); }
+
+  // ─── Loading ─────────────────────────────
+  function showLoading() {
+    document.getElementById('loadingState').style.display = 'flex';
+    document.getElementById('kpiRow').innerHTML = '';
+    document.getElementById('chartGrid').innerHTML = '';
+    document.getElementById('dataSection').style.display = 'none';
+    document.getElementById('welcomeState').style.display = 'none';
+  }
+  function hideLoading() {
+    document.getElementById('loadingState').style.display = 'none';
+  }
+  function showError(msg) {
+    hideLoading();
+    document.getElementById('kpiRow').innerHTML = `<div class="error-state">⚠️ ${msg}</div>`;
+  }
+
+})();
+</script>
+</body>
+</html>

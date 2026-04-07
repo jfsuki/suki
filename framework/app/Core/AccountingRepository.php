@@ -80,6 +80,19 @@ final class AccountingRepository
             ->orderBy('fecha', 'DESC')
             ->limit(max(1, min(200, $limit)));
 
+        if (isset($filters['is_electronic'])) {
+            $qb->where('is_electronic', '=', (int) $filters['is_electronic']);
+        }
+        if (!empty($filters['doc_type'])) {
+            $qb->where('doc_type', '=', $filters['doc_type']);
+        }
+        if (!empty($filters['fecha_from'])) {
+            $qb->where('fecha', '>=', $filters['fecha_from']);
+        }
+        if (!empty($filters['fecha_to'])) {
+            $qb->where('fecha', '<=', $filters['fecha_to']);
+        }
+
         return $qb->get();
     }
 
@@ -115,9 +128,14 @@ final class AccountingRepository
                     total_haber DECIMAL(15,2) DEFAULT 0,
                     estado TEXT DEFAULT 'BORRADOR',
                     usuario_id TEXT NOT NULL,
+                    is_electronic INTEGER NOT NULL DEFAULT 0,
+                    cufe TEXT NOT NULL DEFAULT '',
+                    doc_type TEXT NOT NULL DEFAULT 'manual',
                     created_at DATETIME,
                     updated_at DATETIME
                 );
+                CREATE INDEX IF NOT EXISTS idx_journal_tenant ON {$journalTable}(tenant_id, fecha);
+                CREATE INDEX IF NOT EXISTS idx_journal_electronic ON {$journalTable}(tenant_id, is_electronic, fecha);
 
                 CREATE TABLE IF NOT EXISTS {$lineTable} (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -169,10 +187,14 @@ final class AccountingRepository
                     total_haber DECIMAL(15,2) DEFAULT 0,
                     estado ENUM('BORRADOR', 'CONTABILIZADO', 'ANULADO') DEFAULT 'BORRADOR',
                     usuario_id VARCHAR(50) NOT NULL,
+                    is_electronic TINYINT(1) NOT NULL DEFAULT 0,
+                    cufe VARCHAR(200) NOT NULL DEFAULT '',
+                    doc_type VARCHAR(64) NOT NULL DEFAULT 'manual',
                     created_at DATETIME,
                     updated_at DATETIME,
                     INDEX idx_tenant (tenant_id),
-                    INDEX idx_fecha (fecha)
+                    INDEX idx_fecha (fecha),
+                    INDEX idx_electronic (tenant_id, is_electronic, fecha)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
                 CREATE TABLE IF NOT EXISTS {$lineTable} (
