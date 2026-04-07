@@ -30,10 +30,40 @@ final class InventoryService
             throw new RuntimeException('Product SKU already exists in this tenant.');
         }
 
-        $data['tenant_id'] = $tenantId;
         $id = $this->repository->createProduct($data);
         
         return $this->repository->findProduct($tenantId, $id) ?? [];
+    }
+
+    /**
+     * Mass import products (from CSV/Excel mapping)
+     * @param array<int, array<string, mixed>> $rows
+     */
+    public function importProducts(string $tenantId, array $rows): array
+    {
+        $prepared = [];
+        foreach ($rows as $row) {
+            if (empty($row['sku']) || empty($row['nombre'])) continue;
+            
+            $prepared[] = [
+                'tenant_id' => $tenantId,
+                'sku' => (string) $row['sku'],
+                'nombre' => (string) $row['nombre'],
+                'descripcion' => (string) ($row['descripcion'] ?? ''),
+                'precio_venta' => (float) ($row['precio_venta'] ?? 0),
+                'stock_actual' => (float) ($row['stock_actual'] ?? 0),
+                'stock_minimo' => (float) ($row['stock_minimo'] ?? 5),
+                'categoria' => (string) ($row['categoria'] ?? 'General'),
+            ];
+        }
+
+        $count = $this->repository->bulkCreateProducts($prepared);
+        
+        return [
+            'ok' => true,
+            'count' => $count,
+            'message' => "Se han importado {$count} productos correctamente."
+        ];
     }
 
     /**

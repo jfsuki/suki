@@ -22,7 +22,83 @@ include __DIR__ . '/includes/navbar.php';
       min-height: 0;
       overflow: hidden;
       transition: var(--transition);
+      position: relative;
     }
+    .panel-view {
+      position: absolute;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: var(--surface);
+      z-index: 10;
+      display: none;
+      flex-direction: column;
+      animation: fadeIn 0.3s ease;
+    }
+    .panel-view.active { display: flex; }
+    @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+    /* ─── KANBAN STYLES ───────────────────────────────────────── */
+    .kanban-board {
+      display: flex;
+      gap: 16px;
+      padding: 16px;
+      overflow-x: auto;
+      flex: 1;
+      background: var(--surface2);
+    }
+    .kanban-col {
+      min-width: 280px;
+      max-width: 320px;
+      background: rgba(100,116,139,0.05);
+      border-radius: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding: 12px;
+      border: 1px solid var(--border);
+    }
+    .kanban-col-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 0 4px 8px;
+    }
+    .kanban-col-title { font-size: 12px; font-weight: 700; text-transform: uppercase; color: var(--muted); letter-spacing: 0.5px; }
+    .kanban-col-count { background: var(--border); color: var(--text); font-size: 10px; padding: 2px 8px; border-radius: 10px; }
+    .kanban-items { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; min-height: 50px; }
+    .kanban-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 12px;
+      box-shadow: var(--shadow-sm);
+      cursor: grab;
+      transition: var(--transition);
+    }
+    .kanban-card:hover { border-color: var(--accent); transform: translateY(-2px); box-shadow: var(--shadow-md); }
+    .kanban-card-title { font-size: 13px; font-weight: 600; margin-bottom: 4px; }
+    .kanban-card-sub { font-size: 11px; color: var(--muted); margin-bottom: 8px; }
+    .kanban-card-foot { display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border); padding-top: 8px; font-size: 11px; }
+    .kanban-card-price { font-weight: 700; color: var(--teal); }
+
+    /* ─── DASHBOARD STYLES ────────────────────────────────────── */
+    .dash-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+      padding: 20px;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      padding: 20px;
+      border-radius: 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .stat-val { font-size: 24px; font-weight: 700; color: var(--text); }
+    .stat-label { font-size: 12px; color: var(--muted); font-weight: 500; }
+    .chart-container { padding: 0 20px 20px; flex: 1; min-height: 300px; display: flex; align-items: center; justify-content: center; }
     .panel-head {
       padding: 14px 16px;
       border-bottom: 1px solid var(--border);
@@ -317,10 +393,69 @@ include __DIR__ . '/includes/navbar.php';
       box-shadow: 0 0 6px var(--accent);
     }
 
+    /* ─── ACTION BUTTONS ─────────────────────────────────────── */
+    .action-btn {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 14px; margin-bottom: 10px;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: var(--radius); cursor: pointer;
+      text-decoration: none; color: var(--text);
+      font-size: 13px; font-weight: 600;
+      transition: var(--transition);
+    }
+    .action-btn:hover { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-1px); }
+    .action-btn i { font-style: normal; font-size: 18px; }
+    .action-btn.primary {
+      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      color: #fff; border: none; box-shadow: 0 4px 12px var(--glow);
+    }
+    .action-btn.primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px var(--glow); }
+
+    /* ─── MODAL ──────────────────────────────────────────────── */
+    .modal-overlay {
+      position: fixed; inset: 0; z-index: 1000;
+      background: rgba(0,0,0,0.8); backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center;
+      padding: 20px;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal-card {
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); width: 100%; max-width: 500px;
+      box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+      animation: modalIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+    }
+    @keyframes modalIn { from { opacity: 0; transform: scale(0.9); } to { opacity: 1; transform: scale(1); } }
+    .modal-head {
+      padding: 18px 20px; border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .modal-head h2 { font-size: 15px; font-weight: 700; }
+    .modal-body { padding: 20px; }
+    .modal-foot { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; justify-content: flex-end; gap: 10px; }
+    
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 11px; color: var(--muted); font-weight: 600; text-transform: uppercase; margin-bottom: 6px; }
+    .form-input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      color: var(--text); padding: 10px 12px; border-radius: var(--radius-sm);
+      font-size: 13px; outline: none; transition: var(--transition);
+    }
+    .form-input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+
     /* responsive */
     @media (max-width: 900px) {
-      .layout { grid-template-columns: 1fr; }
+      .layout { grid-template-columns: 1fr; padding: 0; gap: 0; }
       .layout > *:not(.chat-panel) { display: none; }
+      .panel { border: none; border-radius: 0; height: 100vh; }
+      .chat-messages { padding: 12px; }
+      .view-tabs { 
+        position: absolute; 
+        bottom: 70px; right: 12px; 
+        flex-direction: column; 
+        z-index: 100;
+        box-shadow: var(--shadow-lg);
+      }
     }
   </style>
 </head>
@@ -349,6 +484,15 @@ include __DIR__ . '/includes/navbar.php';
       <h3>Proyecto Activo</h3>
     </div>
     <div class="panel-body">
+      
+      <!-- FAST ACTIONS -->
+      <a href="reports.html" target="_blank" class="action-btn primary">
+        <i>📊</i> Ver Dashboard de Reportes
+      </a>
+      <button class="action-btn" onclick="openSmtpSettings()">
+        <i>📧</i> Configurar Correo (SMTP)
+      </button>
+
       <div class="section-lbl">Tablas creadas</div>
       <div class="entity-list" id="entityList">
         <div class="empty-hint">
@@ -362,32 +506,58 @@ include __DIR__ . '/includes/navbar.php';
     </div>
   </div>
 
-  <!-- PANEL CENTRO: Chat -->
-  <div class="panel chat-panel">
+  <!-- PANEL CENTRO: Multi-View Panel -->
+  <div class="panel chat-panel" style="position: relative;">
     <div class="panel-head">
       <div class="panel-icon purple">💬</div>
-      <h3>Chat con SUKI Builder</h3>
+      <h3 id="panelTitle">Chat con SUKI Builder</h3>
+      <div class="view-tabs" style="display: flex; gap: 8px; background: var(--surface2); padding: 4px; border-radius: 10px; border: 1px solid var(--border);">
+        <button onclick="switchView('chat')" id="tab-chat" class="tab-btn active" style="border:0; background:var(--accent); color:#fff; font-size:10px; padding:4px 10px; border-radius:6px; cursor:pointer; font-weight:600;">CHAT</button>
+        <button onclick="switchView('kanban')" id="tab-kanban" class="tab-btn" style="border:0; background:transparent; color:var(--muted); font-size:10px; padding:4px 10px; border-radius:6px; cursor:pointer; font-weight:600;">KANBAN</button>
+        <button onclick="switchView('dash')" id="tab-dash" class="tab-btn" style="border:0; background:transparent; color:var(--muted); font-size:10px; padding:4px 10px; border-radius:6px; cursor:pointer; font-weight:600;">DASHBOARD</button>
+      </div>
     </div>
-    <div class="chat-messages" id="chatMessages">
-      <!-- Welcome -->
-      <div class="msg bot">
-        <div class="msg-avatar">S</div>
-        <div>
-          <div class="msg-bubble">
-            👋 Hola, soy <strong>SUKI</strong>, tu asistente de construcción.<br><br>
-            ¿Qué tipo de negocio quieres crear? Dímelo en una frase y lo armamos juntos. 🚀
+
+    <!-- VIEW: CHAT -->
+    <div id="view-chat" class="panel-view active" style="display:flex; flex-direction:column; flex:1; min-height:0;">
+      <div class="chat-messages" id="chatMessages">
+        <div class="msg bot">
+          <div class="msg-avatar">S</div>
+          <div>
+            <div class="msg-bubble">
+              👋 Hola, soy <strong>SUKI</strong>, tu asistente de construcción.<br><br>
+              ¿Qué tipo de negocio quieres crear? Dímelo en una frase y lo armamos juntos. 🚀
+            </div>
+            <div class="msg-meta">0ms · cache · agente: builder_onboarding</div>
           </div>
-          <div class="msg-meta">0ms · cache · agente: builder_onboarding</div>
+        </div>
+      </div>
+      <div class="chat-input-wrap">
+        <div class="chat-input-row">
+          <textarea id="chatInput" placeholder="Ej: tienda de ropa con inventario y ventas..."
+            rows="1" autocomplete="off"></textarea>
+          <button id="sendBtn" title="Enviar">➤</button>
+        </div>
+        <div class="input-hint">Enter para enviar · Shift+Enter nueva línea</div>
+      </div>
+    </div>
+
+    <!-- VIEW: KANBAN -->
+    <div id="view-kanban" class="panel-view" style="display:none; flex-direction:column; flex:1; min-height:0; background:var(--surface2);">
+      <div class="kanban-board" id="kanbanContainer">
+        <div class="empty-hint" style="margin:auto;">
+          <i class="fas fa-spinner fa-spin icon" style="font-size:24px; margin-bottom:10px; display:block;"></i>
+          Cargando tablero...
         </div>
       </div>
     </div>
-    <div class="chat-input-wrap">
-      <div class="chat-input-row">
-        <textarea id="chatInput" placeholder="Ej: tienda de ropa con inventario y ventas..."
-          rows="1" autocomplete="off"></textarea>
-        <button id="sendBtn" title="Enviar">➤</button>
+
+    <!-- VIEW: DASHBOARD -->
+    <div id="view-dash" class="panel-view" style="display:none; flex-direction:column; flex:1; min-height:0;">
+      <div class="dash-grid" id="dashSummary"></div>
+      <div class="chart-container" style="flex:1; padding:20px; display:flex; align-items:center;">
+        <canvas id="mainChart" style="max-height: 300px; width:100%;"></canvas>
       </div>
-      <div class="input-hint">Enter para enviar · Shift+Enter nueva línea</div>
     </div>
   </div>
 
@@ -489,6 +659,7 @@ include __DIR__ . '/includes/navbar.php';
   </div>
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 // ════════════════════════════════════════════
 // SUKI Builder Chat — v2 Multi-Agent Pipeline
@@ -503,6 +674,129 @@ include __DIR__ . '/includes/navbar.php';
   const testPre    = document.getElementById('testInfoPre');
   const entityList = document.getElementById('entityList');
   const formList   = document.getElementById('formList');
+  
+  const kanbanContainer = document.getElementById('kanbanContainer');
+  const dashSummary     = document.getElementById('dashSummary');
+  let   myChart         = null;
+
+  // ── View Switcher ─────────────────────────
+  window.switchView = (view) => {
+    document.querySelectorAll('.panel-view').forEach(v => v.style.display = 'none');
+    document.getElementById(`view-${view}`).style.display = 'flex';
+    
+    document.querySelectorAll('.tab-btn').forEach(b => {
+      b.classList.remove('active');
+      b.style.background = 'transparent';
+      b.style.color = 'var(--muted)';
+    });
+    
+    const activeTab = document.getElementById(`tab-${view}`);
+    activeTab.classList.add('active');
+    activeTab.style.background = 'var(--accent)';
+    activeTab.style.color = '#fff';
+    
+    const titles = { chat: 'Chat con SUKI Builder', kanban: 'Tablero Comercial', dash: 'Métricas de Negocio' };
+    document.getElementById('panelTitle').textContent = titles[view];
+
+    if(view === 'kanban') loadKanban();
+    if(view === 'dash')   loadDashboard();
+  };
+
+  window.loadKanban = async () => {
+    try {
+      const res = await fetch('api.php?route=kanban/get&type=quotes');
+      const json = await res.json();
+      if(json.status !== 'success') throw new Error(json.message);
+      
+      kanbanContainer.innerHTML = '';
+      const cols = json.data.columns;
+      for(const k in cols) {
+        const col = cols[k];
+        const colDiv = document.createElement('div');
+        colDiv.className = 'kanban-col';
+        colDiv.innerHTML = `
+          <div class="kanban-col-head">
+            <span class="kanban-col-title">${col.title}</span>
+            <span class="kanban-col-count">${col.items.length}</span>
+          </div>
+          <div class="kanban-items" ondragover="event.preventDefault()" ondrop="dropCard(event, '${k}')">
+            ${col.items.map(i => `
+              <div class="kanban-card" draggable="true" ondragstart="dragCard(event, '${i.id}', 'quote')">
+                <div class="kanban-card-title">${i.title}</div>
+                <div class="kanban-card-sub">${i.subtitle}</div>
+                <div class="kanban-card-foot">
+                  <span class="kanban-card-price">$${new Intl.NumberFormat().format(i.amount)}</span>
+                </div>
+              </div>
+            `).join('')}
+          </div>
+        `;
+        kanbanContainer.appendChild(colDiv);
+      }
+    } catch(e) { kanbanContainer.innerHTML = `<div class="empty-hint">Error: ${e.message}</div>`; }
+  };
+
+  window.dragCard = (ev, id, type) => {
+    ev.dataTransfer.setData("cardId", id);
+    ev.dataTransfer.setData("cardType", type);
+  };
+
+  window.dropCard = async (ev, newStatus) => {
+    ev.preventDefault();
+    const id = ev.dataTransfer.getData("cardId");
+    const type = ev.dataTransfer.getData("cardType");
+    try {
+      await fetch('api.php?route=kanban/move', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, type, status: newStatus })
+      });
+      loadKanban();
+    } catch(e) { console.error(e); }
+  };
+
+  window.loadDashboard = async () => {
+    try {
+      const res = await fetch('api.php?route=dashboard/metrics');
+      const json = await res.json();
+      if(json.status !== 'success') throw new Error(json.message);
+      
+      const sum = json.data.summary;
+      dashSummary.innerHTML = `
+        <div class="stat-card">
+          <span class="stat-label">Ventas</span>
+          <span class="stat-val" style="color:var(--teal)">$${new Intl.NumberFormat().format(sum.total_sales)}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Gastos</span>
+          <span class="stat-val" style="color:var(--danger)">$${new Intl.NumberFormat().format(sum.total_purchases)}</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-label">Activas</span>
+          <span class="stat-val">${sum.active_quotes}</span>
+        </div>
+      `;
+      renderChart(json.data.charts);
+    } catch(e) { dashSummary.innerHTML = `<div class="empty-hint">Error: ${e.message}</div>`; }
+  };
+
+  function renderChart(data) {
+    if(myChart) myChart.destroy();
+    const ctx = document.getElementById('mainChart').getContext('2d');
+    myChart = new Chart(ctx, {
+      type: 'line',
+      data: {
+        labels: data.labels,
+        datasets: [
+          { label: 'Ingresos', data: data.sales, borderColor: '#14b8a6', tension: 0.4, fill: true, backgroundColor: 'rgba(20,184,166,0.1)' },
+          { label: 'Egresos', data: data.expenses, borderColor: '#ef4444', tension: 0.4 }
+        ]
+      },
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, grid: { color: 'rgba(255,255,255,0.05)' } }, x: { grid: { display: false } } }
+      }
+    });
+  }
 
   // Counters
   let msgCount   = 0;
@@ -749,6 +1043,56 @@ include __DIR__ . '/includes/navbar.php';
       input.focus();
     }
   }
+
+  // ── SMTP Modal ──────────────────────────────
+  const smtpModal = document.getElementById('smtpModal');
+  const smtpFields = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass'];
+
+  window.openSmtpSettings = async () => {
+    smtpModal.classList.add('open');
+    try {
+      const res = await fetch('api/config/get');
+      const json = await res.json();
+      if (json.status === 'success') {
+        const d = json.data;
+        smtpFields.forEach(f => document.getElementById(f).value = d[f] || '');
+      }
+    } catch (e) { console.error('Error loading config', e); }
+  };
+
+  window.closeSmtpSettings = () => {
+    smtpModal.classList.remove('open');
+  };
+
+  window.saveSmtpSettings = async () => {
+    const payload = {};
+    smtpFields.forEach(f => payload[f] = document.getElementById(f).value);
+    
+    const btn = document.querySelector('#smtpModal .primary');
+    const oldText = btn.textContent;
+    btn.textContent = 'Guardando...';
+    btn.disabled = true;
+
+    try {
+      const res = await fetch('api/config/save', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      const json = await res.json();
+      if (json.status === 'success') {
+        alert('✅ Configuración de correo guardada correctamente.');
+        closeSmtpSettings();
+      } else {
+        alert('❌ Error: ' + (json.message || 'Fallo desconocido'));
+      }
+    } catch (e) {
+      alert('❌ Error de conexión al guardar.');
+    } finally {
+      btn.textContent = oldText;
+      btn.disabled = false;
+    }
+  };
 
   function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 

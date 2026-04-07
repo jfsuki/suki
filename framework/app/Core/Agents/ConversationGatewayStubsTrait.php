@@ -3,6 +3,8 @@
 
 namespace App\Core\Agents;
 
+use App\Core\Agents\Memory\MemoryWindow;
+
 trait ConversationGatewayStubsTrait
 {
     public function sessionKey(string $tenantId, string $projectId, string $mode, string $userId): string
@@ -722,7 +724,7 @@ trait ConversationGatewayStubsTrait
                 (string) ($this->contextTenantId ?? 'default'),
                 (string) ($this->contextUserId ?? 'anon')
             );
-
+ 
             return [
                 'action' => 'respond_local',
                 'reply' => $results['reply'] ?? '',
@@ -741,5 +743,17 @@ trait ConversationGatewayStubsTrait
                 'mapped_fields' => []
             ];
         }
+    }
+
+    public function memoryWindow(?string $tenantId = null, ?string $userId = null): MemoryWindow
+    {
+        $tenantId = $tenantId ?? $this->contextTenantId ?? 'default';
+        $userId = $userId ?? $this->contextUserId ?? 'anon';
+        
+        $window = new MemoryWindow(3);
+        $state = $this->loadState($tenantId, $userId, $this->contextProjectId ?? 'default', $this->contextMode ?? 'app');
+        $profile = $this->getProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId ?? 'default', $userId));
+        $window->hydrateFromState($state, $profile);
+        return $window;
     }
 }

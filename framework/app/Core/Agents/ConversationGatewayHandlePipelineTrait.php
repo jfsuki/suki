@@ -10,7 +10,10 @@ trait ConversationGatewayHandlePipelineTrait
     {
         $tenantId = $tenantId !== '' ? $tenantId : 'default';
         $userId = $userId !== '' ? $userId : 'anon';
-        $mode = strtolower(trim($mode)) === 'builder' ? 'builder' : 'app';
+        $mode = strtolower(trim($mode));
+        if (!in_array($mode, ['builder', 'app', 'marketplace'])) {
+            $mode = 'app';
+        }
         $this->contextProjectId = $projectId !== '' ? $projectId : 'default';
         $this->contextMode = $mode;
         $this->contextTenantId = $tenantId;
@@ -60,7 +63,8 @@ trait ConversationGatewayHandlePipelineTrait
         $confusionBase = $this->loadConfusionBase();
 
         // --- MEDIA & FILE INGESTION SIGNALS (Global Bridge) ---
-        if ($mode === 'builder' && preg_match('/\b(subir|enviar|adjuntar|importar|leer|cargar|excel|csv|pdf|xml|rut|foto|imagen|archivo)\b/i', $raw)) {
+        // --- MEDIA & FILE INGESTION SIGNALS (Global Bridge) ---
+        if (preg_match('/\b(subir|enviar|adjuntar|importar|leer|cargar|excel|csv|pdf|xml|rut|foto|imagen|archivo|inventario|productos)\b/i', $raw)) {
             $mediaSkill = new \App\Core\Skills\MediaIngestionSkill();
             $res = $mediaSkill->handle($raw, $state, $profile);
             if (!empty($res['reply'])) {
@@ -82,6 +86,21 @@ trait ConversationGatewayHandlePipelineTrait
             $state = $this->updateState($state, $raw, $reply, null, null, [], null);
             $this->saveState($tenantId, $userId, $state);
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('greeting', true));
+        }
+
+        // --- MARKETPLACE SALES BOT (Specialized mode) ---
+        if ($mode === 'marketplace') {
+            $salesSkill = new \App\Core\Skills\SalesBotSkill();
+            $res = $salesSkill->handle($raw, $state);
+
+            // Log de Leads y Dolores (Tracking)
+            $leadsRepo = new \App\Core\SalesLeadsRepository();
+            $leadsRepo->logLead($tenantId, $userId, $raw, $res['intent'] ?? 'unknown');
+
+            $reply = (string)$res['reply'];
+            $state = $this->updateState($state, $raw, $reply, null, null, [], 'sales_bot');
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('sales_bot', true));
         }
 
         if ($this->isBuilderOnboardingTrigger($normalizedBase) && $mode === 'builder' && ($state['active_task'] ?? '') !== 'builder_onboarding') {

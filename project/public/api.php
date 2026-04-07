@@ -1297,6 +1297,92 @@ if (str_starts_with($route, 'email/')) {
     return;
 }
 
+// ─── Configuración de Negocio (SMTP, Empresa, Logo) ────────────────────────────
+if (str_starts_with($route, 'config/')) {
+    $cAuth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($cAuth)) {
+        respondJson($response, 'error', 'Acceso denegado.', [], 401);
+        return;
+    }
+    $tenantId = (string) ($cAuth['tenant_id'] ?? '');
+    $userId   = (string) ($cAuth['id'] ?? 'system');
+    $cAction  = str_replace('config/', '', $route);
+    $payload  = requestData();
+
+    try {
+        $configService = new App\Core\BusinessConfigService();
+
+        if ($cAction === 'save') {
+           if ($method !== 'POST') {
+               respondJson($response, 'error', 'POST requerido para guardar config.', [], 405);
+               return;
+           }
+           $result = $configService->saveConfig($tenantId, $payload, $userId);
+           respondJson($response, 'success', 'Configuración guardada.', $result);
+        } elseif ($cAction === 'get') {
+           $result = $configService->getConfig($tenantId);
+           respondJson($response, 'success', 'Configuración cargada.', $result);
+        } else {
+           respondJson($response, 'error', "Acción config no reconocida: {$cAction}", [], 400);
+        }
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+    }
+    return;
+}
+
+// ─── Kanban & Tableros Visuales ──────────────────────────────────────────────
+if (str_starts_with($route, 'kanban/')) {
+    $cAuth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($cAuth)) {
+        respondJson($response, 'error', 'Acceso denegado.', [], 401);
+        return;
+    }
+    $tenantId = (string) ($cAuth['tenant_id'] ?? '');
+    $kAction  = str_replace('kanban/', '', $route);
+    $payload  = requestData();
+
+    try {
+        $kanbanService = new App\Core\KanbanService();
+
+        if ($kAction === 'get') {
+            $result = $kanbanService->getQuotesBoard($tenantId);
+            respondJson($response, 'success', 'Tablero cargado.', $result);
+        } elseif ($kAction === 'move') {
+            if ($method !== 'POST') {
+                respondJson($response, 'error', 'POST requerido para mover tarjeta.', [], 405);
+                return;
+            }
+            $result = $kanbanService->moveCard($tenantId, (string)($payload['type'] ?? 'quote'), (string)($payload['id'] ?? ''), (string)($payload['status'] ?? ''));
+            respondJson($response, 'success', 'Tarjeta movida.', ['ok' => $result]);
+        } else {
+            respondJson($response, 'error', "Acción kanban no reconocida: {$kAction}", [], 400);
+        }
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+    }
+    return;
+}
+
+// ─── Dashboard & Métricas ──────────────────────────────────────────────────
+if (str_starts_with($route, 'dashboard/')) {
+    $cAuth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($cAuth)) {
+        respondJson($response, 'error', 'Acceso denegado.', [], 401);
+        return;
+    }
+    $tenantId = (string) ($cAuth['tenant_id'] ?? '');
+
+    try {
+        $dashboardService = new App\Core\DashboardService();
+        $metrics = $dashboardService->getMetrics($tenantId);
+        respondJson($response, 'success', 'Métricas cargadas.', $metrics);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 422);
+    }
+    return;
+}
+
 // ─── Renderizado de Documentos Dinámicos ──────────────────────────────────────
 // Acceso requerido: sesión activa + rol válido por tipo de documento
 // CUFE y QR en facturas electrónicas provienen de Alanube (almacenados en fiscal_document.metadata)

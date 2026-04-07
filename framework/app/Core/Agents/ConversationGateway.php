@@ -48,6 +48,7 @@ class ConversationGateway
         ConversationGatewayBuilderOnboardingTrait::buildProjectStatus insteadof ConversationGatewayStubsTrait;
         ConversationGatewayBuilderOnboardingTrait::parseInstallPlaybookRequest insteadof ConversationGatewayStubsTrait;
         ConversationGatewayBuilderOnboardingTrait::detectBusinessType insteadof ConversationGatewayStubsTrait;
+        ConversationGatewayBuilderOnboardingTrait::memoryWindow insteadof ConversationGatewayStubsTrait;
     }
 
     protected $projectRoot;

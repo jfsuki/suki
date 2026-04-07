@@ -93,6 +93,30 @@ final class InventoryRepository
     }
 
     /**
+     * @param array<int, array<string, mixed>> $products
+     */
+    public function bulkCreateProducts(array $products): int
+    {
+        if (empty($products)) return 0;
+        
+        $this->db->beginTransaction();
+        try {
+            $count = 0;
+            foreach ($products as $data) {
+                $data['created_at'] = date('Y-m-d H:i:s');
+                $data['updated_at'] = $data['created_at'];
+                $this->insertRecord(self::PRODUCT_TABLE, array_keys($data), $data);
+                $count++;
+            }
+            $this->db->commit();
+            return $count;
+        } catch (\Throwable $e) {
+            if ($this->db->inTransaction()) $this->db->rollBack();
+            throw $e;
+        }
+    }
+
+    /**
      * @param array<string, mixed> $updates
      */
     public function updateProduct(string $tenantId, string $productId, array $updates): bool

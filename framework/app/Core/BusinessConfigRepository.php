@@ -66,6 +66,10 @@ final class BusinessConfigRepository
             'logo_path'         => (string) ($data['logo_path']         ?? $existing['logo_path']         ?? ''),
             'logo_base64'       => (string) ($data['logo_base64']       ?? $existing['logo_base64']       ?? ''),
             'currency'          => (string) ($data['currency']          ?? $existing['currency']          ?? 'COP'),
+            'smtp_host'         => (string) ($data['smtp_host']         ?? $existing['smtp_host']         ?? ''),
+            'smtp_port'         => (int)    ($data['smtp_port']         ?? $existing['smtp_port']         ?? 587),
+            'smtp_user'         => (string) ($data['smtp_user']         ?? $existing['smtp_user']         ?? ''),
+            'smtp_pass'         => (string) ($data['smtp_pass']         ?? $existing['smtp_pass']         ?? ''),
             'updated_at'        => $now,
         ];
 
@@ -137,6 +141,10 @@ final class BusinessConfigRepository
                 logo_path        TEXT NOT NULL DEFAULT \'\',
                 logo_base64      TEXT NOT NULL DEFAULT \'\',
                 currency         TEXT NOT NULL DEFAULT \'COP\',
+                smtp_host        TEXT NOT NULL DEFAULT \'\',
+                smtp_port        INTEGER NOT NULL DEFAULT 587,
+                smtp_user        TEXT NOT NULL DEFAULT \'\',
+                smtp_pass        TEXT NOT NULL DEFAULT \'\',
                 created_at       TEXT NOT NULL,
                 updated_at       TEXT NOT NULL
             )

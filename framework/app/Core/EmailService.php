@@ -117,23 +117,27 @@ final class EmailService
      */
     private function send(string $to, string $subject, string $htmlBody, string $tenantId): array
     {
-        $useSmtp = (bool) ((int) (getenv('USE_SMTP') ?: '0'));
+        $company = $this->configService->getConfig($tenantId);
+        
+        // Use SMTP if explicitly set in .env OR if tenant has a host configured
+        $useSmtp = (bool) ((int) (getenv('USE_SMTP') ?: '0')) 
+                || (($company['smtp_host'] ?? '') !== '');
 
         if ($useSmtp) {
-            return $this->sendSmtp($to, $subject, $htmlBody);
+            return $this->sendSmtp($to, $subject, $htmlBody, $company);
         }
 
-        return $this->sendNativeMail($to, $subject, $htmlBody);
+        return $this->sendNativeMail($to, $subject, $htmlBody, $company);
     }
 
     /**
      * Envío usando PHP mail() nativo — funciona en cPanel sin dependencias.
      * @return array<string, mixed>
      */
-    private function sendNativeMail(string $to, string $subject, string $htmlBody): array
+    private function sendNativeMail(string $to, string $subject, string $htmlBody, array $company = []): array
     {
-        $fromEmail = $this->fromEmail();
-        $fromName  = $this->fromName();
+        $fromEmail = $this->fromEmail($company);
+        $fromName  = $this->fromName($company);
         $boundary  = md5(uniqid((string) rand(), true));
 
         $headers  = "MIME-Version: 1.0\r\n";
@@ -161,15 +165,15 @@ final class EmailService
      * Envío SMTP nativo (sockets PHP) — sin PHPMailer, compatible con cPanel.
      * @return array<string, mixed>
      */
-    private function sendSmtp(string $to, string $subject, string $htmlBody): array
+    private function sendSmtp(string $to, string $subject, string $htmlBody, array $company = []): array
     {
-        $host     = (string) (getenv('SMTP_HOST') ?: 'localhost');
-        $port     = (int)    (getenv('SMTP_PORT') ?: 587);
-        $user     = (string) (getenv('SMTP_USER') ?: '');
-        $pass     = (string) (getenv('SMTP_PASS') ?: '');
+        $host     = (string) (($company['smtp_host'] ?? '') !== '' ? $company['smtp_host'] : (getenv('SMTP_HOST') ?: 'localhost'));
+        $port     = (int)    (($company['smtp_port'] ?? 0)  > 0   ? $company['smtp_port'] : (getenv('SMTP_PORT') ?: 587));
+        $user     = (string) (($company['smtp_user'] ?? '') !== '' ? $company['smtp_user'] : (getenv('SMTP_USER') ?: ''));
+        $pass     = (string) (($company['smtp_pass'] ?? '') !== '' ? $company['smtp_pass'] : (getenv('SMTP_PASS') ?: ''));
         $secure   = strtolower(trim((string) (getenv('SMTP_SECURE') ?: 'tls')));
-        $from     = $this->fromEmail();
-        $fromName = $this->fromName();
+        $from     = $this->fromEmail($company);
+        $fromName = $this->fromName($company);
 
         $context = stream_context_create(['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]]);
         $prefix  = $secure === 'ssl' ? 'ssl://' : '';
@@ -251,6 +255,7 @@ final class EmailService
      */
     private function buildDocumentLinkEmail(array $vars): string
     {
+        $_date   = date('d/m/Y H:i');
         $color   = htmlspecialchars((string)($vars['primary_color'] ?? '#1a56db'), ENT_QUOTES);
         $company = htmlspecialchars((string)($vars['company_name'] ?? ''), ENT_QUOTES);
         $label   = htmlspecialchars((string)($vars['doc_label'] ?? 'Documento'), ENT_QUOTES);
@@ -260,6 +265,7 @@ final class EmailService
         $msg     = htmlspecialchars((string)($vars['custom_message'] ?? ''), ENT_QUOTES);
         $cEmail  = htmlspecialchars((string)($vars['company_email'] ?? ''), ENT_QUOTES);
         $cPhone  = htmlspecialchars((string)($vars['company_phone'] ?? ''), ENT_QUOTES);
+        $cEmail_sep = ($cEmail !== '' && $cPhone !== '') ? ' · ' : '';
 
         $greeting = $toName !== '' ? "Hola, <strong>{$toName}</strong>:" : 'Estimado cliente:';
         $docTitle = $num !== '' ? "{$label} N° {$num}" : $label;
@@ -352,14 +358,17 @@ HTML;
 
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
-    private function fromEmail(): string
+    private function fromEmail(array $company = []): string
     {
+        if (($company['email'] ?? '') !== '') return $company['email'];
         $env = trim((string) (getenv('SMTP_FROM') ?: ''));
         return $env !== '' ? $env : ('noreply@' . ($_SERVER['HTTP_HOST'] ?? 'suki-erp.app'));
     }
 
-    private function fromName(): string
+    private function fromName(array $company = []): string
     {
+        if (($company['display_name'] ?? '') !== '') return $company['display_name'];
+        if (($company['company_name'] ?? '') !== '') return $company['company_name'];
         $env = trim((string) (getenv('SMTP_FROM_NAME') ?: ''));
         return $env !== '' ? $env : 'SUKI ERP';
     }

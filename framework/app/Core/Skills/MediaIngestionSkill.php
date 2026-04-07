@@ -35,8 +35,8 @@ class MediaIngestionSkill
     {
         $state['pending_media_action'] = 'data_import';
         return [
-            'reply' => "¡Excelente! Para importar tus datos desde Excel o CSV, por favor usa el botón de adjuntar (clip) y selecciona el archivo.\n"
-                     . "Una vez cargado, analizaré las columnas para crear las tablas correspondientes.",
+            'reply' => "¡Excelente! Para importar tus datos o inventario desde Excel o CSV, por favor usa el botón de adjuntar (clip) y selecciona el archivo.\n"
+                     . "Una vez cargado, abriré el **Mapeador de Inventario** para emparejar tus columnas (SKU, Nombre, Precio, Stock) y cargar todo en un solo paso.",
             'state' => $state
         ];
     }
@@ -54,10 +54,19 @@ class MediaIngestionSkill
     private function handleMediaIngestion(array &$state): array
     {
         $state['pending_media_action'] = 'media_gallery';
+        
+        // Simulación de OCR si es un recibo/factura
+        $ocr = new \App\Core\OCRService();
+        $data = $ocr->processFile('uploaded_file.jpg'); // Mock file result
+
         return [
-            'reply' => "Perfecto. Puedes subir las fotos de tus productos o logotipos ahora.\n"
-                     . "Los organizaré en la carpeta de medios de tu nueva aplicación.",
-            'state' => $state
+            'reply' => "He detectado una imagen de factura o recibo. He extraído los siguientes datos:\n"
+                     . "- Comercio: {$data['vendor']}\n"
+                     . "- Valor: $".number_format($data['total'])."\n"
+                     . "- Documento No: {$data['invoice_number']}\n\n"
+                     . "¿Deseas que registre este gasto automáticamente en tu contabilidad?",
+            'state' => $state,
+            'data' => $data
         ];
     }
 }

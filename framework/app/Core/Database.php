@@ -45,6 +45,14 @@ class Database
         return self::$pdo;
     }
 
+    /**
+     * Instance version of connection() for dependency injection.
+     */
+    public function getPdo(): PDO
+    {
+        return self::connection();
+    }
+
     private static function buildDsn(
         string $driver,
         string $host,
