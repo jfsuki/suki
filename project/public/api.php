@@ -109,6 +109,9 @@ use App\Core\PurchasesService;
 use App\Core\RoleContext;
 use App\Core\WebhookSecurityPolicy;
 use App\Core\Agents\ConversationQualityDashboard;
+use App\Core\DocumentRenderer;
+use App\Core\BusinessConfigService;
+use App\Core\ChartDataService;
 
 $route = trim($_GET['route'] ?? '');
 $manifestError = null;
@@ -1141,6 +1144,184 @@ if (str_starts_with($route, 'contracts/')) {
         respondJson($response, 'error', $e->getMessage(), [], 500);
     }
     return;
+}
+
+// ─── Renderizado de Documentos Dinámicos ──────────────────────────────────────
+// Acceso requerido: sesión activa + rol válido por tipo de documento
+// CUFE y QR en facturas electrónicas provienen de Alanube (almacenados en fiscal_document.metadata)
+if (str_starts_with($route, 'doc/render') || $route === 'doc/render') {
+    $type    = strtolower(trim((string) ($_GET['type'] ?? '')));
+    $id      = (string) ($_GET['id'] ?? '');
+    $reportType = (string) ($_GET['report_type'] ?? '');
+    $desde   = (string) ($_GET['desde'] ?? date('Y-m-01'));
+    $hasta   = (string) ($_GET['hasta'] ?? date('Y-m-d'));
+
+    // Requiere sesión activa — documentos son solo para usuarios autenticados
+    $docAuth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($docAuth)) {
+        respondJson($response, 'error', 'Acceso denegado — debes iniciar sesión para ver documentos.', [], 401);
+        return;
+    }
+    $tenantId = (string) ($_GET['tenant_id'] ?? $docAuth['tenant_id'] ?? '');
+    $userRole = strtolower(trim((string) ($docAuth['role'] ?? 'operator')));
+
+    if ($tenantId === '') {
+        respondJson($response, 'error', 'tenant_id requerido.', [], 400);
+        return;
+    }
+    if ($type === '') {
+        respondJson($response, 'error', 'type requerido (invoice, credit_note, purchase_order, remision, report).', [], 400);
+        return;
+    }
+
+    try {
+        $renderer = new DocumentRenderer();
+        $html = $renderer->render([
+            'type'        => $type,
+            'id'          => $id,
+            'tenant_id'   => $tenantId,
+            'user_role'   => $userRole,
+            'report_type' => $reportType,
+            'desde'       => $desde,
+            'hasta'       => $hasta,
+        ]);
+        header('Content-Type: text/html; charset=utf-8');
+        header('X-Frame-Options: SAMEORIGIN');
+        header('Content-Security-Policy: default-src \'self\' \'unsafe-inline\' https://cdn.jsdelivr.net; img-src \'self\' data: https:;');
+        echo $html;
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', 'Error al renderizar documento: ' . $e->getMessage(), [], 500);
+        return;
+    }
+}
+
+// ─── Configuración de Empresa (Business Config) ────────────────────────────────
+if ($route === 'business/config') {
+    $bAuth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($bAuth)) {
+        respondJson($response, 'error', 'Acceso denegado.', [], 401);
+        return;
+    }
+    $tenantId = (string) ($bAuth['tenant_id'] ?? '');
+    $userRole = strtolower(trim((string) ($bAuth['role'] ?? 'operator')));
+    if (!in_array($userRole, ['admin', 'owner', 'supervisor'], true)) {
+        respondJson($response, 'error', 'Solo administradores pueden cambiar la configuración de empresa.', [], 403);
+        return;
+    }
+
+    $bcService = new BusinessConfigService();
+
+    if ($method === 'GET') {
+        try {
+            $config = $bcService->getConfig($tenantId);
+            respondJson($response, 'success', 'Configuración de empresa', $config);
+        } catch (\Throwable $e) {
+            respondJson($response, 'error', $e->getMessage(), [], 500);
+        }
+        return;
+    }
+
+    if ($method === 'POST' || $method === 'PUT') {
+        try {
+            $payload = requestData();
+            $saved = $bcService->saveConfig($tenantId, $payload, (string) ($bAuth['id'] ?? 'system'));
+            respondJson($response, 'success', 'Configuración de empresa guardada.', $saved);
+        } catch (\Throwable $e) {
+            respondJson($response, 'error', $e->getMessage(), [], 500);
+        }
+        return;
+    }
+
+    respondJson($response, 'error', 'Método no permitido.', [], 405);
+    return;
+}
+
+// ─── Subida de Logo ─────────────────────────────────────────────────────────────
+if ($route === 'business/logo/upload') {
+    if ($method !== 'POST') {
+        respondJson($response, 'error', 'Método no permitido.', [], 405);
+        return;
+    }
+    $logoAuth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($logoAuth)) {
+        respondJson($response, 'error', 'Acceso denegado.', [], 401);
+        return;
+    }
+    $tenantId = (string) ($logoAuth['tenant_id'] ?? '');
+    $userRole = strtolower(trim((string) ($logoAuth['role'] ?? 'operator')));
+    if (!in_array($userRole, ['admin', 'owner', 'supervisor'], true)) {
+        respondJson($response, 'error', 'Solo administradores pueden subir el logo.', [], 403);
+        return;
+    }
+
+    $file = is_array($_FILES['logo'] ?? null) ? (array) $_FILES['logo'] : [];
+    if (empty($file) || ($file['error'] ?? UPLOAD_ERR_NO_FILE) !== UPLOAD_ERR_OK) {
+        respondJson($response, 'error', 'Archivo logo no recibido o con error.', [], 400);
+        return;
+    }
+
+    try {
+        $bcService = new BusinessConfigService();
+        $result = $bcService->uploadLogo($tenantId, [
+            'tmp_path'      => (string) ($file['tmp_name'] ?? ''),
+            'original_name' => (string) ($file['name'] ?? 'logo'),
+            'size'          => (int) ($file['size'] ?? 0),
+        ], (string) ($logoAuth['id'] ?? 'system'));
+        respondJson($response, 'success', $result['message'] ?? 'Logo actualizado.', $result);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
+// ─── Reporte Dinámico (Chart.js) ──────────────────────────────────────────────
+if ($route === 'report/dynamic') {
+    $rAuth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($rAuth)) {
+        respondJson($response, 'error', 'Acceso denegado — debes iniciar sesión.', [], 401);
+        return;
+    }
+    $tenantId   = (string) ($_GET['tenant_id'] ?? $rAuth['tenant_id'] ?? '');
+    $reportType = (string) ($_GET['report_type'] ?? 'ventas_resumen');
+    $desde      = (string) ($_GET['desde'] ?? date('Y-m-01'));
+    $hasta      = (string) ($_GET['hasta'] ?? date('Y-m-d'));
+    $userRole   = strtolower(trim((string) ($rAuth['role'] ?? 'operator')));
+
+    // Solo roles con acceso a reportes
+    $reportRoles = ['admin', 'owner', 'accountant', 'supervisor', 'analyst'];
+    if (!in_array($userRole, $reportRoles, true)) {
+        respondJson($response, 'error', 'Sin acceso a reportes para tu rol: ' . $userRole, [], 403);
+        return;
+    }
+
+    $format = strtolower(trim((string) ($_GET['format'] ?? 'html')));
+
+    try {
+        if ($format === 'json') {
+            $chartService = new ChartDataService();
+            $data = $chartService->getReportData($tenantId, $reportType, $desde, $hasta, $_GET);
+            respondJson($response, 'success', 'Datos del reporte', $data);
+        } else {
+            $renderer = new DocumentRenderer();
+            $html = $renderer->render([
+                'type'        => 'report_chart',
+                'tenant_id'   => $tenantId,
+                'id'          => '',
+                'user_role'   => $userRole,
+                'report_type' => $reportType,
+                'desde'       => $desde,
+                'hasta'       => $hasta,
+            ]);
+            header('Content-Type: text/html; charset=utf-8');
+            header('X-Frame-Options: SAMEORIGIN');
+            echo $html;
+        }
+        return;
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+        return;
+    }
 }
 
 if (str_starts_with($route, 'reports/')) {
