@@ -1,0 +1,9 @@
+=== TRANSCRIPCION DE CONVERSACION SUKI ===
+Tenant: tenant_alpha
+Sesión: entity_search_chat_1775736404_1
+Fecha: 2026-04-09 12:06:44
+------------------------------------------
+
+[2026-04-09 12:06:44] [USUARIO]: busca el arroz grande
+
+=== FIN DEL ARCHIVO ===

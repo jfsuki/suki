@@ -1,0 +1,9 @@
+=== TRANSCRIPCION DE CONVERSACION SUKI ===
+Tenant: default
+Sesión: queue_whatsapp_573005555555
+Fecha: 2026-04-09 12:05:08
+------------------------------------------
+
+[2026-04-09 12:05:08] [USUARIO]: hola idempotencia worker
+
+=== FIN DEL ARCHIVO ===

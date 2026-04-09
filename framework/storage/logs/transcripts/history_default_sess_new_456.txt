@@ -1,0 +1,16 @@
+=== TRANSCRIPCION DE CONVERSACION SUKI ===
+Tenant: default
+Sesión: sess_new_456
+Fecha: 2026-04-09 01:14:32
+------------------------------------------
+
+[2026-04-09 01:11:48] [USUARIO]: ¿De qué tipo de negocio hablamos antes?
+[2026-04-09 01:11:48] [USUARIO]: /history
+[2026-04-09 01:13:01] [USUARIO]: ¿De qué tipo de negocio hablamos antes?
+[2026-04-09 01:13:07] [USUARIO]: /history
+[2026-04-09 01:13:46] [USUARIO]: ¿De que negocio hablamos antes?
+[2026-04-09 01:13:53] [USUARIO]: /history
+[2026-04-09 01:14:26] [USUARIO]: ¿De que negocio hablamos antes?
+[2026-04-09 01:14:32] [USUARIO]: /history
+
+=== FIN DEL ARCHIVO ===

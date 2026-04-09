@@ -4,5 +4,8 @@ Options -Indexes
     RewriteEngine On
     RewriteCond %{REQUEST_FILENAME} !-f
     RewriteCond %{REQUEST_FILENAME} !-d
+    # Soporte para API cuando se accede vía ruta física /tower/public/
+    RewriteRule ^api/(.*)$ ../../project/public/api.php?route=$1 [QSA,L]
+    
     RewriteRule ^(.*)$ index.php?url=$1 [QSA,L]
 </IfModule>

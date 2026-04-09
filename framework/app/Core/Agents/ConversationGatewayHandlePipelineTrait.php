@@ -63,8 +63,7 @@ trait ConversationGatewayHandlePipelineTrait
         $confusionBase = $this->loadConfusionBase();
 
         // --- MEDIA & FILE INGESTION SIGNALS (Global Bridge) ---
-        // --- MEDIA & FILE INGESTION SIGNALS (Global Bridge) ---
-        if (preg_match('/\b(subir|enviar|adjuntar|importar|leer|cargar|excel|csv|pdf|xml|rut|foto|imagen|archivo|inventario|productos)\b/i', $raw)) {
+        if (preg_match('/\b(subir|enviar|adjuntar|importar|leer|cargar|excel|csv|pdf|xml|rut|foto|imagen|archivo)\b/i', $raw)) {
             $mediaSkill = new \App\Core\Skills\MediaIngestionSkill();
             $res = $mediaSkill->handle($raw, $state, $profile);
             if (!empty($res['reply'])) {

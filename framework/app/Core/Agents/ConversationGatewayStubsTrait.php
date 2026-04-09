@@ -522,7 +522,7 @@ trait ConversationGatewayStubsTrait
     {
         $search = $this->intentClassifier()->search($text);
         
-        // Si encontramos un hit de entrenamiento con buena confianza
+        // 1. Layer: Training Base Hit (Manual playbooks/trainings)
         if ($search['layer'] === 'qdrant' && $search['score'] >= 0.65) {
             $payload = $search['payload'] ?? [];
             $content = $payload['content'] ?? '';
@@ -535,6 +535,37 @@ trait ConversationGatewayStubsTrait
                     'confidence' => $search['score']
                 ];
             }
+        }
+
+        // 2. Layer: UNIVERSAL MEMORY (Cross-session history retrieval)
+        try {
+            $semantic = new \App\Core\SemanticMemoryService();
+            if ($semantic::isEnabledFromEnv()) {
+                $scope = [
+                    'tenant_id' => $tenantId,
+                    'user_id' => $userId,
+                    'memory_type' => 'user_memory'
+                ];
+                $retrieval = $semantic->retrieveUserMemory($text, $scope, 3);
+                
+                if ($retrieval['rag_hit'] && !empty($retrieval['hits'])) {
+                    $bestHit = $retrieval['hits'][0];
+                    if ($bestHit['score'] >= 0.75) {
+                        $reply = "Basado en lo que hemos hablado antes:\n" . $bestHit['content'];
+                        if (isset($bestHit['metadata']['reply'])) {
+                            $reply .= "\n(En esa ocasión te respondí: " . $bestHit['metadata']['reply'] . ")";
+                        }
+                        return [
+                            'action' => 'respond_local',
+                            'reply' => $reply,
+                            'intent' => 'universal_memory_recall',
+                            'confidence' => $bestHit['score']
+                        ];
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+             // Universal memory failure should not block the main flow
         }
 
         return [];

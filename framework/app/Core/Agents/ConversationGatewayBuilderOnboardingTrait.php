@@ -70,6 +70,19 @@ trait ConversationGatewayBuilderOnboardingTrait
 
         // --- NEURON IA: History-Aware Context Reconstruction (Elite Fix) ---
         $this->reconstructContextFromHistory($tenantId, $userId, $text, $localProfile, $localState);
+
+        // --- 2.0.1 IDENTITY RECOVERY (Cross-Session Identity / Carlos Fix) ---
+        if (empty($localProfile['owner_name'])) {
+            try {
+                $registry = new \App\Core\ProjectRegistry();
+                $projData = $registry->resolveProjectFromManifest();
+                if (!empty($projData['creator'])) {
+                    $localProfile['owner_name'] = (string)$projData['creator'];
+                }
+            } catch (\Throwable $e) {
+                // Silently skip if manifest or registry fails
+            }
+        }
         
         $currentStep = $this->resolveBuilderOnboardingStep($localProfile, $localState);
         $localState['onboarding_step'] = $currentStep;
@@ -260,6 +273,15 @@ trait ConversationGatewayBuilderOnboardingTrait
         $name = $this->extractPersonName($text);
         if ($name !== '') {
             $localProfile['owner_name'] = $name;
+            // 2.3.1 PERSISTENCIA ESTRATÉGICA: Guardar nombre en el manifiesto del proyecto (Identidad Cruzada)
+            if (($localState['active_task'] ?? '') === 'builder_onboarding' || $isOnboarding) {
+                try {
+                    $registry = new \App\Core\ProjectRegistry();
+                    $registry->updateProjectManifest(['creator' => $name]);
+                } catch (\Throwable $e) {
+                    error_log("FALLO_PERSISTENCIA_CREADOR: " . $e->getMessage());
+                }
+            }
         }
 
         $existingBusinessType = (string) ($localProfile['business_type'] ?? '');

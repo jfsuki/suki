@@ -1,0 +1,10 @@
+=== TRANSCRIPCION DE CONVERSACION SUKI ===
+Tenant: 1667104992
+Sesión: sess_new_456
+Fecha: 2026-04-09 01:10:34
+------------------------------------------
+
+[2026-04-09 01:09:03] [USUARIO]: ¿De qué tipo de negocio hablamos antes?
+[2026-04-09 01:10:34] [USUARIO]: ¿De qué tipo de negocio hablamos antes?
+
+=== FIN DEL ARCHIVO ===

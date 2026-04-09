@@ -1,0 +1,9 @@
+=== TRANSCRIPCION DE CONVERSACION SUKI ===
+Tenant: default
+Sesión: queue_telegram_tg_agentops_obs_chat_17757363252968
+Fecha: 2026-04-09 12:05:25
+------------------------------------------
+
+[2026-04-09 12:05:25] [USUARIO]: hola observabilidad agentops
+
+=== FIN DEL ARCHIVO ===

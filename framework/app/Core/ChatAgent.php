@@ -67,28 +67,51 @@ final class ChatAgent
         $sessionId = trim((string) ($payload['session_id'] ?? ''));
         if ($sessionId === '') {
              $sessionId = 'sess_' . bin2hex(random_bytes(8));
-        }
+         }
         
         $userId = trim((string) ($payload['user_id'] ?? ''));
+        
+        $tenantId = trim((string) ($payload['tenant_id'] ?? getenv('TENANT_ID') ?? 'default'));
+
+        if ($channel === '') { $channel = 'local'; }
+        if ($tenantId === '') { $tenantId = (string) (getenv('TENANT_ID') ?: 'default'); }
+
         $chatExecAuthRequired = (bool) ($payload['chat_exec_auth_required'] ?? false);
         $isAuthenticated = array_key_exists('is_authenticated', $payload)
             ? (bool) $payload['is_authenticated']
             : !$chatExecAuthRequired;
 
-        if ($userId === '') {
-            $userId = $isAuthenticated ? 'user_unknown' : 'guest_' . $sessionId;
+        // --- Carlos Rule: STRICT AUTH ENFORCEMENT ---
+        if (!$isAuthenticated && $channel !== 'onboarding' && $channel !== 'portal' && !str_contains($text, '!login')) {
+             return $this->reply('Acceso denegado. Debes iniciar sesión en la Torre para continuar.', $channel, $sessionId, 'unknown', 'error');
         }
 
-        $tenantId = trim((string) ($payload['tenant_id'] ?? getenv('TENANT_ID') ?? 'default'));
+        if ($userId === '') {
+            $userId = $isAuthenticated ? 'user_unknown' : 'dev_' . $sessionId;
+        }
+
         $role = trim((string) ($payload['role'] ?? $payload['user_role'] ?? ''));
-        
         $authUserId = trim((string) ($payload['auth_user_id'] ?? ''));
         $authTenantId = trim((string) ($payload['auth_tenant_id'] ?? ''));
         $authProjectId = trim((string) ($payload['auth_project_id'] ?? ''));
 
-        if ($channel === '') { $channel = 'local'; }
-        if ($tenantId === '') { $tenantId = (string) (getenv('TENANT_ID') ?: 'default'); }
-        if ($role === '') { $role = $isAuthenticated ? (string) (getenv('DEFAULT_ROLE') ?: 'admin') : 'guest'; }
+        // 2.3.1 REGISTRO AUTOMÁTICO DE ENTRADA (Carlos Rule - Captura todo incluso errores tempranos)
+        $this->memory->appendShortTermMemory($tenantId, $userId, $sessionId, $channel, 'in', $text);
+
+        // --- Auto-generar título de conversación (Messaging style) ---
+        $convManager = new ConversationManagerService();
+        $convManager->autoGenerateTitle($sessionId, $text);
+
+        // --- IDENTITY HIERARCHY REFACTOR (Carlos Rule) ---
+        // 1. Detección de Torre de Control (Superior)
+        if ($channel === 'portal' && $role === '') {
+            $role = 'architect';
+        }
+
+        if ($role === '') { 
+            // 2. Eliminación de Invitados: Todo usuario no identificado es Desarrollador
+            $role = $isAuthenticated ? (string) (getenv('DEFAULT_ROLE') ?: 'admin') : 'developer'; 
+        }
         
         if ($isAuthenticated) {
             if ($authUserId === '') { $authUserId = $userId; }
@@ -104,7 +127,25 @@ final class ChatAgent
         if ($projectId === '') { $projectId = $manifest['id'] ?? 'default'; }
         if ($isAuthenticated && $authProjectId === '') { $authProjectId = $projectId; }
         
+        if (!defined('TENANT_ID')) {
+            if (is_numeric($tenantId)) {
+                define('TENANT_ID', (int) $tenantId);
+                putenv('TENANT_ID=' . $tenantId);
+            } else {
+                $hash = $this->stableTenantInt($tenantId);
+                define('TENANT_ID', $hash);
+                putenv('TENANT_ID=' . $hash);
+                putenv('TENANT_KEY=' . $tenantId);
+            }
+        }
+        $resolvedTenantId = (string) (defined('TENANT_ID') ? TENANT_ID : $tenantId);
+
         $sessionBinding = $registry->getSession($sessionId);
+
+        // --- Carlos Rule: Auto-persist session on first contact ---
+        if ($isAuthenticated && !is_array($sessionBinding)) {
+            $registry->touchSession($sessionId, $userId, $projectId, $tenantId, $channel);
+        }
 
         if (is_array($sessionBinding)) {
             $boundUser = trim((string) ($sessionBinding['user_id'] ?? ''));
@@ -117,21 +158,11 @@ final class ChatAgent
             if ($boundProject !== '' && $projectId !== '' && $boundProject !== $projectId) {
                 return $this->reply('Esta sesion ya esta enlazada a otro proyecto.', $channel, $sessionId, $userId, 'error');
             }
-            if ($boundTenant !== '' && $boundTenant !== $tenantId) {
+            // Smart compare: allow both string name or resolved ID
+            if ($boundTenant !== '' && $boundTenant !== $tenantId && $boundTenant !== $resolvedTenantId) {
                 return $this->reply('Esta sesion pertenece a otro tenant.', $channel, $sessionId, $userId, 'error');
             }
             if ($boundProject !== '') { $projectId = $boundProject; }
-        }
-        if (!defined('TENANT_ID')) {
-            if (is_numeric($tenantId)) {
-                define('TENANT_ID', (int) $tenantId);
-                putenv('TENANT_ID=' . $tenantId);
-            } else {
-                $hash = $this->stableTenantInt($tenantId);
-                define('TENANT_ID', $hash);
-                putenv('TENANT_ID=' . $hash);
-                putenv('TENANT_KEY=' . $tenantId);
-            }
         }
         $registry->ensureProject(
             $projectId,
@@ -185,7 +216,7 @@ final class ChatAgent
         // --- MEMORY FLOW STEP 1: thread_id ---
         $threadId = $tenantId . ':' . $sessionId;
         $memory = $this->conversationMemory();
-
+        
         // --- MEMORY FLOW STEP 10: Clear Memory Command ---
         if (($local['command'] ?? '') === 'ClearMemory') {
             $memory->clear($threadId);
@@ -1500,6 +1531,18 @@ final class ChatAgent
             return ['command' => 'ClearMemory'];
         }
 
+        if (str_starts_with($normalized, '/sesion') || str_starts_with($normalized, '/history')) {
+            return ['command' => 'ListSessions'];
+        }
+
+        if (str_starts_with($normalized, '/nueva') || str_starts_with($normalized, '/new')) {
+            return ['command' => 'NewSession', 'title' => trim(substr($text, 5))];
+        }
+
+        if (str_starts_with($normalized, '/abrir') || str_starts_with($normalized, '/open')) {
+            return ['command' => 'OpenSession', 'id' => trim(substr($text, 6))];
+        }
+
 
         if ($first === 'crear' && isset($tokens[1]) && in_array(strtolower($tokens[1]), ['tabla', 'entidad'], true)) {
             $entity = $tokens[2] ?? '';
@@ -1546,6 +1589,35 @@ final class ChatAgent
                 'unit' => $result,
                 'acid' => $acid ?? null,
             ]);
+        }
+
+        if ($cmd === 'ListSessions') {
+            $conv = new ConversationManagerService();
+            $history = $conv->getMyHistory($userId);
+            if (empty($history)) {
+                return $this->reply('Aún no tienes conversaciones guardadas.', $channel, $sessionId, $userId);
+            }
+            $list = "Tus conversaciones recientes:\n";
+            foreach ($history as $h) {
+                $list .= "- [" . $h['session_id'] . "] " . ($h['title'] ?: 'Sin título') . " (" . $h['last_message_at'] . ")\n";
+            }
+            return $this->reply($list, $channel, $sessionId, $userId, 'success', ['sessions' => $history]);
+        }
+
+        if ($cmd === 'NewSession') {
+            $conv = new ConversationManagerService();
+            $newId = $conv->startNewSubject($userId, 'default', $tenantId, $channel, $parsed['title'] ?: 'Nueva Conversación');
+            return $this->reply('Iniciando nueva sesión: ' . ($parsed['title'] ?: 'Nueva'), $channel, $newId, $userId, 'success', ['new_session_id' => $newId]);
+        }
+
+        if ($cmd === 'OpenSession') {
+            $targetId = $parsed['id'] ?? '';
+            $registry = new ProjectRegistry();
+            $session = $registry->getSession($targetId);
+            if (!$session || $session['user_id'] !== $userId) {
+                return $this->reply('No se encontró la conversación o no tienes acceso.', $channel, $sessionId, $userId, 'error');
+            }
+            return $this->reply('Abriendo conversación: ' . ($session['title'] ?: $targetId), $channel, $targetId, $userId, 'success', ['switch_to_session_id' => $targetId]);
         }
 
         if ($cmd === 'LLMUsage') {
@@ -2192,7 +2264,7 @@ final class ChatAgent
 
     private function reply(string $text, string $channel, string $sessionId, string $userId, string $status = 'success', array $data = []): array
     {
-        return [
+        $response = [
             'status' => $status,
             'message' => $status === 'success' ? 'OK' : $text,
             'data' => array_merge([
@@ -2202,6 +2274,15 @@ final class ChatAgent
                 'user_id' => $userId,
             ], $data),
         ];
+
+        // --- Carlos Rule: Auto-persist for Universal Memory (Cross-session) ---
+        $this->persistToUserMemory($text, $text, [
+            'tenant_id' => (string) (getenv('TENANT_ID') ?: 'default'),
+            'user_id' => $userId,
+            'session_id' => $sessionId
+        ]);
+
+        return $response;
     }
 
     /**
@@ -4518,16 +4599,14 @@ final class ChatAgent
     private function annotateReplyWithTrainingHint(array $reply, array $telemetry, string $mode): array
     {
         $isGap = ($telemetry['rag_hit'] ?? true) === false && ($telemetry['classification'] ?? '') === 'informational';
-        $isBuilder = $mode === 'builder';
+        $isConfusion = ($telemetry['classification'] ?? '') === 'confusion';
 
-        if (!$isGap && !$isBuilder) {
+        if (!$isGap && !$isConfusion) {
             return $reply;
         }
 
-        // Si es builder, siempre es bueno recordar que puede entrenar
-        // Si es app y hay gap, es obligatorio
         $hint = "\n\n--- 🧠 AI Training Center ---\n"
-            . "Parece que me falta información específica sobre este tema. Como Arquitecto, puedes entrenarme subiendo fuentes oficiales en la **Torre de Control > Entrenamiento AI** para mejorar mi precisión.";
+            . "¿Podrías darme un poco más de contexto? Si se trata de una regla de negocio específica, recuerda que como Arquitecto puedes subir manuales oficiales en la **Torre de Control > Entrenamiento AI** para que yo analice y aprenda tu industria al detalle.";
 
         if (isset($reply['data']['reply'])) {
             $reply['data']['reply'] .= $hint;

@@ -1,0 +1,9 @@
+=== TRANSCRIPCION DE CONVERSACION SUKI ===
+Tenant: tenant_chat_media
+Sesión: media_chat_1775736391_delete
+Fecha: 2026-04-09 12:06:42
+------------------------------------------
+
+[2026-04-09 12:06:42] [USUARIO]: eliminar archivo media_id= confirmar=si
+
+=== FIN DEL ARCHIVO ===

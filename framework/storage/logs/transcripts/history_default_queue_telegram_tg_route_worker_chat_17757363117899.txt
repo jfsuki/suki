@@ -1,0 +1,9 @@
+=== TRANSCRIPCION DE CONVERSACION SUKI ===
+Tenant: default
+Sesión: queue_telegram_tg_route_worker_chat_17757363117899
+Fecha: 2026-04-09 12:05:11
+------------------------------------------
+
+[2026-04-09 12:05:11] [USUARIO]: hola worker route path
+
+=== FIN DEL ARCHIVO ===

@@ -24,6 +24,13 @@ RewriteRule ^(docs|brain|\.agent|\.suki|storage|vendor|framework/(app|config|con
 </FilesMatch>
 
 # 4. Enrutamiento enmascarado (Los 4 Mundos)
+
+# ---- CAPA DE API GLOBAL (Prioridad alta para evitar colisión con mundos) ----
+# Mapea /api/... , /torre/api/... , /apps/api/... , /marketplace/api/... 
+# directamente al orquestador de API en project/public/api.php
+RewriteRule ^(torre|apps|marketplace|builder|editor)/api/(.*)$ project/public/api.php?route=$2 [QSA,L]
+RewriteRule ^api/(.*)$ project/public/api.php?route=$1 [QSA,L]
+
 # Marketplace -> framework/public
 RewriteRule ^marketplace(/.*)?$ framework/public/index.php?url=$1 [QSA,L]
 

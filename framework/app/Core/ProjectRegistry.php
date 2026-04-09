@@ -43,6 +43,7 @@ final class ProjectRegistry
     }
 
 
+
     public function ensureProject(
         string $projectId,
         string $name,
@@ -192,12 +193,31 @@ final class ProjectRegistry
         ]);
     }
 
+    public function listUserSessions(string $userId, int $limit = 20): array
+    { 
+        if ($userId === '') return [];
+        $stmt = $this->db->prepare('SELECT session_id, title, project_id, last_message_at, is_archived 
+            FROM chat_sessions 
+            WHERE user_id = :user AND is_archived = 0 
+            ORDER BY last_message_at DESC LIMIT :limit');
+        $stmt->bindValue(':user', $userId);
+        $stmt->bindValue(':limit', $limit, PDO::PARAM_INT);
+        $stmt->execute();
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function updateSessionTitle(string $sessionId, string $title): bool
+    { 
+        $stmt = $this->db->prepare('UPDATE chat_sessions SET title = :title WHERE session_id = :id');
+        return $stmt->execute([':id' => $sessionId, ':title' => $title]);
+    }
+
     public function getSession(string $sessionId): ?array
     {
         if ($sessionId === '') {
             return null;
         }
-        $stmt = $this->db->prepare('SELECT session_id, user_id, project_id, tenant_id, channel, last_message_at FROM chat_sessions WHERE session_id = :id');
+        $stmt = $this->db->prepare('SELECT * FROM chat_sessions WHERE session_id = :id');
         $stmt->execute([':id' => $sessionId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $row ?: null;
@@ -576,7 +596,20 @@ final class ProjectRegistry
             'status' => (string) ($app['status'] ?? 'draft'),
             'tenant_mode' => (string) ($app['tenant_mode'] ?? 'shared'),
             'storage_model' => $storageModel,
+            'creator' => (string) ($app['creator'] ?? ''),
         ];
+    }
+
+    public function updateProjectManifest(array $appData): void
+    {
+        $manifestPath = $this->projectRoot() . '/contracts/app.manifest.json';
+        $data = [];
+        if (is_file($manifestPath)) {
+            $raw = file_get_contents($manifestPath);
+            $data = is_string($raw) ? json_decode($raw, true) : [];
+        }
+        $data['app'] = array_merge($data['app'] ?? [], $appData);
+        file_put_contents($manifestPath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
     }
 
     private function ensureSchema(): void
@@ -623,8 +656,12 @@ final class ProjectRegistry
             project_id TEXT,
             tenant_id TEXT,
             channel TEXT,
+            title TEXT,
+            is_archived INTEGER DEFAULT 0,
             last_message_at TEXT
         )');
+        $this->ensureChatSessionsColumns();
+        $this->initializeAuthSchema();
         $this->db->exec('CREATE TABLE IF NOT EXISTS auth_users (
             id TEXT,
             project_id TEXT,
@@ -754,6 +791,8 @@ final class ProjectRegistry
         return [
             'projects' => ['storage_model'],
             'auth_users' => ['user_type', 'nit', 'full_name', 'is_active'],
+            'users' => ['password_hash'],
+            'chat_sessions' => ['title', 'is_archived'],
         ];
     }
 
@@ -895,6 +934,18 @@ final class ProjectRegistry
         $cols = $stmt->fetchAll(\PDO::FETCH_COLUMN, 1);
         if (!in_array('password_hash', $cols)) {
             $this->db->exec("ALTER TABLE users ADD COLUMN password_hash TEXT");
+        }
+    }
+
+    private function ensureChatSessionsColumns(): void
+    {
+        $stmt = $this->db->query('PRAGMA table_info(chat_sessions)');
+        $cols = $stmt->fetchAll(PDO::FETCH_COLUMN, 1);
+        if (!in_array('title', $cols, true)) {
+            $this->db->exec('ALTER TABLE chat_sessions ADD COLUMN title TEXT');
+        }
+        if (!in_array('is_archived', $cols, true)) {
+            $this->db->exec('ALTER TABLE chat_sessions ADD COLUMN is_archived INTEGER DEFAULT 0');
         }
     }
 }

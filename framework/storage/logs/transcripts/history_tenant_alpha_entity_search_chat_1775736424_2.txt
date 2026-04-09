@@ -1,0 +1,9 @@
+=== TRANSCRIPCION DE CONVERSACION SUKI ===
+Tenant: tenant_alpha
+Sesión: entity_search_chat_1775736424_2
+Fecha: 2026-04-09 12:07:04
+------------------------------------------
+
+[2026-04-09 12:07:04] [USUARIO]: mira la ultima venta
+
+=== FIN DEL ARCHIVO ===

@@ -1,0 +1,9 @@
+=== TRANSCRIPCION DE CONVERSACION SUKI ===
+Tenant: default
+Sesión: sess_new_69d6fd9b4112b
+Fecha: 2026-04-09 01:15:07
+------------------------------------------
+
+[2026-04-09 01:15:07] [USUARIO]: ¿De que negocio hemos hablado en sesiones anteriores?
+
+=== FIN DEL ARCHIVO ===

@@ -1,0 +1,9 @@
+=== TRANSCRIPCION DE CONVERSACION SUKI ===
+Tenant: default
+Sesión: test_session_ec997b39
+Fecha: 2026-04-09 00:59:09
+------------------------------------------
+
+[2026-04-09 00:59:09] [USUARIO]: Hola Suki
+
+=== FIN DEL ARCHIVO ===

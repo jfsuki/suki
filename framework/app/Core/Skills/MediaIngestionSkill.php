@@ -21,7 +21,7 @@ class MediaIngestionSkill
             return $this->handleDocumentIngestion($state);
         }
         
-        if (str_contains($text, 'foto') || str_contains($text, 'imagen') || str_contains($text, 'producto')) {
+        if (str_contains($text, 'foto') || str_contains($text, 'imagen')) {
             return $this->handleMediaIngestion($state);
         }
 

@@ -60,6 +60,15 @@ class LocalJsonMemoryRepository implements MemoryRepositoryInterface
         $data = is_file($path) ? json_decode(file_get_contents($path), true) : [];
         $data[] = ['msg' => $message, 'dir' => $direction, 'ts' => time()];
         file_put_contents($path, json_encode(array_slice($data, -50)));
+
+        // 2.3.1 GENERACIÓN DE TRANSCRIPCION TXT (Bloc de notas para el usuario)
+        try {
+            $transcriptService = new \App\Core\HistoryTranscriptService();
+            $transcriptService->updateTranscript($tenantId, $sessionId, $data);
+        } catch (\Throwable $e) {
+            // No bloquear el chat si falla el log TXT
+            error_log("FALLO_GEN_TRANSCRIPT: " . $e->getMessage());
+        }
     }
 
     public function getShortTermMemory(string $tenantId, string $sessionId, int $limit = 20): array
