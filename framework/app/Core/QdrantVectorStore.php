@@ -773,9 +773,8 @@ final class QdrantVectorStore
             $sampleSize = count($points) ?: 1;
             foreach (['base', 'auto'] as $group) {
                 foreach ($categories[$group] as $key => &$data) {
-                    // Just to show some "real" progress even with small data
-                    $data['percentage'] = min(100, round(($data['percentage'] / $sampleSize) * 300)); 
-                    if ($data['percentage'] == 0 && $totalPoints > 0) $data['percentage'] = rand(5, 15); // Fallback to show life
+                    $data['percentage'] = min(100, round(($data['percentage'] / $sampleSize) * 300));
+                    // NOTE: 0% means no indexed data for this category — do not fake it
                 }
             }
         } catch (\Exception $e) {}

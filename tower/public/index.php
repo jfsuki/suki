@@ -15,7 +15,14 @@ if ($url === '' || $url === 'torre' || $url === 'tower') {
 }
 
 // 2. Seguridad: La Torre solo se abre con el Master Key en sesión
-$masterKey = getenv('SUKI_MASTER_KEY') ?: 'SUKI_DEV_2026';
+// SUKI_MASTER_KEY DEBE estar definida en el entorno (.env o variable de servidor).
+// No hay default — si falta, la Torre no arranca para evitar acceso con claves conocidas.
+$masterKey = trim((string) getenv('SUKI_MASTER_KEY'));
+if ($masterKey === '') {
+    http_response_code(503);
+    echo '<h1>Configuration Error</h1><p>SUKI_MASTER_KEY is not set. Set it in your environment before accessing the Control Tower.</p>';
+    exit;
+}
 $error = '';
 
 // Procesar Login si se envía el formulario

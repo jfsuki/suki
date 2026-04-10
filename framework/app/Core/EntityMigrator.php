@@ -162,6 +162,98 @@ class EntityMigrator
         ];
     }
 
+    /**
+     * Rename a column safely.
+     * MySQL 8+: RENAME COLUMN (non-destructive, supported in InnoDB).
+     * SQLite: Supported natively since 3.25.0 (2018-09-15).
+     * IMPORTANT: Renaming a column in existing tables with data is safe ONLY if there are no
+     * dependent VIEWs, TRIGGERs, or CHECKs referencing the old name. Validate before calling.
+     */
+    public function renameColumn(string $entityName, string $oldColumnName, string $newColumnName): array
+    {
+        $entityName = $this->sanitizeIdentifier($entityName);
+        $oldColumnName = $this->sanitizeIdentifier($oldColumnName);
+        $newColumnName = $this->sanitizeIdentifier($newColumnName);
+        $entity = $this->registry->get($entityName);
+        $table = $this->resolveEntityTable($entity);
+
+        if (!$this->tableExists($table)) {
+            return ['entity' => $entityName, 'table' => $table, 'applied' => false, 'reason' => 'table_missing'];
+        }
+        if (!$this->columnExists($table, $oldColumnName)) {
+            return ['entity' => $entityName, 'table' => $table, 'applied' => false, 'reason' => 'old_column_missing'];
+        }
+        if ($this->columnExists($table, $newColumnName)) {
+            return ['entity' => $entityName, 'table' => $table, 'applied' => false, 'reason' => 'new_column_already_exists'];
+        }
+
+        $driver = (string) $this->db->getAttribute(\PDO::ATTR_DRIVER_NAME);
+
+        if ($driver === 'mysql') {
+            // MySQL 8+: RENAME COLUMN is safe and non-destructive
+            $sql = "ALTER TABLE {$table} RENAME COLUMN {$oldColumnName} TO {$newColumnName};";
+        } elseif ($driver === 'sqlite') {
+            // SQLite 3.25+ supports RENAME COLUMN natively
+            $sql = "ALTER TABLE {$table} RENAME COLUMN {$oldColumnName} TO {$newColumnName};";
+        } else {
+            throw new RuntimeException("renameColumn no soportado para driver: {$driver}");
+        }
+
+        $this->db->exec($sql);
+
+        return [
+            'entity' => $entityName,
+            'table' => $table,
+            'old_column' => $oldColumnName,
+            'new_column' => $newColumnName,
+            'applied' => true,
+            'sql' => $sql,
+        ];
+    }
+
+    /**
+     * Drop a column from a table.
+     * MySQL: ALTER TABLE DROP COLUMN.
+     * SQLite: Supported natively since 3.35.0 (2021-03-12).
+     * WARNING: Destructive operation. Always backup first. Verify with codex_self_check.
+     */
+    public function dropColumn(string $entityName, string $columnName): array
+    {
+        $entityName = $this->sanitizeIdentifier($entityName);
+        $columnName = $this->sanitizeIdentifier($columnName);
+        $entity = $this->registry->get($entityName);
+        $table = $this->resolveEntityTable($entity);
+
+        if (!$this->tableExists($table)) {
+            return ['entity' => $entityName, 'table' => $table, 'applied' => false, 'reason' => 'table_missing'];
+        }
+        if (!$this->columnExists($table, $columnName)) {
+            return ['entity' => $entityName, 'table' => $table, 'applied' => false, 'reason' => 'column_missing'];
+        }
+
+        $driver = (string) $this->db->getAttribute(\PDO::ATTR_DRIVER_NAME);
+
+        if ($driver === 'mysql') {
+            $sql = "ALTER TABLE {$table} DROP COLUMN {$columnName};";
+        } elseif ($driver === 'sqlite') {
+            // SQLite 3.35+ only. Older versions will throw — caller must handle.
+            $sql = "ALTER TABLE {$table} DROP COLUMN {$columnName};";
+        } else {
+            throw new RuntimeException("dropColumn no soportado para driver: {$driver}");
+        }
+
+        $this->db->exec($sql);
+
+        return [
+            'entity' => $entityName,
+            'table' => $table,
+            'column' => $columnName,
+            'applied' => true,
+            'sql' => $sql,
+        ];
+    }
+
+
     private function buildCreateSql(array $entity): array
     {
         $logicalTable = (string) ($entity['table']['name'] ?? '');

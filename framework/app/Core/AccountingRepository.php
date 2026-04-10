@@ -149,17 +149,112 @@ final class AccountingRepository
                 );
             ");
             
-            // Seed basic accounts if empty
+            // Seed PUC colombiano básico si la tabla está vacía
+            // Basado en Decreto 2649/93 y estructura PUC Colombia (NIIF para PYMES)
             $count = (int) $this->db->query("SELECT COUNT(*) FROM {$accountTable}")->fetchColumn();
             if ($count === 0) {
-                // Simplified seed
-                $this->db->exec("
-                    INSERT INTO {$accountTable} (tenant_id, codigo, nombre, tipo, naturaleza) VALUES 
-                    ('default', '1105', 'Caja General', 'ACTIVO', 'DEBITO'),
-                    ('default', '4135', 'Ventas de productos', 'INGRESO', 'CREDITO'),
-                    ('default', '6135', 'Costo de ventas', 'COSTO', 'DEBITO'),
-                    ('default', '1435', 'Inventarios', 'ACTIVO', 'DEBITO');
-                ");
+                $pucSeed = [
+                    // codigo, nombre, tipo, naturaleza
+                    // CLASE 1 — ACTIVOS
+                    ['1',    'ACTIVOS',                                     'ACTIVO',     'DEBITO'],
+                    ['11',   'Efectivo y equivalentes de efectivo',          'ACTIVO',     'DEBITO'],
+                    ['1105', 'Caja general',                                 'ACTIVO',     'DEBITO'],
+                    ['1110', 'Bancos nacionales',                            'ACTIVO',     'DEBITO'],
+                    ['1115', 'Bancos del exterior',                          'ACTIVO',     'DEBITO'],
+                    ['1120', 'Cuentas de ahorro',                            'ACTIVO',     'DEBITO'],
+                    ['13',   'Deudores',                                     'ACTIVO',     'DEBITO'],
+                    ['1305', 'Clientes nacionales',                          'ACTIVO',     'DEBITO'],
+                    ['1310', 'Clientes del exterior',                        'ACTIVO',     'DEBITO'],
+                    ['1355', 'Anticipo de impuestos',                        'ACTIVO',     'DEBITO'],
+                    ['1360', 'Retención en la fuente (anticipo)',            'ACTIVO',     'DEBITO'],
+                    ['1365', 'IVA descontable',                              'ACTIVO',     'DEBITO'],
+                    ['14',   'Inventarios',                                  'ACTIVO',     'DEBITO'],
+                    ['1405', 'Materias primas',                              'ACTIVO',     'DEBITO'],
+                    ['1430', 'Productos terminados',                         'ACTIVO',     'DEBITO'],
+                    ['1435', 'Mercancías no fabricadas por la empresa',      'ACTIVO',     'DEBITO'],
+                    ['15',   'Propiedad, planta y equipo',                   'ACTIVO',     'DEBITO'],
+                    ['1504', 'Terrenos',                                     'ACTIVO',     'DEBITO'],
+                    ['1516', 'Construcciones y edificaciones',               'ACTIVO',     'DEBITO'],
+                    ['1524', 'Equipo de oficina',                            'ACTIVO',     'DEBITO'],
+                    ['1528', 'Equipo de computación y comunicación',         'ACTIVO',     'DEBITO'],
+                    ['1592', 'Depreciación acumulada (CR)',                  'ACTIVO',     'CREDITO'],
+                    // CLASE 2 — PASIVOS
+                    ['2',    'PASIVOS',                                      'PASIVO',     'CREDITO'],
+                    ['21',   'Obligaciones financieras',                     'PASIVO',     'CREDITO'],
+                    ['2105', 'Bancos nacionales (crédito)',                  'PASIVO',     'CREDITO'],
+                    ['22',   'Proveedores',                                  'PASIVO',     'CREDITO'],
+                    ['2205', 'Proveedores nacionales',                       'PASIVO',     'CREDITO'],
+                    ['2210', 'Proveedores del exterior',                     'PASIVO',     'CREDITO'],
+                    ['23',   'Cuentas por pagar',                            'PASIVO',     'CREDITO'],
+                    ['2335', 'Costos y gastos por pagar',                    'PASIVO',     'CREDITO'],
+                    ['2365', 'Retención en la fuente por pagar',             'PASIVO',     'CREDITO'],
+                    ['2367', 'Retención ICA por pagar',                      'PASIVO',     'CREDITO'],
+                    ['2368', 'Retención IVA por pagar',                      'PASIVO',     'CREDITO'],
+                    ['24',   'Impuestos gravámenes y tasas',                 'PASIVO',     'CREDITO'],
+                    ['2404', 'Impuesto de renta por pagar',                  'PASIVO',     'CREDITO'],
+                    ['2408', 'IVA generado por pagar',                       'PASIVO',     'CREDITO'],
+                    ['2412', 'ICA por pagar',                                'PASIVO',     'CREDITO'],
+                    ['25',   'Obligaciones laborales',                       'PASIVO',     'CREDITO'],
+                    ['2505', 'Salarios por pagar',                           'PASIVO',     'CREDITO'],
+                    ['2510', 'Cesantías consolidadas',                       'PASIVO',     'CREDITO'],
+                    ['2515', 'Intereses sobre cesantías',                    'PASIVO',     'CREDITO'],
+                    ['2520', 'Prima de servicios',                           'PASIVO',     'CREDITO'],
+                    ['2525', 'Vacaciones consolidadas',                      'PASIVO',     'CREDITO'],
+                    // CLASE 3 — PATRIMONIO
+                    ['3',    'PATRIMONIO',                                   'PATRIMONIO', 'CREDITO'],
+                    ['31',   'Capital social',                               'PATRIMONIO', 'CREDITO'],
+                    ['3105', 'Capital suscrito y pagado',                    'PATRIMONIO', 'CREDITO'],
+                    ['33',   'Reservas',                                     'PATRIMONIO', 'CREDITO'],
+                    ['3305', 'Reserva legal',                                'PATRIMONIO', 'CREDITO'],
+                    ['3310', 'Reserva estatutaria',                          'PATRIMONIO', 'CREDITO'],
+                    ['36',   'Resultados del ejercicio',                     'PATRIMONIO', 'CREDITO'],
+                    ['3605', 'Utilidad del ejercicio',                       'PATRIMONIO', 'CREDITO'],
+                    ['3610', 'Pérdida del ejercicio',                        'PATRIMONIO', 'DEBITO'],
+                    // CLASE 4 — INGRESOS
+                    ['4',    'INGRESOS',                                     'INGRESO',    'CREDITO'],
+                    ['41',   'Ingresos operacionales',                       'INGRESO',    'CREDITO'],
+                    ['4135', 'Comercio al por mayor y al por menor',         'INGRESO',    'CREDITO'],
+                    ['4145', 'Servicios',                                    'INGRESO',    'CREDITO'],
+                    ['42',   'Ingresos no operacionales',                    'INGRESO',    'CREDITO'],
+                    ['4210', 'Financieros (intereses recibidos)',             'INGRESO',    'CREDITO'],
+                    ['4220', 'Arrendamientos recibidos',                     'INGRESO',    'CREDITO'],
+                    ['4245', 'Utilidad en venta de activos',                 'INGRESO',    'CREDITO'],
+                    // CLASE 5 — GASTOS
+                    ['5',    'GASTOS',                                       'GASTO',      'DEBITO'],
+                    ['51',   'Gastos de administración',                     'GASTO',      'DEBITO'],
+                    ['5105', 'Gastos de personal (administración)',           'GASTO',      'DEBITO'],
+                    ['5110', 'Honorarios',                                   'GASTO',      'DEBITO'],
+                    ['5115', 'Impuestos y tasas (gasto)',                    'GASTO',      'DEBITO'],
+                    ['5120', 'Arrendamientos (gasto)',                       'GASTO',      'DEBITO'],
+                    ['5135', 'Servicios públicos',                           'GASTO',      'DEBITO'],
+                    ['5145', 'Mantenimiento y reparaciones',                 'GASTO',      'DEBITO'],
+                    ['5160', 'Depreciaciones',                               'GASTO',      'DEBITO'],
+                    ['5195', 'Otros gastos de administración',               'GASTO',      'DEBITO'],
+                    ['52',   'Gastos de ventas',                             'GASTO',      'DEBITO'],
+                    ['5205', 'Gastos de personal (ventas)',                  'GASTO',      'DEBITO'],
+                    ['5225', 'Publicidad y propaganda',                      'GASTO',      'DEBITO'],
+                    ['53',   'Gastos financieros',                           'GASTO',      'DEBITO'],
+                    ['5305', 'Gastos bancarios',                             'GASTO',      'DEBITO'],
+                    ['5310', 'Intereses de créditos',                        'GASTO',      'DEBITO'],
+                    // CLASE 6 — COSTOS DE VENTAS
+                    ['6',    'COSTOS DE VENTAS',                             'COSTO',      'DEBITO'],
+                    ['61',   'Costo de ventas y de prestación de servicios', 'COSTO',      'DEBITO'],
+                    ['6135', 'Mercancías vendidas',                          'COSTO',      'DEBITO'],
+                    ['6145', 'Servicios prestados (costo)',                  'COSTO',      'DEBITO'],
+                    // CLASE 7 — COSTOS DE PRODUCCIÓN
+                    ['7',    'COSTOS DE PRODUCCIÓN O DE OPERACIÓN',          'COSTO',      'DEBITO'],
+                    ['71',   'Materia prima y materiales',                   'COSTO',      'DEBITO'],
+                    ['7105', 'Materias primas utilizadas',                   'COSTO',      'DEBITO'],
+                    ['72',   'Mano de obra directa',                         'COSTO',      'DEBITO'],
+                    ['7205', 'Sueldos y salarios (producción)',              'COSTO',      'DEBITO'],
+                ];
+
+                $stmt = $this->db->prepare(
+                    "INSERT INTO {$accountTable} (tenant_id, codigo, nombre, tipo, naturaleza) VALUES (?, ?, ?, ?, ?)"
+                );
+                foreach ($pucSeed as $row) {
+                    $stmt->execute(['default', $row[0], $row[1], $row[2], $row[3]]);
+                }
             }
         } else {
             // MySQL version
