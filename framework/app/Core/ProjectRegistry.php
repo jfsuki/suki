@@ -453,6 +453,7 @@ final class ProjectRegistry
             created_at    TEXT DEFAULT CURRENT_TIMESTAMP,
             is_active     INTEGER DEFAULT 0,
             user_type     TEXT DEFAULT 'enterprise',
+            active_session_hash TEXT,
             PRIMARY KEY(id, project_id)
         )");
 
@@ -474,7 +475,7 @@ final class ProjectRegistry
         $stmt = $this->db->query("PRAGMA table_info(auth_users)");
         $cols = $stmt->fetchAll(\PDO::FETCH_COLUMN, 1);
         $missing = array_diff(
-            ['nit', 'full_name', 'area_code', 'phone_number', 'business_desc', 'rut_path', 'is_active', 'user_type'],
+            ['label', 'role', 'last_login', 'nit', 'full_name', 'area_code', 'phone_number', 'business_desc', 'rut_path', 'is_active', 'user_type', 'active_session_hash'],
             $cols
         );
 
@@ -633,7 +634,8 @@ final class ProjectRegistry
             tenant_id TEXT,
             password_hash TEXT,
             created_at TEXT,
-            last_seen TEXT
+            last_seen TEXT,
+            active_session_hash TEXT
         )');
         $this->ensureUsersPasswordColumn();
         $this->db->exec('CREATE TABLE IF NOT EXISTS project_users (
@@ -658,7 +660,8 @@ final class ProjectRegistry
             channel TEXT,
             title TEXT,
             is_archived INTEGER DEFAULT 0,
-            last_message_at TEXT
+            last_message_at TEXT,
+            metadata TEXT
         )');
         $this->ensureChatSessionsColumns();
         $this->initializeAuthSchema();
@@ -709,6 +712,16 @@ final class ProjectRegistry
             status       TEXT,
             created_at   TEXT
         )');
+        // Conversation multi-turn memory (user + assistant turns, used by chat history API)
+        $this->db->exec('CREATE TABLE IF NOT EXISTS conversation_memory (
+            id             INTEGER PRIMARY KEY AUTOINCREMENT,
+            thread_id      TEXT NOT NULL,
+            role           TEXT NOT NULL,
+            content        TEXT NOT NULL,
+            token_estimate INTEGER DEFAULT 0,
+            created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
+        )');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_cm_thread ON conversation_memory (thread_id, id)');
     }
 
     public function logAgentEvent(string $agentId, string $tenantId, string $type, string $details, string $status = 'INFO'): void
@@ -935,6 +948,38 @@ final class ProjectRegistry
         if (!in_array('password_hash', $cols)) {
             $this->db->exec("ALTER TABLE users ADD COLUMN password_hash TEXT");
         }
+        if (!in_array('active_session_hash', $cols)) {
+            $this->db->exec("ALTER TABLE users ADD COLUMN active_session_hash TEXT");
+        }
+    }
+
+    public function updateActiveSession(string $userId, string $hash): void
+    {
+        if ($userId === '') return;
+        $stmt = $this->db->prepare('UPDATE auth_users SET active_session_hash = :hash WHERE id = :id');
+        $stmt->execute([':hash' => $hash, ':id' => $userId]);
+        
+        $stmt2 = $this->db->prepare('UPDATE users SET active_session_hash = :hash WHERE id = :id');
+        $stmt2->execute([':hash' => $hash, ':id' => $userId]);
+    }
+
+    public function getActiveSession(string $userId): ?string
+    {
+        if ($userId === '') return null;
+        
+        // Verifica primero en auth_users
+        $stmt = $this->db->prepare('SELECT active_session_hash FROM auth_users WHERE id = :id LIMIT 1');
+        $stmt->execute([':id' => $userId]);
+        $hash = $stmt->fetchColumn();
+        if ($hash) return (string)$hash;
+        
+        // Luego en users
+        $stmt2 = $this->db->prepare('SELECT active_session_hash FROM users WHERE id = :id LIMIT 1');
+        $stmt2->execute([':id' => $userId]);
+        $hash2 = $stmt2->fetchColumn();
+        if ($hash2) return (string)$hash2;
+        
+        return null;
     }
 
     private function ensureChatSessionsColumns(): void
@@ -946,6 +991,9 @@ final class ProjectRegistry
         }
         if (!in_array('is_archived', $cols, true)) {
             $this->db->exec('ALTER TABLE chat_sessions ADD COLUMN is_archived INTEGER DEFAULT 0');
+        }
+        if (!in_array('metadata', $cols, true)) {
+            $this->db->exec('ALTER TABLE chat_sessions ADD COLUMN metadata TEXT');
         }
     }
 }

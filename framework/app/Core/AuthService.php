@@ -67,11 +67,16 @@ class AuthService
         
         if (session_status() === PHP_SESSION_ACTIVE) {
             session_regenerate_id(true);
+            $sessionHash = bin2hex(random_bytes(16));
+            $this->registry->updateActiveSession($user['id'], $sessionHash);
+            
             $_SESSION['user_id'] = $user['id'];
             $_SESSION['role'] = $user['role'] ?? 'user';
             $_SESSION['tenant_id'] = $user['tenant_id'];
             $_SESSION['project_id'] = $projectId;
             $_SESSION['last_ip'] = $ipAddress;
+            $_SESSION['active_session_hash'] = $sessionHash;
+            $_SESSION['auth_user'] = $user; // Fix: Chat agent needs this array
         }
 
         // Actualizar registro general de usuarios

@@ -58,4 +58,43 @@ final class AuthMiddleware
         // Por simplicidad, asumimos roles en sesión por ahora o inyectamos Registry
         return true; 
     }
+
+    /**
+     * Verifica si la sesión actual coincide con la última sesión iniciada en BD (Single Concurrent Session).
+     * Si no coincide (se abrió en otro lado), destruye la sesión y puede redirigir o devolver false.
+     */
+    public static function checkConcurrentSession(bool $apiMode = false): bool
+    {
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+
+        $userId = $_SESSION['user_id'] ?? '';
+        $sessionHash = $_SESSION['active_session_hash'] ?? '';
+
+        // Si no hay sesión o es la cuenta estática Master Key (suki_tower_auth), se omite check BD.
+        if ($userId === '') {
+            return true;
+        }
+
+        // Consultar el hash real en BD
+        $registry = new \App\Core\ProjectRegistry();
+        $realHash = $registry->getActiveSession($userId);
+
+        if ($realHash !== null && $realHash !== '' && $sessionHash !== $realHash) {
+            // Hash difiere -> Se abrió otra sesión.
+            session_destroy();
+            
+            if ($apiMode) {
+                return false;
+            }
+            
+            // Redirigir usando rutas relativas
+            $base = (strpos($_SERVER['REQUEST_URI'] ?? '', '/suki/') !== false) ? '/suki' : '';
+            header("Location: $base/marketplace/?error=session_closed_concurrent");
+            exit;
+        }
+
+        return true;
+    }
 }

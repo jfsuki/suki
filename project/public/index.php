@@ -13,8 +13,16 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// 0. Single Concurrent Session Check
+if (class_exists(\App\Core\AuthMiddleware::class)) {
+    \App\Core\AuthMiddleware::checkConcurrentSession(false);
+}
+
 // 1. Capturar la ruta y limpiar
 $url = isset($_GET['url']) ? rtrim($_GET['url'], '/') : 'dashboard';
+if ($url === '') {
+    $url = 'dashboard';
+}
 
 // 2. SEGURIDAD ESTRICTA:
 // - Dashboard requiere sesión activa.
@@ -26,16 +34,11 @@ $is_public_project_route = in_array($url, ['register-enterprise']);
 $is_tower_authenticated = isset($_SESSION['suki_tower_auth']) && $_SESSION['suki_tower_auth'] === true;
 
 if (!$is_public_project_route && !isset($_SESSION['user_id']) && !$is_tower_authenticated) {
-    // Detectar base para redirección segura en Laragon/subdirectorios
-    $uri = $_SERVER['REQUEST_URI'] ?? '';
-    $base = (strpos($uri, '/suki/') !== false) ? '/suki' : '';
-    
-    // Si intenta entrar al builder sin sesión, va al login de builder.
-    // Si es cualquier otra cosa del proyecto, va al login de marketplace/clientes.
+    // Usar rutas absolutas — siempre se sirve desde la raíz del VirtualHost
     if ($url === 'builder') {
-        header("Location: $base/builder-login"); // O builder/login si el htaccess lo permite
+        header('Location: /builder-login');
     } else {
-        header("Location: $base/marketplace/login"); 
+        header('Location: /marketplace/login');
     }
     exit;
 }

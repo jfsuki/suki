@@ -61,6 +61,20 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+// Inyección de Identidad de Arquitecto para Accesos desde Neural Tower
+if (!empty($_SESSION['suki_tower_auth'])) {
+    if (empty($_SESSION['auth_user']) || ($_SESSION['auth_user']['id'] ?? '') === 'master_tower') {
+        $_SESSION['auth_user'] = [
+            'id' => 'admin',
+            'tenant_id' => 'demo',
+            'project_id' => 'default',
+            'role' => 'creator',
+            'email' => 'architect@suki.local',
+            'nombre' => 'Neural Tower Architect'
+        ];
+    }
+}
+
 $frameworkRoot = getenv('SUKI_FRAMEWORK_ROOT') ?: dirname(PROJECT_ROOT) . '/framework';
 define('APP_ROOT', $frameworkRoot);
 define('FRAMEWORK_ROOT', $frameworkRoot);
@@ -1615,8 +1629,31 @@ if (str_starts_with($route, 'dashboards')) {
 }
 
 if ($route === 'chat/message') {
+    // 0. Single Concurrent Session Check
+    if (\App\Core\AuthMiddleware::class && !\App\Core\AuthMiddleware::checkConcurrentSession(true)) {
+        respondJson($response, 'success', 'Sesión cerrada', [
+            'type' => 'message',
+            'agent' => ['id' => 'system', 'role' => 'security'],
+            'message' => 'Se ha abierto tu cuenta en otro dispositivo. Por seguridad, esta sesión ha sido cerrada.',
+            'action' => 'force_logout'
+        ], 200);
+        return;
+    }
+
     $payload = requestData();
     $auth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    
+    // Tower override para permitir que la clave maestra use el Builder sin restricciones.
+    $isTowerUser = isset($_SESSION['suki_tower_auth']) && $_SESSION['suki_tower_auth'] === true;
+    if (empty($auth) && $isTowerUser) {
+        $auth = [
+            'id' => 'master_tower',
+            'role' => 'creator',
+            'tenant_id' => 'default',
+            'project_id' => 'default'
+        ];
+    }
+    
     $isAuthenticated = !empty($auth);
     if ($isAuthenticated) {
         $authUserId = (string) ($auth['id'] ?? '');
@@ -1626,17 +1663,20 @@ if ($route === 'chat/message') {
         $incomingTenantId = (string) ($payload['tenant_id'] ?? '');
         $incomingProjectId = (string) ($payload['project_id'] ?? '');
 
-        if ($incomingUserId !== '' && $authUserId !== '' && $incomingUserId !== $authUserId) {
-            respondJson($response, 'error', 'No puedes usar un user_id diferente al de tu sesion.', [], 403);
-            return;
-        }
-        if ($incomingTenantId !== '' && $authTenantId !== '' && $incomingTenantId !== $authTenantId) {
-            respondJson($response, 'error', 'No puedes usar un tenant_id diferente al de tu sesion.', [], 403);
-            return;
-        }
-        if ($incomingProjectId !== '' && $authProjectId !== '' && $incomingProjectId !== $authProjectId) {
-            respondJson($response, 'error', 'No puedes usar un project_id diferente al de tu sesion.', [], 403);
-            return;
+        // Bypass restrictions if acting as the system Tower Master
+        if (!$isTowerUser) {
+            if ($incomingUserId !== '' && $authUserId !== '' && $incomingUserId !== $authUserId) {
+                respondJson($response, 'error', 'No puedes usar un user_id diferente al de tu sesion.', [], 403);
+                return;
+            }
+            if ($incomingTenantId !== '' && $authTenantId !== '' && $incomingTenantId !== $authTenantId) {
+                respondJson($response, 'error', 'No puedes usar un tenant_id diferente al de tu sesion.', [], 403);
+                return;
+            }
+            if ($incomingProjectId !== '' && $authProjectId !== '' && $incomingProjectId !== $authProjectId) {
+                respondJson($response, 'error', 'No puedes usar un project_id diferente al de tu sesion.', [], 403);
+                return;
+            }
         }
 
         if (empty($payload['user_id'])) {
@@ -2028,6 +2068,125 @@ if ($route === 'chat/quality') {
             'tenant_id' => $tenantId,
             'project_id' => $projectId,
             'report' => $report,
+        ]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
+if ($route === 'chat/sessions/list') {
+    $auth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($auth)) {
+        respondJson($response, 'error', 'Acceso denegado', [], 401);
+        return;
+    }
+    try {
+        $registry = new App\Core\ProjectRegistry();
+        $db = $registry->db();
+        
+        // List all non-archived sessions for this user, newest first
+        $sql = "SELECT session_id, title, project_id, last_message_at, is_archived
+                FROM chat_sessions
+                WHERE user_id = :userId
+                  AND is_archived = 0
+                ORDER BY COALESCE(last_message_at, session_id) DESC
+                LIMIT 40";
+
+        $stmt = $db->prepare($sql);
+        $stmt->execute([':userId' => (string)$auth['id']]);
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+
+        respondJson($response, 'success', 'Listado de sesiones', ['sessions' => $rows]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
+if ($route === 'chat/history') {
+    $auth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($auth)) {
+        respondJson($response, 'error', 'Acceso denegado', [], 401);
+        return;
+    }
+    $sessionId = (string) ($_GET['session_id'] ?? '');
+    $limit     = max(1, min(200, (int) ($_GET['limit'] ?? 100)));
+    $tenantId  = (string) ($auth['tenant_id'] ?? 'default');
+
+    try {
+        // Read from conversation_memory (SQLite project_registry) — stores BOTH user AND assistant turns
+        $registry = new \App\Core\ProjectRegistry();
+        $db       = $registry->db();
+        $threadId = $tenantId . ':' . $sessionId;
+
+        $stmt = $db->prepare(
+            "SELECT role, content, created_at
+             FROM conversation_memory
+             WHERE thread_id = :tid
+             ORDER BY id ASC
+             LIMIT :lim"
+        );
+        $stmt->bindValue(':tid', $threadId);
+        $stmt->bindValue(':lim', $limit, \PDO::PARAM_INT);
+        $stmt->execute();
+        $rows = $stmt->fetchAll(\PDO::FETCH_ASSOC) ?: [];
+
+        // Map to the format builder.php expects: direction + message + created_at
+        $history = array_map(static function (array $row): array {
+            return [
+                'direction'  => $row['role'] === 'user' ? 'in' : 'out',
+                'message'    => (string) ($row['content'] ?? ''),
+                'created_at' => (string) ($row['created_at'] ?? ''),
+            ];
+        }, $rows);
+
+        respondJson($response, 'success', 'Historial recuperado', ['history' => $history]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
+if ($route === 'chat/sessions/create') {
+    $auth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($auth)) {
+        respondJson($response, 'error', 'Acceso denegado', [], 401);
+        return;
+    }
+    try {
+        $convManager = new \App\Core\ConversationManagerService();
+        $sessionId = $convManager->startNewSubject(
+            (string)$auth['id'], 
+            (string)($auth['project_id'] ?? 'default'), 
+            (string)($auth['tenant_id'] ?? 'default'), 
+            'local'
+        );
+        respondJson($response, 'success', 'Sesión creada', ['session_id' => $sessionId]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
+if ($route === 'chat/journal/get') {
+    $auth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($auth)) {
+        respondJson($response, 'error', 'Acceso denegado', [], 401);
+        return;
+    }
+    $agentRole = (string) ($_GET['role'] ?? 'admin');
+    $projectId = (string) ($auth['project_id'] ?? 'default');
+    $tenantId = (string) ($auth['tenant_id'] ?? 'default');
+    $sessionId = (string) ($_GET['session_id'] ?? '');
+    
+    try {
+        $journalService = new \App\Core\AgentJournalService();
+        $journal = $journalService->getJournal($tenantId, $projectId, $agentRole, $sessionId);
+        // Keywords are LLM-extracted (stored in journal['keywords']) — no regex, no stopwords
+        respondJson($response, 'success', 'Agenda recuperada', [
+            'journal'  => $journal,
+            'keywords' => $journal['keywords'] ?? [],
         ]);
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 500);

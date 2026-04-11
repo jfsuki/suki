@@ -18,6 +18,7 @@ use App\Core\Agents\DialogStateEngine;
 use App\Core\Agents\KnowledgeProvider;
 use App\Core\Agents\ConversationGatewayBuilderOnboardingTrait;
 use App\Core\Agents\ConversationGatewayHandlePipelineTrait;
+use App\Core\Agents\ConversationGatewayRoutingPolicyTrait;
 use App\Core\Agents\ConversationGatewayStubsTrait;
 
 /**
@@ -28,6 +29,7 @@ class ConversationGateway
 {
     use ConversationGatewayHandlePipelineTrait;
     use ConversationGatewayBuilderOnboardingTrait;
+    use ConversationGatewayRoutingPolicyTrait;
     use ConversationGatewayStubsTrait {
         ConversationGatewayBuilderOnboardingTrait::normalize insteadof ConversationGatewayStubsTrait;
         ConversationGatewayBuilderOnboardingTrait::isPureGreeting insteadof ConversationGatewayStubsTrait;

@@ -35,9 +35,16 @@ final class ChatAgent
     private ?IncidentManager $incidentManager = null;
     private bool $controlTowerResolved = false;
     private bool $controlTowerAvailable = false;
+    private bool $journalUpdated = false;
+    private bool $assistantSaved = false;
+    private string $activeThreadId = '';
+    private string $activeTenantStrId = '';
+    private string $activeProjectId = '';
+    private string $activeMode = '';
+    private bool $journalNoteSaved = false;
     private FormWizard $wizard;
     private ContractWriter $writer;
-    private LocalJsonMemoryRepository $memory;
+    private $memory; // Changed from LocalJsonMemoryRepository to allow SQL
     private ?SemanticMemoryService $semanticMemory = null;
     private AuthService $auth;
     private ?EntityBuilder $builder = null;
@@ -48,7 +55,7 @@ final class ChatAgent
         $this->wizard = new FormWizard();
         $this->writer = new ContractWriter();
         $this->builder = new EntityBuilder();
-        $this->memory = new LocalJsonMemoryRepository();
+        $this->memory = new SqlMemoryRepository(); // Unified SQL persistence
         $this->semanticMemory = new SemanticMemoryService();
         $this->auth = new AuthService();
         
@@ -95,8 +102,7 @@ final class ChatAgent
         $authTenantId = trim((string) ($payload['auth_tenant_id'] ?? ''));
         $authProjectId = trim((string) ($payload['auth_project_id'] ?? ''));
 
-        // 2.3.1 REGISTRO AUTOMÁTICO DE ENTRADA (Carlos Rule - Captura todo incluso errores tempranos)
-        $this->memory->appendShortTermMemory($tenantId, $userId, $sessionId, $channel, 'in', $text);
+        // Identity resolution happens below... (moved appendShortTermMemory)
 
         // --- Auto-generar título de conversación (Messaging style) ---
         $convManager = new ConversationManagerService();
@@ -139,6 +145,9 @@ final class ChatAgent
             }
         }
         $resolvedTenantId = (string) (defined('TENANT_ID') ? TENANT_ID : $tenantId);
+
+        // 2.3.1 REGISTRO AUTOMÁTICO DE ENTRADA (Mmovido aquí para usar el ID unificado)
+        $this->memory->appendShortTermMemory($resolvedTenantId, $userId, $sessionId, $channel, 'in', $text);
 
         $sessionBinding = $registry->getSession($sessionId);
 
@@ -215,6 +224,12 @@ final class ChatAgent
         
         // --- MEMORY FLOW STEP 1: thread_id ---
         $threadId = $tenantId . ':' . $sessionId;
+        $this->activeThreadId = $threadId;
+        $this->activeTenantStrId = $tenantId;
+        $this->activeProjectId = $projectId;
+        $this->activeMode = $mode;
+        $this->assistantSaved = false;
+        $this->journalNoteSaved = false;
         $memory = $this->conversationMemory();
         
         // --- MEMORY FLOW STEP 10: Clear Memory Command ---
@@ -271,6 +286,43 @@ final class ChatAgent
         $frustration = $this->handleFrustration($text, $tenantId, $userId, $projectId, $sessionId, $conversationId);
         
         $result = $gateway->handle($tenantId, $userId, $text, $mode, $projectId);
+
+        // --- Agentic Journal Update (v4.6) ---
+        $this->journalUpdated = false;
+        if ($mode === 'builder') {
+            try {
+                $journalService = new AgentJournalService();
+                $userInput  = (string) $text;
+
+                // Detect architectural signal keywords in user input
+                $archKeywords = ['quiero', 'necesito', 'debe', 'app', 'módulo', 'campo', 'tabla',
+                                 'modelo', 'entidad', 'proceso', 'función', 'reporte', 'pantalla',
+                                 'usuario', 'rol', 'permiso', 'integra', 'conect', 'import', 'export',
+                                 'quiero que', 'agregar', 'crear', 'listar', 'buscar', 'eliminar'];
+                $inputLower   = mb_strtolower($userInput);
+                $hasSignal    = false;
+                foreach ($archKeywords as $kw) {
+                    if (str_contains($inputLower, $kw)) { $hasSignal = true; break; }
+                }
+
+                if ($hasSignal) {
+                    // Short inputs (<15 chars) are likely greetings, skip
+                    if (mb_strlen(trim($userInput)) >= 15) {
+                        $journalService->appendNote(
+                            $tenantId,
+                            $projectId,
+                            'architect',
+                            mb_substr($userInput, 0, 250),
+                            'requirement',
+                            $sessionId
+                        );
+                        $this->journalUpdated = true;
+                    }
+                }
+            } catch (\Throwable $e) {
+                // Journal errors must not block the main chat flow
+            }
+        }
 
         if (!empty($local['command']) && in_array($local['command'], ['RunTests', 'LLMUsage'], true)) {
             $utilityTelemetry = $this->buildLocalUtilityTelemetry(
@@ -983,9 +1035,22 @@ final class ChatAgent
             try {
                 // --- MEMORY FLOW STEP 3, 5, 6: Load and Build Context ---
                 $history = $memory->load($threadId);
-                $systemPrompt = @file_get_contents(dirname(__DIR__, 2) . '/prompts/builder_system_prompt.txt') 
+                $systemPrompt = @file_get_contents(dirname(__DIR__, 2) . '/prompts/builder_system_prompt.txt')
                     ?: "Eres SUKI. Responde breve y claro.";
-                
+
+                // --- JOURNAL CONTEXT INJECTION: Inject architect journal into system prompt ---
+                if ($mode === 'builder') {
+                    try {
+                        $journalCtx = (new AgentJournalService())
+                            ->buildContextBlock($tenantId, $projectId, 'architect', $sessionId);
+                        if ($journalCtx !== '') {
+                            $systemPrompt .= "\n\n---\nBITÁCORA DE ARQUITECTURA (no olvides esto):\n" . $journalCtx . "\n---";
+                        }
+                    } catch (\Throwable $ignored) {
+                        // Journal context injection must not block chat
+                    }
+                }
+
                 $messages = [['role' => 'system', 'content' => $systemPrompt]];
                 foreach ($history as $msg) {
                     $messages[] = ['role' => $msg['role'], 'content' => $msg['content']];
@@ -1207,9 +1272,53 @@ final class ChatAgent
                 }
                 $reply = $this->reply($responseText, $channel, $sessionId, $userId);
             }
+            // --- PERSISTENCE: Auto-title session if needed ---
+            if ($sessionId !== '' && ($session = $this->projectRegistry()->getSession($sessionId))) {
+                if (empty($session['title'])) {
+                    $title = mb_substr($text, 0, 40) . (mb_strlen($text) > 40 ? '...' : '');
+                    $this->projectRegistry()->updateSessionTitle($sessionId, $title);
+                }
+            }
+
+            // --- KEYWORD EXTRACTION: Parse [[KEYWORDS: ...]] marker from LLM response ---
+            $llmKeywords = [];
+            if (preg_match('/\[\[KEYWORDS:\s*([^\]]+)\]\]/ui', $responseText, $kwMatch)) {
+                $rawKws = $kwMatch[1] ?? '';
+                $llmKeywords = array_values(array_filter(
+                    array_map('trim', explode(',', $rawKws)),
+                    fn($k) => mb_strlen($k) >= 2 && mb_strlen($k) <= 40
+                ));
+                // Strip the marker from the user-visible response (including surrounding whitespace/newlines)
+                $responseText = trim(preg_replace('/\n?\[\[KEYWORDS:[^\]]*\]\]\n?/ui', '', $responseText));
+            }
+
+            // --- PERSISTENCE: Update Agent Journal with bot response as 'arch' note ---
+            try {
+                $journalService = new \App\Core\AgentJournalService();
+                // Save LLM-extracted keywords into the journal (replaces regex stopwords approach)
+                if (!empty($llmKeywords)) {
+                    $journalService->mergeKeywords($tenantId, $projectId, 'architect', $llmKeywords, $sessionId);
+                    $this->journalUpdated = true;
+                }
+                // Save note with clean response text
+                $responseSnippet = mb_substr(trim($responseText), 0, 280);
+                if (mb_strlen($responseSnippet) >= 40) {
+                    $journalService->appendNote(
+                        $tenantId,
+                        $projectId,
+                        'architect',
+                        $responseSnippet,
+                        'arch',
+                        $sessionId
+                    );
+                    $this->journalUpdated = true;
+                    $this->journalNoteSaved = true; // Prevent duplicate in reply()
+                }
+            } catch (\Throwable $e) { /* Observability — non fatal */ }
 
             // --- MEMORY FLOW STEP 8: Persist Assistant Response ---
             $memory->append($threadId, 'assistant', $responseText);
+            $this->assistantSaved = true;
 
             $task = $this->controlTowerCompleteTask($task, [
                 'result_status' => 'success',
@@ -2264,14 +2373,54 @@ final class ChatAgent
 
     private function reply(string $text, string $channel, string $sessionId, string $userId, string $status = 'success', array $data = []): array
     {
+        // --- MEMORY FLOW: Persist assistant response for ALL code paths ---
+        if ($status === 'success' && !$this->assistantSaved && $this->activeThreadId !== '' && $text !== '') {
+            try {
+                $mem = $this->conversationMemory();
+                $mem->append($this->activeThreadId, 'assistant', $text);
+                $this->assistantSaved = true;
+            } catch (\Throwable $e) {
+                // Non-fatal: memory persistence failure must not break response
+            }
+        }
+
+        // --- JOURNAL: Capture agent response as 'finding' note for non-LLM builder paths ---
+        if ($status === 'success'
+            && !$this->journalNoteSaved
+            && $this->activeMode === 'builder'
+            && $this->activeTenantStrId !== ''
+            && $this->activeProjectId !== ''
+            && mb_strlen(trim($text)) >= 60
+        ) {
+            try {
+                // Extract session_id from activeThreadId (format: tenantId:sessionId)
+                $parts = explode(':', $this->activeThreadId, 2);
+                $jSessionId = $parts[1] ?? '';
+                $snippet = mb_substr(trim($text), 0, 280);
+                (new AgentJournalService())->appendNote(
+                    $this->activeTenantStrId,
+                    $this->activeProjectId,
+                    'architect',
+                    $snippet,
+                    'finding',
+                    $jSessionId
+                );
+                $this->journalNoteSaved = true;
+                $this->journalUpdated = true;
+            } catch (\Throwable $e) {
+                // Non-fatal
+            }
+        }
+
         $response = [
             'status' => $status,
             'message' => $status === 'success' ? 'OK' : $text,
             'data' => array_merge([
-                'reply' => $text,
-                'channel' => $channel,
-                'session_id' => $sessionId,
-                'user_id' => $userId,
+                'reply'           => $text,
+                'channel'         => $channel,
+                'session_id'      => $sessionId,
+                'user_id'         => $userId,
+                'journal_updated' => $this->journalUpdated,
             ], $data),
         ];
 

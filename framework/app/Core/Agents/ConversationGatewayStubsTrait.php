@@ -784,7 +784,16 @@ trait ConversationGatewayStubsTrait
         $window = new MemoryWindow(3);
         $state = $this->loadState($tenantId, $userId, $this->contextProjectId ?? 'default', $this->contextMode ?? 'app');
         $profile = $this->getProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId ?? 'default', $userId));
-        $window->hydrateFromState($state, $profile);
+        
+        // Fetch Agent Journal
+        $journalService = new \App\Core\AgentJournalService();
+        $journal = $journalService->getJournal(
+            $tenantId, 
+            (string)($this->contextProjectId ?? 'default'), 
+            (string)($this->contextMode ?? 'admin')
+        );
+        
+        $window->hydrateFromState($state, $profile, $journal);
         return $window;
     }
 }

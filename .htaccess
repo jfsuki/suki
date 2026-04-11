@@ -1,6 +1,7 @@
 # .htaccess - SUKI OS Global Hardening & Routing
 Options -Indexes
 RewriteEngine On
+RewriteBase /
 
 # 1. Bloquear acceso directo a CUALQUIER archivo .php
 # Solo se permite la ejecución a través de los index.php de cada mundo si son llamados internamente.
@@ -41,9 +42,10 @@ RewriteRule ^apps(/.*)?$ project/public/index.php?url=$1 [QSA,L]
 RewriteRule ^torre(/.*)?$ tower/public/index.php?url=$1 [QSA,L]
 
 # Builder/Editor (Alias globales para el mundo arquitectura)
+RewriteRule ^logout(/.*)?$ framework/public/index.php?url=logout [QSA,L]
 RewriteRule ^builder-login(/.*)?$ framework/public/index.php?url=builder-login [QSA,L]
 RewriteRule ^builder(/.*)?$ project/public/index.php?url=builder [QSA,L]
 RewriteRule ^editor(/.*)?$ project/public/index.php?url=editor [QSA,L]
 
 # Redirección por defecto al Marketplace
-RewriteRule ^$ marketplace/ [R=302,L]
+RewriteRule ^$ /marketplace/ [R=302,L]

@@ -18,6 +18,7 @@ class MemoryWindow
 {
     private array $shortTermHistory = [];
     private array $longTermProfile = [];
+    private array $journal = [];
     private int $maxTurns;
 
     /**
@@ -32,8 +33,9 @@ class MemoryWindow
      * Carga el estado histórico y el perfil desde la persistencia de SUKI.
      * Extrae inteligentemente qué es perfil a largo plazo y qué es charla reciente.
      */
-    public function hydrateFromState(array $state, array $profile = []): void
+    public function hydrateFromState(array $state, array $profile = [], array $journal = []): void
     {
+        $this->journal = $journal;
         $this->longTermProfile = [
             'tenant' => $state['tenant_id'] ?? 'default',
             'project' => $state['project_id'] ?? 'default',
@@ -49,11 +51,20 @@ class MemoryWindow
         // Extraer los últimos N turnos de la bitácora "history_log" (si existe)
         $historyLog = is_array($state['history_log'] ?? null) ? $state['history_log'] : [];
         if (!empty($historyLog)) {
-            // Un array de formato [{role: 'user', text: '...'}, {role: 'assistant', text: '...'}]
-            // Si el history_log es de otro formato, lo adaptaremos aca.
-            // Para simplificar, asumimos que tomamos los ultimos (maxTurns * 2) mensajes.
             $sliceLength = $this->maxTurns * 2;
-            $this->shortTermHistory = array_slice($historyLog, -$sliceLength);
+            $rawSlice = array_slice($historyLog, -$sliceLength);
+            
+            // NORMALIZACIÓN: Convertir formatos heterogéneos (SQL, JSON, Neuron) 
+            // a un formato interno consistente {role, content}
+            $this->shortTermHistory = array_map(function($m) {
+                $role = $m['role'] ?? $m['dir'] ?? $m['direction'] ?? 'user';
+                $content = $m['content'] ?? $m['text'] ?? $m['msg'] ?? $m['message'] ?? '';
+                
+                return [
+                    'role' => (strtolower($role) === 'out' || strtolower($role) === 'assistant') ? 'assistant' : 'user',
+                    'content' => $content
+                ];
+            }, $rawSlice);
         } else {
             $this->shortTermHistory = [];
         }
@@ -96,8 +107,18 @@ class MemoryWindow
      */
     public function compileLlmContext(TokenBudgeter $budgeter, int $maxHistoryTokens = 500): array
     {
-        // 1. Facts (siempre se envían íntegros, ya que son pares key:value pequeños)
+        // 1. Facts & Journal
         $facts = $this->getLongTermFacts();
+        $agenda = $this->journal['summary'] ?? '';
+        $pendingTasks = array_keys(array_filter($this->journal['tasks'] ?? [], fn($t) => ($t['status'] ?? '') === 'pending'));
+        
+        if ($agenda !== '') {
+            $facts['agenda_context'] = $agenda;
+        }
+        if (!empty($pendingTasks)) {
+            $facts['pending_objectives'] = implode(', ', $pendingTasks);
+        }
+
         // Limpiamos nulos o vacíos para ahorrar tokens
         $facts = array_filter($facts, fn($val) => $val !== null && $val !== '' && $val !== []);
 
@@ -109,19 +130,18 @@ class MemoryWindow
         $reversedHistory = array_reverse($this->shortTermHistory);
         foreach ($reversedHistory as $msg) {
             $role = strtoupper($msg['role'] ?? 'USER');
-            $text = $msg['text'] ?? '';
+            $text = $msg['content'] ?? '';
             
             $line = "$role: $text";
             $lineTokens = $budgeter->estimate($line);
-
+            
             if ($currentTokens + $lineTokens > $maxHistoryTokens) {
-                // Si la línea entera no cabe, recortamos usando el budgeter y metemos lo que quepa (estrategia 'start' para conservar el inicio o 'end' según convenga)
                 $remainder = $maxHistoryTokens - $currentTokens;
                 if ($remainder > 10) {
                     $cropped = $budgeter->cropText($text, $remainder - 5, 'end');
                     $compiledHistory[] = "$role: $cropped";
                 }
-                break; // No admitimos más mensajes antiguos
+                break;
             }
 
             $compiledHistory[] = $line;
@@ -134,7 +154,8 @@ class MemoryWindow
         return [
             'long_term_facts' => $facts,
             'recent_history' => implode("\n", $compiledHistory),
-            'active_task' => $this->longTermProfile['active_task'] ?? 'none'
+            'active_task' => $this->longTermProfile['active_task'] ?? 'none',
+            'agent_agenda' => $agenda
         ];
     }
 }

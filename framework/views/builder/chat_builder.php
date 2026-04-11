@@ -247,6 +247,34 @@ include __DIR__ . '/includes/navbar.php';
       color: var(--text);
       border-radius: 4px 14px 14px 14px;
     }
+    /* ─── SESSION SIDEBAR ───────────────────────────────────── */
+    .session-sidebar { display: flex; flex-direction: column; gap: 8px; border-right: 0; }
+    .session-item {
+        padding: 10px 12px; border-radius: 12px; cursor: pointer; transition: 0.2s;
+        border: 1px solid transparent; font-size: 11.5px; color: var(--muted);
+        display: flex; align-items: center; gap: 8px;
+    }
+    .session-item:hover { background: var(--surface2); color: var(--text); }
+    .session-item.active { background: var(--accent-soft); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+    .session-item .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--muted); }
+    .session-item.active .dot { background: var(--accent); }
+    .new-chat-btn {
+        background: var(--surface2); border: 1px dashed var(--border);
+        width: 100%; padding: 10px; border-radius: 12px; color: var(--text);
+        font-size: 11.5px; font-weight: 600; cursor: pointer; transition: 0.2s;
+        margin-bottom: 8px;
+    }
+    .new-chat-btn:hover { border-color: var(--accent); background: var(--accent-soft); color: var(--accent); }
+
+    /* ─── JOURNAL PANE ────────────────────────────────────────── */
+    .journal-entry { margin-bottom: 12px; }
+    .journal-label { font-size: 10px; font-weight: 700; color: var(--muted); text-transform: uppercase; margin-bottom: 4px; display: block; }
+    .journal-text { font-size: 12px; color: var(--text); line-height: 1.5; background: var(--surface2); padding: 10px; border-radius: 10px; border: 1px solid var(--border); }
+    .task-item { display: flex; align-items: center; gap: 8px; font-size: 11.5px; margin-bottom: 6px; }
+    .task-check { width: 14px; height: 14px; border: 1.5px solid var(--border); border-radius: 4px; flex-shrink: 0; }
+    .task-check.done { background: var(--teal); border-color: var(--teal); }
+    .task-check.done::after { content: '✓'; color: #fff; font-size: 8px; display: block; text-align: center; }
+
     .msg-meta { font-size: 10px; color: var(--muted); margin-top: 4px; }
     .msg.user .msg-meta { text-align: right; }
 
@@ -477,6 +505,24 @@ include __DIR__ . '/includes/navbar.php';
 <!-- MAIN LAYOUT -->
 <div class="layout">
 
+  <!-- PANEL 0: Temas (Multiplexación) -->
+  <div class="panel session-sidebar" id="sessionPanel">
+    <div class="panel-head">
+      <div class="panel-icon purple">🎨</div>
+      <h3>Temas</h3>
+    </div>
+    <div class="panel-body">
+      <button class="new-chat-btn" onclick="createNewSession()">+ Nueva sesión</button>
+      <div id="sessionList">
+        <!-- Sessions will be loaded here -->
+        <div class="session-item active">
+          <div class="dot"></div>
+          <div class="session-title">Cargando...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- PANEL IZQUIERDO: Entidades del proyecto -->
   <div class="panel">
     <div class="panel-head">
@@ -521,16 +567,8 @@ include __DIR__ . '/includes/navbar.php';
     <!-- VIEW: CHAT -->
     <div id="view-chat" class="panel-view active" style="display:flex; flex-direction:column; flex:1; min-height:0;">
       <div class="chat-messages" id="chatMessages">
-        <div class="msg bot">
-          <div class="msg-avatar">S</div>
-          <div>
-            <div class="msg-bubble">
-              👋 Hola, soy <strong>SUKI</strong>, tu asistente de construcción.<br><br>
-              ¿Qué tipo de negocio quieres crear? Dímelo en una frase y lo armamos juntos. 🚀
-            </div>
-            <div class="msg-meta">0ms · cache · agente: builder_onboarding</div>
-          </div>
-        </div>
+        <!-- Messages will be loaded here -->
+        <div class="empty-hint">Conectando con SUKI...</div>
       </div>
       <div class="chat-input-wrap">
         <div class="chat-input-row">
@@ -561,20 +599,35 @@ include __DIR__ . '/includes/navbar.php';
     </div>
   </div>
 
-  <!-- PANEL DERECHO: Métricas y pipeline -->
-  <div class="panel">
+  <!-- PANEL DERECHO: Agenda y métricas -->
+  <div class="panel" id="rightPanel">
     <div class="panel-head">
-      <div class="panel-icon slate">📊</div>
-      <h3>Orquestador</h3>
+      <div class="panel-icon teal">📖</div>
+      <h3>Agenda Suki</h3>
+      <div style="flex:1"></div>
+      <button onclick="toggleInspector()" id="inspectBtn" style="border:0; background:transparent; cursor:pointer; font-size:12px;" title="Ver Inspector">🧪</button>
     </div>
-    <div class="panel-body">
+    <div class="panel-body" id="journalPane">
+      <!-- Journal Content -->
+      <div class="journal-entry">
+        <span class="journal-label">Resumen de avance</span>
+        <div class="journal-text" id="journalSummary">...</div>
+      </div>
+      <div class="journal-entry">
+        <span class="journal-label">Objetivos pendientes</span>
+        <div id="taskList">
+          <!-- Tasks list here -->
+        </div>
+      </div>
+    </div>
 
-      <!-- Orchestrator status -->
+    <!-- Orchestrator status (Inspector Mode - Hidden by default) -->
+    <div class="panel-body" id="inspectorPane" style="display:none">
       <div class="orchestrator-badge">
         <div class="ob-dot"></div>
         <div>
-          <div class="ob-text">ChatOrchestrator v2</div>
-          <div class="ob-sub">Multi-Agent Pipeline · CrewAI</div>
+          <div class="ob-text">TECHNICAL INSPECTOR</div>
+          <div class="ob-sub">AgentOps · Multi-Step Trace</div>
         </div>
       </div>
 
@@ -939,6 +992,122 @@ include __DIR__ . '/includes/navbar.php';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
   }
 
+  // ── SESSION & JOURNAL MANAGEMENT ──────────────────
+  let ACTIVE_SESSION_ID = localStorage.getItem('suki_builder_session') || '';
+
+  window.toggleInspector = () => {
+    const journal = document.getElementById('journalPane');
+    const inspector = document.getElementById('inspectorPane');
+    const btn = document.getElementById('inspectBtn');
+    
+    if (journal.style.display === 'none') {
+        journal.style.display = 'block';
+        inspector.style.display = 'none';
+        btn.textContent = '🧪';
+    } else {
+        journal.style.display = 'none';
+        inspector.style.display = 'block';
+        btn.textContent = '📖';
+    }
+  };
+
+  window.loadSessions = async () => {
+    try {
+      const res = await fetch('api/chat/sessions/list');
+      const json = await res.json();
+      if (json.status === 'success') {
+        const list = document.getElementById('sessionList');
+        if (!list) return;
+        list.innerHTML = '';
+        json.data.sessions.forEach(s => {
+          const item = document.createElement('div');
+          item.className = 'session-item' + (s.session_id === ACTIVE_SESSION_ID ? ' active' : '');
+          item.onclick = () => switchSession(s.session_id);
+          item.innerHTML = `<div class="dot"></div><div class="session-title text-truncate" style="max-width:140px">${s.title || 'Nueva sesión'}</div>`;
+          list.appendChild(item);
+        });
+        if (ACTIVE_SESSION_ID) {
+            switchSession(ACTIVE_SESSION_ID, true);
+        } else if (json.data.sessions.length > 0) {
+            switchSession(json.data.sessions[0].session_id, true);
+        } else {
+            document.getElementById('chatMessages').innerHTML = `
+                <div class="msg bot">
+                    <div class="msg-avatar">S</div>
+                    <div>
+                        <div class="msg-bubble">👋 Hola, soy <strong>SUKI</strong>, tu asistente de construcción.<br><br>¿Qué tipo de negocio quieres crear? Dímelo en una frase y lo armamos juntos. 🚀</div>
+                        <div class="msg-meta">0ms · ready</div>
+                    </div>
+                </div>`;
+        }
+      }
+    } catch (e) { console.error('Error loading sessions', e); }
+  };
+
+  window.switchSession = async (sid, force = false) => {
+    if (sid === ACTIVE_SESSION_ID && !force) return;
+    ACTIVE_SESSION_ID = sid;
+    localStorage.setItem('suki_builder_session', sid);
+    loadSessions();
+    const chatMsgs = document.getElementById('chatMessages');
+    chatMsgs.innerHTML = '<div class="empty-hint">Cargando historial...</div>';
+    
+    try {
+        const res = await fetch(`api/chat/history?session_id=${sid}`);
+        const json = await res.json();
+        chatMsgs.innerHTML = '';
+        if (json.data.history) {
+            json.data.history.forEach(m => {
+                addMsg(m.dir === 'in' ? 'user' : 'bot', m.msg, m.ts ? new Date(m.ts * 1000).toLocaleTimeString() : '');
+            });
+        }
+    } catch (e) { console.error('Error switching session', e); }
+  };
+
+  window.createNewSession = async () => {
+    try {
+        const res = await fetch('api/chat/sessions/create');
+        const json = await res.json();
+        if (json.status === 'success') {
+            ACTIVE_SESSION_ID = json.data.session_id;
+            const chatMsgs = document.getElementById('chatMessages');
+            chatMsgs.innerHTML = '';
+            addMsg('bot', 'Nueva sesión iniciada. ¿En qué puedo ayudarte?');
+            loadSessions();
+        }
+    } catch (e) { console.error('Error creating session', e); }
+  };
+
+  window.loadJournal = async () => {
+    try {
+        const res = await fetch(`api/chat/journal/get?role=${MODE === 'builder' ? 'architect' : 'admin'}`);
+        const json = await res.json();
+        if (json.status === 'success') {
+            const j = json.data.journal;
+            const sum = document.getElementById('journalSummary');
+            if (sum) sum.textContent = j.summary || 'Sin resumen.';
+            const taskList = document.getElementById('taskList');
+            if (taskList) {
+                taskList.innerHTML = '';
+                const tasks = j.tasks || {};
+                Object.keys(tasks).forEach(t => {
+                    const item = document.createElement('div');
+                    item.className = 'task-item';
+                    const done = tasks[t].status === 'done';
+                    item.innerHTML = `<div class="task-check ${done ? 'done' : ''}"></div><div class="task-label">${t}</div>`;
+                    taskList.appendChild(item);
+                });
+            }
+        }
+    } catch (e) { console.error('Error loading journal', e); }
+  };
+
+  // Initial load
+  setTimeout(() => {
+    loadSessions();
+    loadJournal();
+  }, 1000);
+
   // ── Send message ───────────────────────────
   async function sendMessage() {
     const text = input.value.trim();
@@ -970,6 +1139,7 @@ include __DIR__ . '/includes/navbar.php';
         tenant_id: TENANT_ID,
         user_id:   USER_ID,
         project_id: PROJECT_ID,
+        session_id: ACTIVE_SESSION_ID,
         test_mode: testToggle.checked,
       };
       const res  = await fetch(API_URL, {

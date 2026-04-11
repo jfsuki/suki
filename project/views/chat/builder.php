@@ -6,13 +6,15 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
 ?>
 <style>
     /* ─── CHAT-SPECIFIC LAYOUT (PROJECT SYNC) ───────────────── */
-    .layout {
-      display: grid;
-      grid-template-columns: 260px 1fr 300px;
+    #mainBuilderGrid {
+      display: grid !important;
+      grid-template-columns: 200px 240px 1fr 280px !important;
       gap: 12px;
       padding: 12px;
-      flex: 1;
-      min-height: 0;
+      height: calc(100vh - 60px);
+      min-height: 600px;
+      overflow: hidden;
+      width: 100% !important;
     }
     .panel {
       background: var(--surface);
@@ -318,165 +320,250 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
       box-shadow: 0 0 6px var(--accent);
     }
 
-    /* responsive */
+    .session-item {
+      padding: 10px 14px;
+      margin-bottom: 4px;
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border: 1px solid transparent;
+      transition: var(--transition);
+      background: var(--surface2);
+    }
+    .session-item:hover {
+      background: rgba(139,92,246,0.08); border-color: rgba(139,92,246,0.2);
+    }
+    .session-item.active {
+      background: var(--accent-gradient);
+      border-color: var(--accent);
+      color: #fff;
+      box-shadow: 0 4px 12px var(--glow);
+    }
+    .session-item .dot {
+      width: 6px; height: 6px; border-radius: 50%; background: var(--muted);
+    }
+    .session-item.active .dot { background: #fff; box-shadow: 0 0 8px #fff; }
+    .session-item .session-title {
+      font-size: 11.5px; font-weight: 500;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .session-item.active .session-title { color: #fff; font-weight: 600; }
+
+    /* responsive disable stacking ALWAYS for this specific layout */
     @media (max-width: 900px) {
-      .layout { grid-template-columns: 1fr; }
-      .layout > *:not(.chat-panel) { display: none; }
+      #mainBuilderGrid { grid-template-columns: 200px 240px 1fr 280px !important; }
     }
   </style>
 </head>
 <body>
 
 
-<!-- MAIN LAYOUT -->
-<div class="layout">
+  <!-- MAIN LAYOUT GRID -->
+  <div id="mainBuilderGrid">
 
-  <!-- PANEL IZQUIERDO: Entidades del proyecto -->
-  <div class="panel">
-    <div class="panel-head">
-      <div class="panel-icon teal">📦</div>
-      <h3>Proyecto Activo</h3>
-    </div>
-    <div class="panel-body">
-      <div class="section-lbl">Tablas creadas</div>
-      <div class="entity-list" id="entityList">
-        <div class="empty-hint">
-          <span class="icon">✨</span>
-          Aún no hay tablas.<br>Dile a SUKI qué tipo de negocio tienes.
+    <!-- PANEL 0: Conversaciones (Multiplexación) -->
+    <div class="panel session-sidebar" id="sessionPanel">
+      <div class="panel-head">
+        <div class="panel-icon purple">💬</div>
+        <h3>Chats</h3>
+      </div>
+      <div class="panel-body">
+        <button class="nav-btn primary" style="width:100%;margin-bottom:12px;justify-content:center" onclick="createNewSession()">+ Nuevo chat</button>
+        <div id="sessionList">
+          <div class="empty-hint">Cargando...</div>
         </div>
       </div>
-
-      <div class="section-lbl" id="formSectionLbl" style="display:none">Formularios</div>
-      <div class="entity-list" id="formList"></div>
     </div>
-  </div>
 
-  <!-- PANEL CENTRO: Chat -->
-  <div class="panel chat-panel">
-    <div class="panel-head">
-      <div class="panel-icon purple">💬</div>
-      <h3>Chat con SUKI Builder</h3>
-    </div>
-    <div class="chat-messages" id="chatMessages">
-      <!-- Welcome -->
-      <div class="msg bot">
-        <div class="msg-avatar">S</div>
-        <div>
-          <div class="msg-bubble">
-            👋 Hola, soy <strong>SUKI</strong>, tu asistente de construcción.<br><br>
-            ¿Qué tipo de negocio quieres crear? Dímelo en una frase y lo armamos juntos. 🚀
+    <!-- PANEL IZQUIERDO: Entidades del proyecto -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-icon teal">📦</div>
+        <h3>Proyecto Activo</h3>
+      </div>
+      <div class="panel-body">
+        <div class="section-lbl">Tablas creadas</div>
+        <div class="entity-list" id="entityList">
+          <div class="empty-hint">
+            <span class="icon">✨</span>
+            Aún no hay tablas.<br>Dile a SUKI qué tipo de negocio tienes.
           </div>
-          <div class="msg-meta">0ms · cache · agente: builder_onboarding</div>
         </div>
+
+        <div class="section-lbl" id="formSectionLbl" style="display:none">Formularios</div>
+        <div class="entity-list" id="formList"></div>
       </div>
     </div>
-    <div class="chat-input-wrap">
-      <div class="chat-input-row">
-        <textarea id="chatInput" placeholder="Ej: tienda de ropa con inventario y ventas..."
-          rows="1" autocomplete="off"></textarea>
-        <button id="sendBtn" title="Enviar">➤</button>
+
+    <!-- PANEL CENTRO: Chat -->
+    <div class="panel chat-panel">
+      <div class="panel-head">
+        <div class="panel-icon purple">💬</div>
+        <h3>Chat con SUKI Builder</h3>
       </div>
-      <div class="input-hint">Enter para enviar · Shift+Enter nueva línea</div>
+      <div class="chat-messages" id="chatMessages">
+        <div class="empty-hint">Conectando con SUKI...</div>
+      </div>
+      <div class="chat-input-wrap">
+        <div class="chat-input-row">
+          <textarea id="chatInput" placeholder="Ej: tienda de ropa con inventario y ventas..."
+            rows="1" autocomplete="off"></textarea>
+          <button id="sendBtn" title="Enviar">➤</button>
+        </div>
+        <div class="input-hint">Enter para enviar · Shift+Enter nueva línea</div>
+      </div>
+    </div>
+
+    <!-- PANEL DERECHO: Métricas y pipeline -->
+    <div class="panel">
+      <div class="panel-head">
+        <div class="panel-icon slate">📊</div>
+        <h3>Orquestador</h3>
+      </div>
+      <div class="panel-body">
+        
+        <!-- Panel switcher -->
+        <div id="orchestratorTabs" style="display:flex;gap:4px;background:var(--surface2);padding:4px;border-radius:10px;margin-bottom:12px;border:1px solid var(--border)">
+          <button id="inspectBtn" class="nav-btn active" style="flex:1;justify-content:center;font-size:10px" onclick="showPane('journal')">📖 Agenda</button>
+          <button id="techBtn" class="nav-btn" style="flex:1;justify-content:center;font-size:10px" onclick="showPane('tech')">🧪 Técnico</button>
+        </div>
+
+        <!-- Journal Pane (Agenda) -->
+        <div id="journalPane">
+          <!-- Header row: label + badge -->
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+            <span style="font-size:10px;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.8px">Libreta del Agente</span>
+            <span id="journalBadge" style="display:none;font-size:9px;background:#22c55e;color:#fff;padding:2px 7px;border-radius:20px;font-weight:600;letter-spacing:.3px">✓ guardado</span>
+          </div>
+
+          <!-- Stats row -->
+          <div id="journalStats" style="display:flex;gap:6px;margin-bottom:10px">
+            <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center">
+              <div id="jStatTurns" style="font-size:16px;font-weight:700;color:var(--accent)">—</div>
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Turnos</div>
+            </div>
+            <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center">
+              <div id="jStatNotes" style="font-size:16px;font-weight:700;color:var(--teal)">—</div>
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Notas</div>
+            </div>
+            <div style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:7px 10px;text-align:center">
+              <div id="jStatRoute" style="font-size:11px;font-weight:700;color:var(--success)">—</div>
+              <div style="font-size:9px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px">Ruta</div>
+            </div>
+          </div>
+
+          <!-- LLM-extracted keywords for Qdrant context -->
+          <div class="section-lbl" style="display:flex;align-items:center;justify-content:space-between">
+            <span>🔍 Entidades del proyecto</span>
+            <span style="font-size:9px;color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">extraídas por LLM</span>
+          </div>
+          <div id="journalKeywords" style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:10px">
+            <span style="font-size:10px;color:var(--muted);padding:2px 0">Aún sin contexto...</span>
+          </div>
+
+          <!-- Notes -->
+          <div class="section-lbl">📝 Notas de sesión <span id="jNotesCount" style="color:var(--muted);font-weight:400"></span></div>
+          <div id="journalNotes" style="display:flex;flex-direction:column;gap:5px;margin-bottom:10px"></div>
+
+          <!-- Tasks -->
+          <div class="section-lbl" id="jTasksLbl" style="display:none">⏳ Próximos pasos</div>
+          <div id="taskList" style="display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+
+        <!-- Inspector Pane (Tecnico - oculto por defecto) -->
+        <div id="inspectorPane" style="display:none">
+          <!-- Orchestrator status -->
+          <div class="orchestrator-badge">
+            <div class="ob-dot"></div>
+            <div>
+              <div class="ob-text">ChatOrchestrator v2</div>
+              <div class="ob-sub">Multi-Agent Pipeline · CrewAI</div>
+            </div>
+          </div>
+
+          <!-- Test mode toggle -->
+          <div class="test-toggle">
+            <span>🧪 Inspector técnico</span>
+            <label class="toggle-switch">
+              <input type="checkbox" id="testModeToggle">
+              <span class="toggle-slider"></span>
+            </label>
+          </div>
+
+          <!-- Métricas -->
+          <div class="metrics-grid">
+            <div class="metric-card">
+              <div class="metric-val accent" id="mMsgs">0</div>
+              <div class="metric-lbl">Mensajes</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-val teal" id="mTokens">0</div>
+              <div class="metric-lbl">Tokens</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-val success" id="mCache">0</div>
+              <div class="metric-lbl">Cache Hits</div>
+            </div>
+            <div class="metric-card">
+              <div class="metric-val warn" id="mLatency">—</div>
+              <div class="metric-lbl">P95 ms</div>
+            </div>
+          </div>
+
+          <!-- Route path -->
+          <div class="section-lbl">Último Route Path</div>
+          <div class="route-trace" id="routeTrace">
+            <span class="route-step">cache</span>
+            <span class="route-step">rules</span>
+            <span class="route-step">rag</span>
+            <span class="route-step">tools</span>
+            <span class="route-step">llm</span>
+          </div>
+
+          <!-- Pipeline steps -->
+          <div class="section-lbl">Pipeline en tiempo real</div>
+          <div class="pipeline-steps">
+            <div class="step" id="ps-cache">
+              <div class="dot"></div>
+              <span class="step-label">1. Semantic Cache</span>
+              <span class="step-time" id="ps-cache-t">—</span>
+            </div>
+            <div class="step" id="ps-budget">
+              <div class="dot"></div>
+              <span class="step-label">2. Token Budget</span>
+              <span class="step-time" id="ps-budget-t">—</span>
+            </div>
+            <div class="step" id="ps-qdrant">
+              <div class="dot"></div>
+              <span class="step-label">3. Qdrant Classifier</span>
+              <span class="step-time" id="ps-qdrant-t">—</span>
+            </div>
+            <div class="step" id="ps-process">
+              <div class="dot"></div>
+              <span class="step-label">4. Agent Process</span>
+              <span class="step-time" id="ps-process-t">—</span>
+            </div>
+            <div class="step" id="ps-kernel">
+              <div class="dot"></div>
+              <span class="step-label">5. PHP Kernel</span>
+              <span class="step-time" id="ps-kernel-t">—</span>
+            </div>
+          </div>
+
+          <!-- Test info box (visible en test mode) -->
+          <div id="testInfoBox" style="display:none; margin-top:12px;">
+            <div class="section-lbl">Debug Info</div>
+            <pre id="testInfoPre" style="font-size:10px; color:var(--muted); background:var(--surface2);
+              border:1px solid var(--border); border-radius:8px; padding:10px; overflow:auto; max-height:200px;
+              white-space:pre-wrap; word-break:break-all; line-height:1.5;"></pre>
+          </div>
+        </div>
+
+      </div>
     </div>
   </div>
-
-  <!-- PANEL DERECHO: Métricas y pipeline -->
-  <div class="panel">
-    <div class="panel-head">
-      <div class="panel-icon slate">📊</div>
-      <h3>Orquestador</h3>
-    </div>
-    <div class="panel-body">
-
-      <!-- Orchestrator status -->
-      <div class="orchestrator-badge">
-        <div class="ob-dot"></div>
-        <div>
-          <div class="ob-text">ChatOrchestrator v2</div>
-          <div class="ob-sub">Multi-Agent Pipeline · CrewAI</div>
-        </div>
-      </div>
-
-      <!-- Test mode toggle -->
-      <div class="test-toggle">
-        <span>🧪 Inspector técnico</span>
-        <label class="toggle-switch">
-          <input type="checkbox" id="testModeToggle">
-          <span class="toggle-slider"></span>
-        </label>
-      </div>
-
-      <!-- Métricas -->
-      <div class="metrics-grid">
-        <div class="metric-card">
-          <div class="metric-val accent" id="mMsgs">0</div>
-          <div class="metric-lbl">Mensajes</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-val teal" id="mTokens">0</div>
-          <div class="metric-lbl">Tokens</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-val success" id="mCache">0</div>
-          <div class="metric-lbl">Cache Hits</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-val warn" id="mLatency">—</div>
-          <div class="metric-lbl">P95 ms</div>
-        </div>
-      </div>
-
-      <!-- Route path -->
-      <div class="section-lbl">Último Route Path</div>
-      <div class="route-trace" id="routeTrace">
-        <span class="route-step">cache</span>
-        <span class="route-step">rules</span>
-        <span class="route-step">rag</span>
-        <span class="route-step">tools</span>
-        <span class="route-step">llm</span>
-      </div>
-
-      <!-- Pipeline steps -->
-      <div class="section-lbl">Pipeline en tiempo real</div>
-      <div class="pipeline-steps">
-        <div class="step" id="ps-cache">
-          <div class="dot"></div>
-          <span class="step-label">1. Semantic Cache</span>
-          <span class="step-time" id="ps-cache-t">—</span>
-        </div>
-        <div class="step" id="ps-budget">
-          <div class="dot"></div>
-          <span class="step-label">2. Token Budget</span>
-          <span class="step-time" id="ps-budget-t">—</span>
-        </div>
-        <div class="step" id="ps-qdrant">
-          <div class="dot"></div>
-          <span class="step-label">3. Qdrant Classifier</span>
-          <span class="step-time" id="ps-qdrant-t">—</span>
-        </div>
-        <div class="step" id="ps-process">
-          <div class="dot"></div>
-          <span class="step-label">4. Agent Process</span>
-          <span class="step-time" id="ps-process-t">—</span>
-        </div>
-        <div class="step" id="ps-kernel">
-          <div class="dot"></div>
-          <span class="step-label">5. PHP Kernel</span>
-          <span class="step-time" id="ps-kernel-t">—</span>
-        </div>
-      </div>
-
-      <!-- Test info box (visible en test mode) -->
-      <div id="testInfoBox" style="display:none; margin-top:12px;">
-        <div class="section-lbl">Debug Info</div>
-        <pre id="testInfoPre" style="font-size:10px; color:var(--muted); background:var(--surface2);
-          border:1px solid var(--border); border-radius:8px; padding:10px; overflow:auto; max-height:200px;
-          white-space:pre-wrap; word-break:break-all; line-height:1.5;"></pre>
-      </div>
-
-    </div>
-  </div>
-</div>
 
 <script>
 // ════════════════════════════════════════════
@@ -505,11 +592,278 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
   const TENANT_ID = _cfg('tenant_id', 'demo');
   const USER_ID   = _cfg('user_id',   'admin');
   const PROJECT_ID = _cfg('project_id', 'default');
+  
+  let ACTIVE_SESSION_ID = localStorage.getItem('suki_builder_session') || '';
 
   function _cfg(k, def) {
     const m = document.cookie.match(new RegExp('(?:^|;)\\s*' + k + '=([^;]*)'));
     return m ? decodeURIComponent(m[1]) : def;
   }
+
+  // ── SESSION & JOURNAL MANAGEMENT ──────────────────
+  window.showPane = (pane) => {
+    const journal = document.getElementById('journalPane');
+    const inspector = document.getElementById('inspectorPane');
+    const bJournal = document.getElementById('inspectBtn');
+    const bTech = document.getElementById('techBtn');
+
+    if (pane === 'journal') {
+        journal.style.display = 'block';
+        inspector.style.display = 'none';
+        bJournal.classList.add('active');
+        bTech.classList.remove('active');
+    } else {
+        journal.style.display = 'none';
+        inspector.style.display = 'block';
+        bJournal.classList.remove('active');
+        bTech.classList.add('active');
+    }
+  };
+
+  window.loadSessions = async () => {
+    const sList = document.getElementById('sessionList');
+    try {
+        const res = await fetch('api/chat/sessions/list');
+        if (!res.ok) throw new Error('Network error: ' + res.status);
+        
+        const json = await res.json();
+        if (json.status !== 'success') throw new Error(json.message || 'Error desconocido');
+
+        sList.innerHTML = '';
+        if (!json.data.sessions || json.data.sessions.length === 0) {
+            sList.innerHTML = '<div class="empty-hint">Sin conversaciones previas.</div>';
+            document.getElementById('chatMessages').innerHTML = '<div class="empty-hint">Dile algo a SUKI para empezar.</div>';
+            return;
+        }
+
+        json.data.sessions.forEach(s => {
+            const div = document.createElement('div');
+            div.className = 'session-item' + (ACTIVE_SESSION_ID === s.session_id ? ' active' : '');
+            div.id = 'sid-' + s.session_id;
+            div.onclick = () => switchSession(s.session_id);
+            div.innerHTML = `
+                <div class="dot"></div>
+                <div class="session-title">${s.title || 'Conversación'}</div>
+            `;
+            sList.appendChild(div);
+        });
+        
+        // Carga inicial de historial si hay sesión activa
+        if (ACTIVE_SESSION_ID) {
+            loadHistory(ACTIVE_SESSION_ID, true);
+        } else if (json.data.sessions.length > 0) {
+            switchSession(json.data.sessions[0].session_id);
+        } else {
+            document.getElementById('chatMessages').innerHTML = '<div class="empty-hint">Inicia un chat para comenzar.</div>';
+        }
+    } catch (e) {
+        console.error('Error cargando sesiones:', e);
+        sList.innerHTML = `<div class="empty-hint" style="color:var(--danger)">⚠️ Error de conexión</div>`;
+        document.getElementById('chatMessages').innerHTML = `<div class="empty-hint">No se pudo conectar con el servidor.</div>`;
+    }
+  };
+
+  window.switchSession = (sid) => {
+    if (sid === ACTIVE_SESSION_ID) return;
+    ACTIVE_SESSION_ID = sid;
+    localStorage.setItem('suki_builder_session', sid);
+    
+    // UI Update local
+    document.querySelectorAll('.session-item').forEach(el => {
+        el.classList.toggle('active', el.id === 'sid-' + sid);
+    });
+    loadHistory(sid);
+    loadJournal(sid);
+  };
+
+  window.loadHistory = async (sid, force = false) => {
+    const chatMsgs = document.getElementById('chatMessages');
+    chatMsgs.innerHTML = '<div class="empty-hint">Cargando historial...</div>';
+
+    try {
+        const res = await fetch(`api/chat/history?session_id=${sid}`);
+        const json = await res.json();
+        chatMsgs.innerHTML = '';
+        if (json.data.history && json.data.history.length > 0) {
+            json.data.history.forEach(m => {
+                const role = m.direction === 'in' ? 'user' : 'bot';
+                const text = m.message ?? '';
+                const meta = m.created_at ? new Date(m.created_at.replace(' ', 'T')).toLocaleTimeString() : '';
+                addMsg(role, text, meta);
+            });
+            // Sync turn counter in journal stats
+            const turns = json.data.history.filter(m => m.direction === 'in').length;
+            msgCount = turns;
+            const jTurns = document.getElementById('jStatTurns');
+            if (jTurns) jTurns.textContent = turns;
+        } else {
+            addMsg('bot', '👋 Hola, soy SUKI. ¿En qué puedo ayudarte con este proyecto?');
+        }
+    } catch (e) { console.error('Error loading history', e); }
+  };
+
+  window.createNewSession = async () => {
+    try {
+        const res = await fetch('api/chat/sessions/create');
+        const json = await res.json();
+        if (json.status === 'success') {
+            const newSid = json.data.session_id;
+            ACTIVE_SESSION_ID = newSid;
+            localStorage.setItem('suki_builder_session', newSid);
+
+            // Mark all existing sidebar items as inactive (preserve them — don't reload)
+            document.querySelectorAll('.session-item').forEach(el => el.classList.remove('active'));
+
+            // Prepend new session item to the top of the sidebar
+            const sList = document.getElementById('sessionList');
+            const div = document.createElement('div');
+            div.className = 'session-item active';
+            div.id = 'sid-' + newSid;
+            div.onclick = () => switchSession(newSid);
+            div.innerHTML = '<div class="dot"></div><div class="session-title">Nueva conversación</div>';
+            if (sList.firstChild) {
+                sList.insertBefore(div, sList.firstChild);
+            } else {
+                sList.appendChild(div);
+            }
+
+            // Clear the chat area and show greeting (previous session stays in sidebar)
+            const chatMsgs = document.getElementById('chatMessages');
+            chatMsgs.innerHTML = '';
+            addMsg('bot', '👋 Hola, soy SUKI. ¿En qué puedo ayudarte?');
+
+            loadJournal(newSid);
+        }
+    } catch (e) { console.error('Error creating session', e); }
+  };
+
+  // Category config: color, icon, label
+  const CAT_CONFIG = {
+    requirement: { color: '#0ea5e9', icon: '📋', label: 'Req' },
+    arch:        { color: '#8b5cf6', icon: '🏗', label: 'Agente' },
+    decision:    { color: '#6366f1', icon: '✅', label: 'Decisión' },
+    finding:     { color: '#22c55e', icon: '💡', label: 'Hallazgo' },
+    default:     { color: '#64748b', icon: '📌', label: 'Nota' },
+  };
+
+  function catCfg(cat) { return CAT_CONFIG[cat] || CAT_CONFIG.default; }
+
+  function relativeTime(tsStr) {
+    if (!tsStr) return '';
+    try {
+      const d = new Date(tsStr.replace(' ', 'T'));
+      const diff = Math.floor((Date.now() - d) / 1000);
+      if (diff < 60)   return 'ahora';
+      if (diff < 3600) return Math.floor(diff/60) + 'm';
+      if (diff < 86400) return Math.floor(diff/3600) + 'h';
+      return d.toLocaleDateString('es', { day:'2-digit', month:'short' });
+    } catch { return ''; }
+  }
+
+  // Keywords are extracted by the LLM and stored server-side (no fragile regex/stopwords needed)
+  function extractKeywords(_notes) { return []; }
+
+  window.loadJournal = async (sid = '') => {
+    const journalId = sid || ACTIVE_SESSION_ID;
+    if (!journalId) return;
+
+    try {
+        const res = await fetch(`api/chat/journal/get?role=architect&session_id=${journalId}`);
+        const json = await res.json();
+        if (json.status !== 'success') return;
+
+        const j = json.data.journal;
+        const allNotes = Array.isArray(j.notes) ? j.notes : [];
+
+        // ── Stats ──────────────────────────────
+        const el = id => document.getElementById(id);
+        el('jStatNotes').textContent = allNotes.length;
+
+        // ── Keywords for Qdrant context (server-computed takes priority) ────────
+        const kwEl = el('journalKeywords');
+        kwEl.innerHTML = '';
+        const kws = Array.isArray(json.data.keywords) && json.data.keywords.length
+                    ? json.data.keywords
+                    : extractKeywords(allNotes);
+        if (kws.length) {
+          kws.forEach(kw => {
+            const tag = document.createElement('span');
+            tag.style.cssText = 'font-size:9px;padding:2px 7px;border-radius:999px;background:var(--accent-soft);color:var(--accent);font-weight:600;border:1px solid rgba(139,92,246,.2)';
+            tag.textContent = kw;
+            kwEl.appendChild(tag);
+          });
+        } else {
+          kwEl.innerHTML = '<span style="font-size:10px;color:var(--muted)">Sin términos aún...</span>';
+        }
+
+        // ── Notes ──────────────────────────────
+        const notesEl = el('journalNotes');
+        notesEl.innerHTML = '';
+        const recentNotes = allNotes.slice(-8);
+        el('jNotesCount').textContent = allNotes.length > 8 ? `(últimas 8 de ${allNotes.length})` : '';
+
+        if (recentNotes.length === 0) {
+          notesEl.innerHTML = '<div style="font-size:10px;color:var(--muted);padding:6px 4px">Sin notas aún. El agente irá anotando al conversar.</div>';
+        } else {
+          recentNotes.forEach(n => {
+            const cfg = catCfg(n.category);
+            const wrap = document.createElement('div');
+            wrap.style.cssText = `padding:7px 9px;border-radius:7px;border-left:3px solid ${cfg.color};background:var(--surface2);position:relative`;
+            const header = document.createElement('div');
+            header.style.cssText = 'display:flex;align-items:center;gap:5px;margin-bottom:3px';
+            header.innerHTML = `<span style="font-size:9px;font-weight:700;color:${cfg.color};text-transform:uppercase;letter-spacing:.5px">${cfg.icon} ${cfg.label}</span>`
+                             + `<span style="font-size:9px;color:var(--muted);margin-left:auto">${relativeTime(n.ts)}</span>`;
+            const body = document.createElement('div');
+            body.style.cssText = 'font-size:10.5px;color:var(--text);line-height:1.5;word-break:break-word';
+            body.textContent = n.text;
+            wrap.appendChild(header);
+            wrap.appendChild(body);
+            notesEl.appendChild(wrap);
+          });
+          // Auto-scroll to latest note
+          notesEl.scrollTop = notesEl.scrollHeight;
+        }
+
+        // ── Tasks ──────────────────────────────
+        const taskList = el('taskList');
+        const jTasksLbl = el('jTasksLbl');
+        taskList.innerHTML = '';
+        const tasks = j.tasks || {};
+        const taskKeys = Array.isArray(tasks) ? [] : Object.keys(tasks);
+        jTasksLbl.style.display = taskKeys.length ? '' : 'none';
+        taskKeys.forEach(t => addJournalTask(t, tasks[t].status));
+
+    } catch (e) { console.error('Error loading journal', e); }
+  };
+
+  function addJournalTask(t, status = 'pending') {
+      const taskList = document.getElementById('taskList');
+      const item = document.createElement('div');
+      item.className = 'step' + (status === 'completed' ? ' done' : '');
+      item.innerHTML = `<div class="dot"></div><div class="step-label">${t}</div>`;
+      taskList.appendChild(item);
+  }
+
+  function showJournalBadge() {
+      const badge = document.getElementById('journalBadge');
+      if (!badge) return;
+      badge.textContent = 'Apunte guardado';
+      badge.style.display = 'inline-block';
+      badge.style.opacity = '1';
+      clearTimeout(badge._hideTimer);
+      badge._hideTimer = setTimeout(() => {
+          badge.style.transition = 'opacity 0.6s';
+          badge.style.opacity = '0';
+          setTimeout(() => { badge.style.display = 'none'; badge.style.transition = ''; }, 650);
+      }, 2500);
+  }
+
+  // Initial load
+  setTimeout(() => {
+    loadSessions();
+    if (ACTIVE_SESSION_ID) loadJournal(ACTIVE_SESSION_ID);
+  }, 100);
+
 
   // ── Test mode ─────────────────────────────
   function setTestMode(on) {
@@ -558,7 +912,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
   }
 
   // ── Metrics ───────────────────────────────
-  function updateMetrics(latency, tokens, fromCache) {
+  function updateMetrics(latency, tokens, fromCache, routePath) {
     msgCount++;
     if (tokens)     tokenCount += parseInt(tokens) || 0;
     if (fromCache)  cacheHits++;
@@ -570,6 +924,18 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
     const sorted = [...latencies].sort((a,b)=>a-b);
     const p95    = sorted[Math.floor(sorted.length * 0.95)] ?? (sorted[sorted.length-1] ?? 0);
     document.getElementById('mLatency').textContent = p95 ? p95+'ms' : '—';
+
+    // ── Journal stats panel sync ──
+    const jTurns = document.getElementById('jStatTurns');
+    const jRoute = document.getElementById('jStatRoute');
+    if (jTurns) jTurns.textContent = msgCount;
+    if (jRoute && routePath) {
+      // Show last segment of route path
+      const last = routePath.split('>').map(s=>s.trim()).filter(Boolean).pop() || routePath;
+      jRoute.textContent = last.toUpperCase();
+      const routeColors = { cache:'#22c55e', rules:'#0ea5e9', rag:'#f59e0b', llm:'#8b5cf6', tools:'#6366f1' };
+      jRoute.style.color = routeColors[last] || 'var(--success)';
+    }
   }
 
   // ── Entity panel ──────────────────────────
@@ -665,6 +1031,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
         tenant_id: TENANT_ID,
         user_id:   USER_ID,
         project_id: PROJECT_ID,
+        session_id: ACTIVE_SESSION_ID,
         test_mode: testToggle.checked,
       };
       const res  = await fetch(API_URL, {
@@ -713,7 +1080,16 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
 
       addMsg('bot', reply, metaParts.join(' · '));
       renderRoutePath(routePath);
-      updateMetrics(latency, tokens, fromCache);
+      updateMetrics(latency, tokens, fromCache, routePath);
+
+      // --- PERSISTENCE SYNC (Carlos Rule) ---
+      // If server returned a session_id and we don't have one or it changed, update local state
+      if (data.session_id && data.session_id !== ACTIVE_SESSION_ID) {
+          ACTIVE_SESSION_ID = data.session_id;
+          localStorage.setItem('suki_builder_session', ACTIVE_SESSION_ID);
+          // Refresh sidebar to show the new (and now named) session
+          loadSessions(); 
+      }
 
       // Test info dump
       if (testToggle.checked && Object.keys(testInfo).length) {
@@ -723,6 +1099,14 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
       // Refresh entity panel
       if (data.entities || data.forms) {
         refreshEntities(data.entities ?? [], data.forms ?? []);
+      }
+
+      // --- JOURNAL AUTO-RELOAD: refresh agenda panel after every response ---
+      if (ACTIVE_SESSION_ID) {
+        loadJournal(ACTIVE_SESSION_ID);
+        if (data.journal_updated) {
+          showJournalBadge();
+        }
       }
 
     } catch (err) {

@@ -81,4 +81,41 @@ class ConversationManagerService
         $stmt = $this->registry->db()->prepare('UPDATE chat_sessions SET is_archived = 1 WHERE session_id = :id');
         return $stmt->execute([':id' => $sessionId]);
     }
+    /**
+     * Gets the journal (Agenda de Apuntes) for a specific agent role.
+     */
+    public function getAgentJournal(string $tenantId, string $projectId, string $agentRole, string $sessionId = ''): array
+    {
+        $journalService = new AgentJournalService();
+        return $journalService->getJournal($tenantId, $projectId, $agentRole, $sessionId);
+    }
+
+    /**
+     * Updates the journal for an agent.
+     */
+    public function updateAgentJournal(string $tenantId, string $projectId, string $agentRole, array $updates, string $sessionId = ''): void
+    {
+        $journalService = new AgentJournalService();
+        $journalService->updateJournal($tenantId, $projectId, $agentRole, $updates, $sessionId);
+    }
+
+    /**
+     * Searches across ALL conversation history for a user using semantic memory.
+     */
+    public function searchGlobalMemory(string $tenantId, string $userId, string $query, int $limit = 5): array
+    {
+        $semanticMemory = new SemanticMemoryService();
+        if (!SemanticMemoryService::isEnabledFromEnv()) {
+             return [];
+        }
+        
+        $scope = [
+            'memory_type' => 'user_memory',
+            'tenant_id' => $tenantId,
+            'user_id' => $userId
+        ];
+        
+        $result = $semanticMemory->retrieveUserMemory($query, $scope, $limit);
+        return $result['hits'] ?? [];
+    }
 }

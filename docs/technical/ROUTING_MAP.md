@@ -17,21 +17,28 @@
 
 ## API routing
 - project/public/api.php:
-  - route param split by '/': <controller>/<method>
-  - class: App\Controller\<Controller>Controller
-  - method: lowercased second segment (default index)
-  - endpoints custom:
-    - contracts/forms, reports, dashboards
-    - wizard/form-from-entity
-    - entity/save, import/csv
-    - records/*, command
-    - chat/message, chat/help, chat/acid-test, chat/acid-report
-    - registry/status, registry/projects, registry/select, registry/users, registry/user
-    - registry/deploys, registry/deploy, registry/entities
-    - auth/send-code, auth/verify-code, auth/login, auth/users
-    - integrations/alanube/* (test/save/emit/status/cancel/webhook)
+  - Este es el **ENRUTADOR CENTRAL MAESTRO**. No asumas que un archivo final en `app/controller/` es el responsable de un endpoint si la ruta está hardcodeada aquí.
+  - La mayoría de rutas core del sistema interceptan la ejecución mediantes bloques `if ($route === '...')`.
+  - **Endpoints Core Hardcodeados:**
+    - `contracts/forms`, `reports`, `dashboards` (Generación visual y metadata)
+    - `wizard/form-from-entity`
+    - `entity/save`, `import/csv`
+    - `records/*`, `command`, `entity/options` (CRUD y QueryBuilder dinámico)
+    - `chat/sessions/list`, `chat/history`, `chat/sessions/create`, `chat/journal/get` (Persistencia del SUKI Builder y chat)
+    - `chat/message`, `chat/help`, `chat/acid-test`, `chat/acid-report`, `chat/quality` (Agente Conversacional)
+    - `registry/status`, `registry/projects`, `registry/select`, `registry/users`, `registry/user`
+    - `registry/deploys`, `registry/deploy`, `registry/entities`
+    - `auth/send-code`, `auth/verify-code`, `auth/login`, `auth/users`
+    - `integrations/alanube/*` (test/save/emit/status/cancel/webhook)
+    - `channels/telegram/webhook`, `channels/whatsapp/webhook`
+    - `workflow/*` (Remix, List, Restore, Diff)
 
-## Menu driven routes
+- **FALLBACK ARCHITECTURE (Fallback MVC Routing):**
+  - Si (y solo si) una ruta de API no fue procesada por los `if ($route === '...')` hardcodeados en `api.php`, el enrutador entra en un modo "Fallback".
+  - route param split by '/': `<controller>/<method>`
+  - class instanciada: `App\Controller\<Controller>Controller` (Que vive físicamente en `project/app/controller/`)
+  - method: lowercased second segment (default index)
+  - *ADVERTENCIA*: Si un archivo luce como Controller pero su ruta coincide con un bloque `if ($route === ...)` en `api.php`, **el controlador será ignorado (Código Muerto/Ghost File)**. Verifique siempre `api.php` primero.
 - framework/config/menu.php loads project/config/menu.json:
   - dashboard -> project/views/dashboard.php
   - facturas -> project/views/facturas.php

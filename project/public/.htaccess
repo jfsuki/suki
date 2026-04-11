@@ -11,7 +11,7 @@ Options -Indexes
 
 <IfModule mod_rewrite.c>
     RewriteEngine On
-    RewriteBase /suki/project/public/
+    RewriteBase /project/public/
 
     # 1. Si la petición es un archivo o carpeta que SÍ existe, no enrutar.
     RewriteCond %{REQUEST_FILENAME} -f [OR]

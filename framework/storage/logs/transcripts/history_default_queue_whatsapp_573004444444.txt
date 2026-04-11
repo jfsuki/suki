@@ -1,9 +1,0 @@
-=== TRANSCRIPCION DE CONVERSACION SUKI ===
-Tenant: default
-Sesión: queue_whatsapp_573004444444
-Fecha: 2026-04-09 12:05:04
-------------------------------------------
-
-[2026-04-09 12:05:04] [USUARIO]: hola worker whatsapp
-
-=== FIN DEL ARCHIVO ===

@@ -1,0 +1,118 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                    SUKI QUICK REFERENCE — 2026-04-09                      ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+PROJECT: SUKI (AI-AOS) — Chat-first ERP platform builder
+STATUS: 🟡 YELLOW | BLOCKER: LLM credentials expired | TESTS: ✅ 71/71 PASS
+
+────────────────────────────────────────────────────────────────────────────
+
+📋 MANDATORY PRE-FLIGHT (EVERY TIME)
+  php framework/scripts/codex_self_check.php --strict
+
+🧪 TEST SUITE (AFTER CHANGES)
+  php framework/tests/run.php                    # All 71 unit tests
+  ENFORCEMENT_MODE=strict php framework/tests/chat_golden.php  # 24 chat routes
+  php framework/tests/db_health.php              # DB integrity
+
+📦 QA GATE (BEFORE COMMIT)
+  php framework/scripts/qa_gate.php post         # Full validation
+
+────────────────────────────────────────────────────────────────────────────
+
+🏗️ ARCHITECTURE LAYERS
+  [1] Intent Classification (Qdrant + Router Rules)
+  [2] Conversation Memory (Tenant/Session scoped)
+  [3] Skill/CommandBus (Deterministic execution only)
+  [4] Module Handlers (POS, Purchases, Fiscal, Ecommerce, Media, Search)
+  [5] Database Kernel (QueryBuilder, Repository, auto tenant isolation)
+  [6] AgentOps (Telemetry, audit, learning)
+
+🔀 ROUTER ORDER (IMMUTABLE)
+  Cache → Rules/DSL → RAG (Qdrant) → LLM (last resort only)
+
+────────────────────────────────────────────────────────────────────────────
+
+🚫 NON-NEGOTIABLES
+  ✋ Never rewrite (additive only)
+  🔒 Never break contract JSON keys
+  🚫 Never raw SQL (use Repository/QueryBuilder)
+  👁️ All queries tenant-scoped (automatic)
+  🧪 Tests before commit (evidence required)
+  🎫 QA gates mandatory (no blind pushes)
+
+────────────────────────────────────────────────────────────────────────────
+
+📂 CRITICAL FILES (NEVER BREAK)
+  • /docs/contracts/action_catalog.json         — Action whitelist
+  • /docs/contracts/skills_catalog.json         — Skill registry
+  • /docs/contracts/router_policy.json          — Router rules
+  • /project/contracts/entities/*.json          — Entity schemas
+  • /framework/app/Core/ChatAgent.php           — Message orchestrator
+  • /framework/app/Core/IntentRouter.php        — Routing engine
+  • /framework/app/Core/Database.php            — ORM + multi-tenant kernel
+  • AGENTS.md                                    — Developer protocol
+
+────────────────────────────────────────────────────────────────────────────
+
+📖 ESSENTIAL DOCS (READ FIRST)
+  1. CLAUDE.md (quick ref + architecture)
+  2. AGENTS.md (developer protocol - MANDATORY)
+  3. docs/INDEX.md (navigation)
+  4. docs/PROJECT_MEMORY.md (current state)
+  5. docs/canon/SUKI_ARCHITECTURE_CANON.md (immutable laws)
+  6. docs/canon/ROUTER_CANON.md (routing rules)
+
+────────────────────────────────────────────────────────────────────────────
+
+🛠️ AVAILABLE SKILLS
+  suki-qa-gate             → Run QA gates (pre/post/full)
+  suki-contract-guardian   → Validate contracts, breaking changes
+  suki-router-analyzer     → Debug routing, trace intent path
+  suki-architecture-review → Validate law compliance
+
+────────────────────────────────────────────────────────────────────────────
+
+⚠️ CURRENT BLOCKERS
+  🔴 LLM credentials expired (P0) → FIX: Update .env Gemini + OpenRouter keys
+  ⚠️  Manual E2E test missing (P1) → Create e2e_full_flow.php
+  ⚠️  ConversationGateway 8855 lines (P1) → Continue extraction (-15%)
+
+────────────────────────────────────────────────────────────────────────────
+
+📊 TEST RESULTS (2026-04-09)
+  ✅ Unit tests:        71/71 PASS
+  ✅ Chat golden:       24/24 PASS
+  ✅ DB health:         100% OK
+  ✅ Security hardening: COMPLETE
+  ❌ LLM smoke:         FAIL (credentials, not code bug)
+
+────────────────────────────────────────────────────────────────────────────
+
+🔧 DEVELOPMENT WORKFLOW
+  1. Pre-check: codex_self_check.php --strict
+  2. Read relevant docs (retrieval-led, not all repo)
+  3. Code changes (incremental, preserve contracts)
+  4. Test locally (run.php, chat_golden, db_health)
+  5. Post-check: qa_gate.php post
+  6. Commit with evidence: git commit -m "... Tests: [pass evidence]"
+  7. NO BLIND PUSHES
+
+────────────────────────────────────────────────────────────────────────────
+
+🎯 NEXT ACTIONS
+  1. Fix LLM credentials → Update .env (Gemini, OpenRouter, DeepSeek)
+  2. Run llm_smoke.php → Validate all providers green
+  3. Create E2E test → Full POS→Fiscal→Invoice flow
+  4. Profile ConversationGateway → Plan Strangler extraction
+
+────────────────────────────────────────────────────────────────────────────
+
+💡 KEY CONCEPTS
+  • AI-AOS: AI Application Operating System (not chatbot)
+  • Deterministic: Router follows order, LLM only if rules/RAG can't resolve
+  • Multi-tenant: Automatic isolation, every table has tenant_id
+  • Contract-driven: JSON schemas = source of truth, immutable
+  • Additive: No rewrites, only incremental backward-compatible changes
+
+════════════════════════════════════════════════════════════════════════════

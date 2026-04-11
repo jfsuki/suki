@@ -30,10 +30,20 @@ credentials/
 /project/storage/cache/*.cache.json
 *.tar.gz
 
-# Temporary and Session Data (added by cleanup)
+# Temporary and Session Data
 /framework/storage/meta/memory/
 /tmp/
 /project/storage/tenants/**/*.log.jsonl
 /project/storage/tenants/**/*.jsonl
 .vscode/
 single_research.php
+
+# Runtime logs, traces and agent journals (noise — never commit)
+/framework/storage/logs/
+/framework/storage/meta/journals/
+codex_error.log
+*.log
+
+# Generated training artifacts (auto-generated, not source)
+/framework/framework/
+/framework/project/

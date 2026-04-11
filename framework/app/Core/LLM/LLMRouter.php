@@ -20,6 +20,10 @@ final class LLMRouter
     public function chat(array $capsule, array $options = []): array
     {
         $policy = $capsule['policy'] ?? [];
+        // Make prompt_contract available for response schema derivation
+        if (!empty($capsule['prompt_contract']) && is_array($capsule['prompt_contract']) && !isset($policy['prompt_contract'])) {
+            $policy['prompt_contract'] = $capsule['prompt_contract'];
+        }
         $messages = [
             ['role' => 'system', 'content' => $this->systemPrompt($policy)],
         ];
@@ -570,7 +574,7 @@ final class LLMRouter
     private function deriveResponseSchema(array $capsule): ?array
     {
         $policy = $capsule['policy'] ?? $capsule['prompt_contract'] ?? [];
-        $output = $policy['OUTPUT_FORMAT'] ?? null;
+        $output = $policy['OUTPUT_FORMAT'] ?? ($policy['prompt_contract']['OUTPUT_FORMAT'] ?? null);
         if (!is_array($output) || $output === []) {
             return null;
         }

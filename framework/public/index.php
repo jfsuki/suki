@@ -8,8 +8,21 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
+if (class_exists(\App\Core\AuthMiddleware::class)) {
+    \App\Core\AuthMiddleware::checkConcurrentSession(false);
+}
+
 // 1. Capturar la ruta. Por defecto a 'marketplace'
 $url = isset($_GET['url']) ? trim($_GET['url'], '/') : 'marketplace';
+if ($url === '') {
+    $url = 'marketplace';
+}
+
+if ($url === 'logout' || $url === 'builder/logout') {
+    session_destroy();
+    header("Location: /marketplace/");
+    exit;
+}
 
 // 2. Definición de Rutas y Permisos
 // 'view' => path relativo a framework/views/
@@ -29,7 +42,7 @@ if (array_key_exists($url, $routes)) {
     // Verificar Seguridad
     if (!($route['public'] ?? false)) {
         if (!isset($_SESSION['user_id'])) {
-            header('Location: login'); // Redirigir a login (enmascarado)
+            header('Location: /marketplace/login');
             exit;
         }
         if (isset($route['role']) && ($_SESSION['role'] ?? '') !== $route['role']) {

@@ -111,6 +111,21 @@ if (empty($failures)) {
                 array $payload,
                 int $timeoutSec
             ): array {
+                // Batch embed request (:batchEmbedContents)
+                if (is_array($payload['requests'] ?? null)) {
+                    $embeddings = [];
+                    foreach ((array) $payload['requests'] as $req) {
+                        $text = trim((string) ($req['content']['parts'][0]['text'] ?? ''));
+                        $seed = max(1, strlen($text));
+                        $value = min(1.0, $seed / 200.0);
+                        $embeddings[] = ['values' => array_fill(0, 768, $value)];
+                    }
+                    return [
+                        'status' => 200,
+                        'data' => ['embeddings' => $embeddings],
+                    ];
+                }
+                // Single embed request (:embedContent)
                 $text = trim((string) ($payload['content']['parts'][0]['text'] ?? ''));
                 $seed = max(1, strlen($text));
                 $value = min(1.0, $seed / 200.0);

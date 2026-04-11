@@ -87,6 +87,7 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
         if ($direction !== 'in' && $direction !== 'out') {
             $direction = 'in';
         }
+        $now = date('Y-m-d H:i:s');
         $stmt = $this->db->prepare(
             'INSERT INTO chat_log (tenant_id, user_id, session_id, channel, direction, message, meta_json, created_at)
              VALUES (:tenant_id, :user_id, :session_id, :channel, :direction, :message, :meta_json, :created_at)'
@@ -99,8 +100,18 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
             ':direction' => $direction,
             ':message' => $message,
             ':meta_json' => $this->encodeValue($meta),
-            ':created_at' => date('Y-m-d H:i:s'),
+            ':created_at' => $now,
         ]);
+
+        // Keep chat_sessions.last_message_at fresh so the session always appears in the listing
+        try {
+            $upd = $this->db->prepare(
+                'UPDATE chat_sessions SET last_message_at = :last WHERE session_id = :sid'
+            );
+            $upd->execute([':last' => $now, ':sid' => $sessionId]);
+        } catch (\Throwable $ignored) {
+            // Non-critical: chat_log row already saved
+        }
     }
 
     public function getShortTermMemory(string $tenantId, string $sessionId, int $limit = 20): array

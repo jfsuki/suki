@@ -45,7 +45,10 @@
           "unique": { "type": "boolean" },
           "source": { "type": "string" },
           "grid": { "type": "string" },
-          "ref": { "type": "string" }
+          "ref": { "type": "string" },
+          "enum": { "type": "array", "items": { "type": "string" } },
+          "index": { "type": "boolean" },
+          "params": { "type": "object", "additionalProperties": true }
         }
       }
     },

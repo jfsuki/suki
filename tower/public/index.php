@@ -4,6 +4,12 @@ declare(strict_types=1);
 
 require_once __DIR__ . '/../../vendor/autoload.php';
 
+// Cargar variables del entorno (.env) del proyecto
+$envLoader = __DIR__ . '/../../project/config/env_loader.php';
+if (file_exists($envLoader)) {
+    require_once $envLoader;
+}
+
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
@@ -29,7 +35,7 @@ $error = '';
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['master_key'])) {
     if ($_POST['master_key'] === $masterKey) {
         $_SESSION['suki_tower_auth'] = true;
-        header('Location: ./torre'); // Redirigir para limpiar el POST
+        header('Location: /torre');
         exit;
     } else {
         $error = 'Master Key inválida. Intento registrado en SecurityHub.';
