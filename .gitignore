@@ -1,3 +1,8 @@
+# Temporal debug scripts — never commit
+scratch/
+tmp_debug/
+debug_*.php
+
 # Secrets and credentials (never commit)
 .env
 .env.*
