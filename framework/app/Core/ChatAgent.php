@@ -1815,100 +1815,6 @@ final class ChatAgent
         return $this->reply('Comando no soportado.', $channel, $sessionId, $userId, 'error');
     }
 
-    private function executeIntent(array $intent, string $channel, string $sessionId, string $userId): array
-    {
-        $actions = $intent['actions'] ?? [];
-        if (!is_array($actions) || count($actions) === 0) {
-            return $this->reply($this->buildHelpMessage(), $channel, $sessionId, $userId);
-        }
-
-        $results = [];
-        $replyParts = [];
-        foreach ($actions as $action) {
-            $type = strtolower((string) ($action['type'] ?? 'help'));
-            switch ($type) {
-                case 'create_entity':
-                    $entityName = (string) ($action['entity'] ?? '');
-                    if ($entityName === '') {
-                        $replyParts[] = 'Falta nombre de tabla.';
-                        break;
-                    }
-                    $entity = $this->builder->build($entityName, $action['fields'] ?? [], ['label' => $action['label'] ?? null]);
-                    $this->writer->writeEntity($entity);
-                    $this->migrator()->migrateEntity($entity, true);
-                    $results[] = ['entity' => $entity];
-                    $replyParts[] = 'Tabla creada: ' . $entity['name'];
-                    break;
-                case 'add_field':
-                    $replyParts[] = 'Agregar campos: pendiente.';
-                    break;
-                case 'create_form':
-                    $entityName = (string) ($action['entity'] ?? '');
-                    if ($entityName === '') {
-                        $replyParts[] = 'Falta entidad para formulario.';
-                        break;
-                    }
-                    $entity = $this->entities->get($entityName);
-                    $form = $this->wizard->buildFromEntity($entity);
-                    $this->writer->writeForm($form);
-                    $results[] = ['form' => $form];
-                    $replyParts[] = 'Formulario creado: ' . ($form['name'] ?? $entityName);
-                    break;
-                case 'create_record':
-                    $results[] = $this->command()->createRecord((string) ($action['entity'] ?? ''), (array) ($action['data'] ?? []));
-                    $replyParts[] = 'Registro creado.';
-                    break;
-                case 'query_records':
-                    $results[] = $this->command()->queryRecords((string) ($action['entity'] ?? ''), (array) ($action['filters'] ?? []), 20, 0);
-                    $replyParts[] = 'Consulta lista.';
-                    break;
-                case 'update_record':
-                    $results[] = $this->command()->updateRecord((string) ($action['entity'] ?? ''), $action['id'] ?? null, (array) ($action['data'] ?? []));
-                    $replyParts[] = 'Registro actualizado.';
-                    break;
-                case 'delete_record':
-                    $results[] = $this->command()->deleteRecord((string) ($action['entity'] ?? ''), $action['id'] ?? null);
-                    $replyParts[] = 'Registro eliminado.';
-                    break;
-                case 'run_tests':
-                    $runner = new UnitTestRunner();
-                    $result = $runner->run();
-                    $results[] = $result;
-                    $summary = $result['summary'];
-                    $warns = array_filter($result['tests'], fn($t) => $t['status'] === 'warn');
-                    $fails = array_filter($result['tests'], fn($t) => $t['status'] === 'fail');
-                    $warnList = $warns ? implode(', ', array_map(fn($t) => $t['name'], $warns)) : '';
-                    $failList = $fails ? implode(', ', array_map(fn($t) => $t['name'], $fails)) : '';
-                    $line = "Pruebas: {$summary['passed']} ok, {$summary['warned']} warn, {$summary['failed']} fail.";
-                    if ($warnList !== '') {
-                        $line .= " Warn: {$warnList}.";
-                    }
-                    if ($failList !== '') {
-                        $line .= " Fail: {$failList}.";
-                    }
-                    try {
-                        $tenantId = getenv('TENANT_KEY') ?: (getenv('TENANT_ID') ?: 'default');
-                        $acidRunner = new AcidChatRunner();
-                        $acid = $acidRunner->run((string) $tenantId, ['save' => true]);
-                        $results[] = ['acid' => $acid];
-                        $acidSummary = $acid['summary'] ?? [];
-                        $line .= " Chat ÃƒÆ’Ã‚Â¡cido: " . ($acidSummary['passed'] ?? 0) . " ok, " . ($acidSummary['failed'] ?? 0) . " fail.";
-                    } catch (\Throwable $e) {
-                        $line .= " Chat ÃƒÆ’Ã‚Â¡cido: error al ejecutar.";
-                    }
-                    $replyParts[] = $line;
-                    break;
-                case 'help':
-                default:
-                    $replyParts[] = $this->buildHelpMessage();
-                    break;
-            }
-        }
-
-        $reply = implode("\n", $replyParts);
-        return $this->reply($reply, $channel, $sessionId, $userId, 'success', ['actions' => $actions, 'results' => $results]);
-    }
-
     private function executeCrud(array $parsed, string $channel, string $sessionId, string $userId): array
     {
         $cmd = $parsed['command'];
@@ -2218,45 +2124,6 @@ final class ChatAgent
         return (array) ($json['help'] ?? []);
     }
 
-    private function isHelpIntent(string $text): bool
-    {
-        $text = trim(mb_strtolower($text));
-        if ($text === '') return true;
-        $keywords = ['hola', 'buenas', 'buenos', 'ayuda', 'help', 'menu', 'funciones', 'que puedes', 'que haces', 'opciones', 'guia'];
-        foreach ($keywords as $kw) {
-            if (str_contains($text, $kw)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    private function isCrudGuideTrigger(string $text): bool
-    {
-        $text = trim(mb_strtolower($text));
-        if ($text === '') {
-            return false;
-        }
-        $patterns = [
-            'como creo',
-            'como crear',
-            'como hago para crear',
-            'como puedo crear',
-            'como registro',
-            'como agrego',
-            'como se crea',
-            'explicame como',
-            'explica como',
-            'dime como crear',
-        ];
-        foreach ($patterns as $pattern) {
-            if (str_contains($text, $pattern)) {
-                return true;
-            }
-        }
-        return false;
-    }
-
     private function isLlmUsageRequest(string $text): bool
     {
         $patterns = [
@@ -2371,23 +2238,6 @@ final class ChatAgent
                 'providers' => $providers,
                 'source' => $file,
             ],
-        ];
-    }
-
-    private function buildContext(): array
-    {
-        $catalog = new ContractsCatalog();
-        $entities = [];
-        foreach ($catalog->entities() as $path) {
-            $entities[] = basename($path, '.entity.json');
-        }
-        $forms = [];
-        foreach ($catalog->forms() as $path) {
-            $forms[] = basename($path, '.json');
-        }
-        return [
-            'entities' => $entities,
-            'forms' => $forms,
         ];
     }
 
@@ -4718,27 +4568,6 @@ final class ChatAgent
         }
         $path = PROJECT_ROOT . '/contracts/forms/' . $entity . '.form.json';
         return is_file($path);
-    }
-
-    private function storeMemory(string $sessionId, string $userText, string $replyText): void
-    {
-        if ($sessionId === '') {
-            return;
-        }
-        $memory = $this->memory->getSession($sessionId);
-        $history = $memory['history'] ?? [];
-        $history[] = ['u' => $userText, 'a' => $replyText, 'ts' => time()];
-        if (count($history) > 6) {
-            $history = array_slice($history, -6);
-        }
-        $summary = $memory['summary'] ?? '';
-        if ($summary === '' && $userText !== '') {
-            $summary = mb_substr($userText, 0, 120);
-        }
-        $this->memory->saveSession($sessionId, [
-            'summary' => $summary,
-            'history' => $history,
-        ]);
     }
 
     private function persistToUserMemory(string $text, string $reply, array $params = []): void
