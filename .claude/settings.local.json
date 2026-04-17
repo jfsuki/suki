@@ -9,7 +9,10 @@
       "Bash(echo \"UserPromptSubmit exit: $?\")",
       "Bash(echo \"SessionStart exit: $?\")",
       "Bash(node -e \"const s = JSON.parse\\(require\\('fs'\\).readFileSync\\('C:/laragon/www/suki/.claude/worktrees/compassionate-dubinsky-7fd713/.claude/settings.json','utf8'\\)\\); console.log\\('UserPromptSubmit hook:', s.hooks.UserPromptSubmit[0].hooks[0].command.substring\\(0,50\\)\\); console.log\\('SessionStart hook:', s.hooks.SessionStart[0].hooks[0].command.substring\\(0,50\\)\\); console.log\\('JSON valid: OK'\\);\")",
-      "Bash(php -r ' *)"
+      "Bash(php -r ' *)",
+      "Bash(gh pr create --title 'feat\\(claude\\): hooks mandatorios pre-tarea - suki-qa-gate + claude-mem + doc canónica' --body ' *)",
+      "Bash(where gh *)",
+      "Read(//c/Users/PortatilHP2/AppData/Local/**)"
     ]
   }
 }
