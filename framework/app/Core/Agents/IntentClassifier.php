@@ -231,6 +231,7 @@ final class IntentClassifier
 
     /**
      * Log classification to the auto-training SQLite for future Qdrant ingestion.
+     * Lazily triggers TrainingPromoter when pending rows exceed threshold.
      */
     private function logTraining(string $text, string $intent, float $score, string $status): void
     {
@@ -244,19 +245,29 @@ final class IntentClassifier
                 intent_classified TEXT,
                 llm_score REAL,
                 status TEXT DEFAULT \'pending\',
+                tenant_id TEXT,
                 created_at TEXT
             )');
+            // Add tenant_id column if table was created before this migration
+            $db->exec("ALTER TABLE training_log ADD COLUMN tenant_id TEXT");
             $stmt = $db->prepare(
-                'INSERT INTO training_log (user_text, intent_classified, llm_score, status, created_at)
-                 VALUES (:text, :intent, :score, :status, :created)'
+                'INSERT INTO training_log (user_text, intent_classified, llm_score, status, tenant_id, created_at)
+                 VALUES (:text, :intent, :score, :status, :tenant, :created)'
             );
             $stmt->execute([
-                ':text' => $text,
+                ':text'   => $text,
                 ':intent' => $intent,
-                ':score' => $score,
+                ':score'  => $score,
                 ':status' => $status,
+                ':tenant' => $this->tenantId,
                 ':created' => date('c'),
             ]);
+
+            // Lazy promotion: push to Qdrant when enough pending rows accumulate
+            if ($status === 'pending') {
+                $promoter = new TrainingPromoter($db, $this->embedder, $this->vectorStore, $this->tenantId);
+                $promoter->promoteIfReady();
+            }
         } catch (\Throwable $e) {
             // Silently fail — logging is non-critical
         }

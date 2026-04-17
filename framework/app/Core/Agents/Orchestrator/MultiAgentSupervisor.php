@@ -110,6 +110,7 @@ class MultiAgentSupervisor
     private function loadWorkflowRegistry(): void
     {
         $this->workflowRegistry = [
+            // Domain workflows
             'PURCHASE' => [
                 'sequence' => ['SALES', 'FINANCES'],
                 'description' => 'Validación de Stock -> Validación de Margen Fiscal'
@@ -121,7 +122,26 @@ class MultiAgentSupervisor
             'SCHEMA_UPDATE' => [
                 'sequence' => ['ARCHITECT', 'FINANCES'],
                 'description' => 'Diseño de Tabla -> Validación de Impacto Contable'
-            ]
+            ],
+            // Active execution processes
+            'APP_EXECUTION' => [
+                'process' => 'AppExecutionProcess',
+                'sequence' => ['APP_EXECUTION'],
+                'description' => 'Operación ERP estándar: intents → router → skills',
+                'modes'   => ['operation', 'chat'],
+            ],
+            'BUILDER_ONBOARDING' => [
+                'process' => 'BuilderOnboardingProcess',
+                'sequence' => ['BUILDER_ONBOARDING'],
+                'description' => 'Onboarding guiado: LLM + CommandBus para configurar apps',
+                'modes'   => ['builder'],
+            ],
+            'AUTONOMOUS_EXECUTION' => [
+                'process' => 'AutonomousExecutionProcess',
+                'sequence' => ['AUTONOMOUS_EXECUTION'],
+                'description' => 'Tool-use loop autónomo: LLM decide skills hasta completar tarea',
+                'modes'   => ['autonomous'],
+            ],
         ];
     }
 

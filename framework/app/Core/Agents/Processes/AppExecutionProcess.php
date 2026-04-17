@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Core\Agents\Processes;
 
+use App\Core\Agents\IntentClassifier;
 use App\Core\Agents\Memory\MemoryWindow;
 use App\Core\Agents\Memory\TokenBudgeter;
 use App\Core\IntentRouter;
@@ -16,9 +17,11 @@ use App\Core\LLM\LLMRouter;
  */
 class AppExecutionProcess
 {
-    public function __construct()
+    private ?IntentClassifier $intentClassifier;
+
+    public function __construct(?IntentClassifier $intentClassifier = null)
     {
-        // Require IntentRouter, CommandBus, ToolCompressor here
+        $this->intentClassifier = $intentClassifier;
     }
 
     /**
@@ -45,12 +48,17 @@ class AppExecutionProcess
         // El router lee 'message_text' del contexto Y del gatewayResult.
         // Poblamos ambos para garantizar compatibilidad con las rutas internas.
         if ($router) {
-            $isGreeting = preg_match('/^(hola|hi|hello|buenos dias|buenas tardes|buenas noches)/i', trim($userText));
+            $detectedIntent = 'unknown';
+            if ($this->intentClassifier !== null) {
+                $classification = $this->intentClassifier->classify($userText);
+                $detectedIntent = $classification['intent'];
+            }
+            $isGreeting = $detectedIntent === 'greeting';
             $gatewayResult = [
-                'intent'       => $isGreeting ? 'greeting' : 'unknown',
+                'intent'       => $detectedIntent,
                 'action'       => 'respond_local',
                 'reply'        => $isGreeting ? '¡Hola! Soy SUKI, tu asistente de negocios. ¿En qué puedo ayudarte hoy?' : '',
-                'message_text' => $userText,   // FIX A1: texto real en gatewayResult
+                'message_text' => $userText,
             ];
             $route = $router->route($gatewayResult, [
                 'message_text' => $userText,
