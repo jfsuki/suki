@@ -1,0 +1,26 @@
+{
+  "hooks": {
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"{\\\"hookSpecificOutput\\\": {\\\"hookEventName\\\": \\\"UserPromptSubmit\\\", \\\"additionalContext\\\": \\\"MANDATORY PRE-TASK: Before proceeding, invoke /suki-qa-gate (pre-flight check) and /claude-mem:mem-search with relevant keywords. Canonical refs: docs/canon/SUKI_ARCHITECTURE_CANON.md, docs/canon/ROUTER_CANON.md, docs/contracts/action_catalog.json, docs/contracts/skills_catalog.json, project/contracts/entities/, project/contracts/invoices/. Non-negotiable laws: never raw SQL, tenant isolation on every query, additive changes only, preserve JSON contract keys.\\\"}}\"",
+            "statusMessage": "Cargando contexto SUKI..."
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "echo \"{\\\"hookSpecificOutput\\\": {\\\"hookEventName\\\": \\\"SessionStart\\\", \\\"additionalContext\\\": \\\"SUKI SESSION INIT — Documentos canónicos a revisar antes de cualquier tarea: (1) CLAUDE.md ya cargado, (2) docs/canon/SUKI_ARCHITECTURE_CANON.md, (3) docs/canon/ROUTER_CANON.md, (4) docs/technical/07_DATABASE_MODEL.md, (5) docs/contracts/action_catalog.json, (6) project/contracts/entities/*.json, (7) project/contracts/invoices/*.json. Usa /claude-mem:mem-search para contexto de sesiones previas.\\\"}}\"",
+            "statusMessage": "Inicializando sesión SUKI..."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "Bash(bash -c 'echo \"{\\\\\"hookSpecificOutput\\\\\": {\\\\\"hookEventName\\\\\": \\\\\"UserPromptSubmit\\\\\", \\\\\"additionalContext\\\\\": \\\\\"MANDATORY PRE-TASK: \\(1\\) invoke /suki-qa-gate, \\(2\\) invoke /claude-mem:mem-search with relevant keywords. Canon docs: docs/canon/SUKI_ARCHITECTURE_CANON.md, docs/canon/ROUTER_CANON.md, docs/contracts/action_catalog.json, project/contracts/entities/.\\\\\"}, \\\\\"systemMessage\\\\\": \\\\\"Running SUKI pre-task checks...\\\\\"}\"')",
+      "Bash(echo \"Exit: $?\")",
+      "Bash(bash -c 'echo \"{\\\\\"hookSpecificOutput\\\\\": {\\\\\"hookEventName\\\\\": \\\\\"SessionStart\\\\\", \\\\\"additionalContext\\\\\": \\\\\"SESSION START — SUKI project. Load before any task: CLAUDE.md \\(already loaded\\), docs/canon/SUKI_ARCHITECTURE_CANON.md, docs/canon/ROUTER_CANON.md, docs/technical/07_DATABASE_MODEL.md, docs/contracts/action_catalog.json, project/contracts/entities/*.json, project/contracts/invoices/*.json. Run /claude-mem:mem-search for recent context.\\\\\"}}\"')",
+      "Bash(echo \"UserPromptSubmit exit: $?\")",
+      "Bash(echo \"SessionStart exit: $?\")",
+      "Bash(node -e \"const s = JSON.parse\\(require\\('fs'\\).readFileSync\\('C:/laragon/www/suki/.claude/worktrees/compassionate-dubinsky-7fd713/.claude/settings.json','utf8'\\)\\); console.log\\('UserPromptSubmit hook:', s.hooks.UserPromptSubmit[0].hooks[0].command.substring\\(0,50\\)\\); console.log\\('SessionStart hook:', s.hooks.SessionStart[0].hooks[0].command.substring\\(0,50\\)\\); console.log\\('JSON valid: OK'\\);\")",
+      "Bash(php -r ' *)"
+    ]
+  }
+}
