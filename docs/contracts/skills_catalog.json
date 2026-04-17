@@ -4432,7 +4432,7 @@
                 "CommandBus"
             ],
             "priority": 100,
-            "memory_type": "transactional",
+            "memory_type": null,
             "input_schema": {
                 "required": [
                     "sku",
@@ -4459,7 +4459,7 @@
                 "CommandBus"
             ],
             "priority": 100,
-            "memory_type": "transactional",
+            "memory_type": null,
             "input_schema": {
                 "required": [
                     "nombre"
@@ -4487,7 +4487,7 @@
                 "CommandBus"
             ],
             "priority": 100,
-            "memory_type": "informative",
+            "memory_type": null,
             "input_schema": {
                 "required": [
                     "sku"
@@ -4510,7 +4510,7 @@
                 "CommandBus"
             ],
             "priority": 90,
-            "memory_type": "informative",
+            "memory_type": null,
             "input_schema": {
                 "optional": [
                     "nombre",
@@ -4535,7 +4535,7 @@
                 "CommandBus"
             ],
             "priority": 100,
-            "memory_type": "transactional",
+            "memory_type": null,
             "input_schema": {
                 "required": [
                     "nombre"
@@ -4563,7 +4563,7 @@
                 "CommandBus"
             ],
             "priority": 100,
-            "memory_type": "transactional",
+            "memory_type": null,
             "input_schema": {
                 "required": [
                     "id"
@@ -4592,7 +4592,7 @@
                 "CommandBus"
             ],
             "priority": 90,
-            "memory_type": "informative",
+            "memory_type": null,
             "input_schema": {
                 "optional": [
                     "nombre",
@@ -4617,7 +4617,7 @@
                 "CommandBus"
             ],
             "priority": 80,
-            "memory_type": "informative",
+            "memory_type": null,
             "input_schema": [],
             "channel_capabilities": [
                 "chat"
@@ -4637,7 +4637,7 @@
                 "CommandBus"
             ],
             "priority": 100,
-            "memory_type": "transactional",
+            "memory_type": null,
             "input_schema": {
                 "required": [
                     "monto"
@@ -4667,7 +4667,7 @@
                 "CommandBus"
             ],
             "priority": 80,
-            "memory_type": "informative",
+            "memory_type": null,
             "input_schema": [],
             "channel_capabilities": [
                 "chat"
@@ -4685,7 +4685,7 @@
                 "CommandBus"
             ],
             "priority": 100,
-            "memory_type": "transactional",
+            "memory_type": null,
             "input_schema": {
                 "required": [
                     "monto"

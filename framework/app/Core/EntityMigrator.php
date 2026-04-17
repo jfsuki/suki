@@ -55,6 +55,28 @@ class EntityMigrator
             foreach ($sqls as $sql) {
                 $this->db->exec($sql);
             }
+            // ADD COLUMN for any fields missing from the existing table (incremental migration).
+            $fields = is_array($entity['fields'] ?? null) ? $entity['fields'] : [];
+            $table = $this->resolveEntityTable($entity);
+            foreach ($fields as $field) {
+                $fieldName = (string) ($field['name'] ?? '');
+                if ($fieldName === '' || $fieldName === 'id') {
+                    continue;
+                }
+                $isGrid = isset($field['grid']) || (isset($field['source']) && str_starts_with((string) $field['source'], 'grid:'));
+                if ($isGrid) {
+                    continue;
+                }
+                if (!$this->columnExists($table, $fieldName)) {
+                    try {
+                        $definition = $this->columnDefinition($field, '', false)['sql'];
+                        $this->db->exec("ALTER TABLE {$table} ADD COLUMN {$definition};");
+                    } catch (\Throwable $e) {
+                        // Non-fatal: log and continue (e.g. duplicate column race condition)
+                        error_log("EntityMigrator: could not add column {$fieldName} to {$table}: " . $e->getMessage());
+                    }
+                }
+            }
             $this->store->upsert($migrationKey, $checksum);
         }
 

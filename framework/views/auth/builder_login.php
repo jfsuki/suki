@@ -39,42 +39,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #030712;
-            --glass: rgba(17, 24, 39, 0.7);
-            --border: rgba(255, 255, 255, 0.1);
-            --accent: #a855f7; /* Purple for builders/creators */
-            --accent-glow: rgba(168, 85, 247, 0.3);
-            --text: #f9fafb;
-            --text-dim: #9ca3af;
+            --bg: #F0F9FF;
+            --card: #FFFFFF;
+            --border: #BAE6FD;
+            --accent: #0891B2;
+            --accent-hover: #0E7490;
+            --accent-glow: rgba(8, 145, 178, 0.18);
+            --text: #0F172A;
+            --text-dim: #64748B;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Outfit', sans-serif;
-            background-color: var(--bg);
+            background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 50%, #CFFAFE 100%);
             color: var(--text);
             height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
-            background: 
-                radial-gradient(circle at top right, #3b0764, transparent 50%),
-                radial-gradient(circle at bottom left, #1e1b4b, transparent 50%);
         }
 
         .auth-card {
-            background: var(--glass);
-            backdrop-filter: blur(20px);
-            -webkit-backdrop-filter: blur(20px);
+            background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 32px;
+            border-radius: 20px;
             padding: 48px;
             width: 100%;
             max-width: 440px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            animation: slideUp 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 6px rgba(8,145,178,0.06), 0 20px 40px rgba(15,23,42,0.10);
+            animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         @keyframes slideUp {
@@ -85,82 +81,86 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         .header-area { text-align: center; margin-bottom: 40px; }
 
         .logo-icon {
-            width: 56px;
-            height: 56px;
-            background: linear-gradient(135deg, #a855f7, #6366f1);
-            border-radius: 16px;
+            width: 52px;
+            height: 52px;
+            background: linear-gradient(135deg, #0891B2, #06B6D4);
+            border-radius: 14px;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             margin-bottom: 20px;
-            box-shadow: 0 8px 20px var(--accent-glow);
+            box-shadow: 0 8px 20px rgba(8,145,178,0.20);
         }
 
-        h1 { font-size: 28px; font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; }
-        .subtitle { color: var(--text-dim); font-size: 15px; }
+        h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; margin-bottom: 8px; color: var(--text); }
+        .subtitle { color: var(--text-dim); font-size: 14px; }
 
-        .form-group { margin-bottom: 24px; }
-        label { display: block; font-size: 13px; font-weight: 700; margin-bottom: 10px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; }
-        
+        .form-group { margin-bottom: 22px; }
+        label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
+
         input {
             width: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 14px 18px;
-            color: white;
-            font-size: 16px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 13px 16px;
+            color: var(--text);
+            font-size: 15px;
+            font-family: inherit;
             transition: all 0.2s;
             outline: none;
         }
 
         input:focus {
             border-color: var(--accent);
-            box-shadow: 0 0 0 4px var(--accent-glow);
+            background: #FFFFFF;
+            box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.12);
         }
 
         .btn-submit {
             width: 100%;
             background: var(--accent);
-            color: white;
+            color: #fff;
             border: none;
-            border-radius: 14px;
-            padding: 16px;
-            font-size: 16px;
-            font-weight: 800;
+            border-radius: 10px;
+            padding: 15px;
+            font-size: 15px;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
             margin-top: 10px;
-            letter-spacing: 0.5px;
+            letter-spacing: 0.05em;
         }
 
         .btn-submit:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px -5px var(--accent-glow);
-            filter: brightness(1.1);
+            background: var(--accent-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(8,145,178,0.25);
         }
 
         .error-msg {
-            background: rgba(239, 68, 68, 0.1);
-            border: 1px solid rgba(239, 68, 68, 0.3);
-            color: #fca5a5;
-            padding: 14px;
-            border-radius: 14px;
+            background: rgba(239, 68, 68, 0.06);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            color: #B91C1C;
+            padding: 12px;
+            border-radius: 10px;
             font-size: 14px;
-            margin-bottom: 25px;
+            margin-bottom: 22px;
             text-align: center;
         }
 
         .badge {
-            background: rgba(168, 85, 247, 0.1);
+            background: rgba(8, 145, 178, 0.08);
             color: var(--accent);
             padding: 4px 12px;
             border-radius: 99px;
             font-size: 11px;
-            font-weight: 800;
+            font-weight: 700;
             display: inline-block;
             margin-bottom: 12px;
-            border: 1px solid rgba(168, 85, 247, 0.2);
+            border: 1px solid rgba(8, 145, 178, 0.20);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
     </style>
 </head>

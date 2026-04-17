@@ -23,6 +23,14 @@ if (session_status() === PHP_SESSION_NONE) {
 
 $tenantId = trim((string)($_REQUEST['tenant_id'] ?? 'default'));
 
+// Validar parámetro form antes de auth (respuesta útil sin sesión)
+if (trim((string)($_REQUEST['form'] ?? '')) === '') {
+    http_response_code(400);
+    header('Content-Type: application/json');
+    echo json_encode(['ok' => false, 'error' => 'Parámetro requerido: form (clave del contrato de reporte).']);
+    exit;
+}
+
 // 1. Validar autenticación básica
 if (empty($_SESSION['auth_user'])) {
     http_response_code(401);

@@ -456,6 +456,26 @@ function matchesFilter(array $payload, array $filter): bool
         if (!is_array($condition)) {
             continue;
         }
+        // Handle nested 'should' (OR) condition — any one sub-condition must match
+        if (isset($condition['should']) && is_array($condition['should'])) {
+            $anyMatch = false;
+            foreach ($condition['should'] as $subCondition) {
+                if (!is_array($subCondition)) {
+                    continue;
+                }
+                $subKey = (string) ($subCondition['key'] ?? '');
+                $subExpected = (string) ($subCondition['match']['value'] ?? '');
+                $subActual = $payload[$subKey] ?? null;
+                if ($subActual !== null && trim((string) $subActual) === $subExpected) {
+                    $anyMatch = true;
+                    break;
+                }
+            }
+            if (!$anyMatch) {
+                return false;
+            }
+            continue;
+        }
         $key = (string) ($condition['key'] ?? '');
         $expected = (string) ($condition['match']['value'] ?? '');
         $actual = $payload[$key] ?? null;

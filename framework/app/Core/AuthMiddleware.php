@@ -26,7 +26,9 @@ final class AuthMiddleware
 
         if (!$authenticated) {
             if ($redirect) {
-                header('Location: /auth/login.php');
+                $uri  = $_SERVER['REQUEST_URI'] ?? '';
+                $base = (str_contains($uri, '/suki/')) ? '/suki' : '';
+                header("Location: {$base}/marketplace/login");
                 exit;
             }
             return false;
@@ -35,10 +37,11 @@ final class AuthMiddleware
         // Validación extra: IP no ha cambiado drásticamente (Secuestro de sesión)
         $currentIp = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
         if (isset($_SESSION['last_ip']) && $_SESSION['last_ip'] !== $currentIp) {
-            // Podríamos registrar una alerta aquí
             session_destroy();
             if ($redirect) {
-                header('Location: /auth/login.php?error=session_compromised');
+                $uri  = $_SERVER['REQUEST_URI'] ?? '';
+                $base = (str_contains($uri, '/suki/')) ? '/suki' : '';
+                header("Location: {$base}/marketplace/login?error=session_compromised");
                 exit;
             }
             return false;

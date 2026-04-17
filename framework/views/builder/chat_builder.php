@@ -1,7 +1,8 @@
-<?php 
+<?php
 $current_page = 'chat';
-include __DIR__ . '/includes/header.php'; 
-include __DIR__ . '/includes/navbar.php'; 
+$__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
+include __DIR__ . '/includes/header.php';
+include __DIR__ . '/includes/navbar.php';
 ?>
 <style>
     /* ─── CHAT-SPECIFIC LAYOUT ───────────────────────────────── */
@@ -221,7 +222,7 @@ include __DIR__ . '/includes/navbar.php';
       font-size: 13px; flex-shrink: 0; font-weight: 600;
     }
     .msg.user .msg-avatar {
-      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      background: linear-gradient(135deg, var(--accent), #0E7490);
       color: #fff; box-shadow: 0 0 12px var(--glow);
     }
     .msg.bot .msg-avatar {
@@ -236,7 +237,7 @@ include __DIR__ . '/includes/navbar.php';
       line-height: 1.65;
     }
     .msg.user .msg-bubble {
-      background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+      background: linear-gradient(135deg, var(--accent) 0%, #0E7490 100%);
       color: #fff;
       border-radius: 14px 4px 14px 14px;
       box-shadow: 0 4px 20px var(--glow);
@@ -326,7 +327,7 @@ include __DIR__ . '/includes/navbar.php';
     }
     #chatInput::placeholder { color: var(--muted); }
     #sendBtn {
-      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      background: linear-gradient(135deg, var(--accent), #0E7490);
       border: none; border-radius: 10px;
       width: 36px; height: 36px; flex-shrink: 0;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -434,7 +435,7 @@ include __DIR__ . '/includes/navbar.php';
     .action-btn:hover { border-color: var(--accent); background: var(--accent-soft); transform: translateY(-1px); }
     .action-btn i { font-style: normal; font-size: 18px; }
     .action-btn.primary {
-      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      background: linear-gradient(135deg, var(--accent), #0E7490);
       color: #fff; border: none; box-shadow: 0 4px 12px var(--glow);
     }
     .action-btn.primary:hover { transform: translateY(-2px); box-shadow: 0 8px 20px var(--glow); }
@@ -497,7 +498,7 @@ include __DIR__ . '/includes/navbar.php';
     <span class="nav-badge">Builder</span>
   </div>
   <div class="nav-actions">
-    <a href="chat_app.html" class="nav-btn">🚀 Ir al App</a>
+    <a href="<?= $__base ?>/apps/app" class="nav-btn">🚀 Ir al App</a>
     <a href="#" class="nav-btn primary" id="testModeNav">🧪 Test Mode</a>
   </div>
 </nav>
@@ -532,7 +533,7 @@ include __DIR__ . '/includes/navbar.php';
     <div class="panel-body">
       
       <!-- FAST ACTIONS -->
-      <a href="reports.html" target="_blank" class="action-btn primary">
+      <a href="<?= $__base ?>/apps/dashboard" target="_blank" class="action-btn primary">
         <i>📊</i> Ver Dashboard de Reportes
       </a>
       <button class="action-btn" onclick="openSmtpSettings()">

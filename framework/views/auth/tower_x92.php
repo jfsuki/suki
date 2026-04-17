@@ -18,7 +18,9 @@ use App\Core\TrainingPortalController;
 // 1. Auth & Context
 if (session_status() === PHP_SESSION_NONE) session_start();
 if (!isset($_SESSION['suki_tower_auth'])) {
-    header('Location: ./torre'); exit;
+    $__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
+    header("Location: {$__base}/torre/");
+    exit;
 }
 
 $registry = new ProjectRegistry();
@@ -260,10 +262,11 @@ function safeStr($s): string {
             <a href="?tab=training" class="<?= $tab==='training'?'active':'' ?>">🧠 Entrenamiento AI</a>
             
             <div style="margin: 20px 0 10px 10px; font-size: 9px; color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">⚡ Herramientas</div>
-            <a href="./builder" target="_blank" style="background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.1);">
+            <?php $__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : ''; ?>
+            <a href="<?= $__base ?>/builder" target="_blank" style="background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.1);">
                 🚀 Ir al Builder
             </a>
-            <a href="./editor" target="_blank" style="background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.1);">
+            <a href="<?= $__base ?>/editor" target="_blank" style="background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.1);">
                 🛠️ Ir al Studio
             </a>
         </nav>

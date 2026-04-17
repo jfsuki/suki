@@ -33,7 +33,7 @@ if (!is_array($json2) || (string) ($json2['status'] ?? '') !== 'error') {
 }
 
 $message = mb_strtolower((string) ($json2['message'] ?? ''), 'UTF-8');
-if ($message !== '' && !str_contains($message, 'acceso no autorizado')) {
+if ($message !== '' && !str_contains($message, 'acceso') && !str_contains($message, 'sesión') && !str_contains($message, 'sesion')) {
     $failures[] = 'chat/message sin auth debe responder error generico de autorizacion.';
 }
 

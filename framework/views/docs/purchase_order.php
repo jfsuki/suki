@@ -44,7 +44,7 @@ $logo = $company['logo_base64'] ?? '';
     <div class="company-meta">NIT: <strong><?= $e($company['nit'] ?? '---') ?></strong><br><?= $e($company['address'] ?? '') ?>, <?= $e($company['city'] ?? '') ?><br><?= $e($company['phone'] ?? '') ?></div>
   </div>
   <div class="doc-title-block">
-    <div class="doc-badge" style="background:#7c3aed;">ORDEN DE COMPRA</div>
+    <div class="doc-badge" style="background:#0891B2;">ORDEN DE COMPRA</div>
     <div class="doc-number">OC-<?= $docNum ?></div>
     <div class="doc-date">Fecha: <strong><?= $created ?></strong></div>
     <div style="margin-top:6px;"><span class="status-badge <?= $statusClass ?>"><?= $e($statusLabel) ?></span></div>
@@ -111,7 +111,7 @@ $logo = $company['logo_base64'] ?? '';
 <?php endif; ?>
 
 <div class="notes-box" style="background:#f5f3ff;border-color:#a78bfa;">
-  <h4 style="color:#7c3aed;">Condiciones de la Orden</h4>
+  <h4 style="color:#0891B2;">Condiciones de la Orden</h4>
   <strong>Condiciones de Pago:</strong> <?= $payTerms ?><br>
   <strong>Lugar de Entrega:</strong> <?= $e($company['address'] ?? '') ?>, <?= $e($company['city'] ?? '') ?><br>
   Los bienes deben entregarse en las condiciones y fechas pactadas. La recepción parcial debe ser notificada al comprador.

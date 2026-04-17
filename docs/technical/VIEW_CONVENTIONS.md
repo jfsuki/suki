@@ -1,5 +1,7 @@
 # View Conventions
 
+> **Design System**: Ver `docs/canon/FRONTEND_DESIGN_SYSTEM.md` para paleta de colores, tokens CSS, tipografía y componentes base. Es canónico y obligatorio en todo desarrollo frontend.
+
 ## Resolution
 - URL path maps to project/views/<path>.php via project/public/index.php.
 - Subfolders allowed: clientes/clientes -> project/views/clientes/clientes.php.

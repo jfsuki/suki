@@ -1,3 +1,4 @@
+<?php $__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : ''; ?>
 <!doctype html>
 <html lang="es">
 <head>
@@ -8,31 +9,31 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
-    /* ─── TOKENS ─────────────────────────────────────────────── */
+    /* ─── TOKENS — SUKI White Cyan Corporate ──────────────────── */
     :root {
-      --bg:           #080d1a;
-      --surface:      #0f1629;
-      --surface2:     #172035;
-      --surface3:     #1e2a42;
-      --border:       rgba(255,255,255,0.06);
-      --accent:       #3b82f6;
-      --accent-soft:  rgba(59,130,246,0.12);
-      --accent-glow:  rgba(59,130,246,0.35);
-      --teal:         #06d6a0;
-      --teal-soft:    rgba(6,214,160,0.12);
-      --amber:        #f59e0b;
-      --amber-soft:   rgba(245,158,11,0.12);
-      --rose:         #f43f5e;
-      --rose-soft:    rgba(244,63,94,0.12);
-      --success:      #22c55e;
-      --success-soft: rgba(34,197,94,0.12);
-      --text:         #dde6f5;
-      --muted:        #5a7096;
-      --radius:       14px;
-      --radius-sm:    9px;
-      --shadow:       0 24px 64px rgba(0,0,0,0.55);
+      --bg:           #F8FAFC;
+      --surface:      #FFFFFF;
+      --surface2:     #F1F5F9;
+      --surface3:     #E8F4F8;
+      --border:       #E2E8F0;
+      --accent:       #0891B2;
+      --accent-soft:  rgba(8,145,178,0.08);
+      --accent-glow:  rgba(8,145,178,0.18);
+      --teal:         #06B6D4;
+      --teal-soft:    rgba(6,182,212,0.10);
+      --amber:        #D97706;
+      --amber-soft:   rgba(217,119,6,0.10);
+      --rose:         #E11D48;
+      --rose-soft:    rgba(225,29,72,0.10);
+      --success:      #059669;
+      --success-soft: rgba(5,150,105,0.10);
+      --text:         #0F172A;
+      --muted:        #64748B;
+      --radius:       12px;
+      --radius-sm:    8px;
+      --shadow:       0 1px 3px rgba(15,23,42,0.06), 0 4px 16px rgba(15,23,42,0.04);
       --font:         'Inter', system-ui, sans-serif;
-      --tr:           0.22s cubic-bezier(0.4,0,0.2,1);
+      --tr:           0.20s cubic-bezier(0.4,0,0.2,1);
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
@@ -44,8 +45,8 @@
       flex-direction: column;
       overflow: hidden;
       background-image:
-        radial-gradient(ellipse 70% 50% at 70% -10%, rgba(59,130,246,0.15) 0%, transparent 60%),
-        radial-gradient(ellipse 50% 40% at 5%  100%, rgba(6,214,160,0.10) 0%, transparent 50%);
+        radial-gradient(ellipse 70% 50% at 70% -10%, rgba(8,145,178,0.05) 0%, transparent 60%),
+        radial-gradient(ellipse 50% 40% at 5%  100%, rgba(6,182,212,0.04) 0%, transparent 50%);
     }
 
     /* ─── NAV ─────────────────────────────────────────────────── */
@@ -54,7 +55,7 @@
       display: flex; align-items: center; justify-content: space-between;
       padding: 0 22px;
       border-bottom: 1px solid var(--border);
-      background: rgba(8,13,26,0.9);
+      background: rgba(255,255,255,0.95);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       z-index: 100;
@@ -182,19 +183,19 @@
       font-size: 12px; flex-shrink: 0; font-weight: 700;
     }
     .msg.user .msg-av {
-      background: linear-gradient(135deg, var(--accent), #1d4ed8);
+      background: linear-gradient(135deg, var(--accent), #0E7490);
       color: #fff; box-shadow: 0 0 10px var(--accent-glow);
     }
     .msg.bot .msg-av {
       background: var(--teal-soft); color: var(--teal);
-      border: 1px solid rgba(6,214,160,0.2);
+      border: 1px solid rgba(6,182,212,0.25);
     }
     .msg-bubble {
       padding: 10px 13px; border-radius: 12px;
       font-size: 13px; line-height: 1.65;
     }
     .msg.user .msg-bubble {
-      background: linear-gradient(135deg, var(--accent) 0%, #1d4ed8 100%);
+      background: linear-gradient(135deg, var(--accent) 0%, #0E7490 100%);
       color: #fff; border-radius: 12px 3px 12px 12px;
       box-shadow: 0 4px 16px var(--accent-glow);
     }
@@ -211,7 +212,7 @@
       font-size: 11.5px; border-radius: 7px; overflow: hidden;
     }
     .data-table th {
-      background: rgba(59,130,246,0.15); color: var(--accent);
+      background: var(--accent-soft); color: var(--accent);
       padding: 5px 8px; font-weight: 600; text-align: left; font-size: 10.5px;
     }
     .data-table td { padding: 5px 8px; border-bottom: 1px solid var(--border); }
@@ -255,7 +256,7 @@
     }
     .chat-input-row:focus-within {
       border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(59,130,246,0.1);
+      box-shadow: 0 0 0 3px rgba(8,145,178,0.10);
     }
     #chatInput {
       flex: 1; background: none; border: none; outline: none;
@@ -374,11 +375,11 @@
   </div>
   <div class="nav-mode">
     <button class="nav-mode-btn active" id="modeBtnApp">🚀 App</button>
-    <button class="nav-mode-btn" id="modeBtnBuilder" onclick="location.href='chat_builder.html'">🔧 Builder</button>
+    <button class="nav-mode-btn" id="modeBtnBuilder" onclick="location.href='<?= $__base ?>/builder'">🔧 Builder</button>
   </div>
   <div class="nav-actions">
     <button class="nav-btn" id="testNavBtn">🧪 Inspector</button>
-    <a href="chat_builder.html" class="nav-btn primary">+ Nuevo proyecto</a>
+    <a href="<?= $__base ?>/builder" class="nav-btn primary">+ Nuevo proyecto</a>
   </div>
 </nav>
 

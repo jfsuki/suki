@@ -30,7 +30,7 @@ $desc = $descriptions[$code] ?? 'Se ha producido una excepción no controlada en
             --bg: #020617;
             --accent: #ef4444; /* Rojo para errores */
             <?php if($code === '403'): ?> --accent: #f59e0b; <?php endif; ?>
-            <?php if($code === '404'): ?> --accent: #3b82f6; <?php endif; ?>
+            <?php if($code === '404'): ?> --accent: #0891B2; <?php endif; ?>
             --accent-glow: rgba(239, 68, 68, 0.2);
             --text: #f8fafc;
             --text-dim: #94a3b8;

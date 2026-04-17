@@ -118,8 +118,8 @@ $service = new AgentToolsIntegrationService(
 try {
     $alphaGroups = $service->listToolGroups($tenantAlpha, 'admin_alpha', $appId);
     $alphaItems = indexByModuleKey((array) ($alphaGroups['tool_groups'] ?? []));
-    if ((int) ($alphaGroups['result_count'] ?? 0) !== 9) {
-        $failures[] = 'listToolGroups debe devolver los 9 grupos canonicos.';
+    if ((int) ($alphaGroups['result_count'] ?? 0) !== 12) {
+        $failures[] = 'listToolGroups debe devolver los 12 grupos canonicos.';
     }
     if (($alphaItems['ecommerce']['enabled'] ?? true) !== false) {
         $failures[] = 'El tenant starter debe ver ecommerce como disabled por plan.';

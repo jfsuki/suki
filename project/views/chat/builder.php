@@ -148,7 +148,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
       font-size: 13px; flex-shrink: 0; font-weight: 600;
     }
     .msg.user .msg-avatar {
-      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      background: linear-gradient(135deg, var(--accent), #0E7490);
       color: #fff; box-shadow: 0 0 12px var(--glow);
     }
     .msg.bot .msg-avatar {
@@ -163,7 +163,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
       line-height: 1.65;
     }
     .msg.user .msg-bubble {
-      background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+      background: linear-gradient(135deg, var(--accent) 0%, #0E7490 100%);
       color: #fff;
       border-radius: 14px 4px 14px 14px;
       box-shadow: 0 4px 20px var(--glow);
@@ -225,7 +225,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
     }
     #chatInput::placeholder { color: var(--muted); }
     #sendBtn {
-      background: linear-gradient(135deg, var(--accent), #7c3aed);
+      background: linear-gradient(135deg, var(--accent), #0E7490);
       border: none; border-radius: 10px;
       width: 36px; height: 36px; flex-shrink: 0;
       cursor: pointer; display: flex; align-items: center; justify-content: center;
@@ -740,7 +740,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
   // Category config: color, icon, label
   const CAT_CONFIG = {
     requirement: { color: '#0ea5e9', icon: '📋', label: 'Req' },
-    arch:        { color: '#8b5cf6', icon: '🏗', label: 'Agente' },
+    arch:        { color: '#0891B2', icon: '🏗', label: 'Agente' },
     decision:    { color: '#6366f1', icon: '✅', label: 'Decisión' },
     finding:     { color: '#22c55e', icon: '💡', label: 'Hallazgo' },
     default:     { color: '#64748b', icon: '📌', label: 'Nota' },
@@ -933,7 +933,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
       // Show last segment of route path
       const last = routePath.split('>').map(s=>s.trim()).filter(Boolean).pop() || routePath;
       jRoute.textContent = last.toUpperCase();
-      const routeColors = { cache:'#22c55e', rules:'#0ea5e9', rag:'#f59e0b', llm:'#8b5cf6', tools:'#6366f1' };
+      const routeColors = { cache:'#059669', rules:'#0891B2', rag:'#D97706', llm:'#0E7490', tools:'#06B6D4' };
       jRoute.style.color = routeColors[last] || 'var(--success)';
     }
   }

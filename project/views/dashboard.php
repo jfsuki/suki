@@ -9,7 +9,7 @@
             <input id="dash-form" class="border rounded px-3 py-2 text-sm" placeholder="form (ej: fact.form)" value="<?php echo htmlspecialchars($_GET['form'] ?? '', ENT_QUOTES); ?>">
             <input id="dash-id" class="border rounded px-3 py-2 text-sm" placeholder="dashboard id (opcional)" value="<?php echo htmlspecialchars($_GET['dashboard'] ?? '', ENT_QUOTES); ?>">
             <input id="dash-entity" class="border rounded px-3 py-2 text-sm" placeholder="entity (opcional)" value="<?php echo htmlspecialchars($_GET['entity'] ?? '', ENT_QUOTES); ?>">
-            <button id="dash-load" class="bg-indigo-600 text-white text-sm font-bold rounded px-3 py-2">Cargar</button>
+            <button id="dash-load" class="bg-cyan-600 text-white text-sm font-semibold rounded-lg px-4 py-2 hover:bg-cyan-700 transition-colors">Cargar</button>
         </div>
     </div>
 
@@ -45,7 +45,7 @@
         title.className = 'text-xs text-gray-500 uppercase font-bold';
         title.textContent = widget.label || 'KPI';
         const value = document.createElement('div');
-        value.className = 'text-2xl font-bold text-indigo-700 mt-1';
+        value.className = 'text-2xl font-bold text-cyan-700 mt-1';
         value.textContent = Number(widget.value || 0).toFixed(2);
         card.appendChild(title);
         card.appendChild(value);
@@ -73,7 +73,7 @@
             const barWrap = document.createElement('div');
             barWrap.className = 'flex-1 h-3 bg-gray-100 rounded';
             const bar = document.createElement('div');
-            bar.className = 'h-3 bg-indigo-500 rounded';
+            bar.className = 'h-3 bg-cyan-500 rounded';
             bar.style.width = ((Number(item.value || 0) / max) * 100) + '%';
             barWrap.appendChild(bar);
             const val = document.createElement('div');

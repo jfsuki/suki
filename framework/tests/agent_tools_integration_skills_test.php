@@ -172,7 +172,7 @@ try {
     if ((string) ($listGroups['status'] ?? '') !== 'success' || (string) (($listGroups['data']['agent_tools_action'] ?? '') ?: '') !== 'list_tool_groups') {
         $failures[] = 'El agente debe listar grupos de herramientas por skill.';
     }
-    if ((int) (($listGroups['data']['result_count'] ?? 0)) !== 9) {
+    if ((int) (($listGroups['data']['result_count'] ?? 0)) !== 12) {
         $failures[] = 'La respuesta de grupos debe devolver el catalogo canonico.';
     }
 

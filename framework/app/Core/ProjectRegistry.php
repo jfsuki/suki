@@ -604,13 +604,22 @@ final class ProjectRegistry
     public function updateProjectManifest(array $appData): void
     {
         $manifestPath = $this->projectRoot() . '/contracts/app.manifest.json';
-        $data = [];
-        if (is_file($manifestPath)) {
-            $raw = file_get_contents($manifestPath);
-            $data = is_string($raw) ? json_decode($raw, true) : [];
+        if (!is_file($manifestPath)) {
+            return;
         }
-        $data['app'] = array_merge($data['app'] ?? [], $appData);
-        file_put_contents($manifestPath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
+        $raw = (string) file_get_contents($manifestPath);
+        // Decode preserving objects (no true flag) to avoid {} → [] corruption
+        $data = json_decode($raw);
+        if (!is_object($data)) {
+            return;
+        }
+        if (!isset($data->app) || !is_object($data->app)) {
+            $data->app = new \stdClass();
+        }
+        foreach ($appData as $k => $v) {
+            $data->app->{$k} = $v;
+        }
+        file_put_contents($manifestPath, json_encode($data, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES));
     }
 
     private function ensureSchema(): void

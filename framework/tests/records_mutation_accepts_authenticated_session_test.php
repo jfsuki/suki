@@ -28,6 +28,7 @@ $result = recordsReadRunApiRoute([
     'payload' => [
         'nombre' => 'Alta autenticada',
         'descripcion' => 'Mutacion con sesion valida',
+        'status' => 'CLIENTE',
         'activo' => true,
     ],
 ]);

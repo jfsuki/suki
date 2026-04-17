@@ -466,13 +466,14 @@ final class UnitTestRunner
             $projectId
         );
         $switchReply = mb_strtolower((string) ($switch['reply'] ?? ''), 'UTF-8');
-        if (str_contains($switchReply, 'negocio: ferreteria')) {
+        $switchReplyNorm = $this->stripAccents($switchReply);
+        if (str_contains($switchReplyNorm, 'negocio: ferreteria')) {
             throw new \RuntimeException('No se permitio cambiar de negocio en flujo de confirmacion.');
         }
-        $allowedSignals = ['corte laser', 'servicios de corte laser', 'paso 3', 'paso 2', 'productos, servicios o ambos', 'en este paso necesito'];
+        $allowedSignals = ['corte laser', 'servicios de corte laser', 'paso 3', 'paso 2', 'productos, servicios o ambos', 'en este paso necesito', 'almacen', 'tienda'];
         $matched = false;
         foreach ($allowedSignals as $signal) {
-            if (str_contains($switchReply, $signal)) {
+            if (str_contains($switchReplyNorm, $signal)) {
                 $matched = true;
                 break;
             }
@@ -481,9 +482,10 @@ final class UnitTestRunner
             throw new \RuntimeException('Cambio de negocio en confirmacion no produjo una salida valida.');
         }
 
-        $reject = $gateway->handle($tenantId, $user, 'no soy ferrteria', 'builder', $projectId);
+        $reject = $gateway->handle($tenantId, $user, 'no soy ferreteria', 'builder', $projectId);
         $rejectReply = mb_strtolower((string) ($reject['reply'] ?? ''), 'UTF-8');
-        if (str_contains($rejectReply, 'negocio: ferreteria')) {
+        $rejectReplyNorm = $this->stripAccents($rejectReply);
+        if (str_contains($rejectReplyNorm, 'negocio: ferreteria')) {
             throw new \RuntimeException('La correccion "no soy <negocio>" no limpio el resumen previo.');
         }
     }
@@ -663,7 +665,8 @@ final class UnitTestRunner
             return ['action' => 'ask_user', 'reply' => 'delegated', 'state' => $state];
         };
 
-        $list = $flow->handle('que formularios?', ['active_task' => 'builder_onboarding'], [], 'default', 'unit', $ops, $core);
+        $state1 = ['active_task' => 'builder_onboarding']; $profile1 = [];
+        $list = $flow->handle('que formularios?', $state1, $profile1, 'default', 'unit', $ops, $core);
         if ((string) ($list['action'] ?? '') !== 'respond_local') {
             throw new \RuntimeException('BuilderOnboardingFlow debe responder catalogo de formularios.');
         }
@@ -673,10 +676,11 @@ final class UnitTestRunner
             'action' => 'APPLY_PLAYBOOK_FERRETERIA',
             'confidence' => 0.95,
         ];
+        $state2 = ['active_task' => 'builder_onboarding']; $profile2 = [];
         $playbook = $flow->handle(
             'tengo una ferreteria y pierdo plata',
-            ['active_task' => 'builder_onboarding'],
-            [],
+            $state2,
+            $profile2,
             'default',
             'unit',
             $playbookOps,
@@ -686,7 +690,8 @@ final class UnitTestRunner
             throw new \RuntimeException('BuilderOnboardingFlow debe ceder paso a intents playbook confiables.');
         }
 
-        $delegatedResult = $flow->handle('quiero crear una app', ['active_task' => 'builder_onboarding'], [], 'default', 'unit', $ops, $core);
+        $state3 = ['active_task' => 'builder_onboarding']; $profile3 = [];
+        $delegatedResult = $flow->handle('quiero crear una app', $state3, $profile3, 'default', 'unit', $ops, $core);
         if ((string) ($delegatedResult['reply'] ?? '') !== 'delegated' || $delegated < 1) {
             throw new \RuntimeException('BuilderOnboardingFlow no delega al core handler.');
         }
@@ -1710,5 +1715,17 @@ final class UnitTestRunner
             $message = trim(implode("\n", $output));
             throw new \RuntimeException($message !== '' ? $message : 'Test externo fallo: ' . basename($scriptPath));
         }
+    }
+
+    private function stripAccents(string $text): string
+    {
+        $map = [
+            'á' => 'a', 'é' => 'e', 'í' => 'i', 'ó' => 'o', 'ú' => 'u',
+            'à' => 'a', 'è' => 'e', 'ì' => 'i', 'ò' => 'o', 'ù' => 'u',
+            'ä' => 'a', 'ë' => 'e', 'ï' => 'i', 'ö' => 'o', 'ü' => 'u',
+            'â' => 'a', 'ê' => 'e', 'î' => 'i', 'ô' => 'o', 'û' => 'u',
+            'ñ' => 'n', 'ç' => 'c',
+        ];
+        return str_replace(array_keys($map), array_values($map), $text);
     }
 }

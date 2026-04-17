@@ -30,6 +30,7 @@ $create = recordsReadRunApiRoute([
     'payload' => [
         'nombre' => 'Registro tenant A',
         'descripcion' => 'Base para prueba cross tenant',
+        'status' => 'CLIENTE',
     ],
 ]);
 

@@ -88,9 +88,29 @@ final class ChatAgent
             ? (bool) $payload['is_authenticated']
             : !$chatExecAuthRequired;
 
+        $mode = trim((string) ($payload['mode'] ?? 'app'));
+
         // --- Carlos Rule: STRICT AUTH ENFORCEMENT ---
-        if (!$isAuthenticated && $channel !== 'onboarding' && $channel !== 'portal' && !str_contains($text, '!login')) {
-             return $this->reply('Acceso denegado. Debes iniciar sesión en la Torre para continuar.', $channel, $sessionId, 'unknown', 'error');
+        // Informational queries (greetings, capability questions) are allowed without auth
+        $isInformationalQuery = $this->isPublicInformationalQuery($text, $mode);
+        if (!$isAuthenticated && !$isInformationalQuery && $channel !== 'onboarding' && $channel !== 'portal' && !str_contains($text, '!login')) {
+            // Write auth-block telemetry before returning so tests and observability can trace the rejection.
+            try {
+                $this->telemetry()->record($tenantId, [
+                    'session_id'       => $sessionId,
+                    'user_id'          => $userId !== '' ? $userId : 'unknown',
+                    'is_authenticated' => false,
+                    'effective_role'   => '',
+                    'gate_decision'    => 'blocked',
+                    'block_reason'     => 'unauthenticated',
+                    'mode'             => $mode,
+                    'project_id'       => trim((string) ($payload['project_id'] ?? '')),
+                    'message'          => $text,
+                ]);
+            } catch (\Throwable $ignored) {
+                // telemetry must never block the auth error response
+            }
+            return $this->reply('Acceso denegado. Debes iniciar sesión en la Torre para continuar.', $channel, $sessionId, 'unknown', 'error');
         }
 
         if ($userId === '') {
@@ -2682,6 +2702,29 @@ final class ChatAgent
             'http_code' => $httpCode,
         ]);
         return $reply;
+    }
+
+    private function isPublicInformationalQuery(string $text, string $mode): bool
+    {
+        $lower = mb_strtolower(trim($text), 'UTF-8');
+        if ($lower === '') {
+            return false;
+        }
+        // Greetings and capability questions are public in builder/app mode
+        $publicPatterns = [
+            '/^hola\b/', '/^buenos?\s+(dias|tardes|noches)\b/', '/^saludos\b/',
+            '/\bque\s+puedes?\s+(hacer|ayudar|ofrecerme)\b/',
+            '/\bpara\s+que\s+(sirves?|eres?)\b/',
+            '/\bcomo\s+funciona(s)?\b/',
+            '/\bque\s+eres?\b/', '/\bquien\s+eres?\b/',
+            '/\bcapacidades?\b/', '/\bayudarme\b/',
+        ];
+        foreach ($publicPatterns as $pattern) {
+            if (preg_match($pattern, $lower)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private function isExecutableIntentOrAction(\App\Core\IntentRouteResult $route, array $gatewayResult): bool

@@ -32,7 +32,7 @@
       height: 58px;
       flex-shrink: 0;
       border-bottom: 1px solid var(--border);
-      background: rgba(10,15,30,0.85);
+      background: rgba(255,255,255,0.95);
       backdrop-filter: blur(20px);
       -webkit-backdrop-filter: blur(20px);
       z-index: 100;
@@ -57,7 +57,7 @@
     .nav-badge {
       background: var(--accent-soft);
       color: var(--accent);
-      border: 1px solid rgba(139,92,246,0.25);
+      border: 1px solid rgba(8,145,178,0.20);
       font-size: 10px;
       font-weight: 600;
       padding: 2px 8px;
@@ -83,9 +83,9 @@
     .nav-btn:hover { background: var(--surface); border-color: var(--accent); color: var(--accent); }
     .nav-btn.active { border-color: var(--accent); color: var(--accent); background: var(--accent-soft); }
     .nav-btn.primary {
-      background: linear-gradient(135deg, var(--accent) 0%, #7c3aed 100%);
+      background: linear-gradient(135deg, var(--accent) 0%, #0E7490 100%);
       border-color: transparent; color: #fff;
-      box-shadow: 0 0 18px var(--glow);
+      box-shadow: 0 4px 14px var(--glow);
     }
     .nav-btn.primary:hover { opacity: 0.88; }
 </style>

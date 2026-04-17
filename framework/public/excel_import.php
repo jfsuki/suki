@@ -12,6 +12,13 @@ require_once $frameworkRoot . '/vendor/autoload.php';
 
 header('Content-Type: application/json; charset=utf-8');
 
+// Validar método antes que auth
+if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
+    http_response_code(405);
+    echo json_encode(['ok' => false, 'error' => 'Método no permitido. Use POST.']);
+    exit;
+}
+
 // session_start() debe ir antes de cualquier salida
 if (session_status() === PHP_SESSION_NONE) {
     session_start();
@@ -37,12 +44,7 @@ if ($userType !== 'admin' && $userType !== 'creator' && $sessionTenant !== $requ
      exit;
 }
 
-// Solo aceptar POST
-if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
-    http_response_code(405);
-    echo json_encode(['ok' => false, 'error' => 'Método no permitido. Use POST.']);
-    exit;
-}
+// Method already validated above
 
 // Leer parámetros
 $tenantId = trim((string)($_POST['tenant_id'] ?? ''));

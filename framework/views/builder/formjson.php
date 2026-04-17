@@ -12,25 +12,24 @@
         :root {
             --ink: #0f172a;
             --muted: #64748b;
-            --accent: #8b5cf6; /* Unified with Builder purple */
-            --accent-strong: #7c3aed;
-            --accent-warm: #f59e0b;
-            --panel: rgba(255,255,255,0.92);
+            --accent: #0891B2;       /* SUKI cyan-600 */
+            --accent-strong: #0E7490;
+            --accent-warm: #D97706;
+            --panel: #FFFFFF;
             --panel-border: #e2e8f0;
-            --shadow-soft: 0 12px 32px rgba(15,23,42,0.08);
-            
+            --shadow-soft: 0 1px 3px rgba(15,23,42,0.06), 0 4px 16px rgba(15,23,42,0.04);
+
             /* Builder World Tokens for navbar compatibility */
-            --bg: #0a0f1e;
-            --surface: #111827;
-            --surface2: #1a2235;
-            --border: rgba(255,255,255,0.07);
-            --glow: rgba(139, 92, 246, 0.35);
-            --text: #f8fafc;
-            /* --muted: #64748b; already defined */
-            --teal: #14b8a6;
-            --teal-soft: rgba(20,184,166,0.12);
-            --accent-soft: rgba(139,92,246,0.12);
-            --transition: 0.22s cubic-bezier(0.4,0,0.2,1);
+            --bg: #F0F9FF;
+            --surface: #FFFFFF;
+            --surface2: #F1F5F9;
+            --border: #E2E8F0;
+            --glow: rgba(8, 145, 178, 0.15);
+            --text: #0F172A;
+            --teal: #06B6D4;
+            --teal-soft: rgba(6,182,212,0.10);
+            --accent-soft: rgba(8,145,178,0.08);
+            --transition: 0.20s cubic-bezier(0.4,0,0.2,1);
             --font: 'Outfit', 'Inter', system-ui, sans-serif;
         }
         body { font-family: 'Outfit', 'Segoe UI', sans-serif; color: var(--ink); }
@@ -380,7 +379,7 @@
                                 <input x-model="authForm.label" class="w-full border rounded px-2 py-1 text-xs" placeholder="Nombre visible (opcional)">
                                 <div class="flex gap-2">
                                     <button @click="createAuthUser()" class="flex-1 px-2 py-1 text-xs font-bold bg-emerald-600 text-white rounded">Crear login</button>
-                                    <button @click="loginAuthUser()" class="flex-1 px-2 py-1 text-xs font-bold bg-indigo-600 text-white rounded">Login</button>
+                                    <button @click="loginAuthUser()" class="flex-1 px-2 py-1 text-xs font-bold bg-cyan-600 text-white rounded">Login</button>
                                     <button @click="logoutAuthUser()" class="flex-1 px-2 py-1 text-xs font-bold bg-slate-200 text-slate-700 rounded">Salir</button>
                                 </div>
                             </div>
@@ -438,7 +437,7 @@
                     <div class="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                         <div class="flex items-center justify-between mb-2">
                             <h4 class="text-xs font-bold text-gray-600 uppercase">IA - Health check</h4>
-                            <button @click="checkLlmHealth()" class="px-2 py-1 text-[10px] font-bold bg-indigo-600 text-white rounded">Probar IA</button>
+                            <button @click="checkLlmHealth()" class="px-2 py-1 text-[10px] font-bold bg-cyan-600 text-white rounded">Probar IA</button>
                         </div>
                         <div class="text-[11px] text-gray-500 mb-2">Ultima prueba: <span x-text="llmHealth.lastRun || '-'"></span></div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
@@ -678,8 +677,8 @@
                             <div class="flex flex-wrap justify-between items-center mb-2 gap-2">
                                 <h4 class="text-[10px] font-bold text-gray-500 uppercase">Entity preview</h4>
                                 <div class="flex flex-wrap gap-2 text-[10px]">
-                                    <button @click="navigator.clipboard.writeText(buildEntityContract())" class="text-indigo-600 hover:text-indigo-800">Copiar</button>
-                                    <button @click="downloadEntity()" class="text-indigo-600 hover:text-indigo-800">Descargar</button>
+                                    <button @click="navigator.clipboard.writeText(buildEntityContract())" class="text-cyan-600 hover:text-cyan-800">Copiar</button>
+                                    <button @click="downloadEntity()" class="text-cyan-600 hover:text-cyan-800">Descargar</button>
                                     <button @click="saveEntityToServer()" class="text-emerald-700 hover:text-emerald-900 font-semibold">Guardar + migrar</button>
                                     <button @click="generateFormFromEntity()" class="text-orange-700 hover:text-orange-900 font-semibold">Crear formulario</button>
                                 </div>
@@ -835,8 +834,8 @@
                         <div class="flex justify-between items-center mb-2">
                             <h4 class="text-xs font-bold text-gray-600 uppercase">app.manifest.json (preview)</h4>
                             <div class="flex gap-2">
-                                <button @click="navigator.clipboard.writeText(buildManifest())" class="text-xs text-indigo-600 hover:text-indigo-800">Copiar</button>
-                                <button @click="downloadManifest()" class="text-xs text-indigo-600 hover:text-indigo-800">Descargar</button>
+                                <button @click="navigator.clipboard.writeText(buildManifest())" class="text-xs text-cyan-600 hover:text-cyan-800">Copiar</button>
+                                <button @click="downloadManifest()" class="text-xs text-cyan-600 hover:text-cyan-800">Descargar</button>
                             </div>
                         </div>
                         <textarea readonly class="w-full h-56 border rounded p-2 text-xs font-mono bg-gray-50" x-text="buildManifest()"></textarea>
@@ -907,7 +906,7 @@
                         <h4 class="text-xs font-bold text-gray-600 uppercase">Mensaje de prueba</h4>
                         <textarea x-model="chatTest.message" rows="3" class="w-full border rounded p-3 text-sm font-mono" placeholder="crear clientes nombre=&quot;Ana&quot; nit=123"></textarea>
                         <div class="flex flex-wrap gap-2">
-                            <button @click="sendChatMessage()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase rounded shadow">
+                            <button @click="sendChatMessage()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold uppercase rounded shadow">
                                 Enviar mensaje
                             </button>
                             <button @click="runChatSmoke()" class="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold uppercase rounded shadow">
@@ -955,7 +954,7 @@
                                 <button @click="builderTopTab='data'; showDataImport=true" :class="builderTopTab==='data' ? 'bg-slate-800 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
                                     <i class="fa-solid fa-database mr-1"></i> Datos
                                 </button>
-                                <button @click="builderTopTab='reports'" :class="builderTopTab==='reports' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
+                                <button @click="builderTopTab='reports'" :class="builderTopTab==='reports' ? 'bg-cyan-600 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
                                     <i class="fa-solid fa-file-lines mr-1"></i> Informes
                                 </button>
                                 <button @click="builderTopTab='Indicadoress'" :class="builderTopTab==='Indicadoress' ? 'bg-sky-600 text-white' : 'bg-white text-gray-700 border'" class="px-4 py-2 text-xs font-bold uppercase rounded shadow">
@@ -996,7 +995,7 @@
                         <div class="bg-white border border-gray-200 rounded-xl shadow-sm p-4 space-y-3">
                             <div class="flex items-center justify-between">
                                 <h4 class="text-xs font-bold text-gray-600 uppercase">Objetos</h4>
-                                <button @click="selectObject('form')" class="text-[10px] text-indigo-600">Pantalla</button>
+                                <button @click="selectObject('form')" class="text-[10px] text-cyan-600">Pantalla</button>
                             </div>
 
                             <div class="space-y-2 text-xs">
@@ -1151,7 +1150,7 @@
                                                 <div class="text-[10px] text-gray-400" x-text="(dash.widgets || []).length + ' widgets'"></div>
                                             </div>
                                             <div class="flex gap-2">
-                                                <button @click="selectObject('Indicadores', dIndex)" class="text-[10px] text-indigo-600">Editar</button>
+                                                <button @click="selectObject('Indicadores', dIndex)" class="text-[10px] text-cyan-600">Editar</button>
                                                 <button @click="removeIndicadores(dIndex)" class="text-[10px] text-rose-600">Eliminar</button>
                                             </div>
                                         </div>
@@ -1176,7 +1175,7 @@
                                                 <div class="text-[10px] text-gray-400" x-text="rep.type || 'report'"></div>
                                             </div>
                                             <div class="flex gap-2">
-                                                <button @click="previewReport(rIndex)" class="text-[10px] text-indigo-600">Previsualizar</button>
+                                                <button @click="previewReport(rIndex)" class="text-[10px] text-cyan-600">Previsualizar</button>
                                                 <button @click="printReport(rIndex)" class="text-[10px] text-gray-600">Imprimir</button>
                                                 <button @click="exportReportPdf(rIndex)" class="text-[10px] text-gray-600">PDF</button>
                                             </div>
@@ -1268,14 +1267,14 @@
                                         </div>
                                     </div>
                                 </template>
-                                <div class="border rounded-lg p-3 bg-indigo-50 canvas-item" x-show="data.summary.length > 0">
+                                <div class="border rounded-lg p-3 bg-cyan-50 canvas-item" x-show="data.summary.length > 0">
                                     <div class="flex items-center justify-between">
-                                        <div class="text-xs font-semibold text-indigo-900">Totales</div>
+                                        <div class="text-xs font-semibold text-cyan-900">Totales</div>
                                         <i class="fa-solid fa-grip-vertical drag-handle text-[10px]"></i>
                                     </div>
                                     <div class="space-y-1 mt-2">
                                         <template x-for="(sum, sIndex) in data.summary" :key="'prev-sum-'+sIndex">
-                                            <div class="flex justify-between text-[11px] text-indigo-900">
+                                            <div class="flex justify-between text-[11px] text-cyan-900">
                                                 <span x-text="sum.label || sum.name"></span>
                                                 <span>0.00</span>
                                             </div>
@@ -1583,7 +1582,7 @@
                                     </div>
                                     <div class="flex flex-wrap gap-2">
                                         <button @click="addIndicadoresWidget('kpi', selectedObject.index)" class="px-3 py-2 text-[10px] font-bold bg-sky-600 text-white rounded">Agregar KPI</button>
-                                        <button @click="addIndicadoresWidget('chart', selectedObject.index)" class="px-3 py-2 text-[10px] font-bold bg-indigo-600 text-white rounded">Agregar Grafica</button>
+                                        <button @click="addIndicadoresWidget('chart', selectedObject.index)" class="px-3 py-2 text-[10px] font-bold bg-cyan-600 text-white rounded">Agregar Grafica</button>
                                     </div>
                                     <div class="space-y-2">
                                         <template x-for="(widget, wIndex) in (data.Indicadoress[selectedObject.index].widgets || [])" :key="'dash-widget-prop-'+wIndex">
@@ -1649,7 +1648,7 @@
                 </div>
 
                 <div x-show="mainTab === 'forms' && showAdvanced" x-transition.opacity>
-                    <div class="bg-indigo-50 border border-indigo-200 text-indigo-900 rounded-xl p-4 mb-6 text-xs">
+                    <div class="bg-cyan-50 border border-cyan-200 text-cyan-900 rounded-xl p-4 mb-6 text-xs">
                         Estas en opciones tecnicas. Si solo necesitas crear pantallas rapidamente, vuelve a <span class="font-bold">Modo simple</span>.
                     </div>
                 <div x-show="activeTab === 'general'" class="space-y-6 max-w-3xl mx-auto" x-transition.opacity>
@@ -2186,7 +2185,7 @@
                         <div class="bg-gray-50 border rounded-lg p-4 text-xs text-gray-700">
                             <div class="flex justify-between items-center mb-2">
                                 <h4 class="text-[10px] font-bold text-gray-500 uppercase">Resumen DB</h4>
-                                <button @click="navigator.clipboard.writeText(buildEntityContract())" class="text-[10px] text-indigo-600 hover:text-indigo-800">Copiar entity</button>
+                                <button @click="navigator.clipboard.writeText(buildEntityContract())" class="text-[10px] text-cyan-600 hover:text-cyan-800">Copiar entity</button>
                             </div>
                             <div class="grid grid-cols-2 gap-2">
                                 <div><span class="font-semibold">Entidad:</span> <span x-text="(getEntityObject() || {}).name || '-'"></span></div>
@@ -2221,7 +2220,7 @@
                         </div>
 
                         <div class="flex flex-wrap gap-2">
-                            <button @click="downloadView()" class="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold uppercase rounded shadow transition">
+                            <button @click="downloadView()" class="px-4 py-2 bg-cyan-600 hover:bg-cyan-700 text-white text-xs font-bold uppercase rounded shadow transition">
                                 Descargar Vista
                             </button>
                             <button @click="downloadSql()" class="px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white text-xs font-bold uppercase rounded shadow transition">
@@ -2247,12 +2246,12 @@
                         <div class="bg-white border rounded-lg p-4 shadow-sm">
                             <div class="flex justify-between items-center mb-2">
                                 <h4 class="text-xs font-bold text-gray-600 uppercase">Vista Generada</h4>
-                                <button @click="navigator.clipboard.writeText(buildViewTemplate())" class="text-xs text-indigo-600 hover:text-indigo-800">Copiar</button>
+                                <button @click="navigator.clipboard.writeText(buildViewTemplate())" class="text-xs text-cyan-600 hover:text-cyan-800">Copiar</button>
                             </div>
                     <div class="bg-white border rounded-lg p-4 shadow-sm mt-4">
                         <div class="flex justify-between items-center mb-2">
                             <h4 class="text-xs font-bold text-gray-600 uppercase">Entity Contract</h4>
-                            <button @click="navigator.clipboard.writeText(buildEntityContract())" class="text-xs text-indigo-600 hover:text-indigo-800">Copiar</button>
+                            <button @click="navigator.clipboard.writeText(buildEntityContract())" class="text-xs text-cyan-600 hover:text-cyan-800">Copiar</button>
                         </div>
                         <textarea readonly class="w-full h-48 border rounded p-2 text-xs font-mono bg-gray-50" x-text="buildEntityContract()"></textarea>
                     </div>
@@ -2261,7 +2260,7 @@
                         <div class="bg-white border rounded-lg p-4 shadow-sm">
                             <div class="flex justify-between items-center mb-2">
                                 <h4 class="text-xs font-bold text-gray-600 uppercase">SQL Generado</h4>
-                                <button @click="navigator.clipboard.writeText(buildSqlSchema())" class="text-xs text-indigo-600 hover:text-indigo-800">Copiar</button>
+                                <button @click="navigator.clipboard.writeText(buildSqlSchema())" class="text-xs text-cyan-600 hover:text-cyan-800">Copiar</button>
                             </div>
                             <textarea readonly class="w-full h-64 border rounded p-2 text-xs font-mono bg-gray-50" x-text="buildSqlSchema()"></textarea>
                         </div>
@@ -2270,7 +2269,7 @@
                     <div class="bg-white border rounded-lg p-4 shadow-sm mt-4">
                         <div class="flex justify-between items-center mb-2">
                             <h4 class="text-xs font-bold text-gray-600 uppercase">Snippet menu.json</h4>
-                            <button @click="navigator.clipboard.writeText(buildMenuSnippet())" class="text-xs text-indigo-600 hover:text-indigo-800">Copiar</button>
+                            <button @click="navigator.clipboard.writeText(buildMenuSnippet())" class="text-xs text-cyan-600 hover:text-cyan-800">Copiar</button>
                         </div>
                         <textarea readonly class="w-full h-20 border rounded p-2 text-xs font-mono bg-gray-50" x-text="buildMenuSnippet()"></textarea>
                     </div>
@@ -2376,7 +2375,7 @@
                 <div class="flex flex-wrap gap-2">
                     <template x-for="step in guidedSteps" :key="'guided-step-'+step.id">
                         <span class="px-2 py-1 rounded text-[10px] font-bold uppercase"
-                            :class="guidedStep === step.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 text-slate-500'">
+                            :class="guidedStep === step.id ? 'bg-cyan-600 text-white' : 'bg-slate-100 text-slate-500'">
                             <span x-text="step.label"></span>
                         </span>
                     </template>
@@ -2396,7 +2395,7 @@
                         <label class="text-[10px] font-bold text-gray-500 uppercase">Nombre visible</label>
                         <input x-model="data.title" class="w-full border rounded px-3 py-2 text-sm" placeholder="Mi app">
                     </div>
-                    <button @click="applyGuidedTemplate()" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Aplicar plantilla</button>
+                    <button @click="applyGuidedTemplate()" class="px-3 py-2 text-xs font-bold bg-cyan-600 text-white rounded">Aplicar plantilla</button>
                 </div>
 
                 <div x-show="guidedStep === 2" class="space-y-3">
@@ -2438,7 +2437,7 @@
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
                         <input x-model="quickReportLabel" class="border rounded px-2 py-1 text-xs" placeholder="Nombre del documento">
                         <div class="hidden md:block"></div>
-                        <button @click="addQuickReport()" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Agregar documento</button>
+                        <button @click="addQuickReport()" class="px-3 py-2 text-xs font-bold bg-cyan-600 text-white rounded">Agregar documento</button>
                     </div>
                 </div>
 
@@ -2453,7 +2452,7 @@
 
                 <div class="flex items-center justify-between pt-2 border-t">
                     <button @click="prevGuided()" :disabled="guidedStep === 1" class="px-3 py-2 text-xs font-bold bg-slate-100 text-slate-600 rounded disabled:opacity-50">Anterior</button>
-                    <button @click="nextGuided()" :disabled="guidedStep === guidedSteps.length" class="px-3 py-2 text-xs font-bold bg-indigo-600 text-white rounded disabled:opacity-50">Siguiente</button>
+                    <button @click="nextGuided()" :disabled="guidedStep === guidedSteps.length" class="px-3 py-2 text-xs font-bold bg-cyan-600 text-white rounded disabled:opacity-50">Siguiente</button>
                 </div>
             </div>
         </div>
@@ -2567,7 +2566,7 @@
                 <div class="flex flex-wrap gap-2">
                     <button @click="testAlanubeConnection()" class="px-4 py-2 text-xs font-bold bg-slate-800 text-white rounded">Probar conexion</button>
                     <button @click="saveAlanubeIntegration()" class="px-4 py-2 text-xs font-bold bg-emerald-600 text-white rounded">Guardar integracion</button>
-                    <button @click="saveInvoiceContract()" class="px-4 py-2 text-xs font-bold bg-indigo-600 text-white rounded">Crear contrato factura</button>
+                    <button @click="saveInvoiceContract()" class="px-4 py-2 text-xs font-bold bg-cyan-600 text-white rounded">Crear contrato factura</button>
                     <button @click="sendAlanubeSandbox()" class="px-4 py-2 text-xs font-bold bg-amber-600 text-white rounded">Enviar sandbox</button>
                     <button @click="showAlanubeWizard = false" class="px-4 py-2 text-xs font-bold bg-slate-200 text-slate-700 rounded">Cerrar</button>
                 </div>

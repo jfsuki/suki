@@ -51,44 +51,38 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #030712;
-            --glass: rgba(17, 24, 39, 0.7);
-            --border: rgba(255, 255, 255, 0.1);
-            --accent: #22d3ee;
-            --accent-hover: #0891b2;
-            --text: #f9fafb;
-            --text-dim: #9ca3af;
-            --success: #10b981;
+            --bg: #F0F9FF;
+            --card: #FFFFFF;
+            --border: #BAE6FD;
+            --accent: #0891B2;
+            --accent-hover: #0E7490;
+            --text: #0F172A;
+            --text-dim: #64748B;
+            --success: #059669;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Inter', sans-serif;
-            background-color: var(--bg);
+            background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 50%, #CFFAFE 100%);
             color: var(--text);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 40px 20px;
-            background: 
-                radial-gradient(circle at 0% 0%, rgba(34, 211, 238, 0.15), transparent 40%),
-                radial-gradient(circle at 100% 100%, rgba(30, 27, 75, 0.4), transparent 40%),
-                var(--bg);
         }
 
         .auth-card {
-            background: var(--glass);
-            backdrop-filter: blur(24px);
-            -webkit-backdrop-filter: blur(24px);
+            background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 28px;
+            border-radius: 20px;
             padding: 48px;
             width: 100%;
             max-width: 580px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.7);
-            animation: fadeIn 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 4px 6px rgba(8,145,178,0.06), 0 20px 40px rgba(15,23,42,0.10);
+            animation: fadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         @keyframes fadeIn {
@@ -97,8 +91,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .logo-area { text-align: center; margin-bottom: 40px; }
-        h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.04em; margin-bottom: 12px; background: linear-gradient(to right, #fff, #94a3b8); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
-        p.subtitle { color: var(--text-dim); font-size: 15px; margin-bottom: 32px; font-weight: 300; }
+        h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.03em; margin-bottom: 12px; color: var(--text); }
+        p.subtitle { color: var(--text-dim); font-size: 14px; margin-bottom: 32px; font-weight: 400; }
 
         .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
         @media (max-width: 480px) { .form-grid { grid-template-columns: 1fr; } }
@@ -110,66 +104,68 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         input, textarea, select {
             width: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            border: 1px solid var(--border);
-            border-radius: 14px;
-            padding: 14px 18px;
-            color: white;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
+            padding: 12px 16px;
+            color: var(--text);
             font-size: 15px;
+            font-family: inherit;
             outline: none;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transition: all 0.2s;
         }
-        input:focus { border-color: var(--accent); box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.1); background: rgba(0, 0, 0, 0.6); }
+        input:focus, textarea:focus { border-color: var(--accent); background: #FFFFFF; box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.12); }
 
         .file-upload {
-            border: 2px dashed var(--border);
-            padding: 30px;
-            border-radius: 16px;
+            border: 1px dashed #BAE6FD;
+            padding: 28px;
+            border-radius: 10px;
             text-align: center;
             cursor: pointer;
-            transition: all 0.3s ease;
-            background: rgba(255, 255, 255, 0.02);
+            transition: all 0.2s;
+            background: #F8FAFC;
+            color: var(--text-dim);
         }
-        .file-upload:hover { border-color: var(--accent); background: rgba(34, 211, 238, 0.05); transform: translateY(-2px); }
+        .file-upload:hover { border-color: var(--accent); background: rgba(8,145,178,0.04); color: var(--accent); }
 
         .btn-primary {
             width: 100%;
-            background: linear-gradient(135deg, var(--accent), #06b6d4);
-            color: #000;
+            background: var(--accent);
+            color: #fff;
             border: none;
-            border-radius: 14px;
-            padding: 18px;
-            font-size: 16px;
+            border-radius: 10px;
+            padding: 16px;
+            font-size: 15px;
             font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s;
-            box-shadow: 0 10px 15px -3px rgba(34, 211, 238, 0.3);
+            transition: all 0.2s;
             margin-top: 20px;
+            letter-spacing: 0.02em;
         }
-        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 20px 25px -5px rgba(34, 211, 238, 0.4); filter: brightness(1.1); }
+        .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 8px 20px rgba(8,145,178,0.25); }
 
-        .error-msg { background: rgba(239, 68, 68, 0.1); border: 1px solid rgba(239, 68, 68, 0.3); color: #fca5a5; padding: 16px; border-radius: 16px; font-size: 14px; margin-bottom: 24px; text-align: center; }
+        .error-msg { background: rgba(239,68,68,0.06); border: 1px solid rgba(239,68,68,0.25); color: #B91C1C; padding: 14px; border-radius: 10px; font-size: 14px; margin-bottom: 22px; text-align: center; }
         
         .detection-card {
-            background: rgba(16, 185, 129, 0.05);
-            border: 1px solid rgba(16, 185, 129, 0.2);
-            border-radius: 20px;
+            background: rgba(5, 150, 105, 0.06);
+            border: 1px solid rgba(5, 150, 105, 0.25);
+            border-radius: 12px;
             padding: 24px;
-            margin-bottom: 30px;
-            animation: slideIn 0.5s ease-out;
+            margin-bottom: 28px;
+            animation: slideIn 0.4s ease-out;
         }
         @keyframes slideIn { from { opacity: 0; transform: scale(0.95); } to { opacity: 1; transform: scale(1); } }
 
-        .detection-card h3 { color: var(--success); font-size: 16px; margin-bottom: 16px; display: flex; align-items: center; gap: 8px; }
+        .detection-card h3 { color: var(--success); font-size: 15px; margin-bottom: 14px; display: flex; align-items: center; gap: 8px; }
         .detection-item { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 13px; }
         .detection-label { color: var(--text-dim); }
-        .detection-val { font-weight: 600; color: #fff; }
+        .detection-val { font-weight: 600; color: var(--text); }
 
         .footer-links { margin-top: 32px; text-align: center; font-size: 14px; color: var(--text-dim); }
         .footer-links a { color: var(--accent); text-decoration: none; font-weight: 600; transition: color 0.2s; }
-        .footer-links a:hover { color: #fff; }
+        .footer-links a:hover { color: var(--accent-hover); text-decoration: underline; }
 
-        .alert-box { font-size: 11px; background: rgba(251, 191, 36, 0.05); color: #fbbf24; padding: 12px; border-radius: 10px; margin-top: 12px; border: 1px solid rgba(251, 191, 36, 0.1); }
+        .alert-box { font-size: 11px; background: rgba(217,119,6,0.06); color: #92400E; padding: 10px 12px; border-radius: 8px; margin-top: 10px; border: 1px solid rgba(217,119,6,0.20); }
     </style>
 </head>
 <body>
@@ -245,7 +241,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php endif; ?>
 
         <div class="footer-links">
-            ¿Ya tienes una empresa registrada? <a href="login.php">Iniciar Sesión</a>
+            ¿Ya tienes una empresa registrada? <a href="login">Iniciar Sesión</a>
         </div>
     </div>
 

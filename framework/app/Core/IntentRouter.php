@@ -2502,7 +2502,13 @@ final class IntentRouter
             || str_starts_with($selectedName, 'usage_')
             || str_starts_with($selectedName, 'agent_')
             || str_starts_with($selectedName, 'agentops_')
-            || in_array($selectedName, ['entity_search', 'entity_resolve'], true);
+            || in_array($selectedName, ['entity_search', 'entity_resolve'], true)
+            || in_array($selectedName, [
+                'create_task', 'list_pending_tasks', 'update_task_status',
+                'create_reminder', 'list_reminders', 'update_reminder_status',
+                'create_alert', 'list_alerts', 'update_alert_status',
+                'fetch_pending_operational_items',
+            ], true);
     }
 
     /**

@@ -46,10 +46,12 @@ $coreHandler = function (
     ];
 };
 
+$stateOnboarding = ['active_task' => 'builder_onboarding'];
+$profileEmpty = [];
 $listResult = $flow->handle(
     'que formularios?',
-    ['active_task' => 'builder_onboarding'],
-    [],
+    $stateOnboarding,
+    $profileEmpty,
     'default',
     'test',
     $baseOps,
@@ -64,10 +66,12 @@ $playbookOps['classifyWithPlaybookIntents'] = fn(string $text, array $profile): 
     'action' => 'APPLY_PLAYBOOK_FERRETERIA',
     'confidence' => 0.95,
 ];
+$statePlaybook = ['active_task' => 'builder_onboarding'];
+$profilePlaybook = [];
 $playbookResult = $flow->handle(
     'tengo una ferreteria y pierdo plata',
-    ['active_task' => 'builder_onboarding'],
-    [],
+    $statePlaybook,
+    $profilePlaybook,
     'default',
     'test',
     $playbookOps,
@@ -77,10 +81,12 @@ if ($playbookResult !== null) {
     $failures[] = 'Expected null when playbook intent should bypass onboarding.';
 }
 
+$stateEmpty1 = [];
+$profileEmpty1 = [];
 $businessHintOnlyResult = $flow->handle(
     'tengo una ferreteria',
-    [],
-    [],
+    $stateEmpty1,
+    $profileEmpty1,
     'default',
     'test',
     $baseOps,
@@ -90,10 +96,12 @@ if ($businessHintOnlyResult !== null) {
     $failures[] = 'Business hint alone should not enter builder onboarding.';
 }
 
+$stateDelegated = ['active_task' => 'builder_onboarding'];
+$profileDelegated = [];
 $delegatedResult = $flow->handle(
     'quiero crear una app',
-    ['active_task' => 'builder_onboarding'],
-    [],
+    $stateDelegated,
+    $profileDelegated,
     'default',
     'test',
     $baseOps,

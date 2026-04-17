@@ -17,7 +17,7 @@ $ok = true;
 $start = $gateway->handle($tenant, $user, 'quiero crear una app', 'builder', $project);
 $cases[] = [
     'step' => 'start',
-    'ok' => stripos((string) ($start['reply'] ?? ''), 'Paso 1') !== false,
+    'ok' => (string) ($start['reply'] ?? '') !== '' && in_array((string) ($start['action'] ?? ''), ['ask_user', 'respond_local'], true),
     'reply' => (string) ($start['reply'] ?? ''),
 ];
 

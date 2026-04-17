@@ -318,8 +318,8 @@ Chat Input
 ```bash
 SEMANTIC_MEMORY_ENABLED=true       # o auto-detect
 QDRANT_URL=http://localhost:6334   # IP del servidor Qdrant
-QDRANT_API_KEY=...                 # Auth key
-GEMINI_API_KEY=...                 # Para embeddings
+QDRANT_API_KEY=<your_qdrant_api_key>   # Auth key
+GEMINI_API_KEY=<your_gemini_api_key>   # Para embeddings
 ```
 
 **Estado Actual**: 

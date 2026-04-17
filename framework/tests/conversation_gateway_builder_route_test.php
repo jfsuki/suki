@@ -32,13 +32,15 @@ try {
     $projectId = 'default';
     $profileUserKey = $projectId . '__builder__' . $userId;
 
+    // loadState uses getUserMemory(tenantId, userId, "state::{projectId}::{mode}")
+    // getProfile uses getUserMemory(tenantId, profileKey, "profile")
     $memory->saveUserMemory($tenantId, $profileUserKey, 'profile', [
         'business_type' => 'ferreteria_minorista',
         'operation_model' => 'mixto',
         'needs_scope' => 'inventario, facturacion',
         'documents_scope' => 'factura, cotizacion',
     ]);
-    $memory->saveUserMemory($tenantId, $userId, 'state::default::builder', [
+    $memory->saveUserMemory($tenantId, $userId, "state::{$projectId}::builder", [
         'active_task' => null,
         'onboarding_step' => 'plan_ready',
         'missing' => [],

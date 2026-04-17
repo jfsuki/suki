@@ -11,32 +11,32 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   
   <style>
-    /* ─── BUILDER WORLD TOKENS ────────────────────────────────── */
+    /* ─── BUILDER WORLD TOKENS — SUKI White Cyan Corporate ─────── */
     :root {
-      --bg:            #0a0f1e;
-      --surface:       #111827;
-      --surface2:      #1a2235;
-      --border:        rgba(255,255,255,0.07);
-      --glow:          rgba(139, 92, 246, 0.35);
-      --text:          #e2e8f0;
-      --muted:         #64748b;
-      --accent:        #8b5cf6;
-      --accent-soft:   rgba(139,92,246,0.12);
-      --teal:          #14b8a6;
-      --teal-soft:     rgba(20,184,166,0.12);
-      --danger:        #ef4444;
-      --success:       #22c55e;
-      --warn:          #f59e0b;
-      --radius:        14px;
+      --bg:            #F0F9FF;
+      --surface:       #FFFFFF;
+      --surface2:      #F1F5F9;
+      --border:        #E2E8F0;
+      --glow:          rgba(8,145,178,0.15);
+      --text:          #0F172A;
+      --muted:         #64748B;
+      --accent:        #0891B2;
+      --accent-soft:   rgba(8,145,178,0.08);
+      --teal:          #06B6D4;
+      --teal-soft:     rgba(6,182,212,0.10);
+      --danger:        #EF4444;
+      --success:       #059669;
+      --warn:          #D97706;
+      --radius:        12px;
       --radius-sm:     8px;
-      --shadow:        0 20px 60px rgba(0,0,0,0.5);
+      --shadow:        0 1px 3px rgba(15,23,42,0.06), 0 4px 16px rgba(15,23,42,0.04);
       --font:          'Inter', system-ui, sans-serif;
-      --transition:    0.22s cubic-bezier(0.4,0,0.2,1);
+      --transition:    0.20s cubic-bezier(0.4,0,0.2,1);
     }
-    
+
     * { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; }
-    
+
     body {
       font-family: var(--font);
       background: var(--bg);
@@ -45,8 +45,8 @@
       flex-direction: column;
       overflow: hidden;
       background-image:
-        radial-gradient(ellipse 80% 60% at 10% -10%, rgba(139,92,246,0.18) 0%, transparent 60%),
-        radial-gradient(ellipse 60% 40% at 90% 110%, rgba(20,184,166,0.12) 0%, transparent 50%);
+        radial-gradient(ellipse 80% 60% at 10% -10%, rgba(8,145,178,0.06) 0%, transparent 60%),
+        radial-gradient(ellipse 60% 40% at 90% 110%, rgba(6,182,212,0.04) 0%, transparent 50%);
     }
 
     /* Standardized Builder layout utilities */

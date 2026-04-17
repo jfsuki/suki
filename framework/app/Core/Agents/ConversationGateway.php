@@ -224,18 +224,31 @@ class ConversationGateway
         array $trace
     ): void
     {
-        // Snapshot logic for production readiness
         $trace['tenant_id'] = $tenantId;
         $trace['user_id'] = $userId;
         $trace['project_id'] = $projectId;
         $trace['mode'] = $mode;
         $trace['ts'] = $trace['ts'] ?? date('c');
 
+        // Persist trace to user memory state for retrieval
+        if ($this->memory !== null) {
+            $stateKey = 'state::' . $projectId . '::' . $mode;
+            $state = $this->memory->getUserMemory($tenantId, $userId, $stateKey, []);
+            $state['agentops_last_trace'] = $trace;
+            if (!empty($trace['task_id'])) {
+                $state['control_tower_last_task'] = [
+                    'task_id' => $trace['task_id'],
+                    'conversation_id' => $trace['conversation_id'] ?? null,
+                    'updated_at' => $trace['ts'],
+                ];
+            }
+            $this->memory->saveUserMemory($tenantId, $userId, $stateKey, $state);
+        }
+
         $logDir = defined('APP_ROOT') ? APP_ROOT . '/storage/logs/agentops' : sys_get_temp_dir();
         if (!is_dir($logDir)) {
             @mkdir($logDir, 0775, true);
         }
-        
         $logFile = $logDir . '/trace_' . date('Y-m-d') . '.jsonl';
         @file_put_contents(
             $logFile,

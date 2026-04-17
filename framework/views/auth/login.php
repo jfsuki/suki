@@ -47,41 +47,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #030712;
-            --glass: rgba(17, 24, 39, 0.7);
-            --border: rgba(255, 255, 255, 0.1);
-            --accent: #22d3ee;
-            --accent-hover: #0891b2;
-            --text: #f9fafb;
-            --text-dim: #9ca3af;
+            --bg: #F0F9FF;
+            --card: #FFFFFF;
+            --border: #BAE6FD;
+            --accent: #0891B2;
+            --accent-hover: #0E7490;
+            --text: #0F172A;
+            --text-dim: #64748B;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Inter', sans-serif;
-            background-color: var(--bg);
+            background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 50%, #CFFAFE 100%);
             color: var(--text);
             height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             overflow: hidden;
-            background: radial-gradient(circle at top right, #1e1b4b, transparent),
-                        radial-gradient(circle at bottom left, #0f172a, transparent);
         }
 
         .auth-card {
-            background: var(--glass);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
+            background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 24px;
+            border-radius: 20px;
             padding: 40px;
             width: 100%;
             max-width: 420px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            animation: fadeIn 0.6s ease-out;
+            box-shadow: 0 4px 6px rgba(8,145,178,0.06), 0 20px 40px rgba(15,23,42,0.10);
+            animation: fadeIn 0.5s ease-out;
         }
 
         @keyframes fadeIn {
@@ -120,46 +116,52 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         label {
             display: block;
-            font-size: 13px;
+            font-size: 12px;
             font-weight: 600;
-            margin-bottom: 8px;
+            margin-bottom: 6px;
             color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
         }
 
         input {
             width: 100%;
-            background: rgba(0, 0, 0, 0.3);
-            border: 1px solid var(--border);
-            border-radius: 12px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
             padding: 12px 16px;
-            color: white;
+            color: var(--text);
             font-size: 15px;
             transition: all 0.2s;
             outline: none;
+            font-family: 'Inter', sans-serif;
         }
 
         input:focus {
             border-color: var(--accent);
-            box-shadow: 0 0 0 4px rgba(34, 211, 238, 0.1);
+            background: #FFFFFF;
+            box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.12);
         }
 
         .btn-primary {
             width: 100%;
             background: var(--accent);
-            color: #000;
+            color: #fff;
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
             padding: 14px;
             font-size: 15px;
-            font-weight: 700;
+            font-weight: 600;
             cursor: pointer;
-            transition: transform 0.2s, background 0.2s;
+            transition: transform 0.2s, background 0.2s, box-shadow 0.2s;
             margin-top: 10px;
+            letter-spacing: 0.01em;
         }
 
         .btn-primary:hover {
             background: var(--accent-hover);
             transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(8,145,178,0.25);
         }
 
         .btn-primary:active {
@@ -167,11 +169,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         }
 
         .error-msg {
-            background: rgba(239, 68, 68, 0.2);
-            border: 1px solid rgba(239, 68, 68, 0.4);
-            color: #fca5a5;
+            background: rgba(239, 68, 68, 0.06);
+            border: 1px solid rgba(239, 68, 68, 0.25);
+            color: #B91C1C;
             padding: 12px;
-            border-radius: 12px;
+            border-radius: 10px;
             font-size: 14px;
             margin-bottom: 20px;
             text-align: center;
@@ -236,7 +238,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         </form>
 
         <div class="footer-links">
-            ¿Aún no tienes cuenta? <a href="register.php">Registrarse ahora</a>
+            ¿Aún no tienes cuenta? <a href="register">Registrarse ahora</a>
         </div>
 
         <div style="text-align: center;">

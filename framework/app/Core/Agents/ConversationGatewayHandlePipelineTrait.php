@@ -19,7 +19,7 @@ trait ConversationGatewayHandlePipelineTrait
         $this->contextTenantId = $tenantId;
         $this->contextUserId = $userId;
         $this->contextSessionId = $this->sessionKey($tenantId, $this->contextProjectId, $mode, $userId);
-        $this->contextProfileUser = $this->profileUserKey($tenantId, $this->contextProjectId, $userId);
+        $this->contextProfileUser = $this->profileUserKey($tenantId, $this->contextProjectId, $userId, $mode);
         $this->scopedEntityNamesCache = null;
         $this->scopedFormNamesCache = null;
 
@@ -131,7 +131,7 @@ trait ConversationGatewayHandlePipelineTrait
             $state['builder_plan'] = null;
             if ($mustClearBusinessProfile) {
                 $profile = $this->resetBuilderBusinessProfile($profile);
-                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $profile);
+                $this->saveProfile($tenantId, $this->contextProfileUser, $profile);
             }
 
             $reply = 'Entendido. A que se dedica tu negocio?';
@@ -166,26 +166,58 @@ trait ConversationGatewayHandlePipelineTrait
             );
         }
 
+        // Flow control (cancel/resume) must be evaluated BEFORE onboarding so that
+        // meta-commands can interrupt any active task, including builder_onboarding.
+        $flowControlRoute = $this->routeFlowControl($normalizedBase, $state, $profile, $mode, $tenantId, $userId);
+        if (!empty($flowControlRoute)) {
+            $reply = (string) ($flowControlRoute['reply'] ?? 'Listo.');
+            $state = $this->updateState(
+                $state,
+                $raw,
+                $reply,
+                (string) ($flowControlRoute['intent'] ?? 'flow_control'),
+                $flowControlRoute['entity'] ?? null,
+                $flowControlRoute['collected'] ?? [],
+                $flowControlRoute['active_task'] ?? ($state['active_task'] ?? null)
+            );
+            if (!empty($flowControlRoute['state_patch']) && is_array($flowControlRoute['state_patch'])) {
+                foreach ($flowControlRoute['state_patch'] as $key => $value) {
+                    $state[$key] = $value;
+                }
+            }
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result(
+                (string) ($flowControlRoute['action'] ?? 'respond_local'),
+                $reply,
+                null,
+                null,
+                $state,
+                $this->telemetry('flow_control', true, $flowControlRoute)
+            );
+        }
+
         // Authoritative Onboarding Orchestrator (Neuron IA / Layer 3)
-        if ($mode === 'builder' && ($state['active_task'] ?? '') === 'builder_onboarding') {
+        if ($mode === 'builder' && in_array((string) ($state['active_task'] ?? ''), ['builder_onboarding', 'unknown_business_discovery'], true)) {
+            $isUnknownDiscoveryActive = (string) ($state['active_task'] ?? '') === 'unknown_business_discovery';
             $currentStep = $state['onboarding_step'] ?? 'business_type';
-            $fastPath = $this->builderFastPath(
+            $fastPath = !$isUnknownDiscoveryActive ? $this->builderFastPath(
                 $raw,
                 $currentStep,
                 $profile,
                 $state,
                 $this->builderAllowedValuesForStep($currentStep, $profile, $state)
-            );
+            ) : ['confidence' => 0];
 
-            // If Agent is confident, take the fast path
-            if (($fastPath['confidence'] ?? 0) >= 0.6) {
+            // If Agent is confident, take the fast path (only for normal onboarding,
+            // and NOT for business_type step which requires unknown-business detection logic).
+            if (!$isUnknownDiscoveryActive && $currentStep !== 'business_type' && ($fastPath['confidence'] ?? 0) >= 0.6) {
                 if (!empty($fastPath['mapped_fields'])) {
                     foreach ($fastPath['mapped_fields'] as $f => $v) {
                         $profile[$f] = is_array($v) ? $v : (string)$v;
                     }
-                    $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $profile);
+                    $this->saveProfile($tenantId, $this->contextProfileUser, $profile);
                 }
-                
+
                 $onboarding = [
                     'action' => 'respond_local',
                     'reply' => $fastPath['reply'],
@@ -194,7 +226,7 @@ trait ConversationGatewayHandlePipelineTrait
                 ];
                 $onboarding['state']['onboarding_step'] = $this->resolveBuilderOnboardingStep($profile, $state);
             } else {
-                // Heuristic Fallback
+                // Heuristic Fallback (or unknown_business_discovery path)
                 $onboarding = $this->handleBuilderOnboarding($tenantId, $userId, $normalizedBase, $profile, $state);
             }
 
@@ -215,13 +247,34 @@ trait ConversationGatewayHandlePipelineTrait
                 if (isset($onboarding['profile']) && is_array($onboarding['profile'])) {
                     $profile = array_merge($profile, $onboarding['profile']);
                 }
-                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $profile);
+                $this->saveProfile($tenantId, $this->contextProfileUser, $profile);
                 return $this->result($action, $reply, null, null, $nextState, $this->telemetry('builder_onboarding', true));
             }
         }
 
 
-        if ($mode === 'builder' && $this->isAmbiguousBuilderCreateRequest($normalizedBase)) {
+        // Mode guard: block schema ops in app mode and CRUD ops in builder mode.
+        // Must run before ambiguous-create, fast-paths, and training routes.
+        {
+            $isPlaybookReq = !empty($this->parseInstallPlaybookRequest($normalizedBase)['matched']);
+            $mgDecision = $this->modeGuardPolicy->evaluate(
+                $mode,
+                $this->hasBuildSignals($normalizedBase),
+                $this->hasRuntimeCrudSignals($normalizedBase),
+                $isPlaybookReq
+            );
+            if (is_array($mgDecision)) {
+                $mgReply = (string) ($mgDecision['reply'] ?? '');
+                $mgTel   = (string) ($mgDecision['telemetry'] ?? 'mode_guard');
+                $state = $this->updateState($state, $raw, $mgReply, null, null, [], null);
+                $this->saveState($tenantId, $userId, $state);
+                return $this->result('respond_local', $mgReply, null, null, $state, $this->telemetry($mgTel, true));
+            }
+        }
+
+        // Skip ambiguous create handler if onboarding is already complete — let it fall through to LLM
+        $builderOnboardingDone = (string) ($state['onboarding_step'] ?? '') === 'plan_ready';
+        if ($mode === 'builder' && !$builderOnboardingDone && $this->isAmbiguousBuilderCreateRequest($normalizedBase)) {
             if (
                 !empty($state['builder_pending_command'])
                 || in_array((string) ($state['active_task'] ?? ''), ['create_table', 'create_form', 'crud'], true)
@@ -257,7 +310,7 @@ trait ConversationGatewayHandlePipelineTrait
                        $profile['documents_scope'] = implode(', ', (array)$v);
                    }
                 }
-                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $profile);
+                $this->saveProfile($tenantId, $this->contextProfileUser, $profile);
             }
 
             $reply = (string) ($fastPath['reply'] ?: '¿En qué puedo ayudarte con tu negocio?');
@@ -364,34 +417,6 @@ trait ConversationGatewayHandlePipelineTrait
                 null,
                 $state,
                 $this->telemetry('flow_expiry', true, $flowExpiryRoute)
-            );
-        }
-
-        $flowControlRoute = $this->routeFlowControl($normalizedBase, $state, $profile, $mode, $tenantId, $userId);
-        if (!empty($flowControlRoute)) {
-            $reply = (string) ($flowControlRoute['reply'] ?? 'Listo.');
-            $state = $this->updateState(
-                $state,
-                $raw,
-                $reply,
-                (string) ($flowControlRoute['intent'] ?? 'flow_control'),
-                $flowControlRoute['entity'] ?? null,
-                $flowControlRoute['collected'] ?? [],
-                $flowControlRoute['active_task'] ?? ($state['active_task'] ?? null)
-            );
-            if (!empty($flowControlRoute['state_patch']) && is_array($flowControlRoute['state_patch'])) {
-                foreach ($flowControlRoute['state_patch'] as $key => $value) {
-                    $state[$key] = $value;
-                }
-            }
-            $this->saveState($tenantId, $userId, $state);
-            return $this->result(
-                (string) ($flowControlRoute['action'] ?? 'respond_local'),
-                $reply,
-                null,
-                null,
-                $state,
-                $this->telemetry('flow_control', true, $flowControlRoute)
             );
         }
 
@@ -766,6 +791,15 @@ trait ConversationGatewayHandlePipelineTrait
         ) {
             $trainingRoute = [];
         }
+        // When builder profile is complete (plan_ready) and no active task, training routes should yield to LLM
+        if (
+            $mode === 'builder'
+            && $builderOnboardingDone
+            && empty($state['active_task'])
+            && empty($state['builder_pending_command'])
+        ) {
+            $trainingRoute = [];
+        }
         if (!empty($trainingRoute)) {
             $reply = $trainingRoute['reply'] ?? '';
             if (($trainingRoute['action'] ?? '') === 'ask_user') {
@@ -838,21 +872,6 @@ trait ConversationGatewayHandlePipelineTrait
         }
 
         $classification = $this->classify($normalized);
-
-        $isPlaybookBuilderRequest = !empty($this->parseInstallPlaybookRequest($normalized)['matched']);
-        $modeGuardDecision = $this->modeGuardPolicy->evaluate(
-            $mode,
-            $this->hasBuildSignals($normalized),
-            $this->hasRuntimeCrudSignals($normalized),
-            $isPlaybookBuilderRequest
-        );
-        if (is_array($modeGuardDecision)) {
-            $reply = (string) ($modeGuardDecision['reply'] ?? '');
-            $telemetry = (string) ($modeGuardDecision['telemetry'] ?? 'mode_guard');
-            $state = $this->updateState($state, $raw, $reply, null, null, [], null);
-            $this->saveState($tenantId, $userId, $state);
-            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry($telemetry, true));
-        }
 
         if ($mode === 'builder') {
             $build = $this->parseBuild($normalized, $state, $profile);
@@ -964,6 +983,7 @@ trait ConversationGatewayHandlePipelineTrait
         $state = $this->updateState($state, $raw, '', $capsule['intent'] ?? null, $capsule['entity'] ?? null, $capsule['state']['collected'] ?? [], $state['active_task'] ?? null);
         $this->saveState($tenantId, $userId, $state);
         $telemetry = $this->telemetry('llm', false);
+        $telemetry['classification'] = 'llm';
         if ($mode === 'builder') {
             $telemetry['builder_normal_flow'] = true;
             $telemetry['builder_fallback_disabled'] = true;

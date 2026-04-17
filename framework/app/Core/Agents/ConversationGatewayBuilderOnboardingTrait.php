@@ -131,13 +131,15 @@ trait ConversationGatewayBuilderOnboardingTrait
             $input = strtolower($this->normalize($text));
             $found = [];
             if (str_contains($input, 'factura')) $found[] = 'facturas';
+            if (str_contains($input, 'cotizaci')) $found[] = 'cotizaciones';
             if (str_contains($input, 'recibo')) $found[] = 'recibos';
             if (str_contains($input, 'ticket')) $found[] = 'tickets';
             if (str_contains($input, 'orden')) $found[] = 'ordenes';
             if (!empty($found)) {
                 $localProfile['documents_scope'] = implode(', ', $found);
                 $localProfile['documents_scope_items'] = $found;
-                $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
+                $currentStep = $this->resolveBuilderOnboardingStep($localProfile, $localState);
+                $localState['onboarding_step'] = $currentStep;
                 error_log("DETECT_LOCAL_DOCS: " . implode(',', $found));
             }
         }
@@ -161,7 +163,7 @@ trait ConversationGatewayBuilderOnboardingTrait
             $localState['resolution_attempts'] = 0;
         }
 
-        if ($this->isBuilderUserFrustrated($text)) {
+        if ($this->isBuilderUserFrustrated($text) && (string) ($localState['active_task'] ?? '') !== 'unknown_business_discovery') {
             $assist = $this->clarifyBuilderStepViaLlm($text, $currentStep, $localProfile, $localState);
             $localState['active_task'] = 'builder_onboarding';
             $localState['onboarding_step'] = $currentStep;
@@ -226,7 +228,7 @@ trait ConversationGatewayBuilderOnboardingTrait
                     $localProfile['documents_scope'] = implode(', ', $docsList);
                 }
                 unset($localProfile['business_candidate']);
-                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
 
                 $localState['proposed_profile'] = $dynamicKey;
                 $localState['dynamic_playbook'] = $proposal;
@@ -273,15 +275,6 @@ trait ConversationGatewayBuilderOnboardingTrait
         $name = $this->extractPersonName($text);
         if ($name !== '') {
             $localProfile['owner_name'] = $name;
-            // 2.3.1 PERSISTENCIA ESTRATÉGICA: Guardar nombre en el manifiesto del proyecto (Identidad Cruzada)
-            if (($localState['active_task'] ?? '') === 'builder_onboarding' || $isOnboarding) {
-                try {
-                    $registry = new \App\Core\ProjectRegistry();
-                    $registry->updateProjectManifest(['creator' => $name]);
-                } catch (\Throwable $e) {
-                    error_log("FALLO_PERSISTENCIA_CREADOR: " . $e->getMessage());
-                }
-            }
         }
 
         $existingBusinessType = (string) ($localProfile['business_type'] ?? '');
@@ -292,8 +285,12 @@ trait ConversationGatewayBuilderOnboardingTrait
             unset($localProfile['business_type']);
             $localState['proposed_profile'] = null;
         }
+        // "no soy [X]": user explicitly rejects detected type — do not treat X as the new business
+        if ($business !== '' && preg_match('/\bno\s+soy\b/u', $this->normalize($text)) === 1) {
+            $business = '';
+        }
         $businessShiftSignal = $this->shouldReprofileBusiness($text, $existingBusinessType, $business, $currentStep);
-        $explicitBusinessChange = preg_match('/\b(cambiar|cambia|otro negocio|nuevo negocio|no soy|soy una|soy un|fabrico|me dedico)\b/u', $text) === 1
+        $explicitBusinessChange = preg_match('/\b(cambiar|cambia|otro negocio|nuevo negocio|soy una|soy un|fabrico|me dedico)\b/u', $text) === 1
             || $businessShiftSignal;
         $explicitBusinessRejection = $this->isBusinessTypeRejectedByUser($text, $existingBusinessType);
         $businessResolvedNote = '';
@@ -396,7 +393,7 @@ trait ConversationGatewayBuilderOnboardingTrait
         }
 
         if (!empty($localProfile)) {
-            $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+            $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
         }
 
         $owner = (string) ($localProfile['owner_name'] ?? '');
@@ -404,7 +401,7 @@ trait ConversationGatewayBuilderOnboardingTrait
         if (in_array($businessType, ['mixto', 'contado', 'credito'], true)) {
             $businessType = '';
             unset($localProfile['business_type']);
-            $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+            $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
         }
         $businessCandidate = trim((string) ($localProfile['business_candidate'] ?? ''));
         $llmThreshold = (float) ($unknownProtocol['llm_confidence_threshold'] ?? 0.85);
@@ -462,7 +459,7 @@ trait ConversationGatewayBuilderOnboardingTrait
                     if ($unknownDiscoveryNote !== '') {
                         $businessResolvedNote = $unknownDiscoveryNote . "\n" . $businessResolvedNote;
                     }
-                    $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                    $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
                 }
             } elseif ($status === 'NEW_BUSINESS') {
                 $needsList = is_array($resolution['needs_normalized'] ?? null)
@@ -575,7 +572,7 @@ trait ConversationGatewayBuilderOnboardingTrait
                 $businessType = $mappedBusinessType;
                 $businessResolvedNote = 'Entendi tu negocio como "' . $this->domainLabelByBusinessType($mappedBusinessType) . '".'
                     . ' Si no es correcto, dime: "no, cambiemos el tipo de negocio".';
-                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
             } elseif ($assist !== null) {
                 $localState['active_task'] = 'builder_onboarding';
                 $localState['onboarding_step'] = 'business_type';
@@ -647,7 +644,7 @@ trait ConversationGatewayBuilderOnboardingTrait
                 if ($mappedOperationModel !== '') {
                     $localProfile['operation_model'] = $mappedOperationModel;
                     $operationModel = $mappedOperationModel;
-                    $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                    $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
                 } else {
                     $localState['active_task'] = 'builder_onboarding';
                     $localState['onboarding_step'] = 'operation_model';
@@ -687,7 +684,7 @@ trait ConversationGatewayBuilderOnboardingTrait
                     $captured[] = 'documentos';
                 }
                 if (!empty($captured)) {
-                    $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                    $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
                 }
                 $localState['active_task'] = 'builder_onboarding';
                 $localState['onboarding_step'] = 'operation_model';
@@ -717,7 +714,7 @@ trait ConversationGatewayBuilderOnboardingTrait
             $needsItems = !empty($needsItemsDetected) ? $needsItemsDetected : $this->extractNeedItems($text, $businessType);
             if ($this->isReferenceToPreviousScope($text) && !empty($localProfile['needs_scope'])) {
                 $localProfile['needs_scope'] = (string) $localProfile['needs_scope'];
-                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
             } elseif ($this->isOnboardingMetaAnswer($text) && empty($needsItems)) {
                 $reply = 'En este paso necesito que me digas que quieres controlar primero.' . "\n"
                     . 'Ejemplo: ' . $this->buildNeedsScopeExample($businessType, $localProfile) . '.';
@@ -725,7 +722,7 @@ trait ConversationGatewayBuilderOnboardingTrait
             } elseif (!empty($needsItems)) {
                 $localProfile['needs_scope_items'] = $needsItems;
                 $localProfile['needs_scope'] = implode(', ', $needsItems);
-                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
             } elseif ($this->shouldEscalateUnusableBuilderScopeAnswer($text, [])) {
                 $assist = $this->clarifyBuilderStepViaLlm($text, 'needs_scope', $localProfile, $localState);
                 $mappedNeed = $this->extractBuilderLlmAssistMappedValue($assist, 'needs_scope');
@@ -739,7 +736,7 @@ trait ConversationGatewayBuilderOnboardingTrait
                     $mergedNeeds = $this->mergeScopeLabels($currentNeeds, [$mappedNeed]);
                     $localProfile['needs_scope_items'] = $mergedNeeds;
                     $localProfile['needs_scope'] = implode(', ', $mergedNeeds);
-                    $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                    $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
                 } else {
                     $localState['active_task'] = 'builder_onboarding';
                     $localState['onboarding_step'] = 'needs_scope';
@@ -753,7 +750,7 @@ trait ConversationGatewayBuilderOnboardingTrait
             } else {
                 $localProfile['needs_scope'] = $this->sanitizeRequirementText($text);
                 unset($localProfile['needs_scope_items']);
-                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
             }
         }
         if (empty($localProfile['needs_scope'])) {
@@ -771,7 +768,7 @@ trait ConversationGatewayBuilderOnboardingTrait
             $documentItems = !empty($documentsItemsDetected) ? $documentsItemsDetected : $this->extractDocumentItems($text);
             if ($this->isReferenceToPreviousScope($text) && !empty($localProfile['documents_scope'])) {
                 $localProfile['documents_scope'] = (string) $localProfile['documents_scope'];
-                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
             } elseif ($this->isOnboardingMetaAnswer($text) && empty($documentItems)) {
                 $reply = 'En este paso necesito los documentos que vas a usar.' . "\n"
                     . 'Ejemplo: ' . $this->buildDocumentsScopeExample($businessType, $localProfile) . '.';
@@ -779,7 +776,7 @@ trait ConversationGatewayBuilderOnboardingTrait
             } elseif (!empty($documentItems)) {
                 $localProfile['documents_scope_items'] = $documentItems;
                 $localProfile['documents_scope'] = implode(', ', $documentItems);
-                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
             } elseif ($this->shouldEscalateUnusableBuilderScopeAnswer($text, [])) {
                 $assist = $this->clarifyBuilderStepViaLlm($text, 'documents_scope', $localProfile, $localState);
                 $mappedDocument = $this->extractBuilderLlmAssistMappedValue($assist, 'documents_scope');
@@ -793,7 +790,7 @@ trait ConversationGatewayBuilderOnboardingTrait
                     $mergedDocs = $this->mergeScopeLabels($currentDocs, [$mappedDocument]);
                     $localProfile['documents_scope_items'] = $mergedDocs;
                     $localProfile['documents_scope'] = implode(', ', $mergedDocs);
-                    $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                    $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
                 } else {
                     $localState['active_task'] = 'builder_onboarding';
                     $localState['onboarding_step'] = 'documents_scope';
@@ -807,7 +804,7 @@ trait ConversationGatewayBuilderOnboardingTrait
             } else {
                 $localProfile['documents_scope'] = $this->sanitizeRequirementText($text);
                 unset($localProfile['documents_scope_items']);
-                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
             }
         }
         if (empty($localProfile['documents_scope'])) {
@@ -883,19 +880,24 @@ trait ConversationGatewayBuilderOnboardingTrait
                     $adjusted = true;
                 }
                 if ($adjusted) {
-                    $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                    $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
                     unset($localState['analysis_approved']);
                     $reply = $this->buildRequirementsSummaryReply($businessType, $localProfile, $plan);
                     return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState];
                 }
 
-                if ($this->isBuilderUserFrustrated($text) || $this->isClarificationRequest($text)) {
+                // Guard: when profile is complete, don't let LLM override the deterministic summary
+                $profileComplete = !empty($localProfile['business_type'])
+                    && !empty($localProfile['operation_model'])
+                    && !empty($localProfile['needs_scope'])
+                    && !empty($localProfile['documents_scope']);
+                if (!$profileComplete && ($this->isBuilderUserFrustrated($text) || $this->isClarificationRequest($text))) {
                     $assist = $this->clarifyBuilderStepViaLlm($text, 'confirm_scope', $localProfile, $localState);
                     return $this->routeBuilderConfirmScopeAssist($assist, $localProfile, $localState, $businessType, $plan);
                 }
             }
             if ($this->isNegativeReply($text)) {
-                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $localProfile);
+                $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
                 $localState['onboarding_step'] = 'needs_scope';
                 unset($localState['analysis_approved']);
                 $reply = 'Listo, ajustamos el alcance.' . "\n"
@@ -1082,7 +1084,7 @@ trait ConversationGatewayBuilderOnboardingTrait
         }
 
         return match ($step) {
-            'business_type' => 'Para avanzar con el diseño de tu app, dime en una frase: ¿qué vendes o a qué se dedica tu negocio?',
+            'business_type' => 'Paso 1: Para avanzar con el diseño de tu app, dime en una frase: ¿qué vendes o a qué se dedica tu negocio?',
             'operation_model' => 'Entendido. ¿Cómo manejas tus ventas habitualmente: de contado, a crédito o manejas ambos tipos?',
             'needs_scope' => 'Perfecto. Para priorizar los módulos, ¿qué es lo más importante de controlar en tu operación ahora mismo?',
             'documents_scope' => 'Excelente. ¿Qué documentos legales o comerciales necesitas que genere la aplicación?',
@@ -1615,19 +1617,22 @@ trait ConversationGatewayBuilderOnboardingTrait
     private function buildRequirementsSummaryReply(string $businessType, array $profile, array $plan): string
     {
         $label = $this->domainLabelByBusinessType($businessType);
-        
-        $needs = is_array($plan['entities'] ?? null) && !empty($plan['entities']) 
-                 ? implode(', ', $plan['entities']) 
+
+        $needs = is_array($plan['entities'] ?? null) && !empty($plan['entities'])
+                 ? implode(', ', $plan['entities'])
                  : ($profile['needs_scope'] ?? 'módulos de negocio');
-                 
-        $docs = is_array($plan['documents'] ?? null) && !empty($plan['documents']) 
-                ? implode(', ', $plan['documents']) 
+
+        $docs = is_array($plan['documents'] ?? null) && !empty($plan['documents'])
+                ? implode(', ', $plan['documents'])
                 : ($profile['documents_scope'] ?? 'documentos comerciales');
 
-        return "Perfecto. He diseñado un plan para tu negocio de **$label**:\n"
+        $opModel = (string) ($profile['operation_model'] ?? 'mixto');
+
+        return "Perfecto. He diseñado un plan para tu negocio:\n"
+             . "- Negocio: $label\n"
              . "- Controlaremos: $needs\n"
-             . "- Usaremos: $docs\n"
-             . "- Operación: " . ($profile['operation_model'] ?? 'mixto') . "\n"
+             . "- Documentos: $docs\n"
+             . "- Forma de pago: $opModel\n"
              . "¿Es correcto?";
     }
 
@@ -1741,7 +1746,7 @@ trait ConversationGatewayBuilderOnboardingTrait
                 $debugData['profile_after'] = $profile;
                 @file_put_contents($debugPath, json_encode($debugData, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE));
 
-                $this->saveProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId, $userId), $profile);
+                $this->saveProfile($tenantId, $this->contextProfileUser, $profile);
             }
         } catch (\Throwable $e) {
             error_log("BUILDER_ONBOARDING: Error in reconstructContextFromHistory: " . $e->getMessage());
@@ -1790,7 +1795,71 @@ trait ConversationGatewayBuilderOnboardingTrait
 
     private function handleUnknownBusinessDiscoveryStep(string $text, array &$state, array &$profile, array $protocol, string $tenantId, string $userId, string &$note): ?array
     {
-        return null;
+        if ((string) ($state['active_task'] ?? '') !== 'unknown_business_discovery') {
+            return null;
+        }
+
+        $flow = is_array($state['unknown_business_discovery'] ?? null) ? (array) $state['unknown_business_discovery'] : [];
+        if (empty($flow)) {
+            return null;
+        }
+
+        $questions = is_array($flow['questions'] ?? null) ? array_values((array) $flow['questions']) : [];
+        $currentIndex = (int) ($flow['current_index'] ?? 0);
+        $answers = is_array($flow['answers'] ?? null) ? (array) $flow['answers'] : [];
+        $candidate = (string) ($flow['candidate'] ?? '');
+        $total = count($questions);
+
+        // Determine if this answer is useful (advances the index)
+        $isUseful = !$this->isBuilderUserFrustrated($text)
+            && mb_strlen(trim($text)) >= 4
+            && count(array_filter(explode(' ', $this->normalize($text)))) >= 2;
+
+        if ($isUseful) {
+            $answers[$currentIndex] = $text;
+            $nextIndex = $currentIndex + 1;
+        } else {
+            // Repeat same question
+            $nextIndex = $currentIndex;
+        }
+
+        $flow['answers'] = $answers;
+
+        if ($nextIndex >= $total) {
+            // All questions answered — compile technical prompt
+            $summary = "Negocio candidato: $candidate\n";
+            foreach ($questions as $i => $q) {
+                $answer = (string) ($answers[$i] ?? '(sin respuesta)');
+                $summary .= "P" . ($i + 1) . ": $q\nR: $answer\n";
+            }
+            $flow['current_index'] = $nextIndex;
+            $flow['technical_prompt'] = $summary;
+            $state['unknown_business_discovery'] = $flow;
+            $note = 'unknown_discovery_complete';
+
+            $reply = "Gracias. He preparado el documento tecnico inicial para tu negocio '$candidate'.\n"
+                   . "Con esta informacion puedo comenzar a disenar la app. ¿Continuamos con la arquitectura?";
+
+            return [
+                'action' => 'ask_user',
+                'reply'  => $reply,
+                'state'  => $state,
+            ];
+        }
+
+        // Ask next (or same) question
+        $questionText = (string) ($questions[$nextIndex] ?? '');
+        $displayIndex = $nextIndex + 1;
+        $reply = "Pregunta $displayIndex/$total: $questionText";
+
+        $flow['current_index'] = $nextIndex;
+        $state['unknown_business_discovery'] = $flow;
+
+        return [
+            'action' => 'ask_user',
+            'reply'  => $reply,
+            'state'  => $state,
+        ];
     }
 
     private function isBuilderActionMessage(string $text): bool
@@ -1823,7 +1892,27 @@ trait ConversationGatewayBuilderOnboardingTrait
 
     private function detectUnknownBusinessCandidate(string $text, string $business): string
     {
-        return '';
+        if ($business !== '') {
+            return '';
+        }
+        $n = $this->normalize($text);
+        // Onboarding triggers are not business descriptions
+        if ($this->isBuilderOnboardingTrigger($n)) {
+            return '';
+        }
+        // Skip affirmatives, negatives, simple commands
+        if ($this->isAffirmativeReply($n) || $this->isNegativeReply($n)) {
+            return '';
+        }
+        if (preg_match('/^(si|no|cancelar|retomar|reiniciar|ayuda|hola|ok|listo|mixto|contado|credito)\b/', $n)) {
+            return '';
+        }
+        // Need at least 2 words to qualify as a business description
+        $words = array_filter(explode(' ', $n));
+        if (count($words) < 2) {
+            return '';
+        }
+        return $text;
     }
 
     private function detectBusinessScopeChoice(string $text): string
@@ -1846,12 +1935,183 @@ trait ConversationGatewayBuilderOnboardingTrait
 
     private function startUnknownBusinessDiscovery(string $candidate, array &$state, array $protocol): ?array
     {
-        return null;
+        // Only start once per candidate - don't re-start if already running
+        $existing = is_array($state['unknown_business_discovery'] ?? null) ? (array) $state['unknown_business_discovery'] : [];
+        if (!empty($existing) && (string) ($existing['candidate'] ?? '') === $candidate) {
+            return null;
+        }
+
+        $questions = is_array($protocol['technical_requirements_questions'] ?? null)
+            ? array_values($protocol['technical_requirements_questions'])
+            : [
+                '¿Cuál es el objetivo principal de la app en una frase?',
+                '¿Qué proceso completo quieres operar primero (inicio a fin)?',
+                '¿Qué datos mínimos necesitas capturar por registro?',
+                '¿Qué documentos o comprobantes debes emitir primero?',
+                '¿Qué indicador necesitas ver cada día o semana?',
+            ];
+
+        $total = count($questions);
+        $firstQuestion = (string) ($questions[0] ?? '');
+        $reply = "Para entender mejor tu negocio, tengo algunas preguntas.\nPregunta 1/$total: $firstQuestion";
+
+        $state['active_task'] = 'unknown_business_discovery';
+        $state['onboarding_step'] = 'business_type';
+        $state['unknown_business_discovery'] = [
+            'candidate'     => $candidate,
+            'questions'     => $questions,
+            'current_index' => 0,
+            'answers'       => [],
+            'technical_prompt' => '',
+        ];
+
+        return [
+            'action' => 'ask_user',
+            'reply'  => $reply,
+            'state'  => $state,
+        ];
     }
 
     private function resolveUnknownBusinessWithGemini(string $text, string $candidate, array $profile, array $state): array
     {
         return ['status' => 'NONE'];
+    }
+
+    private function normalizeUnknownBusinessLlmResolution(
+        array $llmResult,
+        string $candidate,
+        string $text,
+        array $knownProfile,
+        array $contextFields,
+        float $threshold,
+        array $scopeContext
+    ): array {
+        // Normalize status
+        $rawStatus = strtoupper(trim((string) ($llmResult['status'] ?? '')));
+        $statusMap = ['SUCCESS' => 'MATCHED', 'MATCHED' => 'MATCHED', 'NEEDS_CLARIFICATION' => 'NEEDS_CLARIFICATION', 'NONE' => 'NONE'];
+        $status = $statusMap[$rawStatus] ?? $rawStatus;
+
+        // Normalize confidence
+        $confidence = (float) ($llmResult['confidence'] ?? 0.0);
+
+        // If MATCHED but no canonical type → degrade
+        $canonicalType = trim((string) ($llmResult['canonical_business_type'] ?? ''));
+        if ($status === 'MATCHED' && $canonicalType === '') {
+            $status = 'NEEDS_CLARIFICATION';
+        }
+
+        // Normalize needs_normalized (JSON string or array)
+        $needsRaw = $llmResult['needs_normalized'] ?? [];
+        if (is_string($needsRaw) && str_starts_with(trim($needsRaw), '[')) {
+            $decoded = json_decode($needsRaw, true);
+            $needsRaw = is_array($decoded) ? $decoded : explode(',', str_replace(['"', "'", '[', ']'], '', $needsRaw));
+        } elseif (is_string($needsRaw)) {
+            $needsRaw = explode(',', $needsRaw);
+        }
+        $needsCanonicalMap = [
+            'gastos/costos' => 'gastos', 'gastos costos' => 'gastos', 'costo' => 'gastos', 'costos' => 'gastos',
+            'facturacion' => 'facturacion', 'contabilidad' => 'contabilidad',
+        ];
+        $needs = [];
+        foreach ((array) $needsRaw as $n) {
+            $n = trim(strtolower((string) $n));
+            if ($n === '') continue;
+            $n = str_replace(['_', '-'], ' ', $n);
+            $needs[] = $needsCanonicalMap[$n] ?? $n;
+        }
+
+        // Normalize documents_normalized (CSV or array)
+        $docsRaw = $llmResult['documents_normalized'] ?? [];
+        if (is_string($docsRaw)) {
+            $docsRaw = explode(',', $docsRaw);
+        }
+        $docsCanonicalMap = [
+            'factura venta' => 'factura', 'facturaventa' => 'factura', 'factura de venta' => 'factura',
+            'ticket pos' => 'ticket', 'ticketpos' => 'ticket', 'ticket de venta' => 'ticket',
+            'comprobante egreso' => 'comprobante de egreso', 'comprobante de egreso' => 'comprobante de egreso',
+            'recibo de caja' => 'recibo de caja', 'recibo caja' => 'recibo de caja',
+        ];
+        $docs = [];
+        foreach ((array) $docsRaw as $d) {
+            $d = trim(strtolower((string) $d));
+            if ($d === '') continue;
+            $normalized = str_replace('_', ' ', $d);
+            $docs[] = $docsCanonicalMap[$normalized] ?? $normalized;
+        }
+
+        return array_merge($llmResult, [
+            'status'              => $status,
+            'confidence'          => $confidence,
+            'canonical_business_type' => $canonicalType,
+            'needs_normalized'    => $needs,
+            'documents_normalized' => $docs,
+        ]);
+    }
+
+    private function evaluateUnknownBusinessLlmQuality(array $resolved, float $threshold): array
+    {
+        $status = (string) ($resolved['status'] ?? '');
+        $confidence = (float) ($resolved['confidence'] ?? 0.0);
+
+        if ($status === 'INVALID_RESPONSE') {
+            return ['ok' => false, 'score' => 0.0, 'issues' => ['invalid_response']];
+        }
+        if ($confidence < 0.5) {
+            return ['ok' => false, 'score' => $confidence, 'issues' => ['confidence_too_low']];
+        }
+
+        $issues = [];
+        $score = min(1.0, $confidence);
+        if (empty($resolved['canonical_business_type'])) {
+            $issues[] = 'missing_canonical_type';
+            $score -= 0.1;
+        }
+        if (empty($resolved['needs_normalized'])) {
+            $issues[] = 'missing_needs';
+            $score -= 0.05;
+        }
+        if (empty($resolved['documents_normalized'])) {
+            $issues[] = 'matched_sin_documents';
+            $score -= 0.05;
+        }
+
+        $ok = $score >= $threshold && !in_array('missing_canonical_type', $issues, true);
+        return ['ok' => $ok, 'score' => max(0.0, $score), 'issues' => $issues];
+    }
+
+    private function persistUnknownBusinessLlmSample(
+        string $tenantId,
+        string $userId,
+        string $candidate,
+        string $text,
+        array $resolved,
+        array $qualityResult
+    ): void {
+        // Append sample
+        $existing = $this->memory->getTenantMemory($tenantId, 'unknown_business_llm_samples', ['items' => []]);
+        $items = is_array($existing['items'] ?? null) ? (array) $existing['items'] : [];
+        $items[] = [
+            'candidate'  => $candidate,
+            'text'       => $text,
+            'resolved'   => $resolved,
+            'quality'    => $qualityResult,
+            'user_id'    => $userId,
+            'created_at' => date('c'),
+        ];
+        $this->memory->saveTenantMemory($tenantId, 'unknown_business_llm_samples', ['items' => $items]);
+
+        // If quality is low, enqueue research topic
+        if (!(bool) ($qualityResult['ok'] ?? true)) {
+            $queue = $this->memory->getTenantMemory($tenantId, 'research_queue', ['topics' => []]);
+            $topics = is_array($queue['topics'] ?? null) ? (array) $queue['topics'] : [];
+            $topics[] = [
+                'topic'      => $candidate . ':llm_quality',
+                'issues'     => $qualityResult['issues'] ?? [],
+                'score'      => $qualityResult['score'] ?? 0.0,
+                'created_at' => date('c'),
+            ];
+            $this->memory->saveTenantMemory($tenantId, 'research_queue', ['topics' => $topics]);
+        }
     }
 
     private function mergeScopeLabels(array $current, array $new): array
@@ -1918,7 +2178,8 @@ trait ConversationGatewayBuilderOnboardingTrait
         $normalized = strtolower($this->normalize($text));
         $patterns = [
             'no entendi', 'no entiendo', 'no te entendi', 'no te entiendo', 'que dices', 'que hablas',
-            'estas loco', 'no me estas entendiendo', 'no me estas entenid', 'hablas por hablar', 'hablas por hablas', 'estas mal',
+            'estas loco', 'no me estas entendiendo', 'no me estas entenid', 'no estas entendiendo',
+            'hablas por hablar', 'hablas por hablas', 'estas mal',
             'no se', 'ni idea', 'ayuda', 'me perdi', 'estoy confundido', 'no se que responder',
             'no se que hacer', 'como asi', 'que es eso', 'que significa', 'explicame', 'explicamelo facil',
             'por donde vas', 'q es es',
@@ -2206,7 +2467,7 @@ trait ConversationGatewayBuilderOnboardingTrait
         // Only true schema-building signals (used by ModeGuardPolicy to block app-mode schema ops).
         // Do NOT include plain 'crear' here — that would block legitimate CRUD in app mode.
         $schemaSignals = [
-            'crear tabla', 'crear formulario', 'crear entidad',
+            'crear tabla', 'crear una tabla', 'crear formulario', 'crear entidad',
             'haz una tabla', 'haz el formulario', 'genera la tabla',
             'nueva tabla', 'nueva entidad', 'nuevo formulario',
             'montar tabla', 'agregar tabla', 'definir tabla',

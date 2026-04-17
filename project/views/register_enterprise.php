@@ -55,42 +55,37 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;800&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg: #030712;
-            --glass: rgba(17, 24, 39, 0.7);
-            --border: rgba(255, 255, 255, 0.1);
-            --accent: #22d3ee;
-            --accent-glow: rgba(34, 211, 238, 0.3);
-            --text: #f9fafb;
-            --text-dim: #9ca3af;
+            --bg: #F0F9FF;
+            --card: #FFFFFF;
+            --border: #BAE6FD;
+            --accent: #0891B2;
+            --accent-glow: rgba(8, 145, 178, 0.18);
+            --text: #0F172A;
+            --text-dim: #64748B;
         }
 
         * { margin: 0; padding: 0; box-sizing: border-box; }
 
         body {
             font-family: 'Outfit', sans-serif;
-            background-color: var(--bg);
+            background: linear-gradient(135deg, #F0F9FF 0%, #E0F2FE 50%, #CFFAFE 100%);
             color: var(--text);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
             padding: 20px;
-            background: 
-                radial-gradient(circle at top right, #1e1b4b, transparent 50%),
-                radial-gradient(circle at bottom left, #0f172a, transparent 50%);
         }
 
         .reg-card {
-            background: var(--glass);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
+            background: var(--card);
             border: 1px solid var(--border);
-            border-radius: 28px;
+            border-radius: 24px;
             padding: 40px;
             width: 100%;
             max-width: 500px;
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
-            animation: fadeIn 0.6s ease-out;
+            box-shadow: 0 4px 6px rgba(8,145,178,0.06), 0 20px 40px rgba(15,23,42,0.10);
+            animation: fadeIn 0.5s ease-out;
         }
 
         @keyframes fadeIn {
@@ -105,7 +100,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         .badge-app {
             display: inline-block;
-            background: rgba(34, 211, 238, 0.1);
+            background: rgba(8, 145, 178, 0.08);
             color: var(--accent);
             padding: 6px 12px;
             border-radius: 99px;
@@ -114,7 +109,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-bottom: 12px;
-            border: 1px solid rgba(34, 211, 238, 0.2);
+            border: 1px solid rgba(8, 145, 178, 0.20);
         }
 
         h1 { font-size: 26px; font-weight: 800; letter-spacing: -1px; margin-bottom: 8px; }
@@ -125,11 +120,11 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         
         input, textarea {
             width: 100%;
-            background: rgba(0, 0, 0, 0.4);
-            border: 1px solid var(--border);
-            border-radius: 12px;
+            background: #F8FAFC;
+            border: 1px solid #E2E8F0;
+            border-radius: 10px;
             padding: 12px 16px;
-            color: white;
+            color: var(--text);
             font-size: 15px;
             font-family: inherit;
             transition: all 0.2s;
@@ -138,53 +133,56 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         input:focus, textarea:focus {
             border-color: var(--accent);
-            box-shadow: 0 0 0 4px var(--accent-glow);
+            background: #FFFFFF;
+            box-shadow: 0 0 0 3px rgba(8, 145, 178, 0.12);
         }
 
         .file-custom {
             display: block;
-            background: rgba(255, 255, 255, 0.03);
-            border: 1px dashed var(--border);
+            background: #F8FAFC;
+            border: 1px dashed #BAE6FD;
             padding: 20px;
-            border-radius: 12px;
+            border-radius: 10px;
             text-align: center;
             cursor: pointer;
             transition: all 0.2s;
+            color: var(--text-dim);
         }
-        .file-custom:hover { background: rgba(34, 211, 238, 0.05); border-color: var(--accent); }
+        .file-custom:hover { background: rgba(8, 145, 178, 0.04); border-color: var(--accent); color: var(--accent); }
 
         .btn-submit {
             width: 100%;
             background: var(--accent);
-            color: #000;
+            color: #fff;
             border: none;
-            border-radius: 12px;
+            border-radius: 10px;
             padding: 16px;
-            font-size: 16px;
-            font-weight: 800;
+            font-size: 15px;
+            font-weight: 700;
             cursor: pointer;
-            transition: all 0.3s;
+            transition: all 0.2s;
             margin-top: 10px;
             text-transform: uppercase;
-            letter-spacing: 1px;
+            letter-spacing: 0.08em;
         }
 
         .btn-submit:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 10px 25px -5px var(--accent-glow);
-            filter: brightness(1.1);
+            background: #0E7490;
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(8,145,178,0.25);
         }
 
         .alert {
-            padding: 15px;
-            border-radius: 14px;
-            margin-bottom: 25px;
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 24px;
             font-size: 14px;
             text-align: center;
-            backdrop-filter: blur(5px);
         }
-        .alert-error { background: rgba(239, 68, 68, 0.1); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.3); }
-        .alert-success { background: rgba(16, 185, 129, 0.1); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.3); }
+        .alert-error { background: rgba(239, 68, 68, 0.06); color: #B91C1C; border: 1px solid rgba(239, 68, 68, 0.25); }
+        .alert-success { background: rgba(5, 150, 105, 0.08); color: #065F46; border: 1px solid rgba(5, 150, 105, 0.25); }
+
+        label { display: block; font-size: 12px; font-weight: 600; margin-bottom: 6px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.05em; }
 
         footer {
             position: absolute;
@@ -212,7 +210,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         <?php if ($success): ?>
             <div class="alert alert-success"><?php echo $success; ?></div>
             <div style="text-align: center; margin-top: 20px;">
-                <a href="../../framework/public/login" style="color: var(--accent); text-decoration: none; font-weight: 700;">Volver al Portal</a>
+                <?php $__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : ''; ?>
+                <a href="<?= $__base ?>/marketplace/login" style="color: var(--accent); text-decoration: none; font-weight: 700;">Volver al Portal</a>
             </div>
         <?php else: ?>
             <form action="" method="POST" enctype="multipart/form-data">

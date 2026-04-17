@@ -12,9 +12,9 @@ trait ConversationGatewayStubsTrait
         return "sess_{$tenantId}_{$projectId}_{$mode}_{$userId}";
     }
 
-    public function profileUserKey(string $tenantId, string $projectId, string $userId): string
+    public function profileUserKey(string $tenantId, string $projectId, string $userId, string $mode = 'app'): string
     {
-        return "prof_{$tenantId}_{$projectId}_{$userId}";
+        return $projectId . '__' . $mode . '__' . $userId;
     }
 
     public function appendShortTermLog(string $event, $data = null, array $meta = []): void
@@ -36,7 +36,7 @@ trait ConversationGatewayStubsTrait
 
     public function loadState(string $tenantId, string $userId, string $projectId = 'default', string $mode = 'app'): array
     {
-        return (array)$this->memory->get("state_{$tenantId}_{$userId}_{$projectId}_{$mode}");
+        return $this->memory->getUserMemory($tenantId, $userId, "state::{$projectId}::{$mode}", []);
     }
 
     public function loadLexicon(string $tenantId = 'default'): array
@@ -56,7 +56,7 @@ trait ConversationGatewayStubsTrait
 
     public function getProfile(string $tenantId, string $profileKey): array
     {
-        return (array)$this->memory->get($profileKey);
+        return $this->memory->getUserMemory($tenantId, $profileKey, 'profile', []);
     }
 
     public function syncDialogState(array $state, string $mode, array $profile): array
@@ -114,7 +114,19 @@ trait ConversationGatewayStubsTrait
     {
         $projectId = $this->contextProjectId ?? 'default';
         $mode = $this->contextMode ?? 'app';
-        $this->memory->save("state_{$tenantId}_{$userId}_{$projectId}_{$mode}", $state);
+        $this->memory->saveUserMemory($tenantId, $userId, "state::{$projectId}::{$mode}", $state);
+
+        // Keep working_memory in sync for builder mode so the session context is always recoverable.
+        if ($mode === 'builder') {
+            $working = [
+                'active_task'      => $state['active_task'] ?? null,
+                'onboarding_step'  => $state['onboarding_step'] ?? null,
+                'last_reply'       => $state['last_reply'] ?? null,
+                'collected'        => $state['collected'] ?? [],
+                'updated_at'       => date('c'),
+            ];
+            $this->memory->saveUserMemory($tenantId, $userId, "working_memory::{$projectId}::{$mode}", $working);
+        }
     }
 
     public function result(string $action, string $reply, $command = null, $data = null, array $state = [], array $telemetry = []): array
@@ -183,7 +195,7 @@ trait ConversationGatewayStubsTrait
 
     public function saveProfile(string $tenantId, string $profileKey, array $profile): void
     {
-        $this->memory->save($profileKey, $profile);
+        $this->memory->saveUserMemory($tenantId, $profileKey, 'profile', $profile);
     }
 
     public function isAmbiguousBuilderCreateRequest(string $text): bool
@@ -293,6 +305,46 @@ trait ConversationGatewayStubsTrait
 
     public function routeFlowControl(string $text, array $state, array $profile, string $mode, string $tenantId, string $userId): array
     {
+        $n = $this->normalize($text);
+
+        // Cancel: clear active task and pending commands
+        if (in_array($n, ['cancelar', 'cancel', 'cancela', 'detener', 'detener todo', 'para', 'parar'], true)) {
+            return [
+                'action' => 'respond_local',
+                'reply' => 'Operación cancelada. Dime cuando quieras continuar.',
+                'intent' => 'flow_cancel',
+                'active_task' => null,
+                'collected' => [],
+                'state_patch' => [
+                    'active_task' => null,
+                    'builder_pending_command' => null,
+                    'missing' => [],
+                    'requested_slot' => null,
+                ],
+            ];
+        }
+
+        // Resume: re-engage with the last active context
+        if (in_array($n, ['retomar', 'resumir', 'continuar', 'seguir', 'retomemos', 'continue', 'resume'], true)) {
+            $lastTask = (string) ($state['active_task'] ?? '');
+            if ($lastTask !== '' && $lastTask !== null) {
+                return [
+                    'action' => 'ask_user',
+                    'reply' => 'Retomamos. ' . ($state['last_reply'] ?? '¿En qué quedamos?'),
+                    'intent' => 'flow_resume',
+                    'active_task' => $lastTask,
+                    'collected' => (array) ($state['collected'] ?? []),
+                ];
+            }
+            return [
+                'action' => 'ask_user',
+                'reply' => 'Retomamos desde donde estábamos. ¿En qué puedo ayudarte?',
+                'intent' => 'flow_resume',
+                'active_task' => $lastTask ?: null,
+                'collected' => [],
+            ];
+        }
+
         return [];
     }
 
@@ -514,6 +566,79 @@ trait ConversationGatewayStubsTrait
 
     public function routeBuilderGuidance(string $text, array $training, array $state, array $lexicon, string $mode): array
     {
+        if ($mode !== 'builder') {
+            return [];
+        }
+        $n = $this->normalize($text);
+
+        // Field type guidance: "un campo para el precio", "campo de fecha", etc.
+        if (preg_match('/\bcampo\b/u', $n)) {
+            if (preg_match('/\b(precio|importe|monto|valor|costo|pago|descuento)\b/u', $n)) {
+                return [
+                    'action'      => 'ask_user',
+                    'reply'       => 'Para campos de precio o valor monetario se recomienda tipo decimal (ej: 19999.99). ¿Lo añado con ese tipo?',
+                    'intent'      => 'builder_field_guidance',
+                    'active_task' => 'builder_guidance',
+                    'collected'   => [],
+                ];
+            }
+            if (preg_match('/\b(fecha|date|dia)\b/u', $n)) {
+                return [
+                    'action'      => 'ask_user',
+                    'reply'       => 'Para campos de fecha se recomienda tipo date (formato YYYY-MM-DD). ¿Lo añado así?',
+                    'intent'      => 'builder_field_guidance',
+                    'active_task' => 'builder_guidance',
+                    'collected'   => [],
+                ];
+            }
+        }
+
+        // Relation guidance: "conectar X con Y", "relacionar X con Y"
+        if (preg_match('/\b(conectar|relacionar|vincular|enlazar)\b/u', $n)) {
+            $words = preg_split('/\s+/', $n);
+            $skipWords = ['conectar', 'relacionar', 'vincular', 'enlazar', 'con', 'y', 'a', 'de', 'el', 'la', 'los', 'las'];
+            $tables = [];
+            foreach ($words as $w) {
+                if (!in_array($w, $skipWords, true) && preg_match('/^\w{3,}$/u', $w)) {
+                    $tables[] = $w;
+                    if (count($tables) === 2) break;
+                }
+            }
+            if (count($tables) === 2) {
+                [$t1, $t2] = $tables;
+                return [
+                    'action'          => 'ask_user',
+                    'reply'           => "Voy a crear una relacion entre '$t1' y '$t2'. ¿Confirmas?",
+                    'intent'          => 'builder_relation_guidance',
+                    'active_task'     => 'builder_guidance',
+                    'pending_command' => ['command' => 'CreateRelation', 'table1' => $t1, 'table2' => $t2, 'entity' => $t1],
+                    'collected'       => [],
+                ];
+            }
+        }
+
+        // Performance/index guidance: "busqueda lenta en tabla X por Y", "indice para X"
+        if (preg_match('/\b(busqueda|buscar|lenta|lento|indice|index|rendimiento|rapido)\b/u', $n)) {
+            $table  = '';
+            $column = '';
+            if (preg_match('/tabla\s+(\w+)/u', $n, $tm)) {
+                $table = $tm[1];
+            }
+            if (preg_match('/(?:por|en|campo)\s+(\w+)/u', $n, $cm)) {
+                $column = $cm[1];
+            }
+            if ($table !== '' && $column !== '') {
+                return [
+                    'action'          => 'ask_user',
+                    'reply'           => "Voy a crear un indice en la tabla '$table' por el campo '$column' para mejorar la busqueda. ¿Lo hago?",
+                    'intent'          => 'builder_performance_guidance',
+                    'active_task'     => 'builder_guidance',
+                    'pending_command' => ['command' => 'CreateIndex', 'table' => $table, 'column' => $column, 'entity' => $table],
+                    'collected'       => [],
+                ];
+            }
+        }
+
         return [];
     }
 
@@ -617,7 +742,17 @@ trait ConversationGatewayStubsTrait
 
     public function hasRuntimeCrudSignals(string $text): bool
     {
-        return str_contains($text, 'ver') || str_contains($text, 'listar');
+        $n = $this->normalize($text);
+        // Listing/viewing records
+        if (str_contains($n, 'ver ') || str_contains($n, 'listar') || str_contains($n, 'mostrar')) {
+            return true;
+        }
+        // Record CRUD with field=value pairs (e.g. "crear cliente nombre=Ana")
+        if ((str_contains($n, 'crear ') || str_contains($n, 'registrar') || str_contains($n, 'modificar') || str_contains($n, 'borrar') || str_contains($n, 'guardar'))
+            && $this->hasFieldPairs($text)) {
+            return true;
+        }
+        return false;
     }
 
     public function parseInstallPlaybookRequest(string $text): array
@@ -783,7 +918,7 @@ trait ConversationGatewayStubsTrait
         
         $window = new MemoryWindow(3);
         $state = $this->loadState($tenantId, $userId, $this->contextProjectId ?? 'default', $this->contextMode ?? 'app');
-        $profile = $this->getProfile($tenantId, $this->profileUserKey($tenantId, $this->contextProjectId ?? 'default', $userId));
+        $profile = $this->getProfile($tenantId, $this->contextProfileUser ?? $this->profileUserKey($tenantId, $this->contextProjectId ?? 'default', $userId, $this->contextMode ?? 'app'));
         
         // Fetch Agent Journal
         $journalService = new \App\Core\AgentJournalService();
