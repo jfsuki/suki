@@ -41,7 +41,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
       font-size: 13px;
       flex-shrink: 0;
     }
-    .panel-icon.purple { background: var(--accent-soft); }
+    .panel-icon.accent { background: var(--accent-soft); }
     .panel-icon.teal   { background: var(--teal-soft); }
     .panel-icon.slate  { background: rgba(100,116,139,0.15); }
     .panel-head h3 {
@@ -366,7 +366,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
     <!-- PANEL 0: Conversaciones (Multiplexación) -->
     <div class="panel session-sidebar" id="sessionPanel">
       <div class="panel-head">
-        <div class="panel-icon purple">💬</div>
+        <div class="panel-icon accent">💬</div>
         <h3>Chats</h3>
       </div>
       <div class="panel-body">
@@ -400,7 +400,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
     <!-- PANEL CENTRO: Chat -->
     <div class="panel chat-panel">
       <div class="panel-head">
-        <div class="panel-icon purple">💬</div>
+        <div class="panel-icon accent">💬</div>
         <h3>Chat con SUKI Builder</h3>
       </div>
       <div class="chat-messages" id="chatMessages">
@@ -741,7 +741,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
   const CAT_CONFIG = {
     requirement: { color: '#0ea5e9', icon: '📋', label: 'Req' },
     arch:        { color: '#0891B2', icon: '🏗', label: 'Agente' },
-    decision:    { color: '#6366f1', icon: '✅', label: 'Decisión' },
+    decision:    { color: '#0891B2', icon: '✅', label: 'Decisión' },
     finding:     { color: '#22c55e', icon: '💡', label: 'Hallazgo' },
     default:     { color: '#64748b', icon: '📌', label: 'Nota' },
   };

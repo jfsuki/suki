@@ -1800,7 +1800,7 @@
                 <div x-show="activeTab === 'layout'" class="max-w-4xl mx-auto" x-transition.opacity>
                     <div class="flex justify-between items-center mb-6">
                         <h3 class="font-bold text-gray-700 text-lg">Diseño de Secciones</h3>
-                        <button @click="addSection()" class="text-xs font-bold uppercase bg-purple-600 text-white px-4 py-2 rounded-lg hover:bg-purple-700 shadow transition">
+                        <button @click="addSection()" class="text-xs font-bold uppercase bg-cyan-600 text-white px-4 py-2 rounded-lg hover:bg-cyan-700 shadow transition">
                             + Nueva Sección
                         </button>
                     </div>
@@ -1813,11 +1813,11 @@
                                 <div class="flex gap-4 mb-3 items-end">
                                     <div class="flex-1">
                                         <label class="text-[10px] font-bold text-gray-400 uppercase">Título Sección</label>
-                                        <input x-model="section.title" class="font-bold text-gray-800 border-b border-gray-300 focus:border-purple-500 outline-none w-full pb-1" placeholder="Ej: Información Personal">
+                                        <input x-model="section.title" class="font-bold text-gray-800 border-b border-gray-300 focus:border-cyan-500 outline-none w-full pb-1" placeholder="Ej: Información Personal">
                                     </div>
                                     <div class="w-24">
                                         <label class="text-[10px] text-gray-400 uppercase">Columnas</label>
-                                        <input x-model="section.columns" type="number" min="1" max="4" class="w-full border rounded px-2 py-1 text-center font-bold text-purple-700">
+                                        <input x-model="section.columns" type="number" min="1" max="4" class="w-full border rounded px-2 py-1 text-center font-bold text-cyan-700">
                                     </div>
                                 </div>
                                 <input x-model="section.id" class="text-[10px] text-gray-400 mb-3 w-full font-mono bg-transparent border-none p-0 focus:ring-0" placeholder="id_seccion_opcional">
@@ -1826,16 +1826,16 @@
                                     <p class="text-[10px] font-bold text-gray-500 mb-2 uppercase tracking-wider">Datos Asignados:</p>
                                     <div class="flex flex-wrap gap-2 mb-3 min-h-[30px]">
                                         <template x-for="fieldId in section.fields">
-                                            <span class="bg-purple-100 text-purple-800 text-xs px-2 py-1 rounded border border-purple-200 flex items-center gap-1 shadow-sm">
+                                            <span class="bg-cyan-50 text-cyan-800 text-xs px-2 py-1 rounded border border-cyan-200 flex items-center gap-1 shadow-sm">
                                                 <i class="fa-solid fa-cube text-[10px]"></i> <span x-text="fieldId"></span>
-                                                <button @click="section.fields = section.fields.filter(f => f !== fieldId)" class="hover:text-red-600 ml-1 rounded-full w-4 h-4 flex items-center justify-center hover:bg-purple-200">×</button>
+                                                <button @click="section.fields = section.fields.filter(f => f !== fieldId)" class="hover:text-red-600 ml-1 rounded-full w-4 h-4 flex items-center justify-center hover:bg-cyan-100">×</button>
                                             </span>
                                         </template>
                                         <span x-show="section.fields.length === 0" class="text-xs text-gray-400 italic py-1">Arrastra o selecciona Datos abajo...</span>
                                     </div>
                                     
                                     <div class="relative">
-                                        <select @change="if($event.target.value) { section.fields.push($event.target.value); $event.target.value=''; }" class="text-xs border border-gray-300 rounded p-2 w-full bg-white hover:border-purple-400 cursor-pointer outline-none">
+                                        <select @change="if($event.target.value) { section.fields.push($event.target.value); $event.target.value=''; }" class="text-xs border border-gray-300 rounded p-2 w-full bg-white hover:border-cyan-400 cursor-pointer outline-none">
                                             <option value="">+ Añadir campo a esta sección...</option>
                                             <template x-for="f in data.fields">
                                                 <option :value="f.id" x-text="f.label + ' (' + f.id + ')'" :disabled="section.fields.includes(f.id)"></option>
@@ -1962,12 +1962,12 @@
                                                                     <button @click="col.formula = {expression:'', watch:[]}" class="text-[10px] text-gray-400 border border-gray-200 rounded px-2 py-1 hover:bg-gray-100 hover:text-gray-600 transition">+ Fórmula Calc.</button>
                                                                 </template>
                                                                 <template x-if="col.formula">
-                                                                    <div class="w-full bg-purple-50 p-2 rounded border border-purple-200 relative group">
-                                                                        <button @click="delete col.formula" class="absolute top-1 right-1 text-purple-300 hover:text-red-500"><i class="fa-solid fa-times-circle"></i></button>
-                                                                        <label class="block text-[9px] font-bold text-purple-700">Expresión</label>
-                                                                        <input x-model="col.formula.expression" placeholder="cant * precio" class="w-full text-xs border border-purple-200 rounded px-1 py-0.5 mb-1 bg-white focus:ring-1 focus:ring-purple-400">
-                                                                        <label class="block text-[9px] font-bold text-purple-700">Observar (IDs)</label>
-                                                                        <input x-model="col.formula.watch" placeholder='["cant", "precio"]' class="w-full text-xs border border-purple-200 rounded px-1 py-0.5 font-mono bg-white text-gray-600">
+                                                                    <div class="w-full bg-cyan-50 p-2 rounded border border-cyan-200 relative group">
+                                                                        <button @click="delete col.formula" class="absolute top-1 right-1 text-cyan-300 hover:text-red-500"><i class="fa-solid fa-times-circle"></i></button>
+                                                                        <label class="block text-[9px] font-bold text-cyan-700">Expresión</label>
+                                                                        <input x-model="col.formula.expression" placeholder="cant * precio" class="w-full text-xs border border-cyan-200 rounded px-1 py-0.5 mb-1 bg-white focus:ring-1 focus:ring-cyan-400">
+                                                                        <label class="block text-[9px] font-bold text-cyan-700">Observar (IDs)</label>
+                                                                        <input x-model="col.formula.watch" placeholder='["cant", "precio"]' class="w-full text-xs border border-cyan-200 rounded px-1 py-0.5 font-mono bg-white text-gray-600">
                                                                     </div>
                                                                 </template>
                                                             </div>

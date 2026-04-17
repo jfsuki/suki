@@ -115,7 +115,7 @@ include __DIR__ . '/includes/navbar.php';
       font-size: 13px;
       flex-shrink: 0;
     }
-    .panel-icon.purple { background: var(--accent-soft); }
+    .panel-icon.accent { background: var(--accent-soft); }
     .panel-icon.teal   { background: var(--teal-soft); }
     .panel-icon.slate  { background: rgba(100,116,139,0.15); }
     .panel-head h3 {
@@ -509,7 +509,7 @@ include __DIR__ . '/includes/navbar.php';
   <!-- PANEL 0: Temas (Multiplexación) -->
   <div class="panel session-sidebar" id="sessionPanel">
     <div class="panel-head">
-      <div class="panel-icon purple">🎨</div>
+      <div class="panel-icon accent">🎨</div>
       <h3>Temas</h3>
     </div>
     <div class="panel-body">
@@ -556,7 +556,7 @@ include __DIR__ . '/includes/navbar.php';
   <!-- PANEL CENTRO: Multi-View Panel -->
   <div class="panel chat-panel" style="position: relative;">
     <div class="panel-head">
-      <div class="panel-icon purple">💬</div>
+      <div class="panel-icon accent">💬</div>
       <h3 id="panelTitle">Chat con SUKI Builder</h3>
       <div class="view-tabs" style="display: flex; gap: 8px; background: var(--surface2); padding: 4px; border-radius: 10px; border: 1px solid var(--border);">
         <button onclick="switchView('chat')" id="tab-chat" class="tab-btn active" style="border:0; background:var(--accent); color:#fff; font-size:10px; padding:4px 10px; border-radius:6px; cursor:pointer; font-weight:600;">CHAT</button>
