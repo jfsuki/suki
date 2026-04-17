@@ -335,6 +335,31 @@ final class QdrantVectorStore
     }
 
     /**
+     * Query with automatic tenant_id isolation.
+     * Merges tenant_id into filter must[] — prevents cross-tenant vector leakage.
+     * Use this instead of query() in all tenant-scoped contexts.
+     *
+     * @param array<int,float|int|string> $vector
+     * @param array<string,mixed> $filter Additional filter conditions (merged with tenant must[])
+     * @return array<int,array<string,mixed>>
+     */
+    public function queryForTenant(
+        string $tenantId,
+        array $vector,
+        array $filter = [],
+        int $limit = 5,
+        bool $withPayload = true
+    ): array {
+        if ($tenantId === '' || $tenantId === 'system') {
+            return $this->query($vector, $filter, $limit, $withPayload);
+        }
+
+        $must = is_array($filter['must'] ?? null) ? $filter['must'] : [];
+        $must[] = ['key' => 'tenant_id', 'match' => ['value' => $tenantId]];
+        return $this->query($vector, array_merge($filter, ['must' => $must]), $limit, $withPayload);
+    }
+
+    /**
      * @param array<int,float|int|string> $vector
      * @param array<string,mixed> $filter
      * @return array<int,array<string,mixed>>

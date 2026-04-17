@@ -148,6 +148,26 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
     }
 
     /**
+     * Tenant-safe load. Validates that the tenant embedded in $threadId matches
+     * $expectedTenantId before loading. Returns [] on mismatch (silent security block).
+     * Use this instead of load() in all authenticated contexts.
+     *
+     * @param string $threadId      "tenant_id:session_id"
+     * @param string $expectedTenantId  The authenticated tenant from the request context
+     */
+    public function loadForTenant(string $threadId, string $expectedTenantId, int $limit = 20): array
+    {
+        if ($expectedTenantId !== '') {
+            $parsedTenant = explode(':', $threadId, 2)[0] ?? '';
+            if ($parsedTenant !== $expectedTenantId) {
+                error_log('[SqlMemoryRepository] TENANT MISMATCH thread=' . $threadId . ' expected=' . $expectedTenantId);
+                return [];
+            }
+        }
+        return $this->load($threadId, $limit);
+    }
+
+    /**
      * Standardized load() method for Neuron IA.
      * Expects $threadId as "tenant_id:session_id".
      * Maps direction 'in' to 'user' and 'out' to 'assistant'.
