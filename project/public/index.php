@@ -18,6 +18,9 @@ if (class_exists(\App\Core\AuthMiddleware::class)) {
     \App\Core\AuthMiddleware::checkConcurrentSession(false);
 }
 
+// Detectar subdirectorio base (/suki en Laragon, vacío en vhost raíz)
+$__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
+
 // 1. Capturar la ruta y limpiar
 $url = isset($_GET['url']) ? rtrim($_GET['url'], '/') : 'dashboard';
 if ($url === '') {
@@ -36,9 +39,9 @@ $is_tower_authenticated = isset($_SESSION['suki_tower_auth']) && $_SESSION['suki
 if (!$is_public_project_route && !isset($_SESSION['user_id']) && !$is_tower_authenticated) {
     // Usar rutas absolutas — siempre se sirve desde la raíz del VirtualHost
     if ($url === 'builder') {
-        header('Location: /builder-login');
+        header("Location: {$__base}/builder-login");
     } else {
-        header('Location: /marketplace/login');
+        header("Location: {$__base}/marketplace/login");
     }
     exit;
 }

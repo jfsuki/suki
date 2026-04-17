@@ -31,11 +31,14 @@ if ($masterKey === '') {
 }
 $error = '';
 
+// Detectar subdirectorio base (/suki en Laragon, vacío en vhost raíz)
+$__baseTower = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
+
 // Procesar Login si se envía el formulario
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['master_key'])) {
     if ($_POST['master_key'] === $masterKey) {
         $_SESSION['suki_tower_auth'] = true;
-        header('Location: /torre');
+        header("Location: {$__baseTower}/torre");
         exit;
     } else {
         $error = 'Master Key inválida. Intento registrado en SecurityHub.';

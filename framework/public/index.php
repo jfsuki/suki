@@ -12,6 +12,9 @@ if (class_exists(\App\Core\AuthMiddleware::class)) {
     \App\Core\AuthMiddleware::checkConcurrentSession(false);
 }
 
+// Detectar subdirectorio base (/suki en Laragon, vacío en vhost raíz)
+$__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
+
 // 1. Capturar la ruta. Por defecto a 'marketplace'
 $url = isset($_GET['url']) ? trim($_GET['url'], '/') : 'marketplace';
 if ($url === '') {
@@ -20,7 +23,7 @@ if ($url === '') {
 
 if ($url === 'logout' || $url === 'builder/logout') {
     session_destroy();
-    header("Location: /marketplace/");
+    header("Location: {$__base}/marketplace/");
     exit;
 }
 
@@ -42,7 +45,7 @@ if (array_key_exists($url, $routes)) {
     // Verificar Seguridad
     if (!($route['public'] ?? false)) {
         if (!isset($_SESSION['user_id'])) {
-            header('Location: /marketplace/login');
+            header("Location: {$__base}/marketplace/login");
             exit;
         }
         if (isset($route['role']) && ($_SESSION['role'] ?? '') !== $route['role']) {

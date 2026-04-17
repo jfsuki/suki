@@ -147,7 +147,8 @@ $desc = $descriptions[$code] ?? 'Se ha producido una excepción no controlada en
         <h1><?php echo $title; ?></h1>
         <p class="description"><?php echo $desc; ?></p>
         
-        <a href="/suki/marketplace" class="btn-home">Retornar al Marketplace</a>
+        <?php $__errBase = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : ''; ?>
+        <a href="<?= $__errBase ?>/marketplace" class="btn-home">Retornar al Marketplace</a>
         
         <div class="footer-logo">SUKI OS CORE SECURE</div>
     </div>

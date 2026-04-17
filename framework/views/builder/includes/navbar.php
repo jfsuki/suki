@@ -7,17 +7,17 @@
   </div>
   <div class="nav-actions">
     <!-- Links strictly for the Builder world -->
-    <a href="/suki/builder" class="nav-btn <?= (isset($current_page) && $current_page==='chat') ? 'active' : '' ?>">
+    <a href="<?= htmlspecialchars(($__base ?? '') . '/builder') ?>" class="nav-btn <?= (isset($current_page) && $current_page==='chat') ? 'active' : '' ?>">
        💬 Orchestrator
     </a>
-    <a href="/suki/editor" class="nav-btn <?= (isset($current_page) && $current_page==='editor') ? 'active' : '' ?>">
+    <a href="<?= htmlspecialchars(($__base ?? '') . '/editor') ?>" class="nav-btn <?= (isset($current_page) && $current_page==='editor') ? 'active' : '' ?>">
        🛠️ Studio / Editor
     </a>
     <a href="#" class="nav-btn primary" id="testModeNav">🧪 Test Mode</a>
     
     <div style="margin-left: 14px; border-left: 1px solid var(--border); padding-left: 14px; display: flex; align-items: center; gap: 10px;">
         <span style="font-size: 10px; color: var(--muted); font-weight: 600; text-transform: uppercase;">Architect Mode</span>
-        <a href="logout" class="nav-btn" style="border-color: var(--danger); color: var(--danger);">Salir</a>
+        <a href="<?= htmlspecialchars(($__base ?? '') . '/logout') ?>" class="nav-btn" style="border-color: var(--danger); color: var(--danger);">Salir</a>
     </div>
   </div>
 </nav>
