@@ -10,7 +10,7 @@ final class AlanubeIntegrationAdapter implements IntegrationAdapterInterface
     public function execute(string $action, array $integration, array $payload, array $context = []): array
     {
         $token = $this->resolveToken($integration, $payload);
-        $baseUrl = (string) ($integration['base_url'] ?? '');
+        $baseUrl = $this->resolveBaseUrl($integration);
         $client = new AlanubeClient($baseUrl, $token);
         $endpoint = (string) ($payload['endpoint'] ?? '/documents');
 
@@ -33,9 +33,42 @@ final class AlanubeIntegrationAdapter implements IntegrationAdapterInterface
                 }
                 $body = is_array($payload['body'] ?? null) ? (array) $payload['body'] : [];
                 return $client->cancelDocument($endpoint, $externalId, $body);
+            case 'list_received':
+                $companyId = trim((string) ($payload['company_id'] ?? $integration['company_id'] ?? ''));
+                if ($companyId === '') {
+                    $metaCompany = is_array($integration['metadata'] ?? null) ? (array) $integration['metadata'] : [];
+                    $companyId = trim((string) ($metaCompany['company_id'] ?? ''));
+                }
+                if ($companyId === '') {
+                    throw new RuntimeException('company_id requerido para listar documentos recibidos.');
+                }
+                $filters = is_array($payload['filters'] ?? null) ? (array) $payload['filters'] : [];
+                return $client->listReceivedDocuments($companyId, $filters);
+            case 'get_received':
+                $documentId = (string) ($payload['document_id'] ?? '');
+                if ($documentId === '') {
+                    throw new RuntimeException('document_id requerido para consultar documento recibido.');
+                }
+                return $client->getReceivedDocument($documentId);
             default:
                 throw new RuntimeException('Accion Alanube no soportada: ' . $action);
         }
+    }
+
+    /**
+     * @param array<string,mixed> $integration
+     */
+    private function resolveBaseUrl(array $integration): string
+    {
+        $url = trim((string) ($integration['base_url'] ?? ''));
+        if ($url !== '') {
+            return $url;
+        }
+        $envUrl = trim((string) getenv('ALANUBE_BASE_URL'));
+        if ($envUrl !== '') {
+            return $envUrl;
+        }
+        return 'https://api.alanube.co/co/v1';
     }
 
     /**

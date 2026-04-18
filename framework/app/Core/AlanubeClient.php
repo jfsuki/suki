@@ -45,6 +45,53 @@ final class AlanubeClient
         return $this->request('POST', $endpoint . '/' . rawurlencode($externalId) . '/cancel', $payload);
     }
 
+    /**
+     * GET /received-documents/idCompany/{companyId}
+     *
+     * @param array<string,mixed> $filters { status?, limit?, page?, start?, end? }
+     * @return array<string,mixed>
+     */
+    public function listReceivedDocuments(string $companyId, array $filters = []): array
+    {
+        $companyId = trim($companyId);
+        if ($companyId === '') {
+            throw new RuntimeException('company_id requerido para listar documentos recibidos.');
+        }
+
+        $query = [];
+        if (!empty($filters['status'])) {
+            $query['status'] = (string) $filters['status'];
+        }
+        $query['limit'] = isset($filters['limit']) ? max(1, min(100, (int) $filters['limit'])) : 25;
+        $query['page'] = isset($filters['page']) ? max(1, (int) $filters['page']) : 1;
+        if (!empty($filters['start'])) {
+            $query['start'] = (string) $filters['start'];
+        }
+        if (!empty($filters['end'])) {
+            $query['end'] = (string) $filters['end'];
+        }
+
+        $path = '/received-documents/idCompany/' . rawurlencode($companyId);
+        if ($query !== []) {
+            $path .= '?' . http_build_query($query);
+        }
+        return $this->request('GET', $path);
+    }
+
+    /**
+     * GET /received-documents/{documentId}
+     *
+     * @return array<string,mixed>
+     */
+    public function getReceivedDocument(string $documentId): array
+    {
+        $documentId = trim($documentId);
+        if ($documentId === '') {
+            throw new RuntimeException('document_id requerido para consultar documento recibido.');
+        }
+        return $this->request('GET', '/received-documents/' . rawurlencode($documentId));
+    }
+
     private function request(string $method, string $path, array $payload = [], bool $allowErrors = false): array
     {
         $url = $this->buildUrl($path);

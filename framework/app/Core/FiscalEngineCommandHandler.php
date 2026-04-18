@@ -22,6 +22,7 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
         'BuildFiscalDocumentPayload',
         'RecordFiscalEvent',
         'UpdateFiscalDocumentStatus',
+        'SubmitFiscalDocument',
     ];
 
     public function supports(string $commandName): bool
@@ -144,6 +145,7 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
                     'Estado fiscal actualizado: fiscal_document_id=' . (string) (($document = $service->updateStatus($command + ['tenant_id' => $tenantId, 'app_id' => $appId !== '' ? $appId : null]))['id'] ?? '') . '.',
                     $this->documentData('update_status', $document)
                 ),
+                'SubmitFiscalDocument' => $this->respondSubmit($service, $tenantId, $appId, $command, $context, $reply, $channel, $sessionId, $userId),
                 default => throw new RuntimeException('COMMAND_NOT_SUPPORTED'),
             };
         } catch (Throwable $e) {
@@ -316,6 +318,59 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
     }
 
     /**
+     * Envia el documento fiscal al proveedor externo (Alanube Colombia).
+     *
+     * @param array<string,mixed> $command
+     * @param array<string,mixed> $context
+     * @return array<string,mixed>
+     */
+    private function respondSubmit(
+        FiscalEngineService $service,
+        string $tenantId,
+        string $appId,
+        array $command,
+        array $context,
+        callable $reply,
+        string $channel,
+        string $sessionId,
+        string $userId
+    ): array {
+        $documentId = $this->documentId($command);
+        $tenantProfile = is_array($command['tenant_profile'] ?? null) ? (array) $command['tenant_profile'] : [];
+        if ($tenantProfile === [] && is_array($context['tenant_profile'] ?? null)) {
+            $tenantProfile = (array) $context['tenant_profile'];
+        }
+
+        $orchestrator = $context['integration_orchestrator'] ?? null;
+        if (!$orchestrator instanceof IntegrationActionOrchestrator) {
+            $orchestrator = null;
+        }
+        $builder = $context['alanube_builder'] ?? null;
+        if (!$builder instanceof AlanubePayloadBuilderCO) {
+            $builder = null;
+        }
+
+        $document = $service->submitDocument(
+            $tenantId,
+            $documentId,
+            $appId !== '' ? $appId : null,
+            $tenantProfile,
+            $orchestrator,
+            $builder
+        );
+
+        $alanubeId = (string) ($document['external_reference'] ?? '');
+        $text = 'Documento fiscal enviado a Alanube CO: fiscal_document_id=' . (string) ($document['id'] ?? '')
+            . ($alanubeId !== '' ? ' alanube_id=' . $alanubeId : '') . '.';
+
+        $data = $this->documentData('submit_document', $document);
+        $data['external_reference'] = $alanubeId;
+        $data['provider'] = 'Alanube';
+
+        return $this->withReplyText($reply($text, $channel, $sessionId, $userId, 'success', $data));
+    }
+
+    /**
      * @param array<string, mixed> $document
      * @return array<string, mixed>
      */
@@ -421,6 +476,8 @@ final class FiscalEngineCommandHandler implements CommandHandlerInterface
             'PURCHASE_NOT_FOUND' => 'No encontre la compra origen.',
             'STATUS_REQUIRED', 'FISCAL_STATUS_INVALID' => 'Indica un estado fiscal valido.',
             'FISCAL_STATUS_TRANSITION_INVALID' => 'Ese cambio de estado fiscal no es valido.',
+            'FISCAL_SUBMIT_REQUIRES_PREPARED_STATUS' => 'El documento debe estar en estado prepared/pending para enviarlo a Alanube.',
+            'FISCAL_SUBMIT_PROVIDER_ERROR' => 'Alanube rechazo el envio. Revisa la configuracion del emisor y reintenta.',
             'EVENT_TYPE_REQUIRED' => 'Indica `event_type` para registrar el evento fiscal.',
             'EVENT_STATUS_REQUIRED' => 'Indica `event_status` para registrar el evento fiscal.',
             'FISCAL_LINE_DESCRIPTION_REQUIRED' => 'Cada linea fiscal necesita descripcion.',

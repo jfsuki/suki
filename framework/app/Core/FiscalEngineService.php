@@ -199,6 +199,109 @@ final class FiscalEngineService
     }
 
     /**
+     * Envia un documento fiscal al proveedor externo (Alanube Colombia).
+     *
+     * Flujo:
+     *   1) Carga el documento (debe estar en 'prepared')
+     *   2) Construye el payload interno validado
+     *   3) Traduce a formato Alanube CO via AlanubePayloadBuilderCO
+     *   4) Ejecuta la accion 'emit_document' via IntegrationActionOrchestrator
+     *   5) Si HTTP 2xx: actualiza status a 'submitted' y guarda alanube_id
+     *   6) Si falla: el estado queda en 'prepared', re-lanza RuntimeException
+     *
+     * @param array<string,mixed> $tenantProfile perfil fiscal del emisor
+     * @return array<string,mixed>
+     */
+    public function submitDocument(
+        string $tenantId,
+        string $documentId,
+        ?string $appId = null,
+        array $tenantProfile = [],
+        ?IntegrationActionOrchestrator $orchestrator = null,
+        ?AlanubePayloadBuilderCO $builder = null
+    ): array {
+        $startedAt = microtime(true);
+        $document = $this->getDocument($tenantId, $documentId, $appId);
+        $currentStatus = (string) ($document['status'] ?? '');
+        if (!in_array($currentStatus, ['prepared', 'pending'], true)) {
+            throw new RuntimeException('FISCAL_SUBMIT_REQUIRES_PREPARED_STATUS');
+        }
+
+        $payload = $this->validatedPayload($this->documentPayloadFromDocument($document, $appId));
+        $builder = $builder ?? new AlanubePayloadBuilderCO();
+        $alanubeBody = $builder->build($payload, $tenantProfile);
+
+        $orchestrator = $orchestrator ?? new IntegrationActionOrchestrator();
+        $result = $orchestrator->execute(
+            [
+                'action' => 'emit_document',
+                'provider' => 'Alanube',
+                'entity' => 'fiscal_document',
+                'record_id' => (string) ($document['id'] ?? ''),
+                'payload' => [
+                    'endpoint' => '/documents',
+                    'body' => $alanubeBody,
+                ],
+            ],
+            ['tenant_id' => $tenantId]
+        );
+
+        $status = (int) ($result['status'] ?? 0);
+        if ($status < 200 || $status >= 300) {
+            throw new RuntimeException('FISCAL_SUBMIT_PROVIDER_ERROR');
+        }
+
+        $externalId = (string) ($result['external_id'] ?? '');
+        $providerData = is_array($result['data'] ?? null) ? (array) $result['data'] : [];
+
+        $metadata = is_array($document['metadata'] ?? null) ? (array) $document['metadata'] : [];
+        $metadata['provider'] = [
+            'name' => 'Alanube',
+            'country' => 'CO',
+            'alanube_id' => $externalId,
+            'response' => $providerData,
+            'submitted_at' => date('c'),
+        ];
+        $hooks = is_array($metadata['hooks'] ?? null) ? (array) $metadata['hooks'] : [];
+        $hooks['provider_submission'] = 'submitted';
+        $metadata['hooks'] = $hooks;
+
+        $updated = $this->repository->transaction(function () use ($tenantId, $documentId, $appId, $externalId, $metadata): array {
+            $updated = $this->repository->updateDocument($tenantId, $documentId, [
+                'status' => 'submitted',
+                'external_provider' => 'Alanube',
+                'external_reference' => $externalId !== '' ? $externalId : null,
+                'metadata' => $metadata,
+            ], $appId);
+            if (!is_array($updated)) {
+                throw new RuntimeException('FISCAL_DOCUMENT_NOT_FOUND');
+            }
+            $this->repository->createEvent([
+                'tenant_id' => $tenantId,
+                'app_id' => $appId,
+                'fiscal_document_id' => $documentId,
+                'event_type' => 'provider_submitted',
+                'event_status' => 'submitted',
+                'payload' => [
+                    'provider' => 'Alanube',
+                    'alanube_id' => $externalId,
+                ],
+                'created_at' => date('Y-m-d H:i:s'),
+            ]);
+            return $updated;
+        });
+
+        $updated = $this->validatedDocument($updated);
+        $this->logDocumentEvent('submit_document', $tenantId, $appId, $updated, $this->latencyMs($startedAt), [
+            'fiscal_status' => (string) ($updated['status'] ?? ''),
+            'alanube_id' => $externalId,
+            'http_status' => $status,
+        ]);
+
+        return $updated;
+    }
+
+    /**
      * @param array<string, mixed> $filters
      * @return array<int, array<string, mixed>>
      */

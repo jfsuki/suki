@@ -621,22 +621,6 @@ final class SkillExecutor
 
         if ((string) ($parsed['kind'] ?? '') === 'command') {
             $cmd = is_array($parsed['command'] ?? null) ? (array) $parsed['command'] : [];
-            // Supervisor validation for stock-critical operations
-            if ($name === 'pos_finalize_sale') {
-                $validation = $this->supervisorValidate('STOCK_RESERVED', $cmd['data'] ?? $cmd);
-                if ($validation['status'] === 'REJECTED') {
-                    return [
-                        'action' => 'respond_local',
-                        'reply' => 'No puedo finalizar la venta: ' . ($validation['message'] ?? 'Validacion de negocio fallida.'),
-                        'command' => [],
-                        'skill_result_status' => 'rejected_by_supervisor',
-                        'skill_fallback_reason' => 'business_rule_violation',
-                        'skill_failed' => true,
-                        'routing_hint_steps' => ['cache', 'rules', 'skills'],
-                        'telemetry' => $telemetry,
-                    ];
-                }
-            }
             return [
                 'action' => 'execute_command',
                 'reply' => '',
