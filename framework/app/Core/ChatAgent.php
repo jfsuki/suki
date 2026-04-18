@@ -151,6 +151,7 @@ final class ChatAgent
         $role             = $identity['role'];
         $mode             = $identity['mode'];
         $storageModel     = $identity['storage_model'];
+        $manifest         = $identity['manifest'];
 
         // 2.3.1 REGISTRO AUTOMÁTICO DE ENTRADA
         $this->memory->appendShortTermMemory($resolvedTenantId, $userId, $sessionId, $channel, 'in', $text);
@@ -264,128 +265,7 @@ final class ChatAgent
         }
 
         if (!empty($local['command']) && in_array($local['command'], ['RunTests', 'LLMUsage'], true)) {
-            $utilityTelemetry = $this->buildLocalUtilityTelemetry(
-                (string) ($local['command'] ?? 'local_utility'),
-                $tenantId,
-                $projectId,
-                $sessionId,
-                $userId,
-                $task,
-                $conversationId
-            );
-            $task = $this->controlTowerRecordRoute($task, $utilityTelemetry, 'local_utility');
-            $task = $this->controlTowerMarkRunning($task, [
-                'route_path' => (string) ($utilityTelemetry['route_path'] ?? ''),
-                'gate_decision' => (string) ($utilityTelemetry['gate_decision'] ?? 'allow'),
-            ]);
-            try {
-                $reply = $this->localCommandExecutor()->execute(
-                    $local, $channel, $sessionId, $userId, $mode, $tenantId,
-                    fn($msg, $ch, $sid, $uid, $status = 'success', $data = []) => $this->reply($msg, $ch, $sid, $uid, $status, $data),
-                    fn($tid) => $this->buildLlmUsageSummary($tid)
-                );
-                $reply = $this->annotateReplyWithControlTower($reply, $task);
-                $task = $this->controlTowerCompleteTask($task, [
-                    'result_status' => (string) ($reply['status'] ?? 'success'),
-                    'response_kind' => 'local_utility',
-                    'response_text' => (string) ($reply['data']['reply'] ?? ''),
-                ]);
-                $reply = $this->annotateReplyWithControlTower($reply, $task);
-                $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $utilityTelemetry, $this->latencyMs($requestStartedAt), [
-                    'llm_called' => false,
-                    'error_flag' => false,
-                    'error_type' => 'none',
-                    'tool_calls_count' => 0,
-                    'retry_count' => 0,
-                    'task_id' => (string) ($task['task_id'] ?? ''),
-                    'conversation_id' => $conversationId,
-                ]);
-                $this->telemetry()->record($tenantId, array_merge($utilityTelemetry, [
-                    'message' => $text,
-                    'resolved_locally' => true,
-                    'action' => 'respond_local',
-                    'mode' => $mode,
-                    'session_id' => $sessionId,
-                    'user_id' => $userId,
-                    'project_id' => $projectId,
-                    'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-                    'is_authenticated' => $isAuthenticated,
-                    'effective_role' => $role,
-                ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
-                    $utilityTelemetry,
-                    $tenantId,
-                    $projectId,
-                    $sessionId,
-                    $messageId,
-                    $this->latencyMs($requestStartedAt),
-                    'response.emitted',
-                    [
-                        'llm_called' => false,
-                        'error_flag' => false,
-                        'error_type' => 'none',
-                        'response_kind' => 'local_utility',
-                        'response_text' => (string) ($reply['data']['reply'] ?? ''),
-                        'task_id' => (string) ($task['task_id'] ?? ''),
-                        'conversation_id' => $conversationId,
-                    ]
-                )));
-                return $reply;
-            } catch (\Throwable $e) {
-                $rawError = (string) $e->getMessage();
-                $human = str_contains($rawError, 'SQLSTATE')
-                    ? 'No pude conectar la base de datos. El contrato se guarda, pero falta revisar credenciales DB.'
-                    : 'No pude ejecutar ese paso. Revisa configuracion o permisos.';
-                $failure = $this->controlTowerFailTask($task, [
-                    'error_type' => 'local_utility_failure',
-                    'description' => $human,
-                    'created_at' => date('c'),
-                ]);
-                $task = $failure['task'];
-                $reply = $this->reply($human, $channel, $sessionId, $userId, 'error', [
-                    'error' => $rawError,
-                ]);
-                $reply = $this->annotateReplyWithControlTower($reply, $task, $failure['incident']);
-                $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $utilityTelemetry, $this->latencyMs($requestStartedAt), [
-                    'llm_called' => false,
-                    'error_flag' => true,
-                    'error_type' => 'local_utility_failure',
-                    'tool_calls_count' => 0,
-                    'retry_count' => 0,
-                    'task_id' => (string) ($task['task_id'] ?? ''),
-                    'conversation_id' => $conversationId,
-                ]);
-                $this->telemetry()->record($tenantId, array_merge($utilityTelemetry, [
-                    'message' => $text,
-                    'resolved_locally' => true,
-                    'action' => 'respond_local',
-                    'mode' => $mode,
-                    'session_id' => $sessionId,
-                    'user_id' => $userId,
-                    'project_id' => $projectId,
-                    'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-                    'is_authenticated' => $isAuthenticated,
-                    'effective_role' => $role,
-                    'status' => 'error',
-                ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
-                    $utilityTelemetry,
-                    $tenantId,
-                    $projectId,
-                    $sessionId,
-                    $messageId,
-                    $this->latencyMs($requestStartedAt),
-                    'response.emitted',
-                    [
-                        'llm_called' => false,
-                        'error_flag' => true,
-                        'error_type' => 'local_utility_failure',
-                        'response_kind' => 'local_utility',
-                        'response_text' => (string) ($reply['data']['reply'] ?? ''),
-                        'task_id' => (string) ($task['task_id'] ?? ''),
-                        'conversation_id' => $conversationId,
-                    ]
-                )));
-                return $reply;
-            }
+            return $this->handleLocalUtility($local, $task, $tenantId, $projectId, $sessionId, $userId, $mode, $channel, $messageId, $conversationId, $text, $payload, $isAuthenticated, $role, $requestStartedAt);
         }
         $tRouter = microtime(true);
         $route = $this->intentRouter()->route($result, [
@@ -429,996 +309,540 @@ final class ChatAgent
             $userId
         );
         if (is_array($securityBlock)) {
-            $blockedTelemetry = array_merge($telemetry, [
-                'gate_decision' => 'blocked',
-                'fallback_reason' => 'security_block',
-                'error_type' => 'security_block',
-            ]);
-            $failure = $this->controlTowerFailTask($task, [
-                'error_type' => 'security_block',
-                'description' => (string) (($securityBlock['data']['reply'] ?? $securityBlock['message'] ?? 'Bloqueado por seguridad.')),
-                'created_at' => date('c'),
-            ]);
-            $task = $failure['task'];
-            if ($route->isCommand()) {
-                $this->telemetryBuilder()->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $blockedTelemetry, [
-                    'success' => false,
-                    'execution_latency' => 0,
-                    'error_code' => 'security_block',
-                    'result_status' => 'blocked',
-                    'task_id' => (string) ($task['task_id'] ?? ''),
-                    'conversation_id' => $conversationId,
-                ]);
-            }
-            $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $blockedTelemetry, $this->latencyMs($requestStartedAt), [
-                'llm_called' => false,
-                'error_flag' => true,
-                'error_type' => 'security_block',
-                'tool_calls_count' => 0,
-                'retry_count' => 0,
-                'task_id' => (string) ($task['task_id'] ?? ''),
-                'conversation_id' => $conversationId,
-            ]);
-            $this->telemetry()->record($tenantId, array_merge($blockedTelemetry, [
-                'message' => $text,
-                'resolved_locally' => true,
-                'action' => 'execute_command',
-                'mode' => $mode,
-                'session_id' => $sessionId,
-                'user_id' => $userId,
-                'project_id' => $projectId,
-                'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-                'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
-                'is_authenticated' => $isAuthenticated,
-                'effective_role' => $role,
-                'status' => 'blocked',
-            ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
-                $blockedTelemetry,
-                $tenantId,
-                $projectId,
-                $sessionId,
-                $messageId,
-                $this->latencyMs($requestStartedAt),
-                'response.blocked',
-                [
-                    'llm_called' => false,
-                    'error_flag' => true,
-                    'error_type' => 'security_block',
-                    'response_kind' => 'blocked',
-                    'response_text' => (string) (($securityBlock['data']['reply'] ?? $securityBlock['message'] ?? '')),
-                    'task_id' => (string) ($task['task_id'] ?? ''),
-                    'conversation_id' => $conversationId,
-                ]
-            )));
-            try {
-                $this->telemetryService()->recordIntentMetric([
-                    'tenant_id' => $tenantId,
-                    'project_id' => $projectId,
-                    'session_id' => $sessionId,
-                    'mode' => $mode,
-                    'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
-                    'action' => 'execute_command',
-                    'latency_ms' => $this->latencyMs($requestStartedAt),
-                    'status' => 'blocked',
-                ]);
-            } catch (\Throwable $e) {
-                // observability must not block chat response
-            }
-            return $this->annotateReplyWithControlTower($securityBlock, $task, $failure['incident']);
+            return $this->handleSecurityBlock($securityBlock, $route, $telemetry, $state, $task, $tenantId, $projectId, $sessionId, $userId, $mode, $channel, $messageId, $conversationId, $text, $payload, $isAuthenticated, $role, $result, $requestStartedAt);
         }
 
         if ($route->isLocalResponse()) {
-            $localFailure = null;
-            if ($this->telemetryBuilder()->shouldTraceBlockedToolExecution($telemetry)) {
-                $this->telemetryBuilder()->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $telemetry, [
-                    'success' => false,
-                    'execution_latency' => 0,
-                    'result_status' => (string) ($telemetry['result_status'] ?? 'blocked'),
-                    'task_id' => (string) ($task['task_id'] ?? ''),
-                    'conversation_id' => $conversationId,
-                ]);
-                $localFailure = $this->controlTowerFailTask($task, [
-                    'error_type' => 'quality_gate_block',
-                    'description' => (string) $route->reply(),
-                    'created_at' => date('c'),
-                ]);
-                $task = $localFailure['task'];
-            }
-            $localResponseData = $this->telemetryBuilder()->extractOperationalTelemetryMarkers($telemetry);
-            if (trim((string) ($localResponseData['session_id'] ?? '')) === '') {
-                unset($localResponseData['session_id']);
-            }
-            if (trim((string) ($localResponseData['user_id'] ?? '')) === '') {
-                unset($localResponseData['user_id']);
-            }
-            $reply = $this->reply(
-                $route->reply(),
-                $channel,
-                $sessionId,
-                $userId,
-                'success',
-                $localResponseData
-            );
-            if ($localFailure === null) {
-                $task = $this->controlTowerCompleteTask($task, [
-                    'result_status' => 'success',
-                    'response_kind' => $action,
-                    'response_text' => (string) $route->reply(),
-                ]);
-            }
-            $reply = $this->annotateReplyWithControlTower(
-                $reply,
-                $task,
-                is_array($localFailure) ? ($localFailure['incident'] ?? null) : null
-            );
-            $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
-                'llm_called' => false,
-                'error_flag' => $localFailure !== null,
-                'error_type' => $localFailure !== null ? 'quality_gate_block' : 'none',
-                'tool_calls_count' => 0,
-                'retry_count' => 0,
-                'task_id' => (string) ($task['task_id'] ?? ''),
-                'conversation_id' => $conversationId,
-            ]);
-            $this->telemetry()->record($tenantId, array_merge($telemetry, [
-                'message' => $text,
-                'resolved_locally' => true,
-                'action' => $action,
-                'mode' => $mode,
-                'session_id' => $sessionId,
-                'user_id' => $userId,
-                'project_id' => $projectId,
-                'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-                'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
-                'is_authenticated' => $isAuthenticated,
-                'effective_role' => $role,
-            ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
-                $telemetry,
-                $tenantId,
-                $projectId,
-                $sessionId,
-                $messageId,
-                $this->latencyMs($requestStartedAt),
-                'response.emitted',
-                [
-                    'llm_called' => false,
-                    'error_flag' => $localFailure !== null,
-                    'error_type' => $localFailure !== null ? 'quality_gate_block' : 'none',
-                    'response_kind' => $action,
-                    'response_text' => (string) $route->reply(),
-                    'task_id' => (string) ($task['task_id'] ?? ''),
-                    'conversation_id' => $conversationId,
-                ]
-            )));
-            try {
-                $this->telemetryService()->recordIntentMetric([
-                    'tenant_id' => $tenantId,
-                    'project_id' => $projectId,
-                    'session_id' => $sessionId,
-                    'mode' => $mode,
-                    'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
-                    'action' => $action,
-                    'latency_ms' => $this->latencyMs($requestStartedAt),
-                    'status' => 'success',
-                ]);
-            } catch (\Throwable $e) {
-                // observability must not block chat response
-            }
-            $this->persistToUserMemory($text, (string)$route->reply(), [
-                'user_id' => $userId,
-                'session_id' => $sessionId,
-                'tenant_id' => $tenantId,
-                'role' => $role,
-                'is_test' => $testMode
-            ]);
-
-            $reply = $this->annotateReplyWithFrustration($reply, $frustration);
-            $reply = $this->annotateReplyWithTrainingHint($reply, $telemetry, $mode);
-
-            $out = $this->attachTestInfo($reply, $testMode, $telemetry, [
-
-                'action' => $action,
-                'resolved_locally' => true,
-                'llm_called' => false,
-                'provider_used' => 'none',
-            ]);
-            return $out;
+            return $this->handleLocalResponse($route, $action, $telemetry, $state, $task, $tenantId, $projectId, $sessionId, $userId, $mode, $channel, $messageId, $conversationId, $text, $payload, $isAuthenticated, $role, $testMode, $frustration, $result, $requestStartedAt);
         }
 
         if ($route->isCommand()) {
-            $commandStartedAt = microtime(true);
-            $commandPayload = $route->command();
-            $commandExecutionErrorType = '';
-            $task = $this->controlTowerMarkRunning($task, [
-                'route_path' => (string) ($telemetry['route_path'] ?? ''),
-                'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown'),
-            ]);
-            $qualityGate = $this->evaluateControlTowerQualityGates($telemetry, $commandPayload, $tenantId, $authTenantId, $task);
-            if (($qualityGate['ok'] ?? true) !== true) {
-                $taskManager = $this->taskExecutionManager();
-                if ($taskManager && is_array($task)) {
-                    try {
-                        $task = $taskManager->blockExecution((string) $task['tenant_id'], (string) $task['task_id'], [
-                            'warning_type' => 'quality_gate_block',
-                            'errors' => is_array($qualityGate['errors'] ?? null) ? (array) $qualityGate['errors'] : [],
-                            'checked' => is_array($qualityGate['checked'] ?? null) ? (array) $qualityGate['checked'] : [],
-                            'timestamp' => date('c'),
-                            'source' => 'system',
-                        ]);
-                    } catch (\Throwable $e) {
-                        error_log('[ControlTower] block execution failed: ' . $e->getMessage());
-                    }
-                }
-                $failure = $this->controlTowerFailTask($task, [
-                    'error_type' => 'quality_gate_block',
-                    'description' => 'Bloqueado por Control Tower quality gates.',
-                    'created_at' => date('c'),
-                    'quality_gate' => $qualityGate,
-                ]);
-                $task = $failure['task'];
-                $blockedReply = $this->reply(
-                    'Bloqueado por Control Tower. Falta pasar quality gates antes de ejecutar.',
-                    $channel,
-                    $sessionId,
-                    $userId,
-                    'error',
-                    [
-                        'quality_gate' => $qualityGate,
-                    ]
-                );
-                $blockedReply = $this->annotateReplyWithControlTower($blockedReply, $task, $failure['incident']);
-                $this->telemetryBuilder()->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $telemetry, [
-                    'success' => false,
-                    'execution_latency' => 0,
-                    'error_code' => 'quality_gate_block',
-                    'result_status' => 'blocked',
-                    'task_id' => (string) ($task['task_id'] ?? ''),
-                    'conversation_id' => $conversationId,
-                ]);
-                $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
-                    'llm_called' => false,
-                    'error_flag' => true,
-                    'error_type' => 'quality_gate_block',
-                    'tool_calls_count' => 0,
-                    'retry_count' => 0,
-                    'task_id' => (string) ($task['task_id'] ?? ''),
-                    'conversation_id' => $conversationId,
-                ]);
-                $this->telemetry()->record($tenantId, array_merge($telemetry, [
-                    'message' => $text,
-                    'resolved_locally' => true,
-                    'action' => 'execute_command',
-                    'mode' => $mode,
-                    'session_id' => $sessionId,
-                    'user_id' => $userId,
-                    'project_id' => $projectId,
-                    'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-                    'status' => 'blocked',
-                    'is_authenticated' => $isAuthenticated,
-                    'effective_role' => $role,
-                ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
-                    $telemetry,
-                    $tenantId,
-                    $projectId,
-                    $sessionId,
-                    $messageId,
-                    $this->latencyMs($requestStartedAt),
-                    'response.blocked',
-                    [
-                        'llm_called' => false,
-                        'error_flag' => true,
-                        'error_type' => 'quality_gate_block',
-                        'response_kind' => 'blocked',
-                        'response_text' => (string) ($blockedReply['data']['reply'] ?? ''),
-                        'task_id' => (string) ($task['task_id'] ?? ''),
-                        'conversation_id' => $conversationId,
-                    ]
-                )));
-                return $this->attachTestInfo($blockedReply, $testMode, $telemetry, [
-                    'action' => 'execute_command',
-                    'resolved_locally' => true,
-                    'llm_called' => false,
-                    'provider_used' => 'none',
-                ]);
-            }
-            try {
-                $reply = $this->dispatchCommandPayload($commandPayload, $channel, $sessionId, $userId, $mode);
-                $commandReply = $this->extractReplyTextFromEnvelope($reply);
-                if (($reply['status'] ?? '') === 'success') {
-                    $this->gateway()->rememberExecution(
-                        $tenantId,
-                        $userId,
-                        $projectId,
-                        $mode,
-                        $commandPayload,
-                        (array) ($reply['data'] ?? []),
-                        $text,
-                        $commandReply
-                    );
-                    $followup = $this->gateway()->postExecutionFollowup(
-                        $tenantId,
-                        $userId,
-                        $projectId,
-                        $mode,
-                        $commandPayload,
-                        (array) ($reply['data'] ?? [])
-                    );
-                    if ($followup !== '') {
-                        $current = trim((string) ($reply['data']['reply'] ?? ''));
-                        $reply['data']['reply'] = trim($current . "\n" . $followup);
-                        $reply['reply'] = trim($this->extractReplyTextFromEnvelope($reply));
-                    }
-                }
-            } catch (\Throwable $e) {
-                $rawError = (string) $e->getMessage();
-                $human = $this->humanizeSqlError($rawError);
-                $commandExecutionErrorType = 'command_exception';
-                $reply = $this->reply('No pude ejecutar ese paso. Revisa permisos o datos.', $channel, $sessionId, $userId, 'error', [
-                    'reply' => $human,
-                    'error' => $rawError,
-                ]);
-            }
-            $commandName = (string) ($commandPayload['command'] ?? 'unknown');
-            $commandData = is_array($reply['data'] ?? null) ? (array) $reply['data'] : [];
-            $commandMarkers = $this->telemetryBuilder()->extractOperationalTelemetryMarkers($commandData);
-            $commandTelemetry = array_merge($telemetry, $commandMarkers);
-            $commandStatus = (string) ($reply['status'] ?? 'error');
-            $commandReply = $this->extractReplyTextFromEnvelope($reply);
-            $blockedByGuardrail = $commandStatus !== 'success' && $this->looksLikeGuardrailMessage($commandReply);
-            $commandErrorFlag = $commandStatus !== 'success';
-            $commandErrorType = 'none';
-            if ($commandErrorFlag) {
-                if ($blockedByGuardrail) {
-                    $commandErrorType = 'guardrail_blocked';
-                } elseif ($commandExecutionErrorType !== '') {
-                    $commandErrorType = $commandExecutionErrorType;
-                } else {
-                    $commandErrorType = 'command_failed';
-                }
-            }
-            try {
-                $this->telemetryService()->recordCommandMetric([
-                    'tenant_id' => $tenantId,
-                    'project_id' => $projectId,
-                    'session_id' => $sessionId,
-                    'mode' => $mode,
-                    'command_name' => $commandName,
-                    'latency_ms' => $this->latencyMs($commandStartedAt),
-                    'status' => $commandStatus,
-                    'blocked' => $blockedByGuardrail ? 1 : 0,
-                ]);
-                if ($blockedByGuardrail) {
-                    $this->telemetryService()->recordGuardrailEvent([
-                        'tenant_id' => $tenantId,
-                        'project_id' => $projectId,
-                        'session_id' => $sessionId,
-                        'mode' => $mode,
-                        'guardrail' => 'mode_guard',
-                        'reason' => $commandReply,
-                    ]);
-                }
-            } catch (\Throwable $e) {
-                // observability must not block chat response
-            }
-            $this->telemetryBuilder()->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $commandTelemetry, [
-                'success' => !$commandErrorFlag,
-                'execution_latency' => $this->latencyMs($commandStartedAt),
-                'error_code' => $commandErrorFlag ? $commandErrorType : null,
-                'result_status' => $commandStatus,
-                'command_name' => $commandName,
-                'task_id' => (string) ($task['task_id'] ?? ''),
-                'conversation_id' => $conversationId,
-            ]);
-            if ($commandErrorFlag) {
-                $failure = $this->controlTowerFailTask($task, [
-                    'error_type' => $commandErrorType,
-                    'description' => $commandReply !== '' ? $commandReply : 'Command execution failed.',
-                    'created_at' => date('c'),
-                ]);
-                $task = $failure['task'];
-                $reply = $this->annotateReplyWithControlTower($reply, $task, $failure['incident']);
-            } else {
-                $task = $this->controlTowerCompleteTask($task, [
-                    'result_status' => $commandStatus,
-                    'response_kind' => $action,
-                    'response_text' => $commandReply,
-                    'command_name' => $commandName,
-                ]);
-                $reply = $this->annotateReplyWithControlTower($reply, $task);
-            }
-            $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
-                'llm_called' => false,
-                'error_flag' => $commandErrorFlag,
-                'error_type' => $commandErrorType,
-                'tool_calls_count' => 1,
-                'retry_count' => 0,
-                'task_id' => (string) ($task['task_id'] ?? ''),
-                'conversation_id' => $conversationId,
-            ] + $commandMarkers);
-            $this->telemetry()->record($tenantId, array_merge($commandTelemetry, [
-                'message' => $text,
-                'resolved_locally' => true,
-                'action' => $action,
-                'mode' => $mode,
-                'session_id' => $sessionId,
-                'user_id' => $userId,
-                'project_id' => $projectId,
-                'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-                'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
-                'is_authenticated' => $isAuthenticated,
-                'effective_role' => $role,
-            ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
-                $commandTelemetry,
-                $tenantId,
-                $projectId,
-                $sessionId,
-                $messageId,
-                $this->latencyMs($requestStartedAt),
-                'response.emitted',
-                [
-                    'llm_called' => false,
-                    'error_flag' => $commandErrorFlag,
-                    'error_type' => $commandErrorType,
-                    'response_kind' => $action,
-                    'response_text' => $commandReply,
-                    'task_id' => (string) ($task['task_id'] ?? ''),
-                    'conversation_id' => $conversationId,
-                ] + $commandMarkers
-            )));
-            try {
-                $this->telemetryService()->recordIntentMetric([
-                    'tenant_id' => $tenantId,
-                    'project_id' => $projectId,
-                    'session_id' => $sessionId,
-                    'mode' => $mode,
-                    'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
-                    'action' => $action,
-                    'latency_ms' => $this->latencyMs($requestStartedAt),
-                    'status' => $commandStatus,
-                ]);
-            } catch (\Throwable $e) {
-                // observability must not block chat response
-            }
-            $reply = $this->annotateReplyWithFrustration($reply, $frustration);
-
-            return $this->attachTestInfo($reply, $testMode, $commandTelemetry, [
-
-                'action' => $action,
-                'resolved_locally' => true,
-                'llm_called' => false,
-                'provider_used' => 'none',
-            ]);
+            return $this->handleCommand($route, $action, $telemetry, $state, $task, $tenantId, $projectId, $sessionId, $userId, $mode, $channel, $messageId, $conversationId, $text, $payload, $isAuthenticated, $role, $authTenantId, $testMode, $frustration, $result, $requestStartedAt);
         }
 
         if ($route->isLlmRequest()) {
-            $semanticLocalReply = $this->buildSemanticLocalReply($route, $telemetry);
-            if ($semanticLocalReply !== '') {
-                $task = $this->controlTowerCompleteTask($task, [
-                    'result_status' => 'success',
-                    'response_kind' => 'respond_local',
-                    'response_text' => $semanticLocalReply,
-                    'provider' => 'semantic_memory',
+            return $this->handleLlmRequest($route, $action, $telemetry, $state, $task, $tenantId, $projectId, $sessionId, $userId, $mode, $channel, $messageId, $conversationId, $text, $payload, $isAuthenticated, $role, $testMode, $threadId, $memory, $result, $requestStartedAt);
+        }
+
+        return $this->handleRouteError($action, $telemetry, $task, $tenantId, $projectId, $sessionId, $userId, $mode, $channel, $messageId, $conversationId, $text, $payload, $isAuthenticated, $role, $result, $requestStartedAt);
+    }
+
+    // ─── Route Handlers (extracted from handle()) ───────────────────────────
+
+    private function handleLocalUtility(array $local, array $task, string $tenantId, string $projectId, string $sessionId, string $userId, string $mode, string $channel, string $messageId, string $conversationId, string $text, array $payload, bool $isAuthenticated, string $role, float $requestStartedAt): array
+    {
+        $utilityTelemetry = $this->buildLocalUtilityTelemetry(
+            (string) ($local['command'] ?? 'local_utility'),
+            $tenantId, $projectId, $sessionId, $userId, $task, $conversationId
+        );
+        $task = $this->controlTowerRecordRoute($task, $utilityTelemetry, 'local_utility');
+        $task = $this->controlTowerMarkRunning($task, [
+            'route_path'   => (string) ($utilityTelemetry['route_path'] ?? ''),
+            'gate_decision' => (string) ($utilityTelemetry['gate_decision'] ?? 'allow'),
+        ]);
+        try {
+            $reply = $this->localCommandExecutor()->execute(
+                $local, $channel, $sessionId, $userId, $mode, $tenantId,
+                fn($msg, $ch, $sid, $uid, $status = 'success', $data = []) => $this->reply($msg, $ch, $sid, $uid, $status, $data),
+                fn($tid) => $this->buildLlmUsageSummary($tid)
+            );
+            $reply = $this->annotateReplyWithControlTower($reply, $task);
+            $task  = $this->controlTowerCompleteTask($task, [
+                'result_status' => (string) ($reply['status'] ?? 'success'),
+                'response_kind' => 'local_utility',
+                'response_text' => (string) ($reply['data']['reply'] ?? ''),
+            ]);
+            $reply = $this->annotateReplyWithControlTower($reply, $task);
+            $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $utilityTelemetry, $this->latencyMs($requestStartedAt), [
+                'llm_called' => false, 'error_flag' => false, 'error_type' => 'none',
+                'tool_calls_count' => 0, 'retry_count' => 0,
+                'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
+            ]);
+            $this->telemetry()->record($tenantId, array_merge($utilityTelemetry, [
+                'message' => $text, 'resolved_locally' => true, 'action' => 'respond_local',
+                'mode' => $mode, 'session_id' => $sessionId, 'user_id' => $userId,
+                'project_id' => $projectId, 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                'is_authenticated' => $isAuthenticated, 'effective_role' => $role,
+            ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
+                $utilityTelemetry, $tenantId, $projectId, $sessionId, $messageId,
+                $this->latencyMs($requestStartedAt), 'response.emitted',
+                ['llm_called' => false, 'error_flag' => false, 'error_type' => 'none',
+                 'response_kind' => 'local_utility', 'response_text' => (string) ($reply['data']['reply'] ?? ''),
+                 'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId]
+            )));
+            return $reply;
+        } catch (\Throwable $e) {
+            $rawError = (string) $e->getMessage();
+            $human = str_contains($rawError, 'SQLSTATE')
+                ? 'No pude conectar la base de datos. El contrato se guarda, pero falta revisar credenciales DB.'
+                : 'No pude ejecutar ese paso. Revisa configuracion o permisos.';
+            $failure = $this->controlTowerFailTask($task, ['error_type' => 'local_utility_failure', 'description' => $human, 'created_at' => date('c')]);
+            $task    = $failure['task'];
+            $reply   = $this->reply($human, $channel, $sessionId, $userId, 'error', ['error' => $rawError]);
+            $reply   = $this->annotateReplyWithControlTower($reply, $task, $failure['incident']);
+            $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $utilityTelemetry, $this->latencyMs($requestStartedAt), [
+                'llm_called' => false, 'error_flag' => true, 'error_type' => 'local_utility_failure',
+                'tool_calls_count' => 0, 'retry_count' => 0,
+                'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
+            ]);
+            $this->telemetry()->record($tenantId, array_merge($utilityTelemetry, [
+                'message' => $text, 'resolved_locally' => true, 'action' => 'respond_local',
+                'mode' => $mode, 'session_id' => $sessionId, 'user_id' => $userId,
+                'project_id' => $projectId, 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                'is_authenticated' => $isAuthenticated, 'effective_role' => $role, 'status' => 'error',
+            ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
+                $utilityTelemetry, $tenantId, $projectId, $sessionId, $messageId,
+                $this->latencyMs($requestStartedAt), 'response.emitted',
+                ['llm_called' => false, 'error_flag' => true, 'error_type' => 'local_utility_failure',
+                 'response_kind' => 'local_utility', 'response_text' => (string) ($reply['data']['reply'] ?? ''),
+                 'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId]
+            )));
+            return $reply;
+        }
+    }
+
+    private function handleSecurityBlock(array $securityBlock, IntentRouteResult $route, array $telemetry, array $state, array $task, string $tenantId, string $projectId, string $sessionId, string $userId, string $mode, string $channel, string $messageId, string $conversationId, string $text, array $payload, bool $isAuthenticated, string $role, array $result, float $requestStartedAt): array
+    {
+        $blockedTelemetry = array_merge($telemetry, ['gate_decision' => 'blocked', 'fallback_reason' => 'security_block', 'error_type' => 'security_block']);
+        $failure = $this->controlTowerFailTask($task, [
+            'error_type' => 'security_block',
+            'description' => (string) (($securityBlock['data']['reply'] ?? $securityBlock['message'] ?? 'Bloqueado por seguridad.')),
+            'created_at' => date('c'),
+        ]);
+        $task = $failure['task'];
+        if ($route->isCommand()) {
+            $this->telemetryBuilder()->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $blockedTelemetry, [
+                'success' => false, 'execution_latency' => 0, 'error_code' => 'security_block',
+                'result_status' => 'blocked', 'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
+            ]);
+        }
+        $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $blockedTelemetry, $this->latencyMs($requestStartedAt), [
+            'llm_called' => false, 'error_flag' => true, 'error_type' => 'security_block',
+            'tool_calls_count' => 0, 'retry_count' => 0,
+            'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
+        ]);
+        $this->telemetry()->record($tenantId, array_merge($blockedTelemetry, [
+            'message' => $text, 'resolved_locally' => true, 'action' => 'execute_command',
+            'mode' => $mode, 'session_id' => $sessionId, 'user_id' => $userId,
+            'project_id' => $projectId, 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+            'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
+            'is_authenticated' => $isAuthenticated, 'effective_role' => $role, 'status' => 'blocked',
+        ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
+            $blockedTelemetry, $tenantId, $projectId, $sessionId, $messageId,
+            $this->latencyMs($requestStartedAt), 'response.blocked',
+            ['llm_called' => false, 'error_flag' => true, 'error_type' => 'security_block',
+             'response_kind' => 'blocked', 'response_text' => (string) (($securityBlock['data']['reply'] ?? $securityBlock['message'] ?? '')),
+             'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId]
+        )));
+        try {
+            $this->telemetryService()->recordIntentMetric([
+                'tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId, 'mode' => $mode,
+                'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
+                'action' => 'execute_command', 'latency_ms' => $this->latencyMs($requestStartedAt), 'status' => 'blocked',
+            ]);
+        } catch (\Throwable $e) {}
+        return $this->annotateReplyWithControlTower($securityBlock, $task, $failure['incident']);
+    }
+
+    private function handleLocalResponse(IntentRouteResult $route, string $action, array $telemetry, array $state, array $task, string $tenantId, string $projectId, string $sessionId, string $userId, string $mode, string $channel, string $messageId, string $conversationId, string $text, array $payload, bool $isAuthenticated, string $role, bool $testMode, array $frustration, array $result, float $requestStartedAt): array
+    {
+        $localFailure = null;
+        if ($this->telemetryBuilder()->shouldTraceBlockedToolExecution($telemetry)) {
+            $this->telemetryBuilder()->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $telemetry, [
+                'success' => false, 'execution_latency' => 0,
+                'result_status' => (string) ($telemetry['result_status'] ?? 'blocked'),
+                'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
+            ]);
+            $localFailure = $this->controlTowerFailTask($task, ['error_type' => 'quality_gate_block', 'description' => (string) $route->reply(), 'created_at' => date('c')]);
+            $task = $localFailure['task'];
+        }
+        $localResponseData = $this->telemetryBuilder()->extractOperationalTelemetryMarkers($telemetry);
+        if (trim((string) ($localResponseData['session_id'] ?? '')) === '') { unset($localResponseData['session_id']); }
+        if (trim((string) ($localResponseData['user_id'] ?? '')) === '') { unset($localResponseData['user_id']); }
+        $reply = $this->reply($route->reply(), $channel, $sessionId, $userId, 'success', $localResponseData);
+        if ($localFailure === null) {
+            $task = $this->controlTowerCompleteTask($task, ['result_status' => 'success', 'response_kind' => $action, 'response_text' => (string) $route->reply()]);
+        }
+        $reply = $this->annotateReplyWithControlTower($reply, $task, is_array($localFailure) ? ($localFailure['incident'] ?? null) : null);
+        $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+            'llm_called' => false, 'error_flag' => $localFailure !== null,
+            'error_type' => $localFailure !== null ? 'quality_gate_block' : 'none',
+            'tool_calls_count' => 0, 'retry_count' => 0,
+            'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
+        ]);
+        $this->telemetry()->record($tenantId, array_merge($telemetry, [
+            'message' => $text, 'resolved_locally' => true, 'action' => $action,
+            'mode' => $mode, 'session_id' => $sessionId, 'user_id' => $userId,
+            'project_id' => $projectId, 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+            'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
+            'is_authenticated' => $isAuthenticated, 'effective_role' => $role,
+        ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
+            $telemetry, $tenantId, $projectId, $sessionId, $messageId,
+            $this->latencyMs($requestStartedAt), 'response.emitted',
+            ['llm_called' => false, 'error_flag' => $localFailure !== null,
+             'error_type' => $localFailure !== null ? 'quality_gate_block' : 'none',
+             'response_kind' => $action, 'response_text' => (string) $route->reply(),
+             'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId]
+        )));
+        try {
+            $this->telemetryService()->recordIntentMetric([
+                'tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId, 'mode' => $mode,
+                'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
+                'action' => $action, 'latency_ms' => $this->latencyMs($requestStartedAt), 'status' => 'success',
+            ]);
+        } catch (\Throwable $e) {}
+        $this->persistToUserMemory($text, (string) $route->reply(), [
+            'user_id' => $userId, 'session_id' => $sessionId, 'tenant_id' => $tenantId, 'role' => $role, 'is_test' => $testMode,
+        ]);
+        $reply = $this->annotateReplyWithFrustration($reply, $frustration);
+        $reply = $this->annotateReplyWithTrainingHint($reply, $telemetry, $mode);
+        return $this->attachTestInfo($reply, $testMode, $telemetry, [
+            'action' => $action, 'resolved_locally' => true, 'llm_called' => false, 'provider_used' => 'none',
+        ]);
+    }
+
+    private function handleCommand(IntentRouteResult $route, string $action, array $telemetry, array $state, array $task, string $tenantId, string $projectId, string $sessionId, string $userId, string $mode, string $channel, string $messageId, string $conversationId, string $text, array $payload, bool $isAuthenticated, string $role, string $authTenantId, bool $testMode, array $frustration, array $result, float $requestStartedAt): array
+    {
+        $commandStartedAt        = microtime(true);
+        $commandPayload          = $route->command();
+        $commandExecutionErrorType = '';
+        $task = $this->controlTowerMarkRunning($task, [
+            'route_path'   => (string) ($telemetry['route_path'] ?? ''),
+            'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown'),
+        ]);
+        $qualityGate = $this->evaluateControlTowerQualityGates($telemetry, $commandPayload, $tenantId, $authTenantId, $task);
+        if (($qualityGate['ok'] ?? true) !== true) {
+            $taskManager = $this->taskExecutionManager();
+            if ($taskManager && is_array($task)) {
+                try {
+                    $task = $taskManager->blockExecution((string) $task['tenant_id'], (string) $task['task_id'], [
+                        'warning_type' => 'quality_gate_block',
+                        'errors'   => is_array($qualityGate['errors'] ?? null) ? (array) $qualityGate['errors'] : [],
+                        'checked'  => is_array($qualityGate['checked'] ?? null) ? (array) $qualityGate['checked'] : [],
+                        'timestamp' => date('c'), 'source' => 'system',
+                    ]);
+                } catch (\Throwable $e) { error_log('[ControlTower] block execution failed: ' . $e->getMessage()); }
+            }
+            $failure     = $this->controlTowerFailTask($task, ['error_type' => 'quality_gate_block', 'description' => 'Bloqueado por Control Tower quality gates.', 'created_at' => date('c'), 'quality_gate' => $qualityGate]);
+            $task        = $failure['task'];
+            $blockedReply = $this->reply('Bloqueado por Control Tower. Falta pasar quality gates antes de ejecutar.', $channel, $sessionId, $userId, 'error', ['quality_gate' => $qualityGate]);
+            $blockedReply = $this->annotateReplyWithControlTower($blockedReply, $task, $failure['incident']);
+            $this->telemetryBuilder()->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $telemetry, [
+                'success' => false, 'execution_latency' => 0, 'error_code' => 'quality_gate_block',
+                'result_status' => 'blocked', 'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
+            ]);
+            $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+                'llm_called' => false, 'error_flag' => true, 'error_type' => 'quality_gate_block',
+                'tool_calls_count' => 0, 'retry_count' => 0,
+                'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
+            ]);
+            $this->telemetry()->record($tenantId, array_merge($telemetry, [
+                'message' => $text, 'resolved_locally' => true, 'action' => 'execute_command',
+                'mode' => $mode, 'session_id' => $sessionId, 'user_id' => $userId,
+                'project_id' => $projectId, 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                'status' => 'blocked', 'is_authenticated' => $isAuthenticated, 'effective_role' => $role,
+            ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
+                $telemetry, $tenantId, $projectId, $sessionId, $messageId,
+                $this->latencyMs($requestStartedAt), 'response.blocked',
+                ['llm_called' => false, 'error_flag' => true, 'error_type' => 'quality_gate_block',
+                 'response_kind' => 'blocked', 'response_text' => (string) ($blockedReply['data']['reply'] ?? ''),
+                 'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId]
+            )));
+            return $this->attachTestInfo($blockedReply, $testMode, $telemetry, [
+                'action' => 'execute_command', 'resolved_locally' => true, 'llm_called' => false, 'provider_used' => 'none',
+            ]);
+        }
+        try {
+            $reply = $this->dispatchCommandPayload($commandPayload, $channel, $sessionId, $userId, $mode);
+            $commandReply = $this->extractReplyTextFromEnvelope($reply);
+            if (($reply['status'] ?? '') === 'success') {
+                $this->gateway()->rememberExecution($tenantId, $userId, $projectId, $mode, $commandPayload, (array) ($reply['data'] ?? []), $text, $commandReply);
+                $followup = $this->gateway()->postExecutionFollowup($tenantId, $userId, $projectId, $mode, $commandPayload, (array) ($reply['data'] ?? []));
+                if ($followup !== '') {
+                    $current = trim((string) ($reply['data']['reply'] ?? ''));
+                    $reply['data']['reply'] = trim($current . "\n" . $followup);
+                    $reply['reply'] = trim($this->extractReplyTextFromEnvelope($reply));
+                }
+            }
+        } catch (\Throwable $e) {
+            $rawError = (string) $e->getMessage();
+            $commandExecutionErrorType = 'command_exception';
+            $reply = $this->reply('No pude ejecutar ese paso. Revisa permisos o datos.', $channel, $sessionId, $userId, 'error', [
+                'reply' => $this->humanizeSqlError($rawError), 'error' => $rawError,
+            ]);
+        }
+        $commandName     = (string) ($commandPayload['command'] ?? 'unknown');
+        $commandData     = is_array($reply['data'] ?? null) ? (array) $reply['data'] : [];
+        $commandMarkers  = $this->telemetryBuilder()->extractOperationalTelemetryMarkers($commandData);
+        $commandTelemetry = array_merge($telemetry, $commandMarkers);
+        $commandStatus   = (string) ($reply['status'] ?? 'error');
+        $commandReply    = $this->extractReplyTextFromEnvelope($reply);
+        $blockedByGuardrail = $commandStatus !== 'success' && $this->looksLikeGuardrailMessage($commandReply);
+        $commandErrorFlag = $commandStatus !== 'success';
+        $commandErrorType = 'none';
+        if ($commandErrorFlag) {
+            $commandErrorType = $blockedByGuardrail ? 'guardrail_blocked' : ($commandExecutionErrorType !== '' ? $commandExecutionErrorType : 'command_failed');
+        }
+        try {
+            $this->telemetryService()->recordCommandMetric([
+                'tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId, 'mode' => $mode,
+                'command_name' => $commandName, 'latency_ms' => $this->latencyMs($commandStartedAt),
+                'status' => $commandStatus, 'blocked' => $blockedByGuardrail ? 1 : 0,
+            ]);
+            if ($blockedByGuardrail) {
+                $this->telemetryService()->recordGuardrailEvent([
+                    'tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId,
+                    'mode' => $mode, 'guardrail' => 'mode_guard', 'reason' => $commandReply,
                 ]);
-                $semanticReply = $this->reply($semanticLocalReply, $channel, $sessionId, $userId, 'success', [
-                    'provider_used' => 'semantic_memory',
-                    'memory_type' => (string) ($telemetry['memory_type'] ?? ''),
+            }
+        } catch (\Throwable $e) {}
+        $this->telemetryBuilder()->recordToolExecutionTrace($tenantId, $projectId, $sessionId, $commandTelemetry, [
+            'success' => !$commandErrorFlag, 'execution_latency' => $this->latencyMs($commandStartedAt),
+            'error_code' => $commandErrorFlag ? $commandErrorType : null, 'result_status' => $commandStatus,
+            'command_name' => $commandName, 'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
+        ]);
+        if ($commandErrorFlag) {
+            $failure = $this->controlTowerFailTask($task, ['error_type' => $commandErrorType, 'description' => $commandReply !== '' ? $commandReply : 'Command execution failed.', 'created_at' => date('c')]);
+            $task    = $failure['task'];
+            $reply   = $this->annotateReplyWithControlTower($reply, $task, $failure['incident']);
+        } else {
+            $task  = $this->controlTowerCompleteTask($task, ['result_status' => $commandStatus, 'response_kind' => $action, 'response_text' => $commandReply, 'command_name' => $commandName]);
+            $reply = $this->annotateReplyWithControlTower($reply, $task);
+        }
+        $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+            'llm_called' => false, 'error_flag' => $commandErrorFlag, 'error_type' => $commandErrorType,
+            'tool_calls_count' => 1, 'retry_count' => 0,
+            'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
+        ] + $commandMarkers);
+        $this->telemetry()->record($tenantId, array_merge($commandTelemetry, [
+            'message' => $text, 'resolved_locally' => true, 'action' => $action,
+            'mode' => $mode, 'session_id' => $sessionId, 'user_id' => $userId,
+            'project_id' => $projectId, 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+            'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
+            'is_authenticated' => $isAuthenticated, 'effective_role' => $role,
+        ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
+            $commandTelemetry, $tenantId, $projectId, $sessionId, $messageId,
+            $this->latencyMs($requestStartedAt), 'response.emitted',
+            ['llm_called' => false, 'error_flag' => $commandErrorFlag, 'error_type' => $commandErrorType,
+             'response_kind' => $action, 'response_text' => $commandReply,
+             'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId] + $commandMarkers
+        )));
+        try {
+            $this->telemetryService()->recordIntentMetric([
+                'tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId, 'mode' => $mode,
+                'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
+                'action' => $action, 'latency_ms' => $this->latencyMs($requestStartedAt), 'status' => $commandStatus,
+            ]);
+        } catch (\Throwable $e) {}
+        $reply = $this->annotateReplyWithFrustration($reply, $frustration);
+        return $this->attachTestInfo($reply, $testMode, $commandTelemetry, [
+            'action' => $action, 'resolved_locally' => true, 'llm_called' => false, 'provider_used' => 'none',
+        ]);
+    }
+
+    private function handleLlmRequest(IntentRouteResult $route, string $action, array $telemetry, array $state, array $task, string $tenantId, string $projectId, string $sessionId, string $userId, string $mode, string $channel, string $messageId, string $conversationId, string $text, array $payload, bool $isAuthenticated, string $role, bool $testMode, string $threadId, object $memory, array $result, float $requestStartedAt): array
+    {
+        $semanticLocalReply = $this->buildSemanticLocalReply($route, $telemetry);
+        if ($semanticLocalReply !== '') {
+            $task = $this->controlTowerCompleteTask($task, ['result_status' => 'success', 'response_kind' => 'respond_local', 'response_text' => $semanticLocalReply, 'provider' => 'semantic_memory']);
+            $semanticReply = $this->reply($semanticLocalReply, $channel, $sessionId, $userId, 'success', [
+                'provider_used' => 'semantic_memory', 'memory_type' => (string) ($telemetry['memory_type'] ?? ''),
+                'source_ids' => is_array($telemetry['source_ids'] ?? null) ? (array) $telemetry['source_ids'] : [],
+                'evidence_gate_status' => (string) ($telemetry['evidence_gate_status'] ?? ''),
+            ]);
+            $semanticReply = $this->annotateReplyWithControlTower($semanticReply, $task);
+            $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+                'llm_called' => false, 'error_flag' => false, 'error_type' => 'none', 'tool_calls_count' => 0, 'retry_count' => 0,
+                'provider_used' => 'semantic_memory', 'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
+            ]);
+            $this->telemetry()->record($tenantId, array_merge($telemetry, [
+                'message' => $text, 'provider_used' => 'semantic_memory', 'resolved_locally' => true, 'action' => 'respond_local',
+                'mode' => $mode, 'llm_request_count' => 0, 'session_id' => $sessionId, 'user_id' => $userId,
+                'project_id' => $projectId, 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
+                'is_authenticated' => $isAuthenticated, 'effective_role' => $role,
+            ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
+                $telemetry, $tenantId, $projectId, $sessionId, $messageId, $this->latencyMs($requestStartedAt), 'response.emitted',
+                ['llm_called' => false, 'error_flag' => false, 'error_type' => 'none', 'response_kind' => 'respond_local',
+                 'response_text' => $semanticLocalReply, 'provider_used' => 'semantic_memory',
+                 'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId]
+            )));
+            try { $this->telemetryService()->recordIntentMetric(['tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId, 'mode' => $mode, 'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'), 'action' => 'respond_local', 'latency_ms' => $this->latencyMs($requestStartedAt), 'status' => 'success']); } catch (\Throwable $ignored) {}
+            return $this->attachTestInfo($semanticReply, $testMode, $telemetry, ['action' => 'respond_local', 'resolved_locally' => true, 'llm_called' => false, 'provider_used' => 'semantic_memory']);
+        }
+
+        $task = $this->controlTowerMarkRunning($task, ['route_path' => (string) ($telemetry['route_path'] ?? ''), 'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown')]);
+        try {
+            $history = $memory->load($threadId);
+            $systemPrompt = @file_get_contents(dirname(__DIR__, 2) . '/prompts/builder_system_prompt.txt') ?: "Eres SUKI. Responde breve y claro.";
+            if ($mode === 'builder') {
+                try {
+                    $journalCtx = (new AgentJournalService())->buildContextBlock($tenantId, $projectId, 'architect', $sessionId);
+                    if ($journalCtx !== '') { $systemPrompt .= "\n\n---\nBITÁCORA DE ARQUITECTURA (no olvides esto):\n" . $journalCtx . "\n---"; }
+                } catch (\Throwable $ignored) {}
+            }
+            $messages = [['role' => 'system', 'content' => $systemPrompt]];
+            foreach ($history as $msg) { $messages[] = ['role' => $msg['role'], 'content' => $msg['content']]; }
+            $llmResult = $this->llmRouter()->complete($messages, [
+                'mode' => $mode, 'tenant_id' => $tenantId, 'project_id' => $projectId,
+                'session_id' => $sessionId, 'user_id' => $userId, 'policy' => $route->llmRequest()['policy'] ?? [],
+            ]);
+        } catch (\Throwable $e) {
+            $llmFailure = $this->extractLlmFailureDetails($e);
+            $userSafeLlmUnavailableReply = $this->buildUserSafeLlmUnavailableReply($mode);
+            $semanticFailureReply = $this->buildSemanticLlmFailureReply($route, $telemetry);
+            if ($semanticFailureReply !== '') {
+                $task = $this->controlTowerCompleteTask($task, ['result_status' => 'success', 'response_kind' => 'respond_local', 'response_text' => $semanticFailureReply, 'provider' => 'semantic_memory']);
+                $semanticReply = $this->reply($semanticFailureReply, $channel, $sessionId, $userId, 'success', [
+                    'provider_used' => 'semantic_memory', 'memory_type' => (string) ($telemetry['memory_type'] ?? ''),
                     'source_ids' => is_array($telemetry['source_ids'] ?? null) ? (array) $telemetry['source_ids'] : [],
                     'evidence_gate_status' => (string) ($telemetry['evidence_gate_status'] ?? ''),
                 ]);
                 $semanticReply = $this->annotateReplyWithControlTower($semanticReply, $task);
                 $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
-                    'llm_called' => false,
-                    'error_flag' => false,
-                    'error_type' => 'none',
-                    'tool_calls_count' => 0,
-                    'retry_count' => 0,
-                    'provider_used' => 'semantic_memory',
-                    'task_id' => (string) ($task['task_id'] ?? ''),
-                    'conversation_id' => $conversationId,
+                    'llm_called' => true, 'error_flag' => false, 'error_type' => 'llm_unavailable',
+                    'tool_calls_count' => 0, 'retry_count' => 0, 'provider_used' => 'semantic_memory',
+                    'llm_provider_attempted' => 'llm', 'llm_error' => $llmFailure['message'],
+                    'provider_errors' => $llmFailure['provider_errors'], 'provider_statuses' => $llmFailure['provider_statuses'],
+                    'semantic_fallback_used' => true, 'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
                 ]);
                 $this->telemetry()->record($tenantId, array_merge($telemetry, [
-                    'message' => $text,
-                    'provider_used' => 'semantic_memory',
-                    'resolved_locally' => true,
-                    'action' => 'respond_local',
-                    'mode' => $mode,
-                    'llm_request_count' => 0,
-                    'session_id' => $sessionId,
-                    'user_id' => $userId,
-                    'project_id' => $projectId,
-                    'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-                    'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
-                    'is_authenticated' => $isAuthenticated,
-                    'effective_role' => $role,
+                    'message' => $text, 'provider_used' => 'semantic_memory', 'resolved_locally' => true, 'action' => 'respond_local',
+                    'mode' => $mode, 'llm_request_count' => 1, 'session_id' => $sessionId, 'user_id' => $userId,
+                    'project_id' => $projectId, 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                    'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''), 'status' => 'success',
+                    'is_authenticated' => $isAuthenticated, 'effective_role' => $role,
                 ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
-                    $telemetry,
-                    $tenantId,
-                    $projectId,
-                    $sessionId,
-                    $messageId,
-                    $this->latencyMs($requestStartedAt),
-                    'response.emitted',
-                    [
-                        'llm_called' => false,
-                        'error_flag' => false,
-                        'error_type' => 'none',
-                        'response_kind' => 'respond_local',
-                        'response_text' => $semanticLocalReply,
-                        'provider_used' => 'semantic_memory',
-                        'task_id' => (string) ($task['task_id'] ?? ''),
-                        'conversation_id' => $conversationId,
-                    ]
+                    $telemetry, $tenantId, $projectId, $sessionId, $messageId, $this->latencyMs($requestStartedAt), 'response.emitted',
+                    ['llm_called' => true, 'error_flag' => false, 'error_type' => 'llm_unavailable', 'response_kind' => 'respond_local',
+                     'response_text' => $semanticFailureReply, 'provider_used' => 'semantic_memory',
+                     'llm_provider_attempted' => 'llm', 'llm_error' => $llmFailure['message'],
+                     'provider_errors' => $llmFailure['provider_errors'], 'provider_statuses' => $llmFailure['provider_statuses'],
+                     'semantic_fallback_used' => true, 'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId]
                 )));
-                try {
-                    $this->telemetryService()->recordIntentMetric([
-                        'tenant_id' => $tenantId,
-                        'project_id' => $projectId,
-                        'session_id' => $sessionId,
-                        'mode' => $mode,
-                        'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
-                        'action' => 'respond_local',
-                        'latency_ms' => $this->latencyMs($requestStartedAt),
-                        'status' => 'success',
-                    ]);
-                } catch (\Throwable $ignored) {
-                    // observability must not block chat response
-                }
-                return $this->attachTestInfo($semanticReply, $testMode, $telemetry, [
-                    'action' => 'respond_local',
-                    'resolved_locally' => true,
-                    'llm_called' => false,
-                    'provider_used' => 'semantic_memory',
-                ]);
+                try { $this->telemetryService()->recordIntentMetric(['tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId, 'mode' => $mode, 'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'), 'action' => 'respond_local', 'latency_ms' => $this->latencyMs($requestStartedAt), 'status' => 'success']); } catch (\Throwable $ignored) {}
+                return $this->attachTestInfo($semanticReply, $testMode, $telemetry, ['action' => 'respond_local', 'resolved_locally' => true, 'llm_called' => true, 'provider_used' => 'semantic_memory', 'llm_provider_attempted' => 'llm', 'llm_error' => $llmFailure['message'], 'provider_errors' => $llmFailure['provider_errors'], 'provider_statuses' => $llmFailure['provider_statuses'], 'semantic_fallback_used' => true]);
             }
-
-            $task = $this->controlTowerMarkRunning($task, [
-                'route_path' => (string) ($telemetry['route_path'] ?? ''),
-                'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown'),
-            ]);
-            try {
-                // --- MEMORY FLOW STEP 3, 5, 6: Load and Build Context ---
-                $history = $memory->load($threadId);
-                $systemPrompt = @file_get_contents(dirname(__DIR__, 2) . '/prompts/builder_system_prompt.txt')
-                    ?: "Eres SUKI. Responde breve y claro.";
-
-                // --- JOURNAL CONTEXT INJECTION: Inject architect journal into system prompt ---
-                if ($mode === 'builder') {
-                    try {
-                        $journalCtx = (new AgentJournalService())
-                            ->buildContextBlock($tenantId, $projectId, 'architect', $sessionId);
-                        if ($journalCtx !== '') {
-                            $systemPrompt .= "\n\n---\nBITÁCORA DE ARQUITECTURA (no olvides esto):\n" . $journalCtx . "\n---";
-                        }
-                    } catch (\Throwable $ignored) {
-                        // Journal context injection must not block chat
-                    }
-                }
-
-                $messages = [['role' => 'system', 'content' => $systemPrompt]];
-                foreach ($history as $msg) {
-                    $messages[] = ['role' => $msg['role'], 'content' => $msg['content']];
-                }
-
-                // --- MEMORY FLOW STEP 7: Call LLM with Memory ---
-                $llmResult = $this->llmRouter()->complete($messages, [
-                    'mode' => $mode,
-                    'tenant_id' => $tenantId,
-                    'project_id' => $projectId,
-                    'session_id' => $sessionId,
-                    'user_id' => $userId,
-                    'policy' => $route->llmRequest()['policy'] ?? [],
-                ]);
-            } catch (\Throwable $e) {
-                $llmFailure = $this->extractLlmFailureDetails($e);
-                $userSafeLlmUnavailableReply = $this->buildUserSafeLlmUnavailableReply($mode);
-                $semanticFailureReply = $this->buildSemanticLlmFailureReply($route, $telemetry);
-                if ($semanticFailureReply !== '') {
-                    $task = $this->controlTowerCompleteTask($task, [
-                        'result_status' => 'success',
-                        'response_kind' => 'respond_local',
-                        'response_text' => $semanticFailureReply,
-                        'provider' => 'semantic_memory',
-                    ]);
-                    $semanticReply = $this->reply($semanticFailureReply, $channel, $sessionId, $userId, 'success', [
-                        'provider_used' => 'semantic_memory',
-                        'memory_type' => (string) ($telemetry['memory_type'] ?? ''),
-                        'source_ids' => is_array($telemetry['source_ids'] ?? null) ? (array) $telemetry['source_ids'] : [],
-                        'evidence_gate_status' => (string) ($telemetry['evidence_gate_status'] ?? ''),
-                    ]);
-                    $semanticReply = $this->annotateReplyWithControlTower($semanticReply, $task);
-                    $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
-                        'llm_called' => true,
-                        'error_flag' => false,
-                        'error_type' => 'llm_unavailable',
-                        'tool_calls_count' => 0,
-                        'retry_count' => 0,
-                        'provider_used' => 'semantic_memory',
-                        'llm_provider_attempted' => 'llm',
-                        'llm_error' => $llmFailure['message'],
-                        'provider_errors' => $llmFailure['provider_errors'],
-                        'provider_statuses' => $llmFailure['provider_statuses'],
-                        'semantic_fallback_used' => true,
-                        'task_id' => (string) ($task['task_id'] ?? ''),
-                        'conversation_id' => $conversationId,
-                    ]);
-                    $this->telemetry()->record($tenantId, array_merge($telemetry, [
-                        'message' => $text,
-                        'provider_used' => 'semantic_memory',
-                        'resolved_locally' => true,
-                        'action' => 'respond_local',
-                        'mode' => $mode,
-                        'llm_request_count' => 1,
-                        'session_id' => $sessionId,
-                        'user_id' => $userId,
-                        'project_id' => $projectId,
-                        'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-                        'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
-                        'status' => 'success',
-                        'is_authenticated' => $isAuthenticated,
-                        'effective_role' => $role,
-                    ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
-                        $telemetry,
-                        $tenantId,
-                        $projectId,
-                        $sessionId,
-                        $messageId,
-                        $this->latencyMs($requestStartedAt),
-                        'response.emitted',
-                        [
-                            'llm_called' => true,
-                            'error_flag' => false,
-                            'error_type' => 'llm_unavailable',
-                            'response_kind' => 'respond_local',
-                            'response_text' => $semanticFailureReply,
-                            'provider_used' => 'semantic_memory',
-                            'llm_provider_attempted' => 'llm',
-                            'llm_error' => $llmFailure['message'],
-                            'provider_errors' => $llmFailure['provider_errors'],
-                            'provider_statuses' => $llmFailure['provider_statuses'],
-                            'semantic_fallback_used' => true,
-                            'task_id' => (string) ($task['task_id'] ?? ''),
-                            'conversation_id' => $conversationId,
-                        ]
-                    )));
-                    try {
-                        $this->telemetryService()->recordIntentMetric([
-                            'tenant_id' => $tenantId,
-                            'project_id' => $projectId,
-                            'session_id' => $sessionId,
-                            'mode' => $mode,
-                            'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
-                            'action' => 'respond_local',
-                            'latency_ms' => $this->latencyMs($requestStartedAt),
-                            'status' => 'success',
-                        ]);
-                    } catch (\Throwable $ignored) {
-                        // observability must not block chat response
-                    }
-                    return $this->attachTestInfo($semanticReply, $testMode, $telemetry, [
-                        'action' => 'respond_local',
-                        'resolved_locally' => true,
-                        'llm_called' => true,
-                        'provider_used' => 'semantic_memory',
-                        'llm_provider_attempted' => 'llm',
-                        'llm_error' => $llmFailure['message'],
-                        'provider_errors' => $llmFailure['provider_errors'],
-                        'provider_statuses' => $llmFailure['provider_statuses'],
-                        'semantic_fallback_used' => true,
-                    ]);
-                }
-                $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
-                    'llm_called' => true,
-                    'error_flag' => true,
-                    'error_type' => 'llm_unavailable',
-                    'tool_calls_count' => 0,
-                    'retry_count' => 0,
-                    'llm_provider_attempted' => 'llm',
-                    'llm_error' => $llmFailure['message'],
-                    'provider_errors' => $llmFailure['provider_errors'],
-                    'provider_statuses' => $llmFailure['provider_statuses'],
-                    'task_id' => (string) ($task['task_id'] ?? ''),
-                    'conversation_id' => $conversationId,
-                ]);
-                $failure = $this->controlTowerFailTask($task, [
-                    'error_type' => 'llm_unavailable',
-                    'description' => $llmFailure['message'] !== ''
-                        ? 'llm_unavailable: ' . $llmFailure['message']
-                        : 'llm_unavailable',
-                    'created_at' => date('c'),
-                ]);
-                $task = $failure['task'];
-                $this->telemetry()->record($tenantId, array_merge($telemetry, [
-                    'message' => $text,
-                    'provider_used' => 'llm',
-                    'resolved_locally' => true,
-                    'action' => $action,
-                    'mode' => $mode,
-                    'llm_request_count' => 1,
-                    'session_id' => $sessionId,
-                    'user_id' => $userId,
-                    'project_id' => $projectId,
-                    'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-                    'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
-                    'status' => 'error',
-                    'is_authenticated' => $isAuthenticated,
-                    'effective_role' => $role,
-                    'llm_error' => $llmFailure['message'],
-                    'provider_errors' => $llmFailure['provider_errors'],
-                    'provider_statuses' => $llmFailure['provider_statuses'],
-                ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
-                    $telemetry,
-                    $tenantId,
-                    $projectId,
-                    $sessionId,
-                    $messageId,
-                    $this->latencyMs($requestStartedAt),
-                    'response.emitted',
-                    [
-                        'llm_called' => true,
-                        'error_flag' => true,
-                        'error_type' => 'llm_unavailable',
-                        'response_kind' => 'respond_local',
-                        'response_text' => $userSafeLlmUnavailableReply,
-                        'llm_provider_attempted' => 'llm',
-                        'llm_error' => $llmFailure['message'],
-                        'provider_errors' => $llmFailure['provider_errors'],
-                        'provider_statuses' => $llmFailure['provider_statuses'],
-                        'task_id' => (string) ($task['task_id'] ?? ''),
-                        'conversation_id' => $conversationId,
-                    ]
-                )));
-                try {
-                    $this->telemetryService()->recordIntentMetric([
-                        'tenant_id' => $tenantId,
-                        'project_id' => $projectId,
-                        'session_id' => $sessionId,
-                        'mode' => $mode,
-                        'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
-                        'action' => $action,
-                        'latency_ms' => $this->latencyMs($requestStartedAt),
-                        'status' => 'error',
-                    ]);
-                } catch (\Throwable $ignored) {
-                    // observability must not block chat response
-                }
-                $errorReply = $this->annotateReplyWithControlTower(
-                    $this->reply($userSafeLlmUnavailableReply, $channel, $sessionId, $userId),
-                    $task,
-                    $failure['incident']
-                );
-                return $this->attachTestInfo($errorReply, $testMode, $telemetry, [
-                    'action' => $action,
-                    'resolved_locally' => true,
-                    'llm_called' => true,
-                    'provider_used' => 'llm',
-                    'llm_provider_attempted' => 'llm',
-                    'llm_error' => $llmFailure['message'],
-                    'provider_errors' => $llmFailure['provider_errors'],
-                    'provider_statuses' => $llmFailure['provider_statuses'],
-                ]);
-            }
-            $provider = $llmResult['provider'] ?? 'llm';
-            $usage = $this->normalizeUsage((array) ($llmResult['usage'] ?? []));
-            $json = $llmResult['json'] ?? null;
-            $responseKind = 'send_to_llm';
-            $responseText = '';
-            if (is_array($json)) {
-                $reply = $this->executeLlmJson($json, $channel, $sessionId, $userId, $mode);
-                $responseText = (string) (($reply['data']['reply'] ?? $reply['reply'] ?? $reply['message'] ?? ''));
-                $responseKind = (isset($json['command']) || (isset($json['actions']) && is_array($json['actions']) && $json['actions'] !== []))
-                    ? 'execute_command'
-                    : 'respond_local';
-            } else {
-                $responseText = (string) ($llmResult['text'] ?? '');
-                if ($responseText === '') {
-                    $responseText = 'Listo.';
-                }
-                $reply = $this->reply($responseText, $channel, $sessionId, $userId);
-            }
-            // --- PERSISTENCE: Auto-title session if needed ---
-            if ($sessionId !== '' && ($session = $this->projectRegistry()->getSession($sessionId))) {
-                if (empty($session['title'])) {
-                    $title = mb_substr($text, 0, 40) . (mb_strlen($text) > 40 ? '...' : '');
-                    $this->projectRegistry()->updateSessionTitle($sessionId, $title);
-                }
-            }
-
-            // --- KEYWORD EXTRACTION: Parse [[KEYWORDS: ...]] marker from LLM response ---
-            $llmKeywords = [];
-            if (preg_match('/\[\[KEYWORDS:\s*([^\]]+)\]\]/ui', $responseText, $kwMatch)) {
-                $rawKws = $kwMatch[1] ?? '';
-                $llmKeywords = array_values(array_filter(
-                    array_map('trim', explode(',', $rawKws)),
-                    fn($k) => mb_strlen($k) >= 2 && mb_strlen($k) <= 40
-                ));
-                // Strip the marker from the user-visible response (including surrounding whitespace/newlines)
-                $responseText = trim(preg_replace('/\n?\[\[KEYWORDS:[^\]]*\]\]\n?/ui', '', $responseText));
-            }
-
-            // --- PERSISTENCE: Update Agent Journal with bot response as 'arch' note ---
-            try {
-                $journalService = new \App\Core\AgentJournalService();
-                // Save LLM-extracted keywords into the journal (replaces regex stopwords approach)
-                if (!empty($llmKeywords)) {
-                    $journalService->mergeKeywords($tenantId, $projectId, 'architect', $llmKeywords, $sessionId);
-                    $this->journalUpdated = true;
-                }
-                // Save note with clean response text
-                $responseSnippet = mb_substr(trim($responseText), 0, 280);
-                if (mb_strlen($responseSnippet) >= 40) {
-                    $journalService->appendNote(
-                        $tenantId,
-                        $projectId,
-                        'architect',
-                        $responseSnippet,
-                        'arch',
-                        $sessionId
-                    );
-                    $this->journalUpdated = true;
-                    $this->journalNoteSaved = true; // Prevent duplicate in reply()
-                }
-            } catch (\Throwable $e) { /* Observability — non fatal */ }
-
-            // --- MEMORY FLOW STEP 8: Persist Assistant Response ---
-            $memory->append($threadId, 'assistant', $responseText);
-            $this->assistantSaved = true;
-
-            $task = $this->controlTowerCompleteTask($task, [
-                'result_status' => 'success',
-                'response_kind' => $responseKind,
-                'response_text' => $responseText,
-                'provider' => (string) $provider,
-            ]);
-            $reply = $this->annotateReplyWithControlTower($reply, $task);
             $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
-                'llm_called' => true,
-                'error_flag' => false,
-                'error_type' => 'none',
-                'tool_calls_count' => 0,
-                'retry_count' => 0,
-                'usage' => $usage,
-                'cost_estimate' => $llmResult['cost_estimate'] ?? null,
-                'task_id' => (string) ($task['task_id'] ?? ''),
-                'conversation_id' => $conversationId,
+                'llm_called' => true, 'error_flag' => true, 'error_type' => 'llm_unavailable',
+                'tool_calls_count' => 0, 'retry_count' => 0, 'llm_provider_attempted' => 'llm',
+                'llm_error' => $llmFailure['message'], 'provider_errors' => $llmFailure['provider_errors'],
+                'provider_statuses' => $llmFailure['provider_statuses'],
+                'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
             ]);
+            $failure = $this->controlTowerFailTask($task, ['error_type' => 'llm_unavailable', 'description' => $llmFailure['message'] !== '' ? 'llm_unavailable: ' . $llmFailure['message'] : 'llm_unavailable', 'created_at' => date('c')]);
+            $task = $failure['task'];
             $this->telemetry()->record($tenantId, array_merge($telemetry, [
-                'message' => $text,
-                'provider_used' => $provider,
-                'resolved_locally' => false,
-                'action' => $action,
-                'mode' => $mode,
-                'llm_request_count' => 1,
-                'usage' => $usage,
-                'session_id' => $sessionId,
-                'user_id' => $userId,
-                'project_id' => $projectId,
-                'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-                'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
-                'is_authenticated' => $isAuthenticated,
-                'effective_role' => $role,
+                'message' => $text, 'provider_used' => 'llm', 'resolved_locally' => true, 'action' => $action,
+                'mode' => $mode, 'llm_request_count' => 1, 'session_id' => $sessionId, 'user_id' => $userId,
+                'project_id' => $projectId, 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+                'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''), 'status' => 'error',
+                'is_authenticated' => $isAuthenticated, 'effective_role' => $role,
+                'llm_error' => $llmFailure['message'], 'provider_errors' => $llmFailure['provider_errors'], 'provider_statuses' => $llmFailure['provider_statuses'],
             ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
-                $telemetry,
-                $tenantId,
-                $projectId,
-                $sessionId,
-                $messageId,
-                $this->latencyMs($requestStartedAt),
-                'response.emitted',
-                [
-                    'llm_called' => true,
-                    'error_flag' => false,
-                    'error_type' => 'none',
-                    'response_kind' => $responseKind,
-                    'response_text' => $responseText,
-                    'usage' => $usage,
-                    'cost_estimate' => $llmResult['cost_estimate'] ?? null,
-                    'task_id' => (string) ($task['task_id'] ?? ''),
-                    'conversation_id' => $conversationId,
-                ]
+                $telemetry, $tenantId, $projectId, $sessionId, $messageId, $this->latencyMs($requestStartedAt), 'response.emitted',
+                ['llm_called' => true, 'error_flag' => true, 'error_type' => 'llm_unavailable', 'response_kind' => 'respond_local',
+                 'response_text' => $userSafeLlmUnavailableReply, 'llm_provider_attempted' => 'llm',
+                 'llm_error' => $llmFailure['message'], 'provider_errors' => $llmFailure['provider_errors'], 'provider_statuses' => $llmFailure['provider_statuses'],
+                 'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId]
             )));
-            try {
-                $this->telemetryService()->recordIntentMetric([
-                    'tenant_id' => $tenantId,
-                    'project_id' => $projectId,
-                    'session_id' => $sessionId,
-                    'mode' => $mode,
-                    'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
-                    'action' => $action,
-                    'latency_ms' => $this->latencyMs($requestStartedAt),
-                    'status' => 'success',
-                ]);
-                $this->telemetryService()->recordTokenUsage([
-                    'tenant_id' => $tenantId,
-                    'project_id' => $projectId,
-                    'session_id' => $sessionId,
-                    'provider' => (string) $provider,
-                    'prompt_tokens' => (int) ($usage['prompt_tokens'] ?? 0),
-                    'completion_tokens' => (int) ($usage['completion_tokens'] ?? 0),
-                    'total_tokens' => (int) ($usage['total_tokens'] ?? 0),
-                ]);
-            } catch (\Throwable $ignored) {
-                // observability must not block chat response
-            }
-            return $this->attachTestInfo($reply, $testMode, $telemetry, [
-                'action' => $action,
-                'resolved_locally' => false,
-                'llm_called' => true,
-                'provider_used' => (string) $provider,
-                'llm_result' => is_array($llmResult) ? $llmResult : [],
-            ]);
+            try { $this->telemetryService()->recordIntentMetric(['tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId, 'mode' => $mode, 'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'), 'action' => $action, 'latency_ms' => $this->latencyMs($requestStartedAt), 'status' => 'error']); } catch (\Throwable $ignored) {}
+            $errorReply = $this->annotateReplyWithControlTower($this->reply($userSafeLlmUnavailableReply, $channel, $sessionId, $userId), $task, $failure['incident']);
+            return $this->attachTestInfo($errorReply, $testMode, $telemetry, ['action' => $action, 'resolved_locally' => true, 'llm_called' => true, 'provider_used' => 'llm', 'llm_provider_attempted' => 'llm', 'llm_error' => $llmFailure['message'], 'provider_errors' => $llmFailure['provider_errors'], 'provider_statuses' => $llmFailure['provider_statuses']]);
         }
 
+        $provider    = $llmResult['provider'] ?? 'llm';
+        $usage       = $this->normalizeUsage((array) ($llmResult['usage'] ?? []));
+        $json        = $llmResult['json'] ?? null;
+        $responseKind = 'send_to_llm';
+        $responseText = '';
+        if (is_array($json)) {
+            $reply        = $this->executeLlmJson($json, $channel, $sessionId, $userId, $mode);
+            $responseText = (string) (($reply['data']['reply'] ?? $reply['reply'] ?? $reply['message'] ?? ''));
+            $responseKind = (isset($json['command']) || (isset($json['actions']) && is_array($json['actions']) && $json['actions'] !== [])) ? 'execute_command' : 'respond_local';
+        } else {
+            $responseText = (string) ($llmResult['text'] ?? '');
+            if ($responseText === '') { $responseText = 'Listo.'; }
+            $reply = $this->reply($responseText, $channel, $sessionId, $userId);
+        }
+        if ($sessionId !== '' && ($session = $this->projectRegistry()->getSession($sessionId))) {
+            if (empty($session['title'])) {
+                $this->projectRegistry()->updateSessionTitle($sessionId, mb_substr($text, 0, 40) . (mb_strlen($text) > 40 ? '...' : ''));
+            }
+        }
+        $llmKeywords = [];
+        if (preg_match('/\[\[KEYWORDS:\s*([^\]]+)\]\]/ui', $responseText, $kwMatch)) {
+            $rawKws = $kwMatch[1] ?? '';
+            $llmKeywords = array_values(array_filter(array_map('trim', explode(',', $rawKws)), fn($k) => mb_strlen($k) >= 2 && mb_strlen($k) <= 40));
+            $responseText = trim(preg_replace('/\n?\[\[KEYWORDS:[^\]]*\]\]\n?/ui', '', $responseText));
+        }
+        try {
+            $journalService = new \App\Core\AgentJournalService();
+            if (!empty($llmKeywords)) { $journalService->mergeKeywords($tenantId, $projectId, 'architect', $llmKeywords, $sessionId); $this->journalUpdated = true; }
+            $responseSnippet = mb_substr(trim($responseText), 0, 280);
+            if (mb_strlen($responseSnippet) >= 40) {
+                $journalService->appendNote($tenantId, $projectId, 'architect', $responseSnippet, 'arch', $sessionId);
+                $this->journalUpdated = true;
+                $this->journalNoteSaved = true;
+            }
+        } catch (\Throwable $e) {}
+        $memory->append($threadId, 'assistant', $responseText);
+        $this->assistantSaved = true;
+        $task  = $this->controlTowerCompleteTask($task, ['result_status' => 'success', 'response_kind' => $responseKind, 'response_text' => $responseText, 'provider' => (string) $provider]);
+        $reply = $this->annotateReplyWithControlTower($reply, $task);
         $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
-            'llm_called' => false,
-            'error_flag' => true,
-            'error_type' => 'route_error',
-            'tool_calls_count' => 0,
-            'retry_count' => 0,
-            'task_id' => (string) ($task['task_id'] ?? ''),
-            'conversation_id' => $conversationId,
+            'llm_called' => true, 'error_flag' => false, 'error_type' => 'none', 'tool_calls_count' => 0, 'retry_count' => 0,
+            'usage' => $usage, 'cost_estimate' => $llmResult['cost_estimate'] ?? null,
+            'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
         ]);
-        $failure = $this->controlTowerFailTask($task, [
-            'error_type' => 'route_error',
-            'description' => ($mode === 'builder')
-                ? 'No entendí. Cuéntame más sobre tu negocio o qué quieres crear en tu aplicación.'
-                : 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123',
-            'created_at' => date('c'),
-        ]);
-        $task = $failure['task'];
         $this->telemetry()->record($tenantId, array_merge($telemetry, [
-            'message' => $text,
-            'resolved_locally' => true,
-            'action' => 'error',
-            'mode' => $mode,
-            'session_id' => $sessionId,
-            'user_id' => $userId,
-            'project_id' => $projectId,
+            'message' => $text, 'provider_used' => $provider, 'resolved_locally' => false, 'action' => $action,
+            'mode' => $mode, 'llm_request_count' => 1, 'usage' => $usage, 'session_id' => $sessionId,
+            'user_id' => $userId, 'project_id' => $projectId,
             'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
-            'status' => 'error',
-            'is_authenticated' => $isAuthenticated,
-            'effective_role' => $role,
+            'requested_slot' => (string) (($state['requested_slot'] ?? '') ?: ''),
+            'is_authenticated' => $isAuthenticated, 'effective_role' => $role,
         ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
-            $telemetry,
-            $tenantId,
-            $projectId,
-            $sessionId,
-            $messageId,
-            $this->latencyMs($requestStartedAt),
-            'response.emitted',
-            [
-                'llm_called' => false,
-                'error_flag' => true,
-                'error_type' => 'route_error',
-                'response_kind' => 'error',
-                'response_text' => ($mode === 'builder')
-                    ? 'No entendí. Cuéntame más sobre tu negocio o qué quieres crear en tu aplicación.'
-                    : 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123',
-                'task_id' => (string) ($task['task_id'] ?? ''),
-                'conversation_id' => $conversationId,
-            ]
+            $telemetry, $tenantId, $projectId, $sessionId, $messageId, $this->latencyMs($requestStartedAt), 'response.emitted',
+            ['llm_called' => true, 'error_flag' => false, 'error_type' => 'none', 'response_kind' => $responseKind,
+             'response_text' => $responseText, 'usage' => $usage, 'cost_estimate' => $llmResult['cost_estimate'] ?? null,
+             'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId]
         )));
         try {
-            $this->telemetryService()->recordIntentMetric([
-                'tenant_id' => $tenantId,
-                'project_id' => $projectId,
-                'session_id' => $sessionId,
-                'mode' => $mode,
-                'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'),
-                'action' => 'error',
-                'latency_ms' => $this->latencyMs($requestStartedAt),
-                'status' => 'error',
-            ]);
-        } catch (\Throwable $ignored) {
-            // observability must not block chat response
-        }
-        return $this->annotateReplyWithControlTower(
-            $this->reply(($mode === 'builder')
-                ? 'No entendí. Cuéntame más sobre tu negocio o qué quieres crear en tu aplicación.'
-                : 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123', $channel, $sessionId, $userId, 'error'),
-            $task,
-            $failure['incident']
-        );
+            $this->telemetryService()->recordIntentMetric(['tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId, 'mode' => $mode, 'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'), 'action' => $action, 'latency_ms' => $this->latencyMs($requestStartedAt), 'status' => 'success']);
+            $this->telemetryService()->recordTokenUsage(['tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId, 'provider' => (string) $provider, 'prompt_tokens' => (int) ($usage['prompt_tokens'] ?? 0), 'completion_tokens' => (int) ($usage['completion_tokens'] ?? 0), 'total_tokens' => (int) ($usage['total_tokens'] ?? 0)]);
+        } catch (\Throwable $ignored) {}
+        return $this->attachTestInfo($reply, $testMode, $telemetry, [
+            'action' => $action, 'resolved_locally' => false, 'llm_called' => true,
+            'provider_used' => (string) $provider, 'llm_result' => is_array($llmResult) ? $llmResult : [],
+        ]);
     }
+
+    private function handleRouteError(string $action, array $telemetry, array $task, string $tenantId, string $projectId, string $sessionId, string $userId, string $mode, string $channel, string $messageId, string $conversationId, string $text, array $payload, bool $isAuthenticated, string $role, array $result, float $requestStartedAt): array
+    {
+        $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
+            'llm_called' => false, 'error_flag' => true, 'error_type' => 'route_error',
+            'tool_calls_count' => 0, 'retry_count' => 0,
+            'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId,
+        ]);
+        $msg     = ($mode === 'builder') ? 'No entendí. Cuéntame más sobre tu negocio o qué quieres crear en tu aplicación.' : 'No entendi. Puedes decir: crear cliente nombre=Juan nit=123';
+        $failure = $this->controlTowerFailTask($task, ['error_type' => 'route_error', 'description' => $msg, 'created_at' => date('c')]);
+        $task    = $failure['task'];
+        $this->telemetry()->record($tenantId, array_merge($telemetry, [
+            'message' => $text, 'resolved_locally' => true, 'action' => 'error',
+            'mode' => $mode, 'session_id' => $sessionId, 'user_id' => $userId,
+            'project_id' => $projectId, 'country' => (string) ($payload['country'] ?? $payload['country_code'] ?? ''),
+            'status' => 'error', 'is_authenticated' => $isAuthenticated, 'effective_role' => $role,
+        ], $this->telemetryBuilder()->buildAgentOpsTelemetryBase(
+            $telemetry, $tenantId, $projectId, $sessionId, $messageId, $this->latencyMs($requestStartedAt), 'response.emitted',
+            ['llm_called' => false, 'error_flag' => true, 'error_type' => 'route_error', 'response_kind' => 'error', 'response_text' => $msg,
+             'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId]
+        )));
+        try { $this->telemetryService()->recordIntentMetric(['tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId, 'mode' => $mode, 'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'), 'action' => 'error', 'latency_ms' => $this->latencyMs($requestStartedAt), 'status' => 'error']); } catch (\Throwable $ignored) {}
+        return $this->annotateReplyWithControlTower($this->reply($msg, $channel, $sessionId, $userId, 'error'), $task, $failure['incident']);
+    }
+
+    // ─── End Route Handlers ──────────────────────────────────────────────────
 
     private function buildSemanticLocalReply(IntentRouteResult $route, array $telemetry): string
     {

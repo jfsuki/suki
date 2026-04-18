@@ -142,6 +142,7 @@ final class IdentityResolver
             'role'           => $role,
             'mode'           => $mode,
             'storage_model'  => $storageModel,
+            'manifest'       => $manifest,
             'error'          => null,
         ];
     }
