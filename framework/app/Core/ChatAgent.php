@@ -10,6 +10,7 @@ use App\Core\Agents\Processes\BuilderOnboardingProcess;
 use App\Core\Agents\Processes\AppExecutionProcess;
 use App\Core\Agents\AcidChatRunner;
 use App\Core\Agents\CommandParser;
+use App\Core\Agents\IdentityResolver;
 use App\Core\Agents\Telemetry;
 use App\Core\LLM\LLMRouter;
 use App\Core\PlaybookInstaller;
@@ -31,6 +32,7 @@ final class ChatAgent
     private ?AgentOpsObservabilityService $agentOpsObservabilityService = null;
     private ?AgentOpsTelemetryBuilder $telemetryBuilder = null;
     private ?CommandParser $commandParser = null;
+    private ?IdentityResolver $identityResolver = null;
     private ?IntentRouter $intentRouter = null;
     private ?CommandBus $commandBus = null;
     private ?ControlTowerRepository $controlTowerRepository = null;
@@ -126,119 +128,30 @@ final class ChatAgent
         $authTenantId = trim((string) ($payload['auth_tenant_id'] ?? ''));
         $authProjectId = trim((string) ($payload['auth_project_id'] ?? ''));
 
-        // Identity resolution happens below... (moved appendShortTermMemory)
-
         // --- Auto-generar título de conversación (Messaging style) ---
         $convManager = new ConversationManagerService();
         $convManager->autoGenerateTitle($sessionId, $text);
 
-        // --- IDENTITY HIERARCHY REFACTOR (Carlos Rule) ---
-        // 1. Detección de Torre de Control (Superior)
-        if ($channel === 'portal' && $role === '') {
-            $role = 'architect';
-        }
-
-        if ($role === '') { 
-            // 2. Eliminación de Invitados: Todo usuario no identificado es Desarrollador
-            $role = $isAuthenticated ? (string) (getenv('DEFAULT_ROLE') ?: 'admin') : 'developer'; 
-        }
-        
-        if ($isAuthenticated) {
-            if ($authUserId === '') { $authUserId = $userId; }
-            if ($authTenantId === '') { $authTenantId = $tenantId; }
-        }
-        $role = $this->normalizeRole($role);
-        $mode = strtolower((string) ($payload['mode'] ?? 'app'));
-        $projectId = (string) ($payload['project_id'] ?? '');
-
-        $registry = new ProjectRegistry();
-        $manifest = $registry->resolveProjectFromManifest();
-
-        if ($projectId === '') { $projectId = $manifest['id'] ?? 'default'; }
-        if ($isAuthenticated && $authProjectId === '') { $authProjectId = $projectId; }
-        
-        if (!defined('TENANT_ID')) {
-            if (is_numeric($tenantId)) {
-                define('TENANT_ID', (int) $tenantId);
-                putenv('TENANT_ID=' . $tenantId);
-            } else {
-                $hash = $this->stableTenantInt($tenantId);
-                define('TENANT_ID', $hash);
-                putenv('TENANT_ID=' . $hash);
-                putenv('TENANT_KEY=' . $tenantId);
-            }
-        }
-        $resolvedTenantId = (string) (defined('TENANT_ID') ? TENANT_ID : $tenantId);
-
-        // 2.3.1 REGISTRO AUTOMÁTICO DE ENTRADA (Mmovido aquí para usar el ID unificado)
-        $this->memory->appendShortTermMemory($resolvedTenantId, $userId, $sessionId, $channel, 'in', $text);
-
-        $sessionBinding = $registry->getSession($sessionId);
-
-        // --- Carlos Rule: Auto-persist session on first contact ---
-        if ($isAuthenticated && !is_array($sessionBinding)) {
-            $registry->touchSession($sessionId, $userId, $projectId, $tenantId, $channel);
-        }
-
-        if (is_array($sessionBinding)) {
-            $boundUser = trim((string) ($sessionBinding['user_id'] ?? ''));
-            $boundProject = trim((string) ($sessionBinding['project_id'] ?? ''));
-            $boundTenant = trim((string) ($sessionBinding['tenant_id'] ?? ''));
-
-            if ($boundUser !== '' && $boundUser !== $userId) {
-                return $this->reply('Esta sesion pertenece a otro usuario.', $channel, $sessionId, $userId, 'error');
-            }
-            if ($boundProject !== '' && $projectId !== '' && $boundProject !== $projectId) {
-                return $this->reply('Esta sesion ya esta enlazada a otro proyecto.', $channel, $sessionId, $userId, 'error');
-            }
-            // Smart compare: allow both string name or resolved ID
-            if ($boundTenant !== '' && $boundTenant !== $tenantId && $boundTenant !== $resolvedTenantId) {
-                return $this->reply('Esta sesion pertenece a otro tenant.', $channel, $sessionId, $userId, 'error');
-            }
-            if ($boundProject !== '') { $projectId = $boundProject; }
-        }
-        $registry->ensureProject(
-            $projectId,
-            $manifest['name'] ?? 'Proyecto',
-            $manifest['status'] ?? 'draft',
-            $manifest['tenant_mode'] ?? 'shared',
-            $userId,
-            (string) ($manifest['storage_model'] ?? '')
+        // --- Identity resolution ---
+        $identity = $this->identityResolver()->resolve(
+            $payload, $tenantId, $userId, $sessionId, $channel,
+            $isAuthenticated, $testMode, $role, $mode,
+            $authUserId, $authTenantId, $authProjectId
         );
-        $projectMeta = $registry->getProject($projectId) ?? [];
-        $storageModel = StorageModel::normalize((string) ($projectMeta['storage_model'] ?? StorageModel::LEGACY));
-        putenv('PROJECT_STORAGE_MODEL=' . $storageModel);
-        putenv('DB_STORAGE_MODEL=' . $storageModel);
-        putenv('PROJECT_ID=' . $projectId);
-        StorageModel::clearCache();
-        TableNamespace::clearCache();
-        $registry->touchSession($sessionId, $userId, $projectId, $tenantId, $channel);
-        $roleBeforeAccessControl = $role;
+        if ($identity['error'] !== null) {
+            return $this->reply($identity['error'], $channel, $sessionId, $userId, 'error');
+        }
+        $resolvedTenantId = $identity['tenant_id'];
+        $userId           = $identity['user_id'];
+        $authUserId       = $identity['auth_user_id'];
+        $authTenantId     = $identity['auth_tenant_id'];
+        $projectId        = $identity['project_id'];
+        $role             = $identity['role'];
+        $mode             = $identity['mode'];
+        $storageModel     = $identity['storage_model'];
 
-        if (!$testMode && $isAuthenticated && $authUserId !== '' && $authTenantId !== '') {
-            try {
-                $accessControl = new TenantAccessControlService();
-                $tenantUser = $accessControl->resolveTenantUser($authTenantId, $authUserId);
-                if (is_array($tenantUser)) {
-                    $tenantStatus = trim((string) ($tenantUser['status'] ?? ''));
-                    $tenantRole = trim((string) ($tenantUser['role_key'] ?? ''));
-                    if ($tenantStatus === 'active' && $tenantRole !== '') {
-                        $role = $tenantRole;
-                    } elseif ($tenantStatus === 'inactive') {
-                        $role = 'guest';
-                    }
-                }
-            } catch (\Throwable $e) {
-                // Keep legacy role fallback
-            }
-        }
-        if ($role !== $roleBeforeAccessControl) {
-            $registry->touchUser($userId, $role, $mode === 'builder' ? 'creator' : 'app', $tenantId);
-            $registry->assignUserToProject($projectId, $userId, $role);
-        }
-        \App\Core\RoleContext::setRole($role);
-        \App\Core\RoleContext::setUserId($userId);
-        \App\Core\RoleContext::setUserLabel((string) ($payload['user_label'] ?? ''));
+        // 2.3.1 REGISTRO AUTOMÁTICO DE ENTRADA
+        $this->memory->appendShortTermMemory($resolvedTenantId, $userId, $sessionId, $channel, 'in', $text);
         
         if ($text === '' && empty($payload['meta'])) {
             return $this->reply('Mensaje vacio.', $channel, $sessionId, $userId, 'error');
@@ -2459,35 +2372,6 @@ final class ChatAgent
         return null;
     }
 
-    private function normalizeRole(string $role): string
-    {
-        $role = mb_strtolower(trim($role), 'UTF-8');
-        $map = [
-            'administrador' => 'admin',
-            'admin' => 'admin',
-            'dueno' => 'admin',
-            'dueño' => 'admin',
-            'owner' => 'admin',
-            'vendedora' => 'seller',
-            'vendedor' => 'seller',
-            'seller' => 'seller',
-            'contadora' => 'accountant',
-            'contador' => 'accountant',
-            'accountant' => 'accountant',
-            'guest' => 'guest',
-        ];
-        return $map[$role] ?? ($role !== '' ? $role : 'guest');
-    }
-
-    private function stableTenantInt(string $tenantId): int
-    {
-        $hash = crc32((string) $tenantId);
-        $unsigned = (int) sprintf('%u', $hash);
-        // keep inside signed INT range used by MySQL int columns
-        $max = 2147483647;
-        $value = $unsigned % $max;
-        return $value > 0 ? $value : 1;
-    }
 
     private function humanizeSqlError(string $rawError): string
     {
@@ -2591,6 +2475,11 @@ final class ChatAgent
     private function commandParser(): CommandParser
     {
         return $this->commandParser ??= new CommandParser();
+    }
+
+    private function identityResolver(): IdentityResolver
+    {
+        return $this->identityResolver ??= new IdentityResolver();
     }
 
     private function intentRouter(): IntentRouter
