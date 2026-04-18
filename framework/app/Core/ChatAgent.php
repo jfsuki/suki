@@ -11,6 +11,7 @@ use App\Core\Agents\Processes\AppExecutionProcess;
 use App\Core\Agents\AcidChatRunner;
 use App\Core\Agents\CommandParser;
 use App\Core\Agents\IdentityResolver;
+use App\Core\Agents\LocalCommandExecutor;
 use App\Core\Agents\Telemetry;
 use App\Core\LLM\LLMRouter;
 use App\Core\PlaybookInstaller;
@@ -33,6 +34,7 @@ final class ChatAgent
     private ?AgentOpsTelemetryBuilder $telemetryBuilder = null;
     private ?CommandParser $commandParser = null;
     private ?IdentityResolver $identityResolver = null;
+    private ?LocalCommandExecutor $localCommandExecutor = null;
     private ?IntentRouter $intentRouter = null;
     private ?CommandBus $commandBus = null;
     private ?ControlTowerRepository $controlTowerRepository = null;
@@ -277,7 +279,11 @@ final class ChatAgent
                 'gate_decision' => (string) ($utilityTelemetry['gate_decision'] ?? 'allow'),
             ]);
             try {
-                $reply = $this->executeLocal($local, $channel, $sessionId, $userId, $mode, $tenantId);
+                $reply = $this->localCommandExecutor()->execute(
+                    $local, $channel, $sessionId, $userId, $mode, $tenantId,
+                    fn($msg, $ch, $sid, $uid, $status = 'success', $data = []) => $this->reply($msg, $ch, $sid, $uid, $status, $data),
+                    fn($tid) => $this->buildLlmUsageSummary($tid)
+                );
                 $reply = $this->annotateReplyWithControlTower($reply, $task);
                 $task = $this->controlTowerCompleteTask($task, [
                     'result_status' => (string) ($reply['status'] ?? 'success'),
@@ -1561,168 +1567,6 @@ final class ChatAgent
         return $this->commandParser()->parse($text);
     }
 
-    private function executeLocal(array $parsed, string $channel, string $sessionId, string $userId, string $mode = 'app', string $tenantId = 'default'): array
-    {
-        $cmd = $parsed['command'] ?? '';
-        if ($cmd === 'RunTests') {
-            $runner = new UnitTestRunner();
-            $result = $runner->run();
-            $summary = $result['summary'];
-            $warns = array_filter($result['tests'], fn($t) => $t['status'] === 'warn');
-            $fails = array_filter($result['tests'], fn($t) => $t['status'] === 'fail');
-            $warnList = $warns ? implode(', ', array_map(fn($t) => $t['name'], $warns)) : '';
-            $failList = $fails ? implode(', ', array_map(fn($t) => $t['name'], $fails)) : '';
-            $reply = "Pruebas: {$summary['passed']} ok, {$summary['warned']} warn, {$summary['failed']} fail.";
-            if ($warnList !== '') {
-                $reply .= " Warn: {$warnList}.";
-            }
-            if ($failList !== '') {
-                $reply .= " Fail: {$failList}.";
-            }
-            $acid = null;
-            try {
-                $acidRunner = new AcidChatRunner();
-                $acid = $acidRunner->run($tenantId ?: 'default', ['save' => true]);
-                $acidSummary = $acid['summary'] ?? [];
-                $reply .= " Chat ácido: " . ($acidSummary['passed'] ?? 0) . " ok, " . ($acidSummary['failed'] ?? 0) . " fail.";
-            } catch (\Throwable $e) {
-                $reply .= " Chat ácido: error al ejecutar.";
-            }
-            return $this->reply($reply, $channel, $sessionId, $userId, 'success', [
-                'unit' => $result,
-                'acid' => $acid ?? null,
-            ]);
-        }
-
-        if ($cmd === 'ListSessions') {
-            $conv = new ConversationManagerService();
-            $history = $conv->getMyHistory($userId);
-            if (empty($history)) {
-                return $this->reply('Aún no tienes conversaciones guardadas.', $channel, $sessionId, $userId);
-            }
-            $list = "Tus conversaciones recientes:\n";
-            foreach ($history as $h) {
-                $list .= "- [" . $h['session_id'] . "] " . ($h['title'] ?: 'Sin título') . " (" . $h['last_message_at'] . ")\n";
-            }
-            return $this->reply($list, $channel, $sessionId, $userId, 'success', ['sessions' => $history]);
-        }
-
-        if ($cmd === 'NewSession') {
-            $conv = new ConversationManagerService();
-            $newId = $conv->startNewSubject($userId, 'default', $tenantId, $channel, $parsed['title'] ?: 'Nueva Conversación');
-            return $this->reply('Iniciando nueva sesión: ' . ($parsed['title'] ?: 'Nueva'), $channel, $newId, $userId, 'success', ['new_session_id' => $newId]);
-        }
-
-        if ($cmd === 'OpenSession') {
-            $targetId = $parsed['id'] ?? '';
-            $registry = new ProjectRegistry();
-            $session = $registry->getSession($targetId);
-            if (!$session || $session['user_id'] !== $userId) {
-                return $this->reply('No se encontró la conversación o no tienes acceso.', $channel, $sessionId, $userId, 'error');
-            }
-            return $this->reply('Abriendo conversación: ' . ($session['title'] ?: $targetId), $channel, $targetId, $userId, 'success', ['switch_to_session_id' => $targetId]);
-        }
-
-        if ($cmd === 'LLMUsage') {
-            $summary = $this->buildLlmUsageSummary($tenantId);
-            return $this->reply($summary['reply'], $channel, $sessionId, $userId, 'success', $summary['data']);
-        }
-
-        if ($cmd === 'CreateEntity') {
-            if ($mode === 'app') {
-                return $this->reply('Estas en modo app. Usa el chat creador para crear tablas.', $channel, $sessionId, $userId, 'error');
-            }
-            $entityName = (string) ($parsed['entity'] ?? '');
-            if ($entityName === '') {
-                return $this->reply('Necesito el nombre de la tabla.', $channel, $sessionId, $userId, 'error');
-            }
-            if ($this->entityExists($entityName)) {
-                return $this->reply('La tabla ' . $entityName . ' ya existe. No la voy a duplicar.', $channel, $sessionId, $userId, 'success', [
-                    'entity' => ['name' => $entityName],
-                    'already_exists' => true,
-                ]);
-            }
-            $entity = $this->builder->build($entityName, $parsed['fields'] ?? []);
-            $this->writer->writeEntity($entity);
-            try {
-                $this->migrator()->migrateEntity($entity, true);
-            } catch (\Throwable $e) {
-                $rawError = (string) $e->getMessage();
-                $human = str_contains($rawError, 'SQLSTATE')
-                    ? 'Tabla de contrato creada. Falta conectar correctamente la base de datos para crear la tabla fisica.'
-                    : 'Tabla de contrato creada, pero no pude migrar a DB.';
-                return $this->reply($human, $channel, $sessionId, $userId, 'warn', [
-                    'entity' => $entity,
-                    'error' => $rawError,
-                ]);
-            }
-            return $this->reply('Tabla creada: ' . $entity['name'], $channel, $sessionId, $userId, 'success', ['entity' => $entity]);
-        }
-
-        if ($cmd === 'CreateForm') {
-            if ($mode === 'app') {
-                return $this->reply('Estas en modo app. Usa el chat creador para crear formularios.', $channel, $sessionId, $userId, 'error');
-            }
-            $entityName = (string) ($parsed['entity'] ?? '');
-            if ($entityName === '') {
-                return $this->reply('Necesito la entidad para el formulario.', $channel, $sessionId, $userId, 'error');
-            }
-            if ($this->formExistsForEntity($entityName)) {
-                return $this->reply('El formulario de ' . $entityName . ' ya existe. No lo voy a duplicar.', $channel, $sessionId, $userId, 'success', [
-                    'form' => ['name' => $entityName . '.form'],
-                    'already_exists' => true,
-                ]);
-            }
-            $entity = $this->entities->get($entityName);
-            $form = $this->wizard->buildFromEntity($entity);
-            $this->writer->writeForm($form);
-            return $this->reply('Formulario creado para ' . $entityName, $channel, $sessionId, $userId, 'success', ['form' => $form]);
-        }
-
-        if (in_array($cmd, ['CreateRecord', 'QueryRecords', 'ReadRecord', 'UpdateRecord', 'DeleteRecord'], true)) {
-            if ($mode === 'builder') {
-                return $this->reply('Estas en modo creador. Usa el chat app para registrar datos.', $channel, $sessionId, $userId, 'error');
-            }
-            return $this->executeCrud($parsed, $channel, $sessionId, $userId);
-        }
-
-        return $this->reply('Comando no soportado.', $channel, $sessionId, $userId, 'error');
-    }
-
-    private function executeCrud(array $parsed, string $channel, string $sessionId, string $userId): array
-    {
-        $cmd = $parsed['command'];
-        $entity = (string) ($parsed['entity'] ?? '');
-        if ($entity === '') {
-            return $this->reply('Falta entidad.', $channel, $sessionId, $userId, 'error');
-        }
-        $data = [];
-        switch ($cmd) {
-            case 'CreateRecord':
-                $data = $this->command()->createRecord($entity, $parsed['data'] ?? []);
-                $reply = 'Registro creado en ' . $entity;
-                break;
-            case 'QueryRecords':
-                $data = $this->command()->queryRecords($entity, $parsed['filters'] ?? [], 20, 0);
-                $reply = 'Resultados para ' . $entity . ': ' . count($data);
-                break;
-            case 'ReadRecord':
-                $data = $this->command()->readRecord($entity, $parsed['id'] ?? null, true);
-                $reply = 'Registro: ' . $entity;
-                break;
-            case 'UpdateRecord':
-                $data = $this->command()->updateRecord($entity, $parsed['id'] ?? null, $parsed['data'] ?? []);
-                $reply = 'Registro actualizado en ' . $entity;
-                break;
-            case 'DeleteRecord':
-                $data = $this->command()->deleteRecord($entity, $parsed['id'] ?? null);
-                $reply = 'Registro eliminado en ' . $entity;
-                break;
-            default:
-                return $this->reply('Comando no soportado.', $channel, $sessionId, $userId, 'error');
-        }
-        return $this->reply($reply, $channel, $sessionId, $userId, 'success', $data);
-    }
 
     public function buildHelpMessage(string $mode = 'app', string $projectId = ''): string
     {
@@ -2480,6 +2324,11 @@ final class ChatAgent
     private function identityResolver(): IdentityResolver
     {
         return $this->identityResolver ??= new IdentityResolver();
+    }
+
+    private function localCommandExecutor(): LocalCommandExecutor
+    {
+        return $this->localCommandExecutor ??= new LocalCommandExecutor();
     }
 
     private function intentRouter(): IntentRouter
