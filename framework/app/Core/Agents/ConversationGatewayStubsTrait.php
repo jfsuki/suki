@@ -264,12 +264,8 @@ trait ConversationGatewayStubsTrait
 
     public function isOutOfScopeQuestion(string $text, string $mode): bool
     {
-        $normalized = $this->normalize($text);
-        $patterns = ['presidente', 'petro', 'politica', 'clima', 'noticias', 'quien es'];
-        foreach ($patterns as $p) {
-            if (str_contains($normalized, $p)) return true;
-        }
-        return false;
+        $result = $this->intentClassifier()->classify($text);
+        return $result['intent'] === 'out_of_scope' && $result['score'] >= 0.65;
     }
 
     public function buildOutOfScopeReply(string $mode): string
@@ -704,9 +700,20 @@ trait ConversationGatewayStubsTrait
 
     public function detectEntity(string $text, array $lexicon, array $state): string
     {
-        if (str_contains($text, 'cliente')) return 'clientes';
-        if (str_contains($text, 'producto')) return 'productos';
-        if (str_contains($text, 'factura')) return 'facturas';
+        $n = $this->normalize($text);
+        // 1. Tenant-specific entity names from lexicon + scoped cache
+        $entityNames = array_merge(array_values($lexicon), array_values((array)($this->scopedEntityNamesCache ?? [])));
+        foreach ($entityNames as $entityName) {
+            $normalized = $this->normalize((string)$entityName);
+            if ($normalized !== '' && str_contains($n, $normalized)) {
+                return (string)$entityName;
+            }
+        }
+        // 2. Active entity from conversation state
+        $stateEntity = trim((string)($state['entity'] ?? ''));
+        if ($stateEntity !== '') {
+            return $stateEntity;
+        }
         return '';
     }
 
@@ -727,10 +734,6 @@ trait ConversationGatewayStubsTrait
 
     public function classify(string $text): string
     {
-        $n = $this->normalize($text);
-        if (str_contains($n, 'crear tabla') || str_contains($n, 'crear formulario')) return 'build';
-        if (str_contains($n, 'crear') || str_contains($n, 'listar') || str_contains($n, 'ver')) return 'crud';
-        if (str_contains($n, 'que hay hecho') || (str_contains($n, 'que') && str_contains($n, 'puedes') && str_contains($n, 'hacer'))) return 'status';
         $c = $this->intentClassifier()->classify($text);
         return (string)($c['intent'] ?? 'unknown');
     }

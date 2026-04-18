@@ -109,7 +109,7 @@ trait ConversationGatewayBuilderOnboardingTrait
         $currentStep = $this->resolveBuilderOnboardingStep($localProfile, $localState);
         $localState['onboarding_step'] = $currentStep;
 
-        // 2.2 Local Bridge for Needs (FAST PATH)
+        // 2.2 Local Bridge for Needs (FAST PATH + LLM fallback)
         if ($currentStep === 'needs_scope') {
             $input = strtolower($this->normalize($text));
             $found = [];
@@ -118,15 +118,21 @@ trait ConversationGatewayBuilderOnboardingTrait
             if (str_contains($input, 'producto')) $found[] = 'productos';
             if (str_contains($input, 'gasto')) $found[] = 'gastos';
             if (str_contains($input, 'venta')) $found[] = 'ventas';
+            if (empty($found)) {
+                $llmFindings = $this->delegateToContextExtractorCached($text, $localProfile);
+                $llmNeeds = is_array($llmFindings['needs_scope_items'] ?? null) ? (array)$llmFindings['needs_scope_items'] : [];
+                if (!empty($llmNeeds)) {
+                    $found = $llmNeeds;
+                }
+            }
             if (!empty($found)) {
                 $localProfile['needs_scope'] = implode(', ', $found);
                 $localProfile['needs_scope_items'] = $found;
                 $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
-                error_log("DETECT_LOCAL_NEEDS: " . implode(',', $found));
             }
         }
 
-        // 2.3 Local Bridge for Documents (FAST PATH)
+        // 2.3 Local Bridge for Documents (FAST PATH + LLM fallback)
         if ($currentStep === 'documents_scope') {
             $input = strtolower($this->normalize($text));
             $found = [];
@@ -135,12 +141,18 @@ trait ConversationGatewayBuilderOnboardingTrait
             if (str_contains($input, 'recibo')) $found[] = 'recibos';
             if (str_contains($input, 'ticket')) $found[] = 'tickets';
             if (str_contains($input, 'orden')) $found[] = 'ordenes';
+            if (empty($found)) {
+                $llmFindings = $this->delegateToContextExtractorCached($text, $localProfile);
+                $llmDocs = is_array($llmFindings['documents_scope_items'] ?? null) ? (array)$llmFindings['documents_scope_items'] : [];
+                if (!empty($llmDocs)) {
+                    $found = $llmDocs;
+                }
+            }
             if (!empty($found)) {
                 $localProfile['documents_scope'] = implode(', ', $found);
                 $localProfile['documents_scope_items'] = $found;
                 $currentStep = $this->resolveBuilderOnboardingStep($localProfile, $localState);
                 $localState['onboarding_step'] = $currentStep;
-                error_log("DETECT_LOCAL_DOCS: " . implode(',', $found));
             }
         }
         $localState['onboarding_step'] = $currentStep;

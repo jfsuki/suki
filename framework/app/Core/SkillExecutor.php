@@ -240,6 +240,42 @@ final class SkillExecutor
                     $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
                     break;
                 }
+                if ($this->isAccountingSkill($name)) {
+                    $toolOutcome = $this->executeAccountingSkill($name, $context);
+                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
+                    $reply = (string) ($toolOutcome['reply'] ?? '');
+                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
+                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
+                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
+                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
+                    $routingHintSteps = ['cache', 'rules', 'skills'];
+                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    break;
+                }
+                if ($this->isInventorySkill($name)) {
+                    $toolOutcome = $this->executeInventorySkill($name, $context);
+                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
+                    $reply = (string) ($toolOutcome['reply'] ?? '');
+                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
+                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
+                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
+                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
+                    $routingHintSteps = ['cache', 'rules', 'skills'];
+                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    break;
+                }
+                if ($this->isCrmSkill($name)) {
+                    $toolOutcome = $this->executeCrmSkill($name, $context);
+                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
+                    $reply = (string) ($toolOutcome['reply'] ?? '');
+                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
+                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
+                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
+                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
+                    $routingHintSteps = ['cache', 'rules', 'skills'];
+                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    break;
+                }
                 [$action, $reply, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps] = $this->executeToolSkill($skill, $context);
                 break;
 
@@ -584,10 +620,27 @@ final class SkillExecutor
         $telemetry = is_array($parsed['telemetry'] ?? null) ? (array) $parsed['telemetry'] : [];
 
         if ((string) ($parsed['kind'] ?? '') === 'command') {
+            $cmd = is_array($parsed['command'] ?? null) ? (array) $parsed['command'] : [];
+            // Supervisor validation for stock-critical operations
+            if ($name === 'pos_finalize_sale') {
+                $validation = $this->supervisorValidate('STOCK_RESERVED', $cmd['data'] ?? $cmd);
+                if ($validation['status'] === 'REJECTED') {
+                    return [
+                        'action' => 'respond_local',
+                        'reply' => 'No puedo finalizar la venta: ' . ($validation['message'] ?? 'Validacion de negocio fallida.'),
+                        'command' => [],
+                        'skill_result_status' => 'rejected_by_supervisor',
+                        'skill_fallback_reason' => 'business_rule_violation',
+                        'skill_failed' => true,
+                        'routing_hint_steps' => ['cache', 'rules', 'skills'],
+                        'telemetry' => $telemetry,
+                    ];
+                }
+            }
             return [
                 'action' => 'execute_command',
                 'reply' => '',
-                'command' => is_array($parsed['command'] ?? null) ? (array) $parsed['command'] : [],
+                'command' => $cmd,
                 'skill_result_status' => 'command_ready',
                 'skill_fallback_reason' => 'none',
                 'skill_failed' => false,
@@ -1077,5 +1130,121 @@ final class SkillExecutor
             'routing_hint_steps' => ['cache', 'rules', 'skills'],
             'telemetry' => $telemetry,
         ];
+    }
+
+    private function supervisorValidate(string $eventType, array $payload): array
+    {
+        try {
+            $supervisor = new \App\Core\Agents\Orchestrator\MultiAgentSupervisor(new \App\Core\ProjectRegistry());
+            return $supervisor->validateAction(['type' => $eventType, 'payload' => $payload, 'source_agent_id' => 'SkillExecutor']);
+        } catch (\Throwable $e) {
+            return ['status' => 'APPROVED', 'supervisor_trace' => 'Supervisor unavailable: ' . $e->getMessage()];
+        }
+    }
+
+    private function isAccountingSkill(string $name): bool
+    {
+        return in_array($name, [
+            'accounting_post',
+            'accounting_record_entry',
+            'accounting_balance_sheet',
+            'accounting_record_sale',
+        ], true);
+    }
+
+    private function executeAccountingSkill(string $name, array $context): array
+    {
+        $actionMap = [
+            'accounting_post'          => 'record_entry',
+            'accounting_record_entry'  => 'record_entry',
+            'accounting_balance_sheet' => 'balance_sheet',
+            'accounting_record_sale'   => 'record_sale_accounting',
+        ];
+        try {
+            $skill = new \App\Core\Skills\AccountingSkill();
+            $input = array_merge(
+                is_array($context['explicit_args'] ?? null) ? (array)$context['explicit_args'] : [],
+                ['action' => $actionMap[$name] ?? 'balance_sheet']
+            );
+            $result = $skill->handle($input, $context);
+            $reply = is_array($result)
+                ? ($result['reply'] ?? $result['message'] ?? json_encode($result, JSON_UNESCAPED_UNICODE))
+                : (string)$result;
+            return ['action' => 'respond_local', 'reply' => (string)$reply, 'command' => [], 'skill_result_status' => 'ok', 'skill_fallback_reason' => 'none', 'skill_failed' => false, 'telemetry' => []];
+        } catch (\Throwable $e) {
+            return ['action' => 'respond_local', 'reply' => 'No pude ejecutar la operacion contable: ' . $e->getMessage(), 'command' => [], 'skill_result_status' => 'error', 'skill_fallback_reason' => 'exception', 'skill_failed' => true, 'telemetry' => []];
+        }
+    }
+
+    private function isInventorySkill(string $name): bool
+    {
+        return in_array($name, [
+            'inventory_check',
+            'inventory_check_stock',
+            'inventory_adjust_stock',
+            'inventory_create_product',
+            'inventory_list_products',
+        ], true);
+    }
+
+    private function executeInventorySkill(string $name, array $context): array
+    {
+        $actionMap = [
+            'inventory_check'          => 'check_stock',
+            'inventory_check_stock'    => 'check_stock',
+            'inventory_adjust_stock'   => 'adjust_stock',
+            'inventory_create_product' => 'add_product',
+            'inventory_list_products'  => 'list_products',
+        ];
+        try {
+            $skill = new \App\Core\Skills\InventorySkill();
+            $input = array_merge(
+                is_array($context['explicit_args'] ?? null) ? (array)$context['explicit_args'] : [],
+                ['action' => $actionMap[$name] ?? 'check_stock']
+            );
+            $result = $skill->handle($input, $context);
+            $reply = is_array($result)
+                ? ($result['reply'] ?? $result['message'] ?? json_encode($result, JSON_UNESCAPED_UNICODE))
+                : (string)$result;
+            return ['action' => 'respond_local', 'reply' => (string)$reply, 'command' => [], 'skill_result_status' => 'ok', 'skill_fallback_reason' => 'none', 'skill_failed' => false, 'telemetry' => []];
+        } catch (\Throwable $e) {
+            return ['action' => 'respond_local', 'reply' => 'No pude consultar el inventario: ' . $e->getMessage(), 'command' => [], 'skill_result_status' => 'error', 'skill_fallback_reason' => 'exception', 'skill_failed' => true, 'telemetry' => []];
+        }
+    }
+
+    private function isCrmSkill(string $name): bool
+    {
+        return in_array($name, [
+            'customer_lookup',
+            'crm_register_lead',
+            'crm_update_customer',
+            'crm_search_customers',
+            'crm_stats',
+        ], true);
+    }
+
+    private function executeCrmSkill(string $name, array $context): array
+    {
+        $actionMap = [
+            'customer_lookup'      => 'search_customers',
+            'crm_register_lead'    => 'register_lead',
+            'crm_update_customer'  => 'update_customer',
+            'crm_search_customers' => 'search_customers',
+            'crm_stats'            => 'crm_stats',
+        ];
+        try {
+            $skill = new \App\Core\Skills\CRMSkill();
+            $input = array_merge(
+                is_array($context['explicit_args'] ?? null) ? (array)$context['explicit_args'] : [],
+                ['action' => $actionMap[$name] ?? 'search_customers']
+            );
+            $result = $skill->handle($input, $context);
+            $reply = is_array($result)
+                ? ($result['reply'] ?? $result['message'] ?? json_encode($result, JSON_UNESCAPED_UNICODE))
+                : (string)$result;
+            return ['action' => 'respond_local', 'reply' => (string)$reply, 'command' => [], 'skill_result_status' => 'ok', 'skill_fallback_reason' => 'none', 'skill_failed' => false, 'telemetry' => []];
+        } catch (\Throwable $e) {
+            return ['action' => 'respond_local', 'reply' => 'No pude consultar CRM: ' . $e->getMessage(), 'command' => [], 'skill_result_status' => 'error', 'skill_fallback_reason' => 'exception', 'skill_failed' => true, 'telemetry' => []];
+        }
     }
 }
