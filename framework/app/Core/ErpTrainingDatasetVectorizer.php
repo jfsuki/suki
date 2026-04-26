@@ -582,6 +582,7 @@ final class ErpTrainingDatasetVectorizer
                 'subdomain' => (string) ($entryMetadata['subdomain'] ?? ''),
                 'locale' => (string) ($entryMetadata['locale'] ?? ''),
                 'intent_key' => (string) ($entryMetadata['intent_key'] ?? ''),
+                'intent' => (string) ($entryMetadata['intent_key'] ?? ''),
                 'target_skill' => (string) ($entryMetadata['target_skill'] ?? ''),
                 'skill_type' => (string) ($entryMetadata['skill_type'] ?? ''),
                 'required_action' => array_key_exists('required_action', $entryMetadata)

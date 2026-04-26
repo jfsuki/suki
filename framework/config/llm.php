@@ -32,6 +32,8 @@ return [
         ],
         'gemini' => [
             'enabled' => $envFlag('GEMINI_ENABLED', $hasGemini),
+            'chat_enabled' => (bool) (getenv('GEMINI_CHAT_ENABLED') !== false ? getenv('GEMINI_CHAT_ENABLED') : getenv('GEMINI_ENABLED')),
+            'embedding_enabled' => (bool) (getenv('GEMINI_EMBEDDING_ENABLED') !== false ? getenv('GEMINI_EMBEDDING_ENABLED') : getenv('GEMINI_ENABLED')),
             'class' => \App\Core\LLM\Providers\GeminiProvider::class,
         ],
         'deepseek' => [

@@ -250,6 +250,13 @@ final class IntentClassifier
             )');
             // Add tenant_id column if table was created before this migration
             $db->exec("ALTER TABLE training_log ADD COLUMN tenant_id TEXT");
+            // Dedup: skip si ya existe para este utterance + tenant
+            $existing = $db->prepare('SELECT COUNT(*) FROM training_log WHERE user_text = ? AND tenant_id = ?');
+            $existing->execute([$text, $this->tenantId]);
+            if ($existing->fetchColumn() > 0) {
+                return;
+            }
+
             $stmt = $db->prepare(
                 'INSERT INTO training_log (user_text, intent_classified, llm_score, status, tenant_id, created_at)
                  VALUES (:text, :intent, :score, :status, :tenant, :created)'

@@ -1287,7 +1287,7 @@ final class ChatAgent
 
         // --- Carlos Rule: Auto-persist for Universal Memory (Cross-session) ---
         $this->persistToUserMemory($text, $text, [
-            'tenant_id' => (string) (getenv('TENANT_ID') ?: 'default'),
+            'tenant_id' => (string) ($this->activeTenantStrId ?: 'default'),
             'user_id' => $userId,
             'session_id' => $sessionId
         ]);
@@ -1818,18 +1818,18 @@ final class ChatAgent
      * @param array<string, mixed> $payload
      * @return array<string, mixed>|null
      */
-    private function createControlTowerTask(array $payload): ?array
+    private function createControlTowerTask(array $payload): array
     {
         $manager = $this->taskExecutionManager();
         if (!$manager) {
-            return null;
+            return [];
         }
 
         try {
-            return $manager->createTask($payload);
+            return $manager->createTask($payload) ?? [];
         } catch (\Throwable $e) {
             error_log('[ControlTower] create task failed: ' . $e->getMessage());
-            return null;
+            return [];
         }
     }
 
@@ -1880,7 +1880,7 @@ final class ChatAgent
      */
     private function controlTowerRecordRoute(?array $task, array $telemetry, string $intent): ?array
     {
-        if (!is_array($task)) {
+        if (!is_array($task) || empty($task['task_id'])) {
             return $task;
         }
 
@@ -1938,7 +1938,7 @@ final class ChatAgent
      */
     private function controlTowerCompleteTask(?array $task, array $result = []): ?array
     {
-        if (!is_array($task)) {
+        if (!is_array($task) || empty($task['task_id'])) {
             return $task;
         }
 
@@ -2329,6 +2329,20 @@ final class ChatAgent
         return (int) max(0, round((microtime(true) - $startedAt) * 1000));
     }
 
+    private function extractReplyTextFromEnvelope(array $reply): string
+    {
+        $candidate = trim((string) ($reply['reply'] ?? ''));
+        if ($candidate !== '') {
+            return $candidate;
+        }
+        $data = is_array($reply['data'] ?? null) ? (array) $reply['data'] : [];
+        $candidate = trim((string) ($data['reply'] ?? ''));
+        if ($candidate !== '') {
+            return $candidate;
+        }
+        return trim((string) ($reply['message'] ?? ''));
+    }
+
     private function looksLikeGuardrailMessage(string $reply): bool
     {
         $reply = mb_strtolower(trim($reply), 'UTF-8');
@@ -2590,11 +2604,11 @@ final class ChatAgent
         }
     }
 
-    private function handleFrustration(string $text, string $tenantId, string $userId, string $projectId, string $sessionId, string $conversationId): ?array
+    private function handleFrustration(string $text, string $tenantId, string $userId, string $projectId, string $sessionId, string $conversationId): array
     {
         $signal = $this->telemetryService()->detectSignals($text, []);
         if (!$signal || $signal['signal'] !== 'frustration') {
-            return null;
+            return [];
         }
 
         $ticketId = 'tk_' . bin2hex(random_bytes(4));
