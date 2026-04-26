@@ -194,33 +194,36 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
         return $out;
     }
 
-    public function getSession(string $sessionId): array
+    public function getSession(string $sessionId, string $tenantId = 'default'): array
     {
-        $stmt = $this->db->prepare('SELECT data_json FROM mem_sessions WHERE session_id = :session_id LIMIT 1');
-        $stmt->execute([':session_id' => $sessionId]);
+        $stmt = $this->db->prepare(
+            'SELECT data_json FROM mem_sessions WHERE tenant_id = :tenant_id AND session_id = :session_id LIMIT 1'
+        );
+        $stmt->execute([':tenant_id' => $tenantId, ':session_id' => $sessionId]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
         return $this->decodeValue($row['data_json'] ?? null, []);
     }
 
-    public function saveSession(string $sessionId, array $data): void
+    public function saveSession(string $sessionId, array $data, string $tenantId = 'default'): void
     {
         $updatedAt = date('Y-m-d H:i:s');
         $driver = $this->driver();
         if ($driver === 'sqlite') {
             $stmt = $this->db->prepare(
-                'INSERT INTO mem_sessions (session_id, data_json, updated_at)
-                 VALUES (:session_id, :data_json, :updated_at)
-                 ON CONFLICT(session_id)
+                'INSERT INTO mem_sessions (tenant_id, session_id, data_json, updated_at)
+                 VALUES (:tenant_id, :session_id, :data_json, :updated_at)
+                 ON CONFLICT(tenant_id, session_id)
                  DO UPDATE SET data_json = excluded.data_json, updated_at = excluded.updated_at'
             );
         } else {
             $stmt = $this->db->prepare(
-                'INSERT INTO mem_sessions (session_id, data_json, updated_at)
-                 VALUES (:session_id, :data_json, :updated_at)
+                'INSERT INTO mem_sessions (tenant_id, session_id, data_json, updated_at)
+                 VALUES (:tenant_id, :session_id, :data_json, :updated_at)
                  ON DUPLICATE KEY UPDATE data_json = VALUES(data_json), updated_at = VALUES(updated_at)'
             );
         }
         $stmt->execute([
+            ':tenant_id' => $tenantId,
             ':session_id' => $sessionId,
             ':data_json' => $this->encodeValue($data),
             ':updated_at' => $updatedAt,
@@ -311,13 +314,20 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
 
         $this->db->exec(
             "CREATE TABLE IF NOT EXISTS mem_sessions (
+                tenant_id VARCHAR(120) NOT NULL DEFAULT 'default',
                 session_id VARCHAR(190) NOT NULL,
                 data_json JSON NOT NULL,
                 updated_at DATETIME NOT NULL,
-                PRIMARY KEY (session_id),
+                PRIMARY KEY (tenant_id, session_id),
                 KEY idx_mem_sessions_updated (updated_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         );
+        // Lazy migration: add tenant_id to pre-existing tables that lack the column
+        try {
+            $this->db->exec("ALTER TABLE mem_sessions ADD COLUMN tenant_id VARCHAR(120) NOT NULL DEFAULT 'default' FIRST");
+        } catch (\Throwable $ignored) {
+            // Column already exists — expected on fresh installs and after first migration
+        }
     }
 
     private function ensureTablesSqlite(): void
@@ -372,14 +382,23 @@ final class SqlMemoryRepository implements MemoryRepositoryInterface
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_chat_user ON chat_log (tenant_id, user_id, created_at)');
 
         $this->db->exec(
-            'CREATE TABLE IF NOT EXISTS mem_sessions (
+            "CREATE TABLE IF NOT EXISTS mem_sessions (
+                tenant_id TEXT NOT NULL DEFAULT 'default',
                 session_id TEXT NOT NULL,
                 data_json TEXT NOT NULL,
                 updated_at TEXT NOT NULL,
-                PRIMARY KEY (session_id)
-            )'
+                PRIMARY KEY (tenant_id, session_id)
+            )"
         );
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_mem_sessions_updated ON mem_sessions (updated_at)');
+        // Lazy migration: add tenant_id to pre-existing SQLite tables that lack the column.
+        // SQLite cannot drop/recreate the PK via ALTER — existing rows will get tenant_id='default',
+        // which is correct since legacy data has no tenant isolation context.
+        try {
+            $this->db->exec("ALTER TABLE mem_sessions ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'");
+        } catch (\Throwable $ignored) {
+            // Column already exists — expected on fresh installs and after first migration
+        }
     }
 
     /**

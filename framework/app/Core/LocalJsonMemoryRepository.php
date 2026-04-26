@@ -90,13 +90,13 @@ class LocalJsonMemoryRepository implements MemoryRepositoryInterface
         file_put_contents($path, json_encode($value));
     }
 
-    public function getSession(string $sessionId): array
+    public function getSession(string $sessionId, string $tenantId = 'default'): array
     {
-        return $this->get('session_' . $sessionId);
+        return $this->get('session_' . $tenantId . '_' . $sessionId);
     }
 
-    public function saveSession(string $sessionId, array $data): void
+    public function saveSession(string $sessionId, array $data, string $tenantId = 'default'): void
     {
-        $this->save('session_' . $sessionId, $data);
+        $this->save('session_' . $tenantId . '_' . $sessionId, $data);
     }
 }

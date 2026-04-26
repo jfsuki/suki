@@ -728,9 +728,17 @@ final class ProjectRegistry
             role           TEXT NOT NULL,
             content        TEXT NOT NULL,
             token_estimate INTEGER DEFAULT 0,
+            tenant_id      TEXT NOT NULL DEFAULT \'\',
             created_at     DATETIME DEFAULT CURRENT_TIMESTAMP
         )');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_cm_thread ON conversation_memory (thread_id, id)');
+        $this->db->exec('CREATE INDEX IF NOT EXISTS idx_cm_tenant ON conversation_memory (tenant_id)');
+        // Lazy migration: add tenant_id to existing tables created before this column existed
+        try {
+            $this->db->exec("ALTER TABLE conversation_memory ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''");
+        } catch (\Throwable $e) {
+            // Column already exists — safe to ignore
+        }
     }
 
     public function logAgentEvent(string $agentId, string $tenantId, string $type, string $details, string $status = 'INFO'): void

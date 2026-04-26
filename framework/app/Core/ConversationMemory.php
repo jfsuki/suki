@@ -7,10 +7,11 @@ use PDO;
 
 /**
  * ConversationMemory
- * 
+ *
  * Persistent multi-turn history for SUKI chat agents.
  * Stores conversation threads in the project_registry.sqlite database.
  * Thread isolation is achieved via thread_id (tenant_id + session_id).
+ * An explicit tenant_id column is also stored for direct tenant-scoped queries.
  */
 class ConversationMemory
 {
@@ -57,26 +58,33 @@ class ConversationMemory
 
     /**
      * Appends a new message to the conversation history.
-     * 
-     * @param string $threadId The thread identifier.
-     * @param string $role The role of the sender (user, assistant, system).
-     * @param string $content The message content.
+     *
+     * @param string $threadId  The thread identifier (format: "tenantId:sessionId").
+     * @param string $role      The role of the sender (user, assistant, system).
+     * @param string $content   The message content.
+     * @param string $tenantId  Explicit tenant identifier. When empty, extracted from $threadId.
      */
-    public function append(string $threadId, string $role, string $content): void
+    public function append(string $threadId, string $role, string $content, string $tenantId = ''): void
     {
         if (empty(trim($content))) {
             return;
         }
 
+        // Resolve tenant_id: use explicit value or extract from thread_id (format "tenantId:sessionId")
+        if ($tenantId === '') {
+            $tenantId = explode(':', $threadId, 2)[0];
+        }
+
         try {
             $stmt = $this->db->prepare("
-                INSERT INTO conversation_memory (thread_id, role, content, created_at) 
-                VALUES (:thread_id, :role, :content, :created_at)
+                INSERT INTO conversation_memory (thread_id, role, content, tenant_id, created_at)
+                VALUES (:thread_id, :role, :content, :tenant_id, :created_at)
             ");
             $stmt->execute([
                 ':thread_id' => $threadId,
-                ':role' => $role,
-                ':content' => $content,
+                ':role'      => $role,
+                ':content'   => $content,
+                ':tenant_id' => $tenantId,
                 ':created_at' => date('Y-m-d H:i:s')
             ]);
 

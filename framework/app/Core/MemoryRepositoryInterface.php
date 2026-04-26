@@ -29,8 +29,8 @@ interface MemoryRepositoryInterface
 
     public function getShortTermMemory(string $tenantId, string $sessionId, int $limit = 20): array;
 
-    public function getSession(string $sessionId): array;
+    public function getSession(string $sessionId, string $tenantId = 'default'): array;
 
-    public function saveSession(string $sessionId, array $data): void;
+    public function saveSession(string $sessionId, array $data, string $tenantId = 'default'): void;
 }
 
