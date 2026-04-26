@@ -559,6 +559,7 @@ final class OperationalQueueStore
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_jobs_queue_tenant_created ON jobs_queue (tenant_id, created_at)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_jobs_queue_status_available ON jobs_queue (status, available_at)');
         $this->db->exec('CREATE INDEX IF NOT EXISTS idx_jobs_queue_tenant_status_available ON jobs_queue (tenant_id, status, available_at)');
+        try { $this->db->exec("ALTER TABLE jobs_queue ADD COLUMN tenant_id TEXT NOT NULL DEFAULT 'default'"); } catch (\Throwable $e) {}
     }
 
     /**

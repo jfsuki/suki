@@ -76,6 +76,7 @@ class ConversationMemory
         }
 
         try {
+            try { $this->db->exec("ALTER TABLE conversation_memory ADD COLUMN tenant_id TEXT NOT NULL DEFAULT ''"); } catch (\Throwable $e) {}
             $stmt = $this->db->prepare("
                 INSERT INTO conversation_memory (thread_id, role, content, tenant_id, created_at)
                 VALUES (:thread_id, :role, :content, :tenant_id, :created_at)
