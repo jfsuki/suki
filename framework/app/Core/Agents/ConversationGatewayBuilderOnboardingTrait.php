@@ -41,8 +41,12 @@ trait ConversationGatewayBuilderOnboardingTrait
 
     public function builderClassifyWithPlaybookIntents(string $text, array $profile): array
     {
-        // Placeholder hasta integrar clasificador real de playbooks
-        return [];
+        $tenantId = $this->contextTenantId ?? 'default';
+        try {
+            return $this->intentClassifier()->classify($text);
+        } catch (\Throwable $e) {
+            return ['intent' => 'unknown', 'score' => 0.0, 'layer' => 'error'];
+        }
     }
 
     public function isFormListQuestion(string $text): bool
@@ -170,8 +174,8 @@ trait ConversationGatewayBuilderOnboardingTrait
             }
         }
 
-        // Reset attempts if it's a known scenario transition
-        if (str_contains($normalizedText, 'pacientes')) {
+        // Reset attempts on any new meaningful input (sector detection is responsabilidad del intentClassifier)
+        if (strlen($normalizedText) > 5) {
             $localState['resolution_attempts'] = 0;
         }
 
@@ -1090,19 +1094,18 @@ trait ConversationGatewayBuilderOnboardingTrait
 
     private function buildBuilderOnboardingRecoveryReply(string $step, array $profile): string
     {
-        // Si hay contexto fiscal o arquitectonico, elevamos la respuesta
         if (!empty($profile['tax_context']) || !empty($profile['needs_scope'])) {
             return $this->buildArchitectSynthesisResponse($step, $profile);
         }
 
         return match ($step) {
-            'business_type' => 'Paso 1: Para avanzar con el diseño de tu app, dime en una frase: ¿qué vendes o a qué se dedica tu negocio?',
-            'operation_model' => 'Entendido. ¿Cómo manejas tus ventas habitualmente: de contado, a crédito o manejas ambos tipos?',
-            'needs_scope' => 'Perfecto. Para priorizar los módulos, ¿qué es lo más importante de controlar en tu operación ahora mismo?',
-            'documents_scope' => 'Excelente. ¿Qué documentos legales o comerciales necesitas que genere la aplicación?',
-            'confirm_scope' => 'He preparado una propuesta arquitectónica para tu negocio. ¿Te gustaría ajustar el tipo de negocio, la forma de pago o los documentos?',
-            'plan_ready' => 'La arquitectura base está lista. ¿Deseas que proceda a crear la primera tabla o prefieres realizar algún ajuste?',
-            default => 'Dime el siguiente dato clave para completar el diseño del sistema.',
+            'business_type'  => '¿A qué se dedica tu negocio?',
+            'operation_model'=> '¿Vendes a contado, a crédito o manejo mixto?',
+            'needs_scope'    => '¿Qué necesitas controlar: inventario, ventas, clientes?',
+            'documents_scope'=> '¿Qué documentos genera tu negocio?',
+            'confirm_scope'  => '¿Confirmamos esta propuesta o ajustamos algo?',
+            'plan_ready'     => '¿Procedo con la primera tabla o ajustamos algo?',
+            default          => '¿Qué más necesitas configurar?',
         };
     }
 
@@ -2334,15 +2337,15 @@ trait ConversationGatewayBuilderOnboardingTrait
             if (empty($json)) {
                 error_log("BUILDER_ONBOARDING: Empty JSON from context extractor for text: " . $text);
             }
-            
-            // NEURON IA: Flatten if nested (fixes specific model behavior)
+
+            // Flatten if nested (fixes specific model behavior)
             if (isset($json['findings']) && is_array($json['findings'])) {
                 $json = array_merge($json, $json['findings']);
             }
             if (isset($json['extracted']) && is_array($json['extracted'])) {
                 $json = array_merge($json, $json['extracted']);
             }
-            
+
             return is_array($json) ? $json : [];
         } catch (\Throwable $e) {
             error_log("BUILDER_ONBOARDING: LLM Router error in delegateToContextExtractor: " . $e->getMessage());

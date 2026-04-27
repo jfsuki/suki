@@ -330,7 +330,7 @@ final class SemanticMemoryService
         $topK = max(1, (int) ($limit ?? $this->defaultTopK ?? $runtimeConfig['top_k']));
         $minScore = (float) $runtimeConfig['min_score'];
 
-        $results = $store->query($queryEmbedding['vector'], $filter, $topK, true);
+        $results = $store->queryForTenant($tenantId, $queryEmbedding['vector'], $filter, $topK, true);
         $hits = [];
         $sourceIds = [];
         $evidenceIds = [];

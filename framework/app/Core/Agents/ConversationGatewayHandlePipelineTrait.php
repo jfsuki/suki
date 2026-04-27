@@ -6,6 +6,10 @@ namespace App\Core\Agents;
 
 trait ConversationGatewayHandlePipelineTrait
 {
+    /** Capas del router que se resuelven síncronamente (sin LLM) */
+    private const ROUTER_LAYERS_SYNC = ['cache', 'rules'];
+
+
     public function handle(string $tenantId, string $userId, string $message, string $mode = 'app', string $projectId = 'default'): array
     {
         $tenantId = $tenantId !== '' ? $tenantId : 'default';
@@ -56,6 +60,7 @@ trait ConversationGatewayHandlePipelineTrait
         if (!empty($glossary)) {
             $lexicon = $this->mergeLexicon($lexicon, $glossary);
         }
+        $this->scopedEntityNamesCache = $lexicon;
         $profile = $this->getProfile($tenantId, $this->contextProfileUser);
         $state = $this->syncDialogState($state, $mode, $profile);
         $normalized = $this->normalizeWithTraining($raw, $training, $tenantId, $profile, $mode);
@@ -142,30 +147,6 @@ trait ConversationGatewayHandlePipelineTrait
             $telemetry['builder_context_profile_cleared'] = $mustClearBusinessProfile;
             return $this->result('ask_user', $reply, null, null, $state, $telemetry);
         }
-        // --- EVOLUCIÓN FASE 7: TOOL-FIRST AUTONOMOUS LOOP ---
-        if ($mode === 'operation' && (getenv('SUKI_TOOL_FIRST') === '1' || ($state['use_autonomous_loop'] ?? false))) {
-            $autonomousProcess = new \App\Core\Agents\Processes\AutonomousExecutionProcess();
-            $autoResult = $autonomousProcess->execute(
-                $raw,
-                $this->memoryWindow($tenantId, $userId),
-                $this->router,
-                $this->llm,
-                $this->skills
-            );
-
-            $state = $this->updateState($state, $raw, $autoResult['reply'], 'autonomous_operation', null, [], null);
-            $this->saveState($tenantId, $userId, $state);
-
-            return $this->result(
-                $autoResult['action'] ?? 'respond_local',
-                $autoResult['reply'] ?? '',
-                $autoResult['command'] ?? null,
-                null,
-                $state,
-                $autoResult['telemetry'] ?? []
-            );
-        }
-
         // Flow control (cancel/resume) must be evaluated BEFORE onboarding so that
         // meta-commands can interrupt any active task, including builder_onboarding.
         $flowControlRoute = $this->routeFlowControl($normalizedBase, $state, $profile, $mode, $tenantId, $userId);
@@ -248,7 +229,11 @@ trait ConversationGatewayHandlePipelineTrait
                     $profile = array_merge($profile, $onboarding['profile']);
                 }
                 $this->saveProfile($tenantId, $this->contextProfileUser, $profile);
-                return $this->result($action, $reply, null, null, $nextState, $this->telemetry('builder_onboarding', true));
+                $onboardingTelemetry = $this->telemetry('builder_onboarding', true);
+                $onboardingTelemetry['classification'] = 'builder_onboarding';
+                $onboardingTelemetry['resolved_locally'] = true;
+                $onboardingTelemetry['routing_hint_steps'] = self::ROUTER_LAYERS_SYNC;
+                return $this->result($action, $reply, null, null, $nextState, $onboardingTelemetry);
             }
         }
 
