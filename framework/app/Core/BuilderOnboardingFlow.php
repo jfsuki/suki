@@ -40,20 +40,27 @@ final class BuilderOnboardingFlow
             return null;
         }
 
-        if ((bool) ($ops['isFormListQuestion'])($text)) {
-            return ['action' => 'respond_local', 'reply' => (string) ($ops['buildFormList'])(), 'state' => $state, 'profile' => $profile];
-        }
-        if ((bool) ($ops['isEntityListQuestion'])($text)) {
-            return ['action' => 'respond_local', 'reply' => (string) ($ops['buildEntityList'])(), 'state' => $state, 'profile' => $profile];
-        }
-        if (
-            (bool) ($ops['isBuilderProgressQuestion'])($text)
-            || str_contains($text, 'estado del proyecto')
-            || str_contains($text, 'status del proyecto')
-            || str_contains($text, 'estatus del proyecto')
-            || str_contains($text, 'resumen del proyecto')
-        ) {
-            return ['action' => 'respond_local', 'reply' => (string) ($ops['buildProjectStatus'])(), 'state' => $state, 'profile' => $profile];
+        // Shortcuts for info queries are only valid when NOT in a step-guided onboarding flow.
+        // When a step is active (operation_model, needs_scope, etc.), the user's message must
+        // be interpreted as an answer to the current step, not as a general query.
+        $stepGuidedSteps = ['operation_model', 'needs_scope', 'documents_scope', 'confirm_scope', 'plan_ready'];
+        $inStepGuidedFlow = $isOnboarding && in_array((string) ($state['onboarding_step'] ?? ''), $stepGuidedSteps, true);
+        if (!$inStepGuidedFlow) {
+            if ((bool) ($ops['isFormListQuestion'])($text)) {
+                return ['action' => 'respond_local', 'reply' => (string) ($ops['buildFormList'])(), 'state' => $state, 'profile' => $profile];
+            }
+            if ((bool) ($ops['isEntityListQuestion'])($text)) {
+                return ['action' => 'respond_local', 'reply' => (string) ($ops['buildEntityList'])(), 'state' => $state, 'profile' => $profile];
+            }
+            if (
+                (bool) ($ops['isBuilderProgressQuestion'])($text)
+                || str_contains($text, 'estado del proyecto')
+                || str_contains($text, 'status del proyecto')
+                || str_contains($text, 'estatus del proyecto')
+                || str_contains($text, 'resumen del proyecto')
+            ) {
+                return ['action' => 'respond_local', 'reply' => (string) ($ops['buildProjectStatus'])(), 'state' => $state, 'profile' => $profile];
+            }
         }
 
         if (!$isOnboarding && !$isUnknownDiscovery && !$trigger) {

@@ -7,6 +7,14 @@ use App\Core\Agents\Memory\MemoryWindow;
 
 trait ConversationGatewayStubsTrait
 {
+    // ─── Umbrales de scoring del router (orden: Qdrant > clasificador local > fallback keyword) ───
+    private const QDRANT_MIN_SCORE     = 0.65; // Capa Qdrant live: hit de alta confianza
+    private const CLASSIFIER_MIN_SCORE = 0.60; // Clasificador local: confianza media
+    private const FALLBACK_MIN_SCORE   = 0.55; // Fallback keyword: confianza baja, solo si no hay mejor opción
+
+    // ─── Triggers de creación: TODO mover a training data cuando se genere conjunto suficiente ───
+    private const CREATE_TRIGGERS = ['crear', 'hacer', 'construir', 'armar', 'quiero un sistema', 'quiero una app'];
+
     public function sessionKey(string $tenantId, string $projectId, string $mode, string $userId): string
     {
         return "sess_{$tenantId}_{$projectId}_{$mode}_{$userId}";
@@ -41,6 +49,9 @@ trait ConversationGatewayStubsTrait
 
     public function loadLexicon(string $tenantId = 'default'): array
     {
+        if (isset($this->knowledge) && $this->knowledge instanceof \App\Core\Agents\KnowledgeProvider) {
+            return $this->knowledge->loadLexicon($tenantId);
+        }
         return [];
     }
 
@@ -189,7 +200,16 @@ trait ConversationGatewayStubsTrait
 
     public function resetBuilderBusinessProfile(array $profile): array
     {
-        unset($profile['business_type']);
+        unset(
+            $profile['business_type'],
+            $profile['business_label'],
+            $profile['business_candidate'],
+            $profile['operation_model'],
+            $profile['needs_scope'],
+            $profile['needs_scope_items'],
+            $profile['documents_scope'],
+            $profile['documents_scope_items']
+        );
         return $profile;
     }
 
@@ -200,11 +220,29 @@ trait ConversationGatewayStubsTrait
 
     public function isAmbiguousBuilderCreateRequest(string $text): bool
     {
-        $text = strtolower($text);
-        $triggers = ['crear', 'hacer', 'negocio', 'tengo un', 'tengo una', 'vendo', 'ayuda', 'mi empresa', 'mi emprendimiento'];
-        foreach ($triggers as $t) {
-            if (str_contains($text, $t)) {
-                return !str_contains($text, 'tabla') && !str_contains($text, 'formulario');
+        // Structural exclusions — can't be a create request if it names a schema operation
+        $n = strtolower($text);
+        if (str_contains($n, 'tabla') || str_contains($n, 'formulario')) {
+            return false;
+        }
+
+        // Delegate to semantic classifier: only create_request intents are ambiguous builder starts
+        // business_description, user_profile_learn, etc. are NOT ambiguous create requests
+        try {
+            $result = $this->intentClassifier()->classify($text);
+            $intent = $result['intent'] ?? '';
+            $score  = (float) ($result['score'] ?? 0.0);
+            if ($score >= self::CLASSIFIER_MIN_SCORE) {
+                return $intent === 'create_request';
+            }
+        } catch (\Throwable $e) {
+            // fallback below
+        }
+
+        // Low-confidence fallback: only explicit creation vocabulary
+        foreach (self::CREATE_TRIGGERS as $t) {
+            if (str_contains($n, $t)) {
+                return true;
             }
         }
         return false;
@@ -265,7 +303,7 @@ trait ConversationGatewayStubsTrait
     public function isOutOfScopeQuestion(string $text, string $mode): bool
     {
         $result = $this->intentClassifier()->classify($text);
-        return $result['intent'] === 'out_of_scope' && $result['score'] >= 0.65;
+        return $result['intent'] === 'out_of_scope' && $result['score'] >= self::QDRANT_MIN_SCORE;
     }
 
     public function buildOutOfScopeReply(string $mode): string
@@ -643,17 +681,21 @@ trait ConversationGatewayStubsTrait
     {
         $search = $this->intentClassifier()->search($text);
         
-        // 1. Layer: Training Base Hit (Manual playbooks/trainings)
-        if ($search['layer'] === 'qdrant' && $search['score'] >= 0.65) {
-            $payload = $search['payload'] ?? [];
-            $content = $payload['content'] ?? '';
-            
-            if ($content !== '') {
+        // 1. Layer: Training Base Hit (Manual playbooks from AI Training Center)
+        // The `content` field in ALL training/seed data is the user UTTERANCE, not an agent response.
+        // Only return a direct reply if the metadata contains an explicit `response` or `agent_reply` field —
+        // which is set only by manually curated AI Training Center playbook entries.
+        if ($search['layer'] === 'qdrant' && $search['score'] >= self::QDRANT_MIN_SCORE) {
+            $payload      = $search['payload'] ?? [];
+            $metadata     = is_array($payload['metadata'] ?? null) ? (array) $payload['metadata'] : [];
+            $agentReply   = trim((string) ($metadata['response'] ?? $metadata['agent_reply'] ?? ''));
+
+            if ($agentReply !== '') {
                 return [
-                    'action' => 'respond_local',
-                    'reply' => $content,
-                    'intent' => $search['intent'],
-                    'confidence' => $search['score']
+                    'action'     => 'respond_local',
+                    'reply'      => $agentReply,
+                    'intent'     => $search['intent'],
+                    'confidence' => $search['score'],
                 ];
             }
         }
@@ -766,26 +808,38 @@ trait ConversationGatewayStubsTrait
     public function parseBuild(string $text, array $state, array $profile): array
     {
         $n = $this->normalize($text);
+
+        // Sintáctico puro: "crear tabla X: campo:tipo" — el colon doble es estructura, no semántica
         if (str_contains($n, 'crear tabla') && str_contains($n, ':')) {
             $entity = $this->parseEntityFromCrudText($text);
-            if ($entity === '') $entity = 'clientes';
+            if ($entity === '') $entity = 'entidad';
             return [
                 'command' => ['command' => 'CreateEntity', 'entity' => $entity, 'fields' => [['name' => 'nombre', 'type' => 'texto']]],
-                'entity' => $entity
+                'entity' => $entity,
             ];
         }
-        if (str_contains($n, 'crear tabla')) {
-            return ['ask' => 'Entendido. Para crear una tabla base necesito los campos.', 'active_task' => 'create_table'];
+
+        // Semántico: usar IntentClassifier (Qdrant → LLM → degradación)
+        try {
+            $result = $this->intentClassifier()->classify($text);
+            $intent = $result['intent'] ?? 'unknown';
+            $score  = (float) ($result['score'] ?? 0.0);
+
+            if ($score >= self::CLASSIFIER_MIN_SCORE) {
+                if ($intent === 'create_entity' || $intent === 'create_table') {
+                    return ['ask' => 'Entendido. ¿Qué campos necesita esta tabla?', 'active_task' => 'create_table'];
+                }
+                if ($intent === 'create_form' || $intent === 'create_screen') {
+                    return ['ask' => 'Entendido. ¿Sobre qué tabla va este formulario?', 'active_task' => 'create_form'];
+                }
+                if ($intent === 'builder_onboarding' || $intent === 'create_request') {
+                    return ['active_task' => 'builder_onboarding'];
+                }
+            }
+        } catch (\Throwable $e) {
+            // intentClassifier no disponible — degradación aceptable
         }
-        if (str_contains($n, 'crear formulario')) {
-            return ['ask' => 'Entendido. Para crear un formulario necesito la tabla base.', 'active_task' => 'create_form'];
-        }
-        if (str_contains($n, 'crear producto')) {
-            return ['ask' => 'Entendido. Continuamos con busqueda de entidades... ¿Quieres que la cree por ti?', 'active_task' => 'builder_onboarding'];
-        }
-        if (str_contains($n, 'pacientes')) {
-            return ['ask' => 'Entendido. Creamos la tabla pacientes. Paso 4: que documentos necesitas?', 'active_task' => 'builder_onboarding'];
-        }
+
         return [];
     }
 
@@ -815,40 +869,50 @@ trait ConversationGatewayStubsTrait
 
     public function buildAppQuestionReply(string $text, array $lexicon, array $state, array $profile, array $training): string
     {
-        $n = mb_strtolower(trim($text));
-        if (str_contains($n, 'que hay hecho')) {
-             return 'En esta app puedes trabajar con clientes, productos y ventas.';
+        // Clasificación semántica primero (Qdrant → LLM)
+        try {
+            $result = $this->intentClassifier()->classify($text);
+            $intent = $result['intent'] ?? 'unknown';
+            $score  = (float) ($result['score'] ?? 0.0);
+
+            if ($score >= self::FALLBACK_MIN_SCORE) {
+                if ($intent === 'faq' || $intent === 'status_query') {
+                    return ''; // dejar que el pipeline delegue al LLM con contexto real
+                }
+                if ($intent === 'greeting') {
+                    return ''; // pipeline maneja saludos
+                }
+            }
+        } catch (\Throwable $e) {
+            // degradación aceptable
         }
-        if (str_contains($n, 'pantallas')) {
-             return 'Los Formularios estan en el menu lateral.';
-        }
-        if (str_contains($n, 'ana')) {
-             return 'Necesito una accion concreta para proceder.';
-        }
-        if ((str_contains($n, 'crear') || str_contains($n, 'lista') || str_contains($n, 'actualizar') || str_contains($n, 'eliminar')) && !str_contains($n, 'usuario') && !str_contains($n, 'sesion')) {
-             return 'Esa tabla no existe en esta app. Debe ser agregada por el creador.';
-        }
-        if ($n === 'que guardaste' || $n === 'que guardamos') {
-             return 'Aun no he guardado esta informacion. Necesito una accion concreta para proceder.';
-        }
-        if ($n === 'que guardaste' || $n === 'que guardamos' || str_contains($n, 'guardaste')) {
-             return 'Aun no he guardado esta informacion. Necesito una accion concreta para proceder.';
-        }
-        return 'Puedo ayudarte con esta app. Prueba preguntando "que hay hecho" o "quienes son los clientes".';
+
+        // Vacío = el pipeline sube al LLM con el contexto del tenant
+        return '';
     }
 
     public function parseCrud(string $text, array $lexicon, array $state, string $mode): array
     {
-        $n = $this->normalize($text);
-        if (str_contains($n, 'ana')) {
-             return ['action' => 'respond_local', 'reply' => 'Necesito una accion concreta para proceder.'];
+        // Clasificación semántica: IntentClassifier decide la acción CRUD
+        try {
+            $result = $this->intentClassifier()->classify($text);
+            $intent = $result['intent'] ?? 'unknown';
+            $score  = (float) ($result['score'] ?? 0.0);
+
+            if ($score >= self::CLASSIFIER_MIN_SCORE) {
+                $crudIntents = ['crud_create', 'crud_read', 'crud_list', 'crud_update', 'crud_delete', 'create_request'];
+                if (in_array($intent, $crudIntents, true)) {
+                    $entity = $this->detectEntity($text, $lexicon, $state);
+                    if ($entity !== '') {
+                        return ['missing_entity' => false, 'entity' => $entity, 'intent' => $intent];
+                    }
+                    return ['missing_entity' => true, 'entity' => '', 'intent' => $intent];
+                }
+            }
+        } catch (\Throwable $e) {
+            // degradación aceptable — pipeline continúa
         }
-        if (str_contains($n, 'crear client') && !str_contains($n, '=')) {
-             return ['action' => 'respond_local', 'reply' => 'Entendido. Para crear el cliente necesito el nombre.'];
-        }
-        if (str_contains($n, 'crear') || str_contains($n, 'listar') || str_contains($n, 'ver')) {
-             return ['missing_entity' => true, 'entity' => $this->detectEntity($text, $lexicon, $state)];
-        }
+
         return [];
     }
 

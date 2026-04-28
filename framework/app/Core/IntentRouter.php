@@ -540,7 +540,7 @@ final class IntentRouter
                 }
             }
 
-            if ($isMemoryQuery) {
+            if ($isMemoryQuery && $action !== 'execute_command') {
                 if (!in_array('agent_training', $hintPath, true)) {
                     $hintPath[] = 'agent_training';
                 }

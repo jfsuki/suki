@@ -127,24 +127,19 @@ trait ConversationGatewayHandlePipelineTrait
         }
 
         if ($mode === 'builder' && $this->isBuilderContextResetHint($normalizedBase)) {
-            $existingBusinessType = $this->normalizeBusinessType((string) ($profile['business_type'] ?? ''));
-            $normalizedResetText = $this->normalizeBuilderIntentText($normalizedBase);
-            $mustClearBusinessProfile = $this->isBusinessTypeRejectedByUser($normalizedBase, $existingBusinessType)
-                || preg_match('/\bno\s+te\s+he\s+dicho\b/u', $normalizedResetText) === 1;
-
             $state = $this->resetBuilderInferenceState($state);
             $state['builder_plan'] = null;
-            if ($mustClearBusinessProfile) {
-                $profile = $this->resetBuilderBusinessProfile($profile);
-                $this->saveProfile($tenantId, $this->contextProfileUser, $profile);
-            }
+            $state['onboarding_step'] = 'business_type';
+            $state['proposed_profile'] = null;
+            $profile = $this->resetBuilderBusinessProfile($profile);
+            $this->saveProfile($tenantId, $this->contextProfileUser, $profile);
 
             $reply = 'Entendido. A que se dedica tu negocio?';
             $state = $this->updateState($state, $raw, $reply, 'builder_context_reset', null, [], 'builder_onboarding');
             $this->saveState($tenantId, $userId, $state);
             $telemetry = $this->telemetry('builder_context_reset', true);
             $telemetry['builder_context_reset'] = true;
-            $telemetry['builder_context_profile_cleared'] = $mustClearBusinessProfile;
+            $telemetry['builder_context_profile_cleared'] = true;
             return $this->result('ask_user', $reply, null, null, $state, $telemetry);
         }
         // Flow control (cancel/resume) must be evaluated BEFORE onboarding so that
@@ -188,6 +183,18 @@ trait ConversationGatewayHandlePipelineTrait
                 $state,
                 $this->builderAllowedValuesForStep($currentStep, $profile, $state)
             ) : ['confidence' => 0];
+
+            // PHP canonical guard: if the fast path claims to have resolved operation_model
+            // but PHP's own keyword detector finds nothing in the text, reject the LLM claim.
+            // "LLM translates, PHP validates" — prevents hallucinated payment-model mappings.
+            if ($currentStep === 'operation_model' && isset($fastPath['mapped_fields']['operation_model'])) {
+                if ($this->detectOperationModel($raw) === '') {
+                    unset($fastPath['mapped_fields']['operation_model']);
+                    if (empty($fastPath['mapped_fields'])) {
+                        $fastPath['confidence'] = 0.0;
+                    }
+                }
+            }
 
             // If Agent is confident, take the fast path (only for normal onboarding,
             // and NOT for business_type step which requires unknown-business detection logic).

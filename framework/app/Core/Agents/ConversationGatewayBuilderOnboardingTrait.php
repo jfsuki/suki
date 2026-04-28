@@ -1721,16 +1721,21 @@ trait ConversationGatewayBuilderOnboardingTrait
                    }
                 }
 
-                if (!empty($json['operation_model'])) {
+                // Guard: only update profile fields from history once the corresponding step has been passed.
+                // This prevents stale history from pre-reset sessions contaminating a fresh onboarding.
+                $stepLevelMap = ['business_type' => 0, 'operation_model' => 1, 'needs_scope' => 2, 'documents_scope' => 3, 'confirm_scope' => 4, 'plan_ready' => 5];
+                $currentStepLevel = $stepLevelMap[$state['onboarding_step'] ?? 'business_type'] ?? 0;
+
+                if ($currentStepLevel >= 2 && !empty($json['operation_model'])) {
                     $profile['operation_model'] = $this->normalizeOperationModel((string)$json['operation_model']);
                 }
 
-                if (!empty($json['needs']) && is_array($json['needs'])) {
+                if ($currentStepLevel >= 3 && !empty($json['needs']) && is_array($json['needs'])) {
                     $profile['needs_scope_items'] = $this->reconstructionMergeScope($profile['needs_scope_items'] ?? [], $json['needs']);
                     $profile['needs_scope'] = implode(', ', $profile['needs_scope_items']);
                 }
 
-                if (!empty($json['documents']) && is_array($json['documents'])) {
+                if ($currentStepLevel >= 4 && !empty($json['documents']) && is_array($json['documents'])) {
                     $profile['documents_scope_items'] = $this->reconstructionMergeScope($profile['documents_scope_items'] ?? [], $json['documents']);
                     $profile['documents_scope'] = implode(', ', $profile['documents_scope_items']);
                 }

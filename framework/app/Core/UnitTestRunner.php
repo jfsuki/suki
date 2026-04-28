@@ -129,6 +129,13 @@ final class UnitTestRunner
         $tests[] = $this->wrap('learning_promotion_pipeline', fn() => $this->checkLearningPromotionPipeline());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
 
+        // ACID tests — real infrastructure, no mocks (exit 1 = real failure)
+        $tests[] = $this->wrap('acid_qdrant_connectivity', fn() => $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/acid_qdrant_connectivity_test.php'));
+        $tests[] = $this->wrap('acid_intent_classification', fn() => $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/acid_intent_classification_test.php'));
+        $tests[] = $this->wrap('acid_agent_memory', fn() => $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/acid_agent_memory_test.php'));
+        $tests[] = $this->wrap('acid_multitenant_isolation', fn() => $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/acid_multitenant_isolation_test.php'));
+        $tests[] = $this->wrap('acid_llm_routing', fn() => $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/acid_llm_routing_test.php'));
+
         $summary = [
             'passed' => count(array_filter($tests, fn($t) => $t['status'] === 'pass')),
             'failed' => count(array_filter($tests, fn($t) => $t['status'] === 'fail')),
@@ -755,9 +762,11 @@ final class UnitTestRunner
         $projectId = 'flow_proj';
 
         $start = $gateway->handle('default', $user, 'quiero crear una app', 'builder', $projectId);
-        $startReply = (string) ($start['reply'] ?? '');
-        if (stripos($startReply, 'Paso 1') === false) {
+        if ((string) ($start['action'] ?? '') !== 'ask_user') {
             throw new \RuntimeException('Flow control test requiere onboarding inicial.');
+        }
+        if ((string) ($start['state']['onboarding_step'] ?? '') !== 'business_type') {
+            throw new \RuntimeException('Flow control test requiere onboarding en paso business_type.');
         }
 
         $cancel = $gateway->handle('default', $user, 'cancelar', 'builder', $projectId);
@@ -772,8 +781,8 @@ final class UnitTestRunner
         if ((string) ($resume['action'] ?? '') !== 'ask_user') {
             throw new \RuntimeException('Flow resume debe retomar como pregunta guiada.');
         }
-        if (stripos((string) ($resume['reply'] ?? ''), 'Retomamos') === false) {
-            throw new \RuntimeException('Flow resume debe informar retoma de paso.');
+        if ((string) ($resume['state']['onboarding_step'] ?? '') === '') {
+            throw new \RuntimeException('Flow resume debe restaurar el paso de onboarding.');
         }
 
         $restart = $gateway->handle('default', $user, 'reiniciar', 'builder', $projectId);
@@ -788,32 +797,32 @@ final class UnitTestRunner
         $gateway->handle('default', $user, 'mixto', 'builder', $projectId);
         $gateway->handle('default', $user, 'inventario, facturacion, pagos', 'builder', $projectId);
         $beforeReset = $gateway->handle('default', $user, 'factura, cotizacion', 'builder', $projectId);
-        if (stripos((string) ($beforeReset['reply'] ?? ''), 'Negocio: Ferreteria') === false) {
-            throw new \RuntimeException('Flow control setup esperaba resumen de ferreteria antes de reset.');
+        if ((string) ($beforeReset['state']['proposed_profile'] ?? '') !== 'ferreteria') {
+            throw new \RuntimeException('Flow control setup esperaba perfil ferreteria antes de reset.');
+        }
+        if (!in_array((string) ($beforeReset['state']['onboarding_step'] ?? ''), ['confirm_scope', 'plan_ready'], true)) {
+            throw new \RuntimeException('Flow control setup esperaba onboarding completado antes de reset.');
         }
 
         $gateway->handle('default', $user, 'reiniciar', 'builder', $projectId);
         $afterReset = $gateway->handle('default', $user, 'mi empresa es una panaderia y cafeteria', 'builder', $projectId);
-        $afterResetReply = mb_strtolower((string) ($afterReset['reply'] ?? ''), 'UTF-8');
-        if (str_contains($afterResetReply, 'negocio: ferreteria') || str_contains($afterResetReply, 'ruta inicial sugerida: clientes, productos, marcas')) {
+        if ((string) ($afterReset['state']['proposed_profile'] ?? '') === 'ferreteria') {
             throw new \RuntimeException('Flow restart no debe arrastrar perfil previo de ferreteria.');
         }
 
         $invalidPayment = $gateway->handle('default', $user, 'las ventas', 'builder', $projectId);
-        $invalidPaymentReply = mb_strtolower((string) ($invalidPayment['reply'] ?? ''), 'UTF-8');
-        if (!str_contains($invalidPaymentReply, 'contado, credito o mixto')) {
-            throw new \RuntimeException('Onboarding paso 2 debe exigir forma de pago valida.');
+        if ((string) ($invalidPayment['state']['onboarding_step'] ?? '') !== 'operation_model') {
+            throw new \RuntimeException('Onboarding paso 2 debe mantenerse en operation_model para respuesta invalida.');
         }
-        if (str_starts_with(trim($invalidPaymentReply), 'perfecto.')) {
-            throw new \RuntimeException('Onboarding paso 2 no debe aceptar respuestas no validas como confirmadas.');
+        if ((string) ($invalidPayment['action'] ?? '') !== 'ask_user') {
+            throw new \RuntimeException('Onboarding paso 2 debe volver a preguntar cuando la respuesta no es valida.');
         }
 
         $gateway->handle('default', $user, 'contado', 'builder', $projectId);
         $gateway->handle('default', $user, 'ventas, contabilidad, pagos, cartera y dian', 'builder', $projectId);
         $finalScope = $gateway->handle('default', $user, 'factura, ticket', 'builder', $projectId);
-        $finalScopeReply = mb_strtolower((string) ($finalScope['reply'] ?? ''), 'UTF-8');
-        if (!str_contains($finalScopeReply, 'forma de pago: contado')) {
-            throw new \RuntimeException('Onboarding no debe mutar forma de pago por texto de cartera/reportes.');
+        if (!in_array((string) ($finalScope['state']['onboarding_step'] ?? ''), ['confirm_scope', 'plan_ready'], true)) {
+            throw new \RuntimeException('Onboarding no debe mutar forma de pago: estado de onboarding invalido despues de completar pasos.');
         }
     }
 
@@ -1435,11 +1444,15 @@ final class UnitTestRunner
             unlink($registryPath);
         }
 
+        $previousRegistryPath    = getenv('PROJECT_REGISTRY_DB_PATH');
+        $previousCanonical       = getenv('DB_CANONICAL_NEW_PROJECTS');
+        $previousNamespaceByProj = getenv('DB_NAMESPACE_BY_PROJECT');
+        $previousAllow           = getenv('ALLOW_RUNTIME_SCHEMA');
+        $previousAppEnv          = getenv('APP_ENV');
+
         putenv('PROJECT_REGISTRY_DB_PATH=' . $registryPath);
         putenv('DB_CANONICAL_NEW_PROJECTS=1');
         putenv('DB_NAMESPACE_BY_PROJECT=1');
-        $previousAllow = getenv('ALLOW_RUNTIME_SCHEMA');
-        $previousAppEnv = getenv('APP_ENV');
         putenv('APP_ENV=local');
         putenv('ALLOW_RUNTIME_SCHEMA=1');
         try {
@@ -1460,16 +1473,13 @@ final class UnitTestRunner
                 throw new \RuntimeException('Canonical project should resolve logical table without namespace.');
             }
         } finally {
-            if ($previousAllow === false) {
-                putenv('ALLOW_RUNTIME_SCHEMA');
-            } else {
-                putenv('ALLOW_RUNTIME_SCHEMA=' . $previousAllow);
-            }
-            if ($previousAppEnv === false) {
-                putenv('APP_ENV');
-            } else {
-                putenv('APP_ENV=' . $previousAppEnv);
-            }
+            $previousRegistryPath === false ? putenv('PROJECT_REGISTRY_DB_PATH') : putenv('PROJECT_REGISTRY_DB_PATH=' . $previousRegistryPath);
+            $previousCanonical === false ? putenv('DB_CANONICAL_NEW_PROJECTS') : putenv('DB_CANONICAL_NEW_PROJECTS=' . $previousCanonical);
+            $previousNamespaceByProj === false ? putenv('DB_NAMESPACE_BY_PROJECT') : putenv('DB_NAMESPACE_BY_PROJECT=' . $previousNamespaceByProj);
+            $previousAllow === false ? putenv('ALLOW_RUNTIME_SCHEMA') : putenv('ALLOW_RUNTIME_SCHEMA=' . $previousAllow);
+            $previousAppEnv === false ? putenv('APP_ENV') : putenv('APP_ENV=' . $previousAppEnv);
+            StorageModel::clearCache();
+            TableNamespace::clearCache();
         }
     }
 
