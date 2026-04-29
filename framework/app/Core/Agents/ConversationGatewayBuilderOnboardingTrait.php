@@ -123,8 +123,11 @@ trait ConversationGatewayBuilderOnboardingTrait
             if (str_contains($input, 'gasto')) $found[] = 'gastos';
             if (str_contains($input, 'venta')) $found[] = 'ventas';
             if (empty($found)) {
-                $llmFindings = $this->delegateToContextExtractorCached($text, $localProfile);
-                $llmNeeds = is_array($llmFindings['needs_scope_items'] ?? null) ? (array)$llmFindings['needs_scope_items'] : [];
+                $bpe = new BuilderProfileExtractor();
+                $bpeResult = $bpe->extractAndGuide($text, $localProfile);
+                $llmNeeds = $bpeResult['ok'] && is_array($bpeResult['profile_updates']['needs_scope_items'] ?? null)
+                    ? $bpeResult['profile_updates']['needs_scope_items']
+                    : [];
                 if (!empty($llmNeeds)) {
                     $found = $llmNeeds;
                 }
@@ -146,8 +149,11 @@ trait ConversationGatewayBuilderOnboardingTrait
             if (str_contains($input, 'ticket')) $found[] = 'tickets';
             if (str_contains($input, 'orden')) $found[] = 'ordenes';
             if (empty($found)) {
-                $llmFindings = $this->delegateToContextExtractorCached($text, $localProfile);
-                $llmDocs = is_array($llmFindings['documents_scope_items'] ?? null) ? (array)$llmFindings['documents_scope_items'] : [];
+                $bpe = new BuilderProfileExtractor();
+                $bpeResult = $bpe->extractAndGuide($text, $localProfile);
+                $llmDocs = $bpeResult['ok'] && is_array($bpeResult['profile_updates']['documents_scope_items'] ?? null)
+                    ? $bpeResult['profile_updates']['documents_scope_items']
+                    : [];
                 if (!empty($llmDocs)) {
                     $found = $llmDocs;
                 }
@@ -2584,14 +2590,26 @@ trait ConversationGatewayBuilderOnboardingTrait
 
     public function extractNeedItems(string $text, string $businessType = ''): array
     {
-        $findings = $this->delegateToContextExtractorCached($text, ['business_type' => $businessType]);
+        $profile = $businessType !== '' ? ['business_type' => $businessType] : [];
+        $bpe = new BuilderProfileExtractor();
+        $result = $bpe->extractAndGuide($text, $profile);
+        if ($result['ok'] && is_array($result['profile_updates']['needs_scope_items'] ?? null)) {
+            return $result['profile_updates']['needs_scope_items'];
+        }
+        $findings = $this->delegateToContextExtractorCached($text, $profile);
         $items = $findings['needs_scope_items'] ?? [];
         return is_array($items) ? $items : [];
     }
 
     public function extractDocumentItems(string $text, string $businessType = ''): array
     {
-        $findings = $this->delegateToContextExtractorCached($text, ['business_type' => $businessType]);
+        $profile = $businessType !== '' ? ['business_type' => $businessType] : [];
+        $bpe = new BuilderProfileExtractor();
+        $result = $bpe->extractAndGuide($text, $profile);
+        if ($result['ok'] && is_array($result['profile_updates']['documents_scope_items'] ?? null)) {
+            return $result['profile_updates']['documents_scope_items'];
+        }
+        $findings = $this->delegateToContextExtractorCached($text, $profile);
         $items = $findings['documents_scope_items'] ?? [];
         return is_array($items) ? $items : [];
     }
