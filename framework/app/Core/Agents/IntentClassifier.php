@@ -120,27 +120,16 @@ final class IntentClassifier
         }
         try {
             $embedding = $this->embedder->embed($text, ['task_type' => 'RETRIEVAL_QUERY']);
-            $must = [
-                ['key' => 'memory_type', 'match' => ['value' => 'agent_training']],
+            $filter = [
+                'must' => [
+                    ['key' => 'memory_type', 'match' => ['value' => 'agent_training']],
+                ],
             ];
 
-            if ($this->tenantId !== 'system') {
-                $must[] = [
-                    'should' => [
-                        ['key' => 'tenant_id', 'match' => ['value' => $this->tenantId]],
-                        ['key' => 'tenant_id', 'match' => ['value' => 'system']],
-                    ],
-                ];
-            } else {
-                $must[] = [
-                    'key' => 'tenant_id',
-                    'match' => ['value' => 'system'],
-                ];
-            }
-
-            $results = $this->vectorStore->query(
+            $results = $this->vectorStore->queryForTenantWithSystem(
+                $this->tenantId,
                 $embedding['vector'],
-                ['must' => $must],
+                $filter,
                 3,
                 true
             );

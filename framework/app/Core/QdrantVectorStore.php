@@ -360,6 +360,35 @@ final class QdrantVectorStore
     }
 
     /**
+     * Intent-classification query: returns vectors matching this tenant OR tenant='system'.
+     * Canonical method for IntentClassifier — includes global training data + tenant-specific.
+     *
+     * @param array<int,float|int|string> $vector
+     * @param array<string,mixed> $filter Additional filter conditions (merged with tenant/system must[])
+     * @return array<int,array<string,mixed>>
+     */
+    public function queryForTenantWithSystem(
+        string $tenantId,
+        array $vector,
+        array $filter = [],
+        int $limit = 5,
+        bool $withPayload = true
+    ): array {
+        if ($tenantId === '' || $tenantId === 'system') {
+            return $this->query($vector, $filter, $limit, $withPayload);
+        }
+
+        $must = is_array($filter['must'] ?? null) ? $filter['must'] : [];
+        $must[] = [
+            'should' => [
+                ['key' => 'tenant_id', 'match' => ['value' => $tenantId]],
+                ['key' => 'tenant_id', 'match' => ['value' => 'system']],
+            ],
+        ];
+        return $this->query($vector, array_merge($filter, ['must' => $must]), $limit, $withPayload);
+    }
+
+    /**
      * @param array<int,float|int|string> $vector
      * @param array<string,mixed> $filter
      * @return array<int,array<string,mixed>>

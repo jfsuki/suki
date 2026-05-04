@@ -8,18 +8,36 @@ namespace App\Core;
 use PDO;
 use RuntimeException;
 
+/**
+ * AccountingRepository
+ *
+ * Tablas manejadas:
+ *   puc_nacional               — Catálogo PUC nacional (read-only, compartido entre tenants)
+ *   cuentas_contables          — Catálogo activado por tenant + auxiliares propios (7+ dígitos)
+ *   parametros_contables_tenant — Mapeo rol semántico → cuenta real del tenant
+ *   formas_pago_config         — Medio de pago → rol contable del tenant
+ *   asientos_contables         — Libro diario
+ *   asiento_lineas             — Líneas de asiento (partida doble)
+ *
+ * LEY ABSOLUTA (canon § 12.5):
+ *   Nunca buscar cuentas por código PUC hardcodeado.
+ *   Usar siempre findAccountByRole($tenantId, $rol).
+ */
 final class AccountingRepository
 {
-    private const ACCOUNT_TABLE = 'cuentas_contables';
-    private const JOURNAL_TABLE = 'asientos_contables';
-    private const JOURNAL_LINE_TABLE = 'asiento_lineas';
+    private const PUC_NACIONAL_TABLE   = 'puc_nacional';
+    private const ACCOUNT_TABLE        = 'cuentas_contables';
+    private const ROLES_TABLE          = 'parametros_contables_tenant';
+    private const PAYMENT_TABLE        = 'formas_pago_config';
+    private const JOURNAL_TABLE        = 'asientos_contables';
+    private const JOURNAL_LINE_TABLE   = 'asiento_lineas';
 
     private PDO $db;
 
     public function __construct(?PDO $db = null)
     {
         $this->db = $db ?? Database::connection();
-        
+
         RuntimeSchemaPolicy::bootstrap(
             $this->db,
             'AccountingRepository',
@@ -27,21 +45,279 @@ final class AccountingRepository
             [self::ACCOUNT_TABLE, self::JOURNAL_TABLE, self::JOURNAL_LINE_TABLE],
             [
                 self::ACCOUNT_TABLE => ['idx_accounts_tenant', 'idx_accounts_code'],
-                self::JOURNAL_TABLE => ['idx_journal_tenant', 'idx_journal_date']
+                self::JOURNAL_TABLE => ['idx_journal_tenant', 'idx_journal_date'],
             ]
         );
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
-    public function listAccounts(string $tenantId): array
+    // ─── Catálogo Nacional PUC (read-only) ───────────────────────────────────
+
+    /** @return array<int, array<string, mixed>> */
+    public function listPucNacional(?string $nivel = null): array
     {
-        return QueryBuilder::table($this->db, self::ACCOUNT_TABLE)
-            ->where('tenant_id', '=', $tenantId)
-            ->orderBy('codigo', 'ASC')
-            ->get();
+        $table = TableNamespace::resolve(self::PUC_NACIONAL_TABLE);
+        $sql = "SELECT * FROM {$table}";
+        if ($nivel !== null) {
+            $stmt = $this->db->prepare($sql . " WHERE nivel = ? ORDER BY codigo ASC");
+            $stmt->execute([$nivel]);
+        } else {
+            $stmt = $this->db->prepare($sql . " ORDER BY codigo ASC");
+            $stmt->execute();
+        }
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
     }
+
+    public function findPucNacionalByCodigo(string $codigo): ?array
+    {
+        $table = TableNamespace::resolve(self::PUC_NACIONAL_TABLE);
+        $stmt = $this->db->prepare("SELECT * FROM {$table} WHERE codigo = ? LIMIT 1");
+        $stmt->execute([$codigo]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row !== false ? $row : null;
+    }
+
+    // ─── Catálogo Activo del Tenant (cuentas_contables) ─────────────────────
+
+    /** @return array<int, array<string, mixed>> */
+    public function listAccounts(string $tenantId, bool $soloActivas = true): array
+    {
+        $table = TableNamespace::resolve(self::ACCOUNT_TABLE);
+        $sql = "SELECT * FROM {$table} WHERE tenant_id = ?";
+        if ($soloActivas) {
+            $sql .= " AND activa = 1";
+        }
+        $sql .= " ORDER BY codigo ASC";
+        $stmt = $this->db->prepare($sql);
+        $stmt->execute([$tenantId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function findAccountByCodigo(string $tenantId, string $codigo): ?array
+    {
+        $table = TableNamespace::resolve(self::ACCOUNT_TABLE);
+        $stmt = $this->db->prepare(
+            "SELECT * FROM {$table} WHERE tenant_id = ? AND codigo = ? LIMIT 1"
+        );
+        $stmt->execute([$tenantId, $codigo]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row !== false ? $row : null;
+    }
+
+    public function activateAccount(string $tenantId, string $codigo): bool
+    {
+        $puc = $this->findPucNacionalByCodigo($codigo);
+        if ($puc === null) {
+            return false;
+        }
+        $table = TableNamespace::resolve(self::ACCOUNT_TABLE);
+        $driver = (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $orIgnore = $driver === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
+        $stmt = $this->db->prepare(
+            "{$orIgnore} INTO {$table}
+             (tenant_id, codigo, nombre, tipo, naturaleza, parent_codigo, nivel, es_auxiliar, activa)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 0, 1)"
+        );
+        $stmt->execute([
+            $tenantId,
+            $puc['codigo'],
+            $puc['nombre'],
+            $puc['tipo'],
+            $puc['naturaleza'],
+            $puc['parent'] ?? null,
+            $puc['nivel'],
+        ]);
+        return $stmt->rowCount() > 0;
+    }
+
+    /** Crea una cuenta auxiliar propia del tenant (dígito 7+) */
+    public function createAuxiliary(string $tenantId, string $codigo, string $nombre, string $parentCodigo): string
+    {
+        $parent = $this->findAccountByCodigo($tenantId, $parentCodigo);
+        if ($parent === null) {
+            throw new RuntimeException("Cuenta padre '{$parentCodigo}' no está activada para tenant '{$tenantId}'.");
+        }
+        if (strlen($codigo) < 7) {
+            throw new RuntimeException("Auxiliares deben tener 7 o más dígitos. Recibido: '{$codigo}'.");
+        }
+        $table = TableNamespace::resolve(self::ACCOUNT_TABLE);
+        $driver = (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $orIgnore = $driver === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
+        $stmt = $this->db->prepare(
+            "{$orIgnore} INTO {$table}
+             (tenant_id, codigo, nombre, tipo, naturaleza, parent_codigo, nivel, es_auxiliar, activa)
+             VALUES (?, ?, ?, ?, ?, ?, 'auxiliar', 1, 1)"
+        );
+        $stmt->execute([
+            $tenantId, $codigo, $nombre,
+            $parent['tipo'], $parent['naturaleza'], $parentCodigo,
+        ]);
+        return $codigo;
+    }
+
+    // ─── Roles Semánticos → Cuenta Real del Tenant ───────────────────────────
+
+    /**
+     * Resuelve el ID de la cuenta contable configurada para un rol semántico.
+     * Esta es la función que DEBE usar AccountingService — nunca hardcodear códigos.
+     */
+    public function findAccountByRole(string $tenantId, string $rol): ?int
+    {
+        $rolesTable = TableNamespace::resolve(self::ROLES_TABLE);
+        $accountTable = TableNamespace::resolve(self::ACCOUNT_TABLE);
+
+        $stmt = $this->db->prepare(
+            "SELECT cc.id
+             FROM {$rolesTable} r
+             JOIN {$accountTable} cc ON cc.tenant_id = r.tenant_id AND cc.codigo = r.codigo_cuenta
+             WHERE r.tenant_id = ? AND r.rol = ? AND cc.activa = 1
+             LIMIT 1"
+        );
+        $stmt->execute([$tenantId, $rol]);
+        $id = $stmt->fetchColumn();
+        return $id !== false ? (int) $id : null;
+    }
+
+    /** @return array<string, mixed>|null */
+    public function getRoleConfig(string $tenantId, string $rol): ?array
+    {
+        $table = TableNamespace::resolve(self::ROLES_TABLE);
+        $stmt = $this->db->prepare(
+            "SELECT * FROM {$table} WHERE tenant_id = ? AND rol = ? LIMIT 1"
+        );
+        $stmt->execute([$tenantId, $rol]);
+        $row = $stmt->fetch(PDO::FETCH_ASSOC);
+        return $row !== false ? $row : null;
+    }
+
+    /** @return array<int, array<string, mixed>> */
+    public function listRoles(string $tenantId): array
+    {
+        $table = TableNamespace::resolve(self::ROLES_TABLE);
+        $stmt = $this->db->prepare(
+            "SELECT * FROM {$table} WHERE tenant_id = ? ORDER BY rol ASC"
+        );
+        $stmt->execute([$tenantId]);
+        return $stmt->fetchAll(PDO::FETCH_ASSOC) ?: [];
+    }
+
+    public function setRole(string $tenantId, string $rol, string $codigoCuenta, string $descripcion = ''): void
+    {
+        $table = TableNamespace::resolve(self::ROLES_TABLE);
+        $driver = (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $now = date('Y-m-d H:i:s');
+
+        if ($driver === 'sqlite') {
+            $stmt = $this->db->prepare(
+                "INSERT INTO {$table} (tenant_id, rol, codigo_cuenta, descripcion, updated_at)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON CONFLICT(tenant_id, rol) DO UPDATE SET
+                   codigo_cuenta = excluded.codigo_cuenta,
+                   descripcion   = excluded.descripcion,
+                   updated_at    = excluded.updated_at"
+            );
+        } else {
+            $stmt = $this->db->prepare(
+                "INSERT INTO {$table} (tenant_id, rol, codigo_cuenta, descripcion, updated_at)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                   codigo_cuenta = VALUES(codigo_cuenta),
+                   descripcion   = VALUES(descripcion),
+                   updated_at    = VALUES(updated_at)"
+            );
+        }
+        $stmt->execute([$tenantId, $rol, $codigoCuenta, $descripcion, $now]);
+    }
+
+    /**
+     * Siembra los roles por defecto para un nuevo tenant.
+     * Los defaults vienen de framework/data/accounting_roles_defaults.json.
+     * El tenant puede modificarlos luego desde la UI.
+     */
+    public function seedDefaultRolesForTenant(string $tenantId): int
+    {
+        $jsonPath = __DIR__ . '/../../data/accounting_roles_defaults.json';
+        if (!file_exists($jsonPath)) {
+            throw new RuntimeException("Accounting roles defaults file not found: {$jsonPath}");
+        }
+        $data = json_decode((string) file_get_contents($jsonPath), true);
+        $roles = is_array($data['roles'] ?? null) ? (array) $data['roles'] : [];
+        $table = TableNamespace::resolve(self::ROLES_TABLE);
+        $driver = (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $now = date('Y-m-d H:i:s');
+        $orIgnore = $driver === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
+
+        $stmt = $this->db->prepare(
+            "{$orIgnore} INTO {$table} (tenant_id, rol, codigo_cuenta, descripcion, updated_at)
+             VALUES (?, ?, ?, ?, ?)"
+        );
+        $inserted = 0;
+        foreach ($roles as $role) {
+            if (!isset($role['rol'], $role['codigo_default'])) {
+                continue;
+            }
+            $stmt->execute([
+                $tenantId,
+                $role['rol'],
+                $role['codigo_default'],
+                $role['descripcion'] ?? '',
+                $now,
+            ]);
+            $inserted += $stmt->rowCount();
+        }
+
+        // Activar automáticamente las cuentas default en el catálogo del tenant
+        foreach ($roles as $role) {
+            if (!isset($role['codigo_default'])) {
+                continue;
+            }
+            $this->activateAccount($tenantId, $role['codigo_default']);
+        }
+
+        return $inserted;
+    }
+
+    // ─── Medios de Pago → Rol Contable ───────────────────────────────────────
+
+    public function findRolByMedioPago(string $tenantId, string $medioPago): ?string
+    {
+        $table = TableNamespace::resolve(self::PAYMENT_TABLE);
+        $stmt = $this->db->prepare(
+            "SELECT rol_contable FROM {$table} WHERE tenant_id = ? AND medio_pago = ? LIMIT 1"
+        );
+        $stmt->execute([$tenantId, $medioPago]);
+        $rol = $stmt->fetchColumn();
+        return $rol !== false ? (string) $rol : null;
+    }
+
+    public function setMedioPago(string $tenantId, string $medioPago, string $rolContable, string $nombre = ''): void
+    {
+        $table = TableNamespace::resolve(self::PAYMENT_TABLE);
+        $driver = (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $now = date('Y-m-d H:i:s');
+
+        if ($driver === 'sqlite') {
+            $stmt = $this->db->prepare(
+                "INSERT INTO {$table} (tenant_id, medio_pago, rol_contable, nombre, updated_at)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON CONFLICT(tenant_id, medio_pago) DO UPDATE SET
+                   rol_contable = excluded.rol_contable,
+                   nombre       = excluded.nombre,
+                   updated_at   = excluded.updated_at"
+            );
+        } else {
+            $stmt = $this->db->prepare(
+                "INSERT INTO {$table} (tenant_id, medio_pago, rol_contable, nombre, updated_at)
+                 VALUES (?, ?, ?, ?, ?)
+                 ON DUPLICATE KEY UPDATE
+                   rol_contable = VALUES(rol_contable),
+                   nombre       = VALUES(nombre),
+                   updated_at   = VALUES(updated_at)"
+            );
+        }
+        $stmt->execute([$tenantId, $medioPago, $rolContable, $nombre, $now]);
+    }
+
+    // ─── Libro Diario ────────────────────────────────────────────────────────
 
     public function createJournalEntry(array $header, array $lines): string
     {
@@ -49,30 +325,26 @@ final class AccountingRepository
         try {
             $header['created_at'] = date('Y-m-d H:i:s');
             $header['updated_at'] = $header['created_at'];
-            
+
             $journalId = (string) QueryBuilder::table($this->db, self::JOURNAL_TABLE)
                 ->insert($header);
 
             foreach ($lines as $line) {
                 $line['asiento_id'] = $journalId;
-                $line['tenant_id'] = $header['tenant_id'];
+                $line['tenant_id']  = $header['tenant_id'];
                 $line['created_at'] = $header['created_at'];
-                
-                QueryBuilder::table($this->db, self::JOURNAL_LINE_TABLE)
-                    ->insert($line);
+                QueryBuilder::table($this->db, self::JOURNAL_LINE_TABLE)->insert($line);
             }
 
             $this->db->commit();
             return $journalId;
-        } catch (RuntimeException $e) {
+        } catch (\Throwable $e) {
             $this->db->rollBack();
             throw $e;
         }
     }
 
-    /**
-     * @return array<int, array<string, mixed>>
-     */
+    /** @return array<int, array<string, mixed>> */
     public function listJournalEntries(string $tenantId, array $filters = [], int $limit = 50): array
     {
         $qb = QueryBuilder::table($this->db, self::JOURNAL_TABLE)
@@ -96,213 +368,246 @@ final class AccountingRepository
         return $qb->get();
     }
 
+    // ─── Schema ──────────────────────────────────────────────────────────────
+
     private function ensureSchema(): void
     {
-        $driver = (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $driver       = (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $pucTable     = TableNamespace::resolve(self::PUC_NACIONAL_TABLE);
         $accountTable = TableNamespace::resolve(self::ACCOUNT_TABLE);
+        $rolesTable   = TableNamespace::resolve(self::ROLES_TABLE);
+        $paymentTable = TableNamespace::resolve(self::PAYMENT_TABLE);
         $journalTable = TableNamespace::resolve(self::JOURNAL_TABLE);
-        $lineTable = TableNamespace::resolve(self::JOURNAL_LINE_TABLE);
-        
+        $lineTable    = TableNamespace::resolve(self::JOURNAL_LINE_TABLE);
+
         if ($driver === 'sqlite') {
+            // Catálogo nacional PUC (read-only, compartido)
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS {$pucTable} (
+                    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+                    codigo    TEXT NOT NULL UNIQUE,
+                    nombre    TEXT NOT NULL,
+                    tipo      TEXT NOT NULL,
+                    naturaleza TEXT NOT NULL,
+                    nivel     TEXT NOT NULL,
+                    parent    TEXT
+                );
+                CREATE INDEX IF NOT EXISTS idx_puc_codigo ON {$pucTable}(codigo);
+                CREATE INDEX IF NOT EXISTS idx_puc_nivel  ON {$pucTable}(nivel);
+            ");
+
+            // Catálogo activo del tenant + auxiliares propios
             $this->db->exec("
                 CREATE TABLE IF NOT EXISTS {$accountTable} (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    tenant_id TEXT NOT NULL,
-                    codigo TEXT NOT NULL,
-                    nombre TEXT NOT NULL,
-                    tipo TEXT NOT NULL,
-                    naturaleza TEXT NOT NULL,
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id    TEXT NOT NULL,
+                    codigo       TEXT NOT NULL,
+                    nombre       TEXT NOT NULL,
+                    tipo         TEXT NOT NULL,
+                    naturaleza   TEXT NOT NULL,
+                    parent_codigo TEXT,
+                    nivel        TEXT NOT NULL DEFAULT 'cuenta',
+                    es_auxiliar  INTEGER NOT NULL DEFAULT 0,
+                    activa       INTEGER NOT NULL DEFAULT 1,
                     saldo_actual DECIMAL(15,2) DEFAULT 0,
-                    created_at DATETIME
+                    created_at   DATETIME,
+                    UNIQUE(tenant_id, codigo)
                 );
-                CREATE INDEX IF NOT EXISTS idx_accounts_tenant ON {$accountTable}(tenant_id);
-                CREATE INDEX IF NOT EXISTS idx_accounts_code ON {$accountTable}(codigo);
+                CREATE INDEX IF NOT EXISTS idx_accounts_tenant ON {$accountTable}(tenant_id, activa);
+                CREATE INDEX IF NOT EXISTS idx_accounts_code   ON {$accountTable}(tenant_id, codigo);
+            ");
 
-                CREATE TABLE IF NOT EXISTS {$journalTable} (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    tenant_id TEXT NOT NULL,
-                    fecha DATE NOT NULL,
-                    referencia TEXT,
-                    glosa TEXT,
-                    total_debe DECIMAL(15,2) DEFAULT 0,
-                    total_haber DECIMAL(15,2) DEFAULT 0,
-                    estado TEXT DEFAULT 'BORRADOR',
-                    usuario_id TEXT NOT NULL,
-                    is_electronic INTEGER NOT NULL DEFAULT 0,
-                    cufe TEXT NOT NULL DEFAULT '',
-                    doc_type TEXT NOT NULL DEFAULT 'manual',
-                    created_at DATETIME,
-                    updated_at DATETIME
+            // Roles semánticos → cuenta real del tenant
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS {$rolesTable} (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id    TEXT NOT NULL,
+                    rol          TEXT NOT NULL,
+                    codigo_cuenta TEXT NOT NULL,
+                    descripcion  TEXT DEFAULT '',
+                    updated_at   DATETIME,
+                    UNIQUE(tenant_id, rol)
                 );
-                CREATE INDEX IF NOT EXISTS idx_journal_tenant ON {$journalTable}(tenant_id, fecha);
+                CREATE INDEX IF NOT EXISTS idx_roles_tenant ON {$rolesTable}(tenant_id, rol);
+            ");
+
+            // Medios de pago → rol contable del tenant
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS {$paymentTable} (
+                    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id   TEXT NOT NULL,
+                    medio_pago  TEXT NOT NULL,
+                    rol_contable TEXT NOT NULL,
+                    nombre      TEXT DEFAULT '',
+                    updated_at  DATETIME,
+                    UNIQUE(tenant_id, medio_pago)
+                );
+                CREATE INDEX IF NOT EXISTS idx_payment_tenant ON {$paymentTable}(tenant_id, medio_pago);
+            ");
+
+            // Libro diario
+            $this->db->exec("
+                CREATE TABLE IF NOT EXISTS {$journalTable} (
+                    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id    TEXT NOT NULL,
+                    fecha        DATE NOT NULL,
+                    referencia   TEXT,
+                    glosa        TEXT,
+                    total_debe   DECIMAL(15,2) DEFAULT 0,
+                    total_haber  DECIMAL(15,2) DEFAULT 0,
+                    estado       TEXT DEFAULT 'BORRADOR',
+                    usuario_id   TEXT NOT NULL,
+                    is_electronic INTEGER NOT NULL DEFAULT 0,
+                    cufe         TEXT NOT NULL DEFAULT '',
+                    doc_type     TEXT NOT NULL DEFAULT 'manual',
+                    created_at   DATETIME,
+                    updated_at   DATETIME
+                );
+                CREATE INDEX IF NOT EXISTS idx_journal_tenant     ON {$journalTable}(tenant_id, fecha);
                 CREATE INDEX IF NOT EXISTS idx_journal_electronic ON {$journalTable}(tenant_id, is_electronic, fecha);
 
                 CREATE TABLE IF NOT EXISTS {$lineTable} (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    id         INTEGER PRIMARY KEY AUTOINCREMENT,
                     asiento_id INTEGER NOT NULL,
-                    tenant_id TEXT NOT NULL,
-                    cuenta_id INTEGER NOT NULL,
-                    debe DECIMAL(15,2) DEFAULT 0,
-                    haber DECIMAL(15,2) DEFAULT 0,
+                    tenant_id  TEXT NOT NULL,
+                    cuenta_id  INTEGER NOT NULL,
+                    debe       DECIMAL(15,2) DEFAULT 0,
+                    haber      DECIMAL(15,2) DEFAULT 0,
                     glosa_linea TEXT,
                     created_at DATETIME
                 );
+                CREATE INDEX IF NOT EXISTS idx_lines_tenant ON {$lineTable}(tenant_id, asiento_id);
             ");
-            
-            // Seed PUC colombiano básico si la tabla está vacía
-            // Basado en Decreto 2649/93 y estructura PUC Colombia (NIIF para PYMES)
-            $count = (int) $this->db->query("SELECT COUNT(*) FROM {$accountTable}")->fetchColumn();
-            if ($count === 0) {
-                $pucSeed = [
-                    // codigo, nombre, tipo, naturaleza
-                    // CLASE 1 — ACTIVOS
-                    ['1',    'ACTIVOS',                                     'ACTIVO',     'DEBITO'],
-                    ['11',   'Efectivo y equivalentes de efectivo',          'ACTIVO',     'DEBITO'],
-                    ['1105', 'Caja general',                                 'ACTIVO',     'DEBITO'],
-                    ['1110', 'Bancos nacionales',                            'ACTIVO',     'DEBITO'],
-                    ['1115', 'Bancos del exterior',                          'ACTIVO',     'DEBITO'],
-                    ['1120', 'Cuentas de ahorro',                            'ACTIVO',     'DEBITO'],
-                    ['13',   'Deudores',                                     'ACTIVO',     'DEBITO'],
-                    ['1305', 'Clientes nacionales',                          'ACTIVO',     'DEBITO'],
-                    ['1310', 'Clientes del exterior',                        'ACTIVO',     'DEBITO'],
-                    ['1355', 'Anticipo de impuestos',                        'ACTIVO',     'DEBITO'],
-                    ['1360', 'Retención en la fuente (anticipo)',            'ACTIVO',     'DEBITO'],
-                    ['1365', 'IVA descontable',                              'ACTIVO',     'DEBITO'],
-                    ['14',   'Inventarios',                                  'ACTIVO',     'DEBITO'],
-                    ['1405', 'Materias primas',                              'ACTIVO',     'DEBITO'],
-                    ['1430', 'Productos terminados',                         'ACTIVO',     'DEBITO'],
-                    ['1435', 'Mercancías no fabricadas por la empresa',      'ACTIVO',     'DEBITO'],
-                    ['15',   'Propiedad, planta y equipo',                   'ACTIVO',     'DEBITO'],
-                    ['1504', 'Terrenos',                                     'ACTIVO',     'DEBITO'],
-                    ['1516', 'Construcciones y edificaciones',               'ACTIVO',     'DEBITO'],
-                    ['1524', 'Equipo de oficina',                            'ACTIVO',     'DEBITO'],
-                    ['1528', 'Equipo de computación y comunicación',         'ACTIVO',     'DEBITO'],
-                    ['1592', 'Depreciación acumulada (CR)',                  'ACTIVO',     'CREDITO'],
-                    // CLASE 2 — PASIVOS
-                    ['2',    'PASIVOS',                                      'PASIVO',     'CREDITO'],
-                    ['21',   'Obligaciones financieras',                     'PASIVO',     'CREDITO'],
-                    ['2105', 'Bancos nacionales (crédito)',                  'PASIVO',     'CREDITO'],
-                    ['22',   'Proveedores',                                  'PASIVO',     'CREDITO'],
-                    ['2205', 'Proveedores nacionales',                       'PASIVO',     'CREDITO'],
-                    ['2210', 'Proveedores del exterior',                     'PASIVO',     'CREDITO'],
-                    ['23',   'Cuentas por pagar',                            'PASIVO',     'CREDITO'],
-                    ['2335', 'Costos y gastos por pagar',                    'PASIVO',     'CREDITO'],
-                    ['2365', 'Retención en la fuente por pagar',             'PASIVO',     'CREDITO'],
-                    ['2367', 'Retención ICA por pagar',                      'PASIVO',     'CREDITO'],
-                    ['2368', 'Retención IVA por pagar',                      'PASIVO',     'CREDITO'],
-                    ['24',   'Impuestos gravámenes y tasas',                 'PASIVO',     'CREDITO'],
-                    ['2404', 'Impuesto de renta por pagar',                  'PASIVO',     'CREDITO'],
-                    ['2408', 'IVA generado por pagar',                       'PASIVO',     'CREDITO'],
-                    ['2412', 'ICA por pagar',                                'PASIVO',     'CREDITO'],
-                    ['25',   'Obligaciones laborales',                       'PASIVO',     'CREDITO'],
-                    ['2505', 'Salarios por pagar',                           'PASIVO',     'CREDITO'],
-                    ['2510', 'Cesantías consolidadas',                       'PASIVO',     'CREDITO'],
-                    ['2515', 'Intereses sobre cesantías',                    'PASIVO',     'CREDITO'],
-                    ['2520', 'Prima de servicios',                           'PASIVO',     'CREDITO'],
-                    ['2525', 'Vacaciones consolidadas',                      'PASIVO',     'CREDITO'],
-                    // CLASE 3 — PATRIMONIO
-                    ['3',    'PATRIMONIO',                                   'PATRIMONIO', 'CREDITO'],
-                    ['31',   'Capital social',                               'PATRIMONIO', 'CREDITO'],
-                    ['3105', 'Capital suscrito y pagado',                    'PATRIMONIO', 'CREDITO'],
-                    ['33',   'Reservas',                                     'PATRIMONIO', 'CREDITO'],
-                    ['3305', 'Reserva legal',                                'PATRIMONIO', 'CREDITO'],
-                    ['3310', 'Reserva estatutaria',                          'PATRIMONIO', 'CREDITO'],
-                    ['36',   'Resultados del ejercicio',                     'PATRIMONIO', 'CREDITO'],
-                    ['3605', 'Utilidad del ejercicio',                       'PATRIMONIO', 'CREDITO'],
-                    ['3610', 'Pérdida del ejercicio',                        'PATRIMONIO', 'DEBITO'],
-                    // CLASE 4 — INGRESOS
-                    ['4',    'INGRESOS',                                     'INGRESO',    'CREDITO'],
-                    ['41',   'Ingresos operacionales',                       'INGRESO',    'CREDITO'],
-                    ['4135', 'Comercio al por mayor y al por menor',         'INGRESO',    'CREDITO'],
-                    ['4145', 'Servicios',                                    'INGRESO',    'CREDITO'],
-                    ['42',   'Ingresos no operacionales',                    'INGRESO',    'CREDITO'],
-                    ['4210', 'Financieros (intereses recibidos)',             'INGRESO',    'CREDITO'],
-                    ['4220', 'Arrendamientos recibidos',                     'INGRESO',    'CREDITO'],
-                    ['4245', 'Utilidad en venta de activos',                 'INGRESO',    'CREDITO'],
-                    // CLASE 5 — GASTOS
-                    ['5',    'GASTOS',                                       'GASTO',      'DEBITO'],
-                    ['51',   'Gastos de administración',                     'GASTO',      'DEBITO'],
-                    ['5105', 'Gastos de personal (administración)',           'GASTO',      'DEBITO'],
-                    ['5110', 'Honorarios',                                   'GASTO',      'DEBITO'],
-                    ['5115', 'Impuestos y tasas (gasto)',                    'GASTO',      'DEBITO'],
-                    ['5120', 'Arrendamientos (gasto)',                       'GASTO',      'DEBITO'],
-                    ['5135', 'Servicios públicos',                           'GASTO',      'DEBITO'],
-                    ['5145', 'Mantenimiento y reparaciones',                 'GASTO',      'DEBITO'],
-                    ['5160', 'Depreciaciones',                               'GASTO',      'DEBITO'],
-                    ['5195', 'Otros gastos de administración',               'GASTO',      'DEBITO'],
-                    ['52',   'Gastos de ventas',                             'GASTO',      'DEBITO'],
-                    ['5205', 'Gastos de personal (ventas)',                  'GASTO',      'DEBITO'],
-                    ['5225', 'Publicidad y propaganda',                      'GASTO',      'DEBITO'],
-                    ['53',   'Gastos financieros',                           'GASTO',      'DEBITO'],
-                    ['5305', 'Gastos bancarios',                             'GASTO',      'DEBITO'],
-                    ['5310', 'Intereses de créditos',                        'GASTO',      'DEBITO'],
-                    // CLASE 6 — COSTOS DE VENTAS
-                    ['6',    'COSTOS DE VENTAS',                             'COSTO',      'DEBITO'],
-                    ['61',   'Costo de ventas y de prestación de servicios', 'COSTO',      'DEBITO'],
-                    ['6135', 'Mercancías vendidas',                          'COSTO',      'DEBITO'],
-                    ['6145', 'Servicios prestados (costo)',                  'COSTO',      'DEBITO'],
-                    // CLASE 7 — COSTOS DE PRODUCCIÓN
-                    ['7',    'COSTOS DE PRODUCCIÓN O DE OPERACIÓN',          'COSTO',      'DEBITO'],
-                    ['71',   'Materia prima y materiales',                   'COSTO',      'DEBITO'],
-                    ['7105', 'Materias primas utilizadas',                   'COSTO',      'DEBITO'],
-                    ['72',   'Mano de obra directa',                         'COSTO',      'DEBITO'],
-                    ['7205', 'Sueldos y salarios (producción)',              'COSTO',      'DEBITO'],
-                ];
 
-                $stmt = $this->db->prepare(
-                    "INSERT INTO {$accountTable} (tenant_id, codigo, nombre, tipo, naturaleza) VALUES (?, ?, ?, ?, ?)"
-                );
-                foreach ($pucSeed as $row) {
-                    $stmt->execute(['default', $row[0], $row[1], $row[2], $row[3]]);
-                }
+            // Poblar puc_nacional desde JSON si está vacío
+            $count = (int) $this->db->query("SELECT COUNT(*) FROM {$pucTable}")->fetchColumn();
+            if ($count === 0) {
+                $this->loadPucNacionalFromJson();
             }
+
         } else {
-            // MySQL version
+            // MySQL
             $this->db->exec("
+                CREATE TABLE IF NOT EXISTS {$pucTable} (
+                    id         INT AUTO_INCREMENT PRIMARY KEY,
+                    codigo     VARCHAR(16) NOT NULL UNIQUE,
+                    nombre     VARCHAR(255) NOT NULL,
+                    tipo       VARCHAR(50) NOT NULL,
+                    naturaleza ENUM('DEBITO','CREDITO') NOT NULL,
+                    nivel      ENUM('clase','grupo','cuenta','subcuenta') NOT NULL,
+                    parent     VARCHAR(16) NULL,
+                    INDEX idx_puc_codigo (codigo),
+                    INDEX idx_puc_nivel  (nivel)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
                 CREATE TABLE IF NOT EXISTS {$accountTable} (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    tenant_id VARCHAR(50) NOT NULL,
-                    codigo VARCHAR(20) NOT NULL,
-                    nombre VARCHAR(255) NOT NULL,
-                    tipo VARCHAR(50) NOT NULL,
-                    naturaleza ENUM('DEBITO', 'CREDITO') NOT NULL,
-                    saldo_actual DECIMAL(15,2) DEFAULT 0,
-                    created_at DATETIME,
-                    INDEX idx_tenant (tenant_id),
-                    INDEX idx_codigo (codigo)
+                    id            INT AUTO_INCREMENT PRIMARY KEY,
+                    tenant_id     VARCHAR(120) NOT NULL,
+                    codigo        VARCHAR(20) NOT NULL,
+                    nombre        VARCHAR(255) NOT NULL,
+                    tipo          VARCHAR(50) NOT NULL,
+                    naturaleza    ENUM('DEBITO','CREDITO') NOT NULL,
+                    parent_codigo VARCHAR(20) NULL,
+                    nivel         VARCHAR(20) NOT NULL DEFAULT 'cuenta',
+                    es_auxiliar   TINYINT(1) NOT NULL DEFAULT 0,
+                    activa        TINYINT(1) NOT NULL DEFAULT 1,
+                    saldo_actual  DECIMAL(15,2) DEFAULT 0,
+                    created_at    DATETIME,
+                    UNIQUE KEY uq_tenant_codigo (tenant_id, codigo),
+                    INDEX idx_accounts_tenant (tenant_id, activa),
+                    INDEX idx_accounts_code   (tenant_id, codigo)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+                CREATE TABLE IF NOT EXISTS {$rolesTable} (
+                    id            INT AUTO_INCREMENT PRIMARY KEY,
+                    tenant_id     VARCHAR(120) NOT NULL,
+                    rol           VARCHAR(80) NOT NULL,
+                    codigo_cuenta VARCHAR(20) NOT NULL,
+                    descripcion   TEXT,
+                    updated_at    DATETIME,
+                    UNIQUE KEY uq_tenant_rol (tenant_id, rol),
+                    INDEX idx_roles_tenant (tenant_id, rol)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+                CREATE TABLE IF NOT EXISTS {$paymentTable} (
+                    id           INT AUTO_INCREMENT PRIMARY KEY,
+                    tenant_id    VARCHAR(120) NOT NULL,
+                    medio_pago   VARCHAR(80) NOT NULL,
+                    rol_contable VARCHAR(80) NOT NULL,
+                    nombre       VARCHAR(120) DEFAULT '',
+                    updated_at   DATETIME,
+                    UNIQUE KEY uq_tenant_medio (tenant_id, medio_pago),
+                    INDEX idx_payment_tenant (tenant_id, medio_pago)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
                 CREATE TABLE IF NOT EXISTS {$journalTable} (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
-                    tenant_id VARCHAR(50) NOT NULL,
-                    fecha DATE NOT NULL,
-                    referencia VARCHAR(255),
-                    glosa TEXT,
-                    total_debe DECIMAL(15,2) DEFAULT 0,
-                    total_haber DECIMAL(15,2) DEFAULT 0,
-                    estado ENUM('BORRADOR', 'CONTABILIZADO', 'ANULADO') DEFAULT 'BORRADOR',
-                    usuario_id VARCHAR(50) NOT NULL,
+                    id           INT AUTO_INCREMENT PRIMARY KEY,
+                    tenant_id    VARCHAR(50) NOT NULL,
+                    fecha        DATE NOT NULL,
+                    referencia   VARCHAR(255),
+                    glosa        TEXT,
+                    total_debe   DECIMAL(15,2) DEFAULT 0,
+                    total_haber  DECIMAL(15,2) DEFAULT 0,
+                    estado       ENUM('BORRADOR','CONTABILIZADO','ANULADO') DEFAULT 'BORRADOR',
+                    usuario_id   VARCHAR(50) NOT NULL,
                     is_electronic TINYINT(1) NOT NULL DEFAULT 0,
-                    cufe VARCHAR(200) NOT NULL DEFAULT '',
-                    doc_type VARCHAR(64) NOT NULL DEFAULT 'manual',
-                    created_at DATETIME,
-                    updated_at DATETIME,
-                    INDEX idx_tenant (tenant_id),
-                    INDEX idx_fecha (fecha),
-                    INDEX idx_electronic (tenant_id, is_electronic, fecha)
+                    cufe         VARCHAR(200) NOT NULL DEFAULT '',
+                    doc_type     VARCHAR(64) NOT NULL DEFAULT 'manual',
+                    created_at   DATETIME,
+                    updated_at   DATETIME,
+                    INDEX idx_journal_tenant     (tenant_id, fecha),
+                    INDEX idx_journal_electronic (tenant_id, is_electronic, fecha)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
                 CREATE TABLE IF NOT EXISTS {$lineTable} (
-                    id INT AUTO_INCREMENT PRIMARY KEY,
+                    id         INT AUTO_INCREMENT PRIMARY KEY,
                     asiento_id INT NOT NULL,
-                    tenant_id VARCHAR(50) NOT NULL,
-                    cuenta_id INT NOT NULL,
-                    debe DECIMAL(15,2) DEFAULT 0,
-                    haber DECIMAL(15,2) DEFAULT 0,
+                    tenant_id  VARCHAR(50) NOT NULL,
+                    cuenta_id  INT NOT NULL,
+                    debe       DECIMAL(15,2) DEFAULT 0,
+                    haber      DECIMAL(15,2) DEFAULT 0,
                     glosa_linea TEXT,
-                    created_at DATETIME
+                    created_at DATETIME,
+                    INDEX idx_lines_tenant (tenant_id, asiento_id)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
             ");
+
+            $count = (int) $this->db->query("SELECT COUNT(*) FROM {$pucTable}")->fetchColumn();
+            if ($count === 0) {
+                $this->loadPucNacionalFromJson();
+            }
+        }
+    }
+
+    private function loadPucNacionalFromJson(): void
+    {
+        $jsonPath = __DIR__ . '/../../data/puc_colombia_base.json';
+        if (!file_exists($jsonPath)) {
+            return;
+        }
+        $data = json_decode((string) file_get_contents($jsonPath), true);
+        if (!is_array($data)) {
+            return;
+        }
+        $table = TableNamespace::resolve(self::PUC_NACIONAL_TABLE);
+        $driver = (string) $this->db->getAttribute(PDO::ATTR_DRIVER_NAME);
+        $orIgnore = $driver === 'sqlite' ? 'INSERT OR IGNORE' : 'INSERT IGNORE';
+        $stmt = $this->db->prepare(
+            "{$orIgnore} INTO {$table} (codigo, nombre, tipo, naturaleza, nivel, parent)
+             VALUES (?, ?, ?, ?, ?, ?)"
+        );
+        foreach ($data as $row) {
+            if (!isset($row['codigo'], $row['nombre'], $row['tipo'], $row['naturaleza'], $row['nivel'])) {
+                continue;
+            }
+            $stmt->execute([
+                $row['codigo'],
+                $row['nombre'],
+                $row['tipo'],
+                $row['naturaleza'],
+                $row['nivel'],
+                $row['parent'] ?? null,
+            ]);
         }
     }
 }
