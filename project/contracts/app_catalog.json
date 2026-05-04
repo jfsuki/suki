@@ -1,0 +1,32 @@
+{
+  "schema_version": "1.2",
+  "apps": [
+    {
+      "id": "suki_erp",
+      "name": "SUKI ERP Core",
+      "category": "Administrativo",
+      "description": "Control total de inventarios, compras y ventas con inteligencia fiscal integrada.",
+      "status": "available",
+      "enabled_agents": ["ACCOUNTING", "INVENTORY", "PURCHASES", "SALES", "FINANCES"],
+      "default_workflows": ["PURCHASE", "QUOTATION", "FISCAL_CLOSE", "INVENTORY_REORDER"]
+    },
+    {
+      "id": "store_hub",
+      "name": "Store Hub",
+      "category": "Ecommerce",
+      "description": "Conecta tu tienda física con el mundo digital y gestiona todo desde un solo chat.",
+      "status": "available",
+      "enabled_agents": ["SALES", "INVENTORY"],
+      "default_workflows": ["QUOTATION"]
+    },
+    {
+      "id": "agent_support",
+      "name": "Agent Support",
+      "category": "Soporte",
+      "description": "Atención al cliente automatizada con memoria semántica y resolución de dudas.",
+      "status": "available",
+      "enabled_agents": ["SALES"],
+      "default_workflows": []
+    }
+  ]
+}
