@@ -92,26 +92,20 @@ trait ConversationGatewayBuilderOnboardingTrait
         $localState['onboarding_step'] = $currentStep;
 
         // 2.1 Local Bridge for Operation Model (FAST PATH)
+        // Returns early after capturing to prevent the same message from cascading
+        // into needs/docs processing (one message = one step bridge).
         if ($currentStep === 'operation_model') {
-            $input = strtolower($this->normalize($text));
-            if (str_contains($input, 'contado')) {
-                $localProfile['operation_model'] = 'contado';
+            $detectedOpModel = $this->detectOperationModel($text);
+            if ($detectedOpModel !== '') {
+                $localProfile['operation_model'] = $detectedOpModel;
                 $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
-                error_log("DETECT_LOCAL_OP: contado");
-            } elseif (str_contains($input, 'credito')) {
-                $localProfile['operation_model'] = 'credito';
-                $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
-                error_log("DETECT_LOCAL_OP: credito");
-            } elseif (str_contains($input, 'mixto') || str_contains($input, 'ambos')) {
-                $localProfile['operation_model'] = 'mixto';
-                $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
-                error_log("DETECT_LOCAL_OP: mixto");
+                $localState['active_task'] = 'builder_onboarding';
+                $this->saveProfile($tenantId, $this->contextProfileUser, $localProfile);
+                $nextStep = (string) ($localState['onboarding_step']);
+                $reply = $this->buildBuilderOnboardingRecoveryReply($nextStep, $localProfile);
+                return ['action' => 'ask_user', 'reply' => $reply, 'state' => $localState, 'profile' => $localProfile];
             }
         }
-        
-        // Final Resolve after reconstruction/local bridge
-        $currentStep = $this->resolveBuilderOnboardingStep($localProfile, $localState);
-        $localState['onboarding_step'] = $currentStep;
 
         // 2.2 Local Bridge for Needs (FAST PATH + LLM fallback)
         if ($currentStep === 'needs_scope') {
@@ -135,7 +129,8 @@ trait ConversationGatewayBuilderOnboardingTrait
             if (!empty($found)) {
                 $localProfile['needs_scope'] = implode(', ', $found);
                 $localProfile['needs_scope_items'] = $found;
-                $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
+                $currentStep = $this->resolveBuilderOnboardingStep($localProfile, $localState);
+                $localState['onboarding_step'] = $currentStep;
             }
         }
 
@@ -165,8 +160,8 @@ trait ConversationGatewayBuilderOnboardingTrait
                 $localState['onboarding_step'] = $currentStep;
             }
         }
-        $localState['onboarding_step'] = $currentStep;
-        
+        $localState['onboarding_step'] = $this->resolveBuilderOnboardingStep($localProfile, $localState);
+
         // Mapeo contextual para respuestas ambiguas (MisiÃ³n 2 - Paso 2D)
         $normalizedText = strtolower(trim((string) ($text ?? '')));
         if ($normalizedText === 'ambos' || $normalizedText === 'ambas' || $normalizedText === 'ambas cosas' || $normalizedText === 'ambos tipos') {
@@ -1685,7 +1680,7 @@ trait ConversationGatewayBuilderOnboardingTrait
             return;
         }
         $threadId = $tenantId . ':' . ($this->contextSessionId ?? $userId);
-        $history = $this->conversationMemory->load($threadId, 10);
+        $history = $this->conversationMemory->load($threadId, $tenantId);
         
         $historyText = "";
         foreach ($history as $msg) {
@@ -2188,9 +2183,14 @@ trait ConversationGatewayBuilderOnboardingTrait
     private function detectOperationModel(string $text): string
     {
         $normalized = $this->normalize($text);
-        if (str_contains($normalized, 'contado')) return 'contado';
-        if (str_contains($normalized, 'credito')) return 'credito';
+        $hasContado = str_contains($normalized, 'contado');
+        $hasCredito = str_contains($normalized, 'credito');
+        if ($hasContado && $hasCredito) return 'mixto';
         if (str_contains($normalized, 'mixto')) return 'mixto';
+        if (str_contains($normalized, 'ambos')) return 'mixto';
+        if (str_contains($normalized, 'las dos')) return 'mixto';
+        if ($hasContado) return 'contado';
+        if ($hasCredito) return 'credito';
         return '';
     }
 
@@ -2389,7 +2389,8 @@ trait ConversationGatewayBuilderOnboardingTrait
 
     private function normalize(string $text): string
     {
-        return strtolower(trim($text));
+        $text = strtolower(trim($text));
+        return strtr($text, ['á'=>'a','é'=>'e','í'=>'i','ó'=>'o','ú'=>'u','ü'=>'u','ñ'=>'n','à'=>'a','è'=>'e','ì'=>'i','ò'=>'o','ù'=>'u']);
     }
 
     private function safe(string $text): string

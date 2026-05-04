@@ -793,10 +793,10 @@ final class UnitTestRunner
             throw new \RuntimeException('Flow restart debe volver a business_type.');
         }
 
-        $gateway->handle('default', $user, 'mi empresa es una ferreteria', 'builder', $projectId);
-        $gateway->handle('default', $user, 'mixto', 'builder', $projectId);
-        $gateway->handle('default', $user, 'inventario, facturacion, pagos', 'builder', $projectId);
-        $beforeReset = $gateway->handle('default', $user, 'factura, cotizacion', 'builder', $projectId);
+        $gateway->handle('default', $user, 'mi empresa es una ferreteria de materiales', 'builder', $projectId);
+        $gateway->handle('default', $user, 'quiero manejar ventas de contado y también a crédito', 'builder', $projectId);
+        $gateway->handle('default', $user, 'necesito llevar el inventario y poder facturar a mis clientes', 'builder', $projectId);
+        $beforeReset = $gateway->handle('default', $user, 'quiero manejar facturas y cotizaciones para los clientes', 'builder', $projectId);
         if ((string) ($beforeReset['state']['proposed_profile'] ?? '') !== 'ferreteria') {
             throw new \RuntimeException('Flow control setup esperaba perfil ferreteria antes de reset.');
         }
@@ -818,9 +818,9 @@ final class UnitTestRunner
             throw new \RuntimeException('Onboarding paso 2 debe volver a preguntar cuando la respuesta no es valida.');
         }
 
-        $gateway->handle('default', $user, 'contado', 'builder', $projectId);
-        $gateway->handle('default', $user, 'ventas, contabilidad, pagos, cartera y dian', 'builder', $projectId);
-        $finalScope = $gateway->handle('default', $user, 'factura, ticket', 'builder', $projectId);
+        $gateway->handle('default', $user, 'solo manejo ventas de contado', 'builder', $projectId);
+        $gateway->handle('default', $user, 'necesito ventas contabilidad pagos y cartera de clientes', 'builder', $projectId);
+        $finalScope = $gateway->handle('default', $user, 'quiero poder emitir facturas y tickets de venta', 'builder', $projectId);
         if (!in_array((string) ($finalScope['state']['onboarding_step'] ?? ''), ['confirm_scope', 'plan_ready'], true)) {
             throw new \RuntimeException('Onboarding no debe mutar forma de pago: estado de onboarding invalido despues de completar pasos.');
         }
