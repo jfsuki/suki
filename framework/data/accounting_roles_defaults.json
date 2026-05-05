@@ -1,0 +1,65 @@
+{
+  "_comment": "Roles contables semánticos → código PUC por defecto. El tenant puede sobrescribir cada rol desde su configuración.",
+  "roles": [
+    {
+      "rol": "recaudo_ventas",
+      "codigo_default": "1105",
+      "nombre": "Recaudo de ventas (caja/banco)",
+      "descripcion": "Cuenta que recibe el pago del cliente. Configúrela según el medio: 1105 Caja, 1110 Bancolombia, 1120 Nequi, etc."
+    },
+    {
+      "rol": "ingresos_ventas",
+      "codigo_default": "4135",
+      "nombre": "Ingresos por ventas",
+      "descripcion": "Cuenta de ingreso operacional. Configúrela según la actividad: 4135 Comercio, 4145 Servicios, etc."
+    },
+    {
+      "rol": "iva_ventas",
+      "codigo_default": "2408",
+      "nombre": "IVA generado por pagar",
+      "descripcion": "IVA facturado que debe pagar a la DIAN. Generalmente 2408."
+    },
+    {
+      "rol": "retef_por_pagar",
+      "codigo_default": "2365",
+      "nombre": "Retención en la fuente por pagar",
+      "descripcion": "Retención en la fuente que la empresa practica a terceros."
+    },
+    {
+      "rol": "ica_por_pagar",
+      "codigo_default": "2412",
+      "nombre": "ICA por pagar",
+      "descripcion": "Impuesto de Industria y Comercio. Varía por municipio."
+    },
+    {
+      "rol": "clientes_cartera",
+      "codigo_default": "1305",
+      "nombre": "Clientes (cartera)",
+      "descripcion": "Cuentas por cobrar a clientes. Usado cuando la venta es a crédito."
+    },
+    {
+      "rol": "inventario_mercancias",
+      "codigo_default": "1435",
+      "nombre": "Inventario de mercancías",
+      "descripcion": "Mercancías para la venta. Afectado en cada salida de inventario."
+    },
+    {
+      "rol": "costo_mercancias_vendidas",
+      "codigo_default": "6135",
+      "nombre": "Costo de mercancías vendidas",
+      "descripcion": "Costo de ventas. Contrapartida del movimiento de inventario."
+    },
+    {
+      "rol": "proveedores",
+      "codigo_default": "2205",
+      "nombre": "Proveedores nacionales",
+      "descripcion": "Cuentas por pagar a proveedores."
+    },
+    {
+      "rol": "gastos_nomina",
+      "codigo_default": "5105",
+      "nombre": "Gastos de personal",
+      "descripcion": "Nómina y prestaciones sociales."
+    }
+  ]
+}

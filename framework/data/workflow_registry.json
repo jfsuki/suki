@@ -1,0 +1,48 @@
+{
+  "_comment": "Registro de workflows multi-agente. Agrega nuevos workflows aquí sin tocar PHP. sequence = áreas de specialist_personas.json a invocar en orden.",
+  "workflows": {
+    "PURCHASE": {
+      "triggers": ["erp_purchase_finalize"],
+      "sequence": ["SALES", "FINANCES"],
+      "description": "Validación de Stock -> Validación de Margen Fiscal"
+    },
+    "QUOTATION": {
+      "triggers": ["erp_sales_checkout"],
+      "sequence": ["SALES", "FINANCES"],
+      "description": "Disponibilidad de Catálogo -> Optimización de Precios"
+    },
+    "SCHEMA_UPDATE": {
+      "triggers": [],
+      "sequence": ["ARCHITECT", "FINANCES"],
+      "description": "Diseño de Tabla -> Validación de Impacto Contable"
+    },
+    "INVENTORY_REORDER": {
+      "triggers": [],
+      "sequence": ["INVENTORY", "PURCHASES"],
+      "description": "Detección de stock crítico -> Orden de reabastecimiento"
+    },
+    "FISCAL_CLOSE": {
+      "triggers": ["erp_accounting_post", "erp_report_generate", "erp_invoice_create", "erp_tax_credit_note"],
+      "sequence": ["ACCOUNTING", "FINANCES"],
+      "description": "Cierre contable -> Validación fiscal y tributaria"
+    },
+    "APP_EXECUTION": {
+      "process": "AppExecutionProcess",
+      "sequence": ["APP_EXECUTION"],
+      "description": "Operación ERP estándar: intents → router → skills",
+      "modes": ["operation", "chat"]
+    },
+    "BUILDER_ONBOARDING": {
+      "process": "BuilderOnboardingProcess",
+      "sequence": ["BUILDER_ONBOARDING"],
+      "description": "Onboarding guiado: LLM + CommandBus para configurar apps",
+      "modes": ["builder"]
+    },
+    "AUTONOMOUS_EXECUTION": {
+      "process": "AutonomousExecutionProcess",
+      "sequence": ["AUTONOMOUS_EXECUTION"],
+      "description": "Tool-use loop autónomo: LLM decide skills hasta completar tarea",
+      "modes": ["autonomous"]
+    }
+  }
+}

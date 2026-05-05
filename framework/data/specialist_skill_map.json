@@ -1,0 +1,33 @@
+{
+  "_comment": "Mapa de skill PHP → área especialista. Agrega nuevas entradas aquí cuando crees nuevos skills.",
+  "mode_defaults": {
+    "builder": "ARCHITECT"
+  },
+  "skill_to_area": {
+    "AccountingSkill": "ACCOUNTING",
+    "accounting_post": "ACCOUNTING",
+    "accounting_record_entry": "ACCOUNTING",
+    "accounting_balance_sheet": "ACCOUNTING",
+    "accounting_record_sale": "ACCOUNTING",
+    "InventorySkill": "INVENTORY",
+    "inventory_add": "INVENTORY",
+    "inventory_adjust": "INVENTORY",
+    "inventory_check": "INVENTORY",
+    "inventory_list": "INVENTORY",
+    "PurchasesSkill": "PURCHASES",
+    "purchases_create": "PURCHASES",
+    "purchases_approve": "PURCHASES",
+    "purchases_list": "PURCHASES",
+    "SalesSkill": "SALES",
+    "pos_finalize_sale": "SALES",
+    "pos_create_draft": "SALES",
+    "pos_add_draft_line": "SALES",
+    "pos_add_line_by_reference": "SALES",
+    "pos_reprice_draft": "SALES",
+    "FiscalSkill": "FINANCES",
+    "fiscal_generate": "FINANCES",
+    "fiscal_validate": "FINANCES",
+    "invoice_create": "FINANCES",
+    "CRMSkill": "SALES"
+  }
+}
