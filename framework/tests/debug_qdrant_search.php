@@ -6,8 +6,8 @@ require_once __DIR__ . '/../app/autoload.php';
 use App\Core\GeminiEmbeddingService;
 use App\Core\QdrantVectorStore;
 
-$text = 'pierdo plata con los cables porque no se cuanta cantidad me queda';
-$tenantId = 'suki_core';
+$text = $argv[1] ?? 'hey suki';
+$tenantId = $argv[2] ?? 'system';
 
 echo "--- Debugging Qdrant Search ---\n";
 echo "Query: $text\n";
@@ -15,7 +15,8 @@ echo "Tenant: $tenantId\n\n";
 
 try {
     $embedder = new GeminiEmbeddingService();
-    $store = new QdrantVectorStore();
+    // classifier reads from agent_training collection
+    $store = (new QdrantVectorStore())->forMemoryType('agent_training');
     
     $embedding = $embedder->embed($text, ['task_type' => 'RETRIEVAL_QUERY']);
     

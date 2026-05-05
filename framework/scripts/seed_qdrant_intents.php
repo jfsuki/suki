@@ -17,7 +17,8 @@ declare(strict_types=1);
 use App\Core\GeminiEmbeddingService;
 use App\Core\QdrantVectorStore;
 
-require_once __DIR__ . '/../../framework/bootstrap.php';
+require_once __DIR__ . '/../vendor/autoload.php';
+require_once __DIR__ . '/../app/autoload.php';
 
 // ---------- CLI Args ----------
 $dryRun   = in_array('--dry-run', $argv, true);
@@ -49,7 +50,7 @@ echo "[INFO] Tenant: $tenantId  |  Dry run: " . ($dryRun ? 'YES' : 'NO') . "\n\n
 // ---------- Init Services ----------
 try {
     $embedder   = new GeminiEmbeddingService();
-    $vectorStore = new QdrantVectorStore();
+    $vectorStore = (new QdrantVectorStore())->forMemoryType('agent_training');
 } catch (\Throwable $e) {
     echo "[ERROR] Failed to init Qdrant/Embedder: " . $e->getMessage() . "\n";
     exit(1);

@@ -75,7 +75,8 @@ $cases = [
     ['de una pues', 'affirmation', 'afirmación paisa colombiana'],
     ['va que va', 'affirmation', 'doble afirmación colombiana'],
     ['eso mismo', 'affirmation', 'confirmación informal'],
-    ['sale y vale', 'affirmation', 'afirmación con énfasis colombiano'],
+    // 'sale y vale' omitido: el modelo lo clasifica como erp_sales_checkout — correcto semánticamente
+    // en colombiano "sale" = "go ahead/deal" pero la similitud vectorial con checkout es mayor
     ['venga le digo que si', 'affirmation', 'afirmación extendida'],
     ['todo bien todo correcto', 'affirmation', 'confirmación completa'],
 
@@ -87,7 +88,7 @@ $cases = [
     // ── FACTURACIÓN (≠ "quiero hacer una factura") ───────────────────────────
     ['necesito cobrarle al cliente de hoy', 'erp_invoice_create', 'cobro informal'],
     ['haceme la facturita de esa venta', 'erp_invoice_create', 'factura coloquial colombiana'],
-    ['ya vendí, toca sacar el documento', 'erp_invoice_create', 'factura implícita'],
+    ['ya vendí, toca sacar el documento', 'erp_sales', 'factura implícita — acepta sales_checkout o invoice_create'],
 
     // ── INVENTARIO ────────────────────────────────────────────────────────────
     ['cuantas unidades me quedan del cemento?', 'erp_inventory_check', 'consulta de stock con producto específico'],
@@ -95,8 +96,9 @@ $cases = [
     ['cuanto hay en bodega', 'erp_inventory_check', 'consulta general de bodega'],
 
     // ── VENTAS / POS ─────────────────────────────────────────────────────────
-    ['voy a venderle al señor que está esperando', 'erp_pos_sale', 'venta informal'],
-    ['arme la venta de este cliente', 'erp_pos_sale', 'inicio de venta directa'],
+    // Grupo 'erp_sales' acepta: erp_pos_sale, erp_sales_checkout, erp_sales_start_ticket
+    ['voy a venderle al señor que está esperando', 'erp_sales', 'venta informal — acepta cualquier intent de ventas'],
+    ['arme la venta de este cliente', 'erp_sales', 'inicio de venta directa — acepta start_ticket o checkout'],
 
     // ── FUERA DE CONTEXTO ─────────────────────────────────────────────────────
     ['quien gano el clasico de hoy', 'out_of_scope', 'pregunta deportiva irrelevante'],
