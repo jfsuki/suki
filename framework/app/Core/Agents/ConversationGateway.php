@@ -165,7 +165,10 @@ class ConversationGateway
             'result_ok'   => !empty($resultData['ok'] ?? true),
         ];
 
-        $logDir = defined('APP_ROOT') ? APP_ROOT . '/tests/tmp' : sys_get_temp_dir();
+        $logDir = defined('APP_ROOT') ? APP_ROOT . '/storage/orchestrator' : sys_get_temp_dir();
+        if (!is_dir($logDir)) {
+            @mkdir($logDir, 0755, true);
+        }
         $logFile = $logDir . '/session_' . preg_replace('/[^a-z0-9_]/i', '_', $tenantId . '_' . $userId) . '.jsonl';
 
         @file_put_contents(
