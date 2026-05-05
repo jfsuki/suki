@@ -1,0 +1,67 @@
+{
+  "_comment": "Semilla de reglas de negocio UNIVERSALES. Se importa a la tabla 'business_rules' en MySQL al instalar. NO leer en runtime — la fuente de verdad es la DB. El código carga este JSON solo como fallback de emergencia si la DB no está disponible.",
+  "rules": [
+    {
+      "id": "check_stock_availability",
+      "scope": "universal",
+      "event_type": "STOCK_RESERVED",
+      "rule_type": "check_stock_availability",
+      "description": "Rechaza una reserva de stock si la cantidad supera el stock disponible.",
+      "params": {}
+    },
+    {
+      "id": "check_fiscal_margin",
+      "scope": "universal",
+      "event_type": "ENTITY_CREATED",
+      "rule_type": "check_fiscal_margin",
+      "description": "Rechaza entidades creadas con margen por debajo del mínimo permitido.",
+      "params": {
+        "min_margin": 0.25
+      }
+    },
+    {
+      "id": "invoice_amount_range",
+      "scope": "universal",
+      "event_type": "INVOICE_CREATED",
+      "rule_type": "range_check",
+      "description": "Rechaza facturas con monto fuera del rango permitido para PYME colombiana.",
+      "params": {
+        "field": "total",
+        "min": 0,
+        "max": 999999999
+      }
+    },
+    {
+      "id": "sale_require_fields",
+      "scope": "universal",
+      "event_type": "SALE_FINALIZED",
+      "rule_type": "require_fields",
+      "description": "Toda venta debe tener cliente, líneas y total antes de finalizar.",
+      "params": {
+        "fields": ["customer_id", "lines", "total"]
+      }
+    },
+    {
+      "id": "delete_deny_non_admin",
+      "scope": "universal",
+      "event_type": "ENTITY_DELETED",
+      "rule_type": "deny_if_role",
+      "description": "Solo roles admin u owner pueden eliminar entidades críticas.",
+      "params": {
+        "denied_roles": ["operator", "viewer", "guest"]
+      }
+    },
+    {
+      "id": "negative_total_guard",
+      "scope": "universal",
+      "event_type": "SALE_FINALIZED",
+      "rule_type": "range_check",
+      "description": "Rechaza ventas con total negativo o cero.",
+      "params": {
+        "field": "total",
+        "min": 0.01,
+        "max": 999999999
+      }
+    }
+  ]
+}
