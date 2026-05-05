@@ -1,0 +1,4 @@
+{
+  "_comment": "Config del ResponseValidator. max_response_chars: límite de caracteres antes de truncar.",
+  "max_response_chars": 8000
+}

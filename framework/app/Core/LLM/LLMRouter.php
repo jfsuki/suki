@@ -4,6 +4,8 @@
 namespace App\Core\LLM;
 
 use App\Core\SecurityStateRepository;
+use App\Core\LogSanitizer;
+use App\Core\Agents\ResponseValidator;
 use RuntimeException;
 
 final class LLMRouter
@@ -107,7 +109,17 @@ final class LLMRouter
                     'tools' => $options['tools'] ?? $policy['tools'] ?? null,
                     'tool_choice' => $options['tool_choice'] ?? $policy['tool_choice'] ?? null,
                 ]);
-                $text = $result['text'] ?? '';
+                $rawText = $result['text'] ?? '';
+                // Security: sanitize secrets + validate before returning to caller
+                $systemPromptContent = '';
+                foreach ($messages as $msg) {
+                    if (($msg['role'] ?? '') === 'system') {
+                        $systemPromptContent = (string) ($msg['content'] ?? '');
+                        break;
+                    }
+                }
+                $validated = (new ResponseValidator())->validate($rawText, ['system_prompt' => $systemPromptContent]);
+                $text = $validated['sanitized'];
                 $toolCalls = $result['tool_calls'] ?? [];
                 $json = $this->extractJson($text);
                 if ($requiresStrictJson && !is_array($json)) {
@@ -196,26 +208,25 @@ final class LLMRouter
         $mode = $this->resolveProviderMode($options);
         $order = [];
 
-        if (in_array($mode, ['mistral', 'groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
+        $knownProviders = array_keys((array) ($this->config['providers'] ?? []));
+        if (in_array($mode, $knownProviders, true)) {
             $order[] = $mode;
         } else {
             $routing = is_array($this->config['routing'] ?? null) ? (array) $this->config['routing'] : [];
-            $primary = strtolower(trim((string) ($routing['primary'] ?? 'openrouter')));
-            $secondary = strtolower(trim((string) ($routing['secondary'] ?? 'deepseek')));
-            foreach ([$primary, $secondary] as $preferredProvider) {
-                if (in_array($preferredProvider, ['mistral', 'groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
-                    $order[] = $preferredProvider;
+            $cascade = is_array($routing['cascade'] ?? null) ? (array) $routing['cascade'] : [];
+            if ($cascade !== []) {
+                foreach ($cascade as $p) {
+                    $order[] = strtolower(trim((string) $p));
                 }
-            }
-            $latency = (int) ($policy['latency_budget_ms'] ?? 1200);
-            if ($latency <= 1200) {
-                $order[] = 'mistral';
-                $order[] = 'openrouter';
-                $order[] = 'deepseek';
             } else {
-                $order[] = 'deepseek';
-                $order[] = 'mistral';
-                $order[] = 'openrouter';
+                // Fallback legacy: primary + secondary del config (solo si están definidos)
+                $primary   = strtolower(trim((string) ($routing['primary']   ?? '')));
+                $secondary = strtolower(trim((string) ($routing['secondary'] ?? '')));
+                foreach ([$primary, $secondary] as $p) {
+                    if ($p !== '' && in_array($p, $knownProviders, true)) {
+                        $order[] = $p;
+                    }
+                }
             }
         }
 
@@ -245,7 +256,8 @@ final class LLMRouter
 
         foreach ($candidates as $candidate) {
             $mode = strtolower(trim((string) $candidate));
-            if (in_array($mode, ['auto', 'mistral', 'groq', 'gemini', 'openrouter', 'claude', 'deepseek'], true)) {
+            $allProviders = array_merge(['auto'], array_keys((array) ($this->config['providers'] ?? [])));
+            if (in_array($mode, $allProviders, true)) {
                 return $mode;
             }
         }
@@ -255,15 +267,17 @@ final class LLMRouter
 
     private function makeProvider(string $name)
     {
-        $provider = $this->config['providers'][$name] ?? null;
-        if (!$provider || empty($provider['class'])) {
+        $providerCfg = $this->config['providers'][$name] ?? null;
+        if (!is_array($providerCfg) || empty($providerCfg['class'])) {
             throw new RuntimeException("Proveedor {$name} no configurado.");
         }
-        $class = $provider['class'];
+        $class = (string) $providerCfg['class'];
         if (!class_exists($class)) {
             throw new RuntimeException("Clase {$class} no encontrada.");
         }
-        return new $class($this->config);
+        // Pasar config específica del provider (incluye 'model' del JSON) + limits globales
+        $cfg = array_merge($providerCfg, ['limits' => $this->config['limits'] ?? []]);
+        return new $class($cfg);
     }
 
     private function systemPrompt(array $policy): string

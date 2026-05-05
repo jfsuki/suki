@@ -58,21 +58,58 @@ class MultiAgentSupervisor
 
     private function evaluateRule(array $rule, array $payload): array
     {
-        // Ejemplo: Regla de Facturación - No vender sin stock
+        $ruleType = $rule['rule_type'] ?? $rule['id'];
+
+        // Legacy named rules (backward compat)
         if ($rule['id'] === 'check_stock_availability') {
-            $qty = $payload['quantity'] ?? 0;
-            $stock = $payload['available_stock'] ?? 0;
+            $qty   = (float) ($payload['quantity'] ?? 0);
+            $stock = (float) ($payload['available_stock'] ?? 0);
             if ($qty > $stock) {
-                return ['valid' => false, 'message' => "Stock insuficiente detectado por el Supervisor."];
+                return ['valid' => false, 'message' => 'Stock insuficiente detectado por el Supervisor.'];
             }
         }
 
-        // Ejemplo: Regla de Margen Fiscal
         if ($rule['id'] === 'check_fiscal_margin') {
-            $margin = $payload['margin'] ?? 0;
-            $minMargin = $rule['params']['min_margin'] ?? 0.10;
+            $margin    = (float) ($payload['margin'] ?? 0);
+            $minMargin = (float) ($rule['params']['min_margin'] ?? 0.10);
             if ($margin < $minMargin) {
-                return ['valid' => false, 'message' => "Margen inferior al limite permitido (" . ($minMargin * 100) . "%)."];
+                return ['valid' => false, 'message' => 'Margen inferior al limite permitido (' . ($minMargin * 100) . '%).'];
+            }
+        }
+
+        // Generic: range_check — validates a numeric field is within [min, max]
+        if ($ruleType === 'range_check') {
+            $field = (string) ($rule['params']['field'] ?? '');
+            $value = isset($payload[$field]) ? (float) $payload[$field] : null;
+            if ($value === null) {
+                return ['valid' => false, 'message' => "Campo requerido ausente: {$field}."];
+            }
+            $min = isset($rule['params']['min']) ? (float) $rule['params']['min'] : null;
+            $max = isset($rule['params']['max']) ? (float) $rule['params']['max'] : null;
+            if ($min !== null && $value < $min) {
+                return ['valid' => false, 'message' => "Campo {$field} ({$value}) menor al mínimo ({$min})."];
+            }
+            if ($max !== null && $value > $max) {
+                return ['valid' => false, 'message' => "Campo {$field} ({$value}) supera el máximo ({$max})."];
+            }
+        }
+
+        // Generic: require_fields — all listed fields must be present and non-empty
+        if ($ruleType === 'require_fields') {
+            $fields = is_array($rule['params']['fields'] ?? null) ? (array) $rule['params']['fields'] : [];
+            foreach ($fields as $f) {
+                if (empty($payload[(string) $f])) {
+                    return ['valid' => false, 'message' => "Campo obligatorio faltante: {$f}."];
+                }
+            }
+        }
+
+        // Generic: deny_if_role — block if actor role is in the denied list
+        if ($ruleType === 'deny_if_role') {
+            $actorRole   = (string) ($payload['actor_role'] ?? '');
+            $deniedRoles = is_array($rule['params']['denied_roles'] ?? null) ? (array) $rule['params']['denied_roles'] : [];
+            if ($actorRole !== '' && in_array($actorRole, $deniedRoles, true)) {
+                return ['valid' => false, 'message' => "Rol '{$actorRole}' no tiene permiso para esta operación."];
             }
         }
 
@@ -109,56 +146,23 @@ class MultiAgentSupervisor
 
     private function loadWorkflowRegistry(): void
     {
-        $this->workflowRegistry = [
-            // Domain workflows
-            'PURCHASE' => [
-                'sequence' => ['SALES', 'FINANCES'],
-                'description' => 'Validación de Stock -> Validación de Margen Fiscal'
-            ],
-            'QUOTATION' => [
-                'sequence' => ['SALES', 'FINANCES'],
-                'description' => 'Disponibilidad de Catálogo -> Optimización de Precios'
-            ],
-            'SCHEMA_UPDATE' => [
-                'sequence' => ['ARCHITECT', 'FINANCES'],
-                'description' => 'Diseño de Tabla -> Validación de Impacto Contable'
-            ],
-            // Active execution processes
-            'APP_EXECUTION' => [
-                'process' => 'AppExecutionProcess',
-                'sequence' => ['APP_EXECUTION'],
-                'description' => 'Operación ERP estándar: intents → router → skills',
-                'modes'   => ['operation', 'chat'],
-            ],
-            'BUILDER_ONBOARDING' => [
-                'process' => 'BuilderOnboardingProcess',
-                'sequence' => ['BUILDER_ONBOARDING'],
-                'description' => 'Onboarding guiado: LLM + CommandBus para configurar apps',
-                'modes'   => ['builder'],
-            ],
-            'AUTONOMOUS_EXECUTION' => [
-                'process' => 'AutonomousExecutionProcess',
-                'sequence' => ['AUTONOMOUS_EXECUTION'],
-                'description' => 'Tool-use loop autónomo: LLM decide skills hasta completar tarea',
-                'modes'   => ['autonomous'],
-            ],
-        ];
+        $path = dirname(__DIR__, 4) . '/data/workflow_registry.json';
+        if (!file_exists($path)) {
+            $this->workflowRegistry = [];
+            return;
+        }
+        $decoded = json_decode((string) file_get_contents($path), true);
+        $this->workflowRegistry = is_array($decoded['workflows'] ?? null) ? (array) $decoded['workflows'] : [];
     }
 
     private function loadBusinessRules(): void
     {
-        // En una fase posterior, esto vendrá de un JSON o de la DB por Tenant.
-        $this->businessRules = [
-            [
-                'id' => 'check_stock_availability',
-                'event_type' => 'STOCK_RESERVED',
-                'params' => []
-            ],
-            [
-                'id' => 'check_fiscal_margin',
-                'event_type' => 'ENTITY_CREATED',
-                'params' => ['min_margin' => 0.25] // Ejemplo solicitado: 25%
-            ]
-        ];
+        $path = dirname(__DIR__, 4) . '/data/business_rules.json';
+        if (!file_exists($path)) {
+            $this->businessRules = [];
+            return;
+        }
+        $decoded = json_decode((string) file_get_contents($path), true);
+        $this->businessRules = is_array($decoded['rules'] ?? null) ? (array) $decoded['rules'] : [];
     }
 }

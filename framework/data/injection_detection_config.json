@@ -1,0 +1,25 @@
+{
+  "_comment": "Patrones de detección de prompt injection. Agregar nuevas entradas sin tocar PHP. type: substring | regex. risk_score 0.0-1.0. block_threshold: score mínimo para bloquear.",
+  "block_threshold": 0.7,
+  "patterns": [
+    {"id": "ignore_previous_en",   "type": "substring", "pattern": "ignore previous instructions",         "risk_score": 0.95},
+    {"id": "ignore_prev_es",       "type": "substring", "pattern": "ignora las instrucciones anteriores",  "risk_score": 0.95},
+    {"id": "ignore_above_en",      "type": "substring", "pattern": "ignore all above",                     "risk_score": 0.95},
+    {"id": "ignore_above_es",      "type": "substring", "pattern": "ignora todo lo anterior",              "risk_score": 0.95},
+    {"id": "olvida_sistema",       "type": "substring", "pattern": "olvida el sistema",                    "risk_score": 0.90},
+    {"id": "olvida_instrucciones", "type": "substring", "pattern": "olvida las instrucciones",             "risk_score": 0.90},
+    {"id": "new_system_prompt",    "type": "substring", "pattern": "new system prompt",                    "risk_score": 0.90},
+    {"id": "act_as_en",            "type": "regex",     "pattern": "/\\bact as\\b.{0,30}(without|ignore|no restriction)/", "risk_score": 0.85},
+    {"id": "ahora_eres",           "type": "regex",     "pattern": "/ahora eres (un|una|el|la).{0,40}sin (restricciones|limites|filtros)/", "risk_score": 0.85},
+    {"id": "now_you_are",          "type": "regex",     "pattern": "/now you are.{0,40}(without|no) (restrictions|limits|filters)/", "risk_score": 0.85},
+    {"id": "jailbreak_dan",        "type": "substring", "pattern": "do anything now",                      "risk_score": 0.90},
+    {"id": "jailbreak_dna",        "type": "substring", "pattern": "developer mode",                       "risk_score": 0.80},
+    {"id": "pretend_no_rules",     "type": "substring", "pattern": "pretend you have no",                  "risk_score": 0.85},
+    {"id": "token_boundary",       "type": "substring", "pattern": "<|endoftext|>",                        "risk_score": 0.95},
+    {"id": "token_inject_start",   "type": "regex",     "pattern": "/<\\|(?:system|user|assistant)\\|>/",  "risk_score": 0.95},
+    {"id": "print_system_prompt",  "type": "regex",     "pattern": "/print.{0,25}(system|instructions|prompt)/", "risk_score": 0.85},
+    {"id": "reveal_prompt",        "type": "regex",     "pattern": "/(reveal|show|display|dime|muestra).{0,35}(system prompt|instrucciones del sistema)/", "risk_score": 0.80},
+    {"id": "base64_smuggling",     "type": "regex",     "pattern": "/[A-Za-z0-9+\\/]{80,}={0,2}/",        "risk_score": 0.55},
+    {"id": "role_separator",       "type": "regex",     "pattern": "/^(system|assistant|user):\\s*\\n/m",  "risk_score": 0.75}
+  ]
+}

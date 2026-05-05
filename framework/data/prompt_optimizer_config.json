@@ -1,0 +1,21 @@
+{
+  "_comment": "PromptOptimizerAgent runtime config. Editar aquí para ajustar sin tocar PHP.",
+  "enabled": true,
+  "max_system_chars": 3000,
+  "max_history_messages": 6,
+  "trim_whitespace": true,
+  "language_hint": "Responde siempre en español colombiano (es-419). Sé conciso y directo.",
+  "clarification_min_chars": 4,
+  "clarification_intents": ["unknown", "out_of_scope", ""],
+  "mode_overrides": {
+    "builder": {
+      "max_system_chars": 4000,
+      "max_history_messages": 8,
+      "language_hint": "Responde en español colombiano (es-419). Eres un asistente de configuración de apps ERP."
+    },
+    "autonomous": {
+      "max_history_messages": 10,
+      "max_system_chars": 5000
+    }
+  }
+}

@@ -1,0 +1,59 @@
+{
+  "_comment": "Reglas deterministas del supervisor. Agregar nuevas sin modificar código PHP. Tipos: check_stock_availability, check_fiscal_margin, range_check, require_fields, deny_if_role.",
+  "rules": [
+    {
+      "id": "check_stock_availability",
+      "event_type": "STOCK_RESERVED",
+      "description": "Rechaza una reserva de stock si la cantidad supera el stock disponible.",
+      "params": {}
+    },
+    {
+      "id": "check_fiscal_margin",
+      "event_type": "ENTITY_CREATED",
+      "description": "Rechaza entidades creadas con margen por debajo del mínimo permitido.",
+      "params": {
+        "min_margin": 0.25
+      }
+    },
+    {
+      "id": "invoice_amount_range",
+      "event_type": "INVOICE_CREATED",
+      "description": "Rechaza facturas con monto fuera del rango permitido para PYME.",
+      "rule_type": "range_check",
+      "params": {
+        "field": "total",
+        "min": 0,
+        "max": 999999999
+      }
+    },
+    {
+      "id": "sale_require_fields",
+      "event_type": "SALE_FINALIZED",
+      "description": "Toda venta debe tener cliente, líneas y total antes de finalizar.",
+      "rule_type": "require_fields",
+      "params": {
+        "fields": ["customer_id", "lines", "total"]
+      }
+    },
+    {
+      "id": "delete_deny_non_admin",
+      "event_type": "ENTITY_DELETED",
+      "description": "Solo roles admin o owner pueden eliminar entidades críticas.",
+      "rule_type": "deny_if_role",
+      "params": {
+        "denied_roles": ["operator", "viewer", "guest"]
+      }
+    },
+    {
+      "id": "negative_total_guard",
+      "event_type": "SALE_FINALIZED",
+      "description": "Rechaza ventas con total negativo o cero.",
+      "rule_type": "range_check",
+      "params": {
+        "field": "total",
+        "min": 0.01,
+        "max": 999999999
+      }
+    }
+  ]
+}

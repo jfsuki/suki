@@ -32,6 +32,7 @@ final class ChatAgent
     private ?AgentOpsSupervisor $agentOpsSupervisor = null;
     private ?AgentOpsObservabilityService $agentOpsObservabilityService = null;
     private ?AgentOpsTelemetryBuilder $telemetryBuilder = null;
+    private ?\App\Core\Agents\PromptOptimizerAgent $promptOptimizerAgent = null;
     private ?CommandParser $commandParser = null;
     private ?IdentityResolver $identityResolver = null;
     private ?LocalCommandExecutor $localCommandExecutor = null;
@@ -158,6 +159,15 @@ final class ChatAgent
         
         if ($text === '' && empty($payload['meta'])) {
             return $this->reply('Mensaje vacio.', $channel, $sessionId, $userId, 'error');
+        }
+
+        // Security: prompt injection guard (runs before any intent routing or LLM call)
+        $injectionScan = (new \App\Core\Agents\PromptInjectionDetector())->scan($text);
+        if (!$injectionScan['clean']) {
+            return $this->reply(
+                'Tu mensaje no pudo procesarse. Por favor reformula tu pregunta.',
+                $channel, $sessionId, $userId, 'error'
+            );
         }
 
         $local = $this->parseLocal($text);
@@ -310,6 +320,24 @@ final class ChatAgent
         );
         if (is_array($securityBlock)) {
             return $this->handleSecurityBlock($securityBlock, $route, $telemetry, $state, $task, $tenantId, $projectId, $sessionId, $userId, $mode, $channel, $messageId, $conversationId, $text, $payload, $isAuthenticated, $role, $result, $requestStartedAt);
+        }
+
+        // Multi-agent workflow dispatch (workflow_registry.json — agregar triggers en JSON, cero PHP)
+        $classifiedIntent = (string) ($telemetry['classification'] ?? $result['intent'] ?? '');
+        if ($classifiedIntent !== '') {
+            $wfResult = (new \App\Core\Agents\AgentWorkflowDispatcher($this->llmRouter()))->dispatch(
+                $classifiedIntent,
+                $text,
+                ['tenant_id' => $tenantId, 'project_id' => $projectId, 'mode' => $mode]
+            );
+            if ($wfResult !== null) {
+                $memory->append($threadId, 'assistant', (string) ($wfResult['reply'] ?? ''));
+                return $this->reply(
+                    (string) ($wfResult['reply'] ?? 'Operación multi-agente completada.'),
+                    $channel, $sessionId, $userId, 'success',
+                    ['provider_used' => 'multi_agent', 'workflow' => $wfResult['workflow'] ?? '']
+                );
+            }
         }
 
         if ($route->isLocalResponse()) {
@@ -673,7 +701,7 @@ final class ChatAgent
 
         $task = $this->controlTowerMarkRunning($task, ['route_path' => (string) ($telemetry['route_path'] ?? ''), 'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown')]);
         try {
-            $history = $memory->load($threadId);
+            $history = $memory->load($threadId, $tenantId);
             $systemPrompt = @file_get_contents(dirname(__DIR__, 2) . '/prompts/builder_system_prompt.txt') ?: "Eres SUKI. Responde breve y claro.";
             if ($mode === 'builder') {
                 try {
@@ -681,8 +709,18 @@ final class ChatAgent
                     if ($journalCtx !== '') { $systemPrompt .= "\n\n---\nBITÁCORA DE ARQUITECTURA (no olvides esto):\n" . $journalCtx . "\n---"; }
                 } catch (\Throwable $ignored) {}
             }
+            // Inject SpecialistPersonas system prompt based on Qdrant-classified skill
+            $specialistArea = $this->resolveSpecialistArea($telemetry, $mode);
+            if ($specialistArea !== null) {
+                $persona = \App\Core\Agents\Registry\SpecialistPersonas::getPersona($specialistArea);
+                $personaPrompt = trim((string) ($persona['prompt_base'] ?? ''));
+                if ($personaPrompt !== '') {
+                    $systemPrompt = $personaPrompt . "\n\n" . $systemPrompt;
+                }
+            }
             $messages = [['role' => 'system', 'content' => $systemPrompt]];
             foreach ($history as $msg) { $messages[] = ['role' => $msg['role'], 'content' => $msg['content']]; }
+            $messages = $this->promptOptimizer()->optimize($messages, $mode, (string) ($telemetry['classification'] ?? ''));
             $llmResult = $this->llmRouter()->complete($messages, [
                 'mode' => $mode, 'tenant_id' => $tenantId, 'project_id' => $projectId,
                 'session_id' => $sessionId, 'user_id' => $userId, 'policy' => $route->llmRequest()['policy'] ?? [],
@@ -989,6 +1027,38 @@ final class ChatAgent
     public function parseLocal(string $text): array
     {
         return $this->commandParser()->parse($text);
+    }
+
+    private function resolveSpecialistArea(array $telemetry, string $mode): ?string
+    {
+        static $map = null;
+        if ($map === null) {
+            $path = dirname(__DIR__, 2) . '/data/specialist_skill_map.json';
+            $decoded = file_exists($path) ? json_decode((string) file_get_contents($path), true) : [];
+            $map = is_array($decoded) ? $decoded : [];
+        }
+
+        $modeDefaults = is_array($map['mode_defaults'] ?? null) ? (array) $map['mode_defaults'] : [];
+        if (isset($modeDefaults[$mode])) {
+            return (string) $modeDefaults[$mode];
+        }
+
+        $skillToArea = is_array($map['skill_to_area'] ?? null) ? (array) $map['skill_to_area'] : [];
+        $skill = trim((string) ($telemetry['semantic_intent_skill'] ?? ''));
+        if ($skill === '') {
+            return null;
+        }
+        // Exact match first, then substring
+        if (isset($skillToArea[$skill])) {
+            return (string) $skillToArea[$skill];
+        }
+        $skillLower = strtolower($skill);
+        foreach ($skillToArea as $key => $area) {
+            if (str_contains($skillLower, strtolower((string) $key))) {
+                return (string) $area;
+            }
+        }
+        return null;
     }
 
 
@@ -1690,6 +1760,10 @@ final class ChatAgent
             $this->llmRouter = new LLMRouter();
         }
         return $this->llmRouter;
+    }
+    private function promptOptimizer(): \App\Core\Agents\PromptOptimizerAgent
+    {
+        return $this->promptOptimizerAgent ??= new \App\Core\Agents\PromptOptimizerAgent();
     }
 
     private function conversationMemory(): ConversationMemory
