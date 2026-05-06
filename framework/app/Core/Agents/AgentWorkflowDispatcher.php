@@ -56,13 +56,17 @@ class AgentWorkflowDispatcher
     private function execute(array $workflow, string $text, array $context): array
     {
         $tenantId = (string) ($context['tenant_id'] ?? $context['tenantId'] ?? '');
-        $results = [];
+        $results      = [];
+        $priorOutputs = []; // accumulated outputs for stateful chaining
+
         foreach ((array) ($workflow['sequence'] ?? []) as $area) {
             $persona = SpecialistPersonas::getPersonaForTenant((string) $area, $tenantId, $this->db);
+            $output  = $this->callLlm($persona, $text, $context, $priorOutputs);
             $results[(string) $area] = [
                 'status' => 'SUCCESS',
-                'output' => $this->callLlm($persona, $text, $context),
+                'output' => $output,
             ];
+            $priorOutputs[(string) $area] = $output;
         }
 
         $description = (string) ($workflow['description'] ?? $workflow['name'] ?? 'Multi-Agent Workflow');
@@ -71,18 +75,32 @@ class AgentWorkflowDispatcher
         return ['reply' => $reply, 'workflow' => (string) ($workflow['name'] ?? '')];
     }
 
-    private function callLlm(array $persona, string $text, array $context): string
+    /**
+     * @param array<string,string> $priorOutputs  outputs de agentes anteriores en la cadena
+     */
+    private function callLlm(array $persona, string $text, array $context, array $priorOutputs = []): string
     {
         try {
-            $llmParams = is_array($persona['llm_params'] ?? null) ? (array) $persona['llm_params'] : [];
+            $llmParams    = is_array($persona['llm_params'] ?? null) ? (array) $persona['llm_params'] : [];
+            $systemPrompt = trim((string) ($persona['prompt_base'] ?? $persona['description'] ?? ''));
+
+            // Enrich system prompt with chained context from prior agents
+            if (!empty($priorOutputs)) {
+                $chainLines = [];
+                foreach ($priorOutputs as $area => $out) {
+                    $chainLines[] = '[' . $area . ']: ' . $out;
+                }
+                $systemPrompt .= "\n\nContexto de agentes anteriores en este flujo:\n" . implode("\n\n", $chainLines);
+            }
+
             $capsule = [
                 'policy' => [
-                    'max_output_tokens'  => (int) ($llmParams['max_tokens'] ?? 400),
+                    'max_output_tokens'   => (int) ($llmParams['max_tokens'] ?? 400),
                     'requires_strict_json' => false,
                 ],
                 'prompt_contract' => [
-                    'SYSTEM'        => trim((string) ($persona['prompt_base'] ?? $persona['description'] ?? '')),
-                    'USER_MESSAGE'  => $text,
+                    'SYSTEM'         => $systemPrompt,
+                    'USER_MESSAGE'   => $text,
                     'TENANT_CONTEXT' => [
                         'tenant_id'  => (string) ($context['tenant_id'] ?? 'default'),
                         'project_id' => (string) ($context['project_id'] ?? ''),

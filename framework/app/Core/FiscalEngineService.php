@@ -414,7 +414,19 @@ final class FiscalEngineService
                 'total' => $summary['total'],
                 'external_provider' => $this->nullableString($payload['external_provider'] ?? $defaults['external_provider'] ?? null),
                 'external_reference' => $this->nullableString($payload['external_reference'] ?? $defaults['external_reference'] ?? null),
-                'metadata' => $this->buildDocumentMetadata($payload, $sourceSnapshot, $defaults),
+                'metadata' => array_merge(
+                    $this->buildDocumentMetadata($payload, $sourceSnapshot, $defaults),
+                    ['withholding_breakdown' => [
+                        'rete_fuente'       => $summary['rete_fuente'],
+                        'rete_fuente_rate'  => $summary['rete_fuente_rate'],
+                        'rete_ica'          => $summary['rete_ica'],
+                        'rete_ica_rate'     => $summary['rete_ica_rate'],
+                        'rete_iva'          => $summary['rete_iva'],
+                        'total_withholding' => $summary['total_withholding'],
+                        'net_payable'       => $summary['net_payable'],
+                        'notes'             => $summary['withholding_notes'],
+                    ]]
+                ),
                 'created_at' => $createdAt,
                 'updated_at' => $createdAt,
             ]);
@@ -480,7 +492,19 @@ final class FiscalEngineService
                 'total' => $summary['total'],
                 'metadata' => array_merge(
                     is_array($document['metadata'] ?? null) ? (array) $document['metadata'] : [],
-                    ['line_sync' => ['updated_at' => date('c')]]
+                    [
+                        'line_sync' => ['updated_at' => date('c')],
+                        'withholding_breakdown' => [
+                            'rete_fuente'       => $summary['rete_fuente'],
+                            'rete_fuente_rate'  => $summary['rete_fuente_rate'],
+                            'rete_ica'          => $summary['rete_ica'],
+                            'rete_ica_rate'     => $summary['rete_ica_rate'],
+                            'rete_iva'          => $summary['rete_iva'],
+                            'total_withholding' => $summary['total_withholding'],
+                            'net_payable'       => $summary['net_payable'],
+                            'notes'             => $summary['withholding_notes'],
+                        ],
+                    ]
                 ),
             ], $appId);
             if (!is_array($updated)) {
@@ -497,34 +521,68 @@ final class FiscalEngineService
     }
 
     /**
+     * Calcula totales fiscales del documento incluyendo ReteFuente, ICA y ReteIVA.
+     *
+     * Campos nuevos en el retorno (backward-compatible — no rompe callers existentes):
+     *   rete_fuente, rete_fuente_rate, rete_ica, rete_ica_rate,
+     *   rete_iva, total_withholding, net_payable, withholding_notes
+     *
+     * Contexto que puede venir en $base:
+     *   concept           — compras|servicios|honorarios|comisiones|arrendamiento_*|...
+     *   document_type     — sales_invoice|support_document|credit_note
+     *   municipality      — bogota|medellin|cali|barranquilla|... (para ICA)
+     *   activity_type     — comercio|industria|servicios|financiero (para ICA)
+     *   issuer_type       — natural|juridica (para honorarios)
+     *   is_declarante     — bool (solo aplica a persona natural con honorarios)
+     *   country           — CO (default)
+     *
      * @param array<int, array<string, mixed>> $lines
      * @param array<string, mixed> $base
-     * @return array<string, float|null>
+     * @return array<string, mixed>
      */
     public function calculateFiscalTotalsSummary(array $lines, array $base = []): array
     {
         if ($lines === []) {
             return [
-                'subtotal' => $this->nullableMoney($base['subtotal'] ?? null),
-                'tax_total' => $this->nullableMoney($base['tax_total'] ?? null),
-                'total' => $this->nullableMoney($base['total'] ?? null),
+                'subtotal'          => $this->nullableMoney($base['subtotal'] ?? null),
+                'tax_total'         => $this->nullableMoney($base['tax_total'] ?? null),
+                'total'             => $this->nullableMoney($base['total'] ?? null),
+                'rete_fuente'       => null,
+                'rete_fuente_rate'  => null,
+                'rete_ica'          => null,
+                'rete_ica_rate'     => null,
+                'rete_iva'          => null,
+                'total_withholding' => null,
+                'net_payable'       => null,
+                'withholding_notes' => [],
             ];
         }
 
         $subtotal = 0.0;
         $taxTotal = 0.0;
-        $total = 0.0;
+        $total    = 0.0;
         foreach ($lines as $line) {
-            $amounts = $this->lineAmounts($line);
+            $amounts  = $this->lineAmounts($line);
             $subtotal += $amounts['subtotal'];
             $taxTotal += $amounts['tax_total'];
-            $total += $amounts['total'];
+            $total    += $amounts['total'];
         }
 
+        $country     = strtoupper(trim((string) ($base['country'] ?? 'CO')));
+        $withholding = (new \App\Core\FiscalRulesEngine($country))->calculate($subtotal, $taxTotal, $base);
+
         return [
-            'subtotal' => $this->money($subtotal),
-            'tax_total' => $this->money($taxTotal),
-            'total' => $this->money($total),
+            'subtotal'          => $this->money($subtotal),
+            'tax_total'         => $this->money($taxTotal),
+            'total'             => $this->money($total),
+            'rete_fuente'       => $this->money($withholding['rete_fuente']),
+            'rete_fuente_rate'  => $withholding['rete_fuente_rate'],
+            'rete_ica'          => $this->money($withholding['rete_ica']),
+            'rete_ica_rate'     => $withholding['rete_ica_rate'],
+            'rete_iva'          => $this->money($withholding['rete_iva']),
+            'total_withholding' => $this->money($withholding['total_withholding']),
+            'net_payable'       => $this->money($withholding['net_payable']),
+            'withholding_notes' => $withholding['notes'],
         ];
     }
 
@@ -860,8 +918,8 @@ final class FiscalEngineService
             [
                 'provider_submission' => 'pending',
                 'response_handling' => 'pending',
-                'tax_breakdown' => 'pending',
-                'withholding' => 'pending',
+                'tax_breakdown' => 'calculated',
+                'withholding' => 'calculated',
                 'exemptions' => 'pending',
                 'fiscal_profile' => 'pending',
             ]

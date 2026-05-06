@@ -1,0 +1,271 @@
+{
+  "_meta": {
+    "description": "Reglas fiscales Colombia — Estatuto Tributario 2025. Editar aquí para actualizar tarifas sin tocar PHP.",
+    "legal_base": "Estatuto Tributario Nacional (ET), resoluciones DIAN y acuerdos municipales vigentes.",
+    "version": "2025.1",
+    "country": "CO",
+    "currency": "COP",
+    "uvt": 49799
+  },
+
+  "rules": [
+
+    {
+      "id": "iva",
+      "name": "Impuesto al Valor Agregado",
+      "legal_ref": "Art. 420-513 ET",
+      "type": "percentage_line",
+      "applies_at": "line",
+      "applies_to_document_types": ["sales_invoice", "support_document", "credit_note"],
+      "enabled": true,
+      "_comment": "El IVA se calcula línea a línea con tax_rate de cada línea. Este registro es informativo y permite consultas de tarifa.",
+      "rates": [
+        { "key": "general",    "rate": 0.19, "label": "IVA General (Art. 468 ET)" },
+        { "key": "reducido",   "rate": 0.05, "label": "IVA Reducido (Art. 468-1 ET)" },
+        { "key": "exento",     "rate": 0.00, "label": "Exento (Art. 477 ET)" },
+        { "key": "excluido",   "rate": 0.00, "label": "Excluido (Art. 424 ET)" }
+      ],
+      "default_rate_key": "general"
+    },
+
+    {
+      "id": "rete_fuente_compras",
+      "name": "ReteFuente — Compras generales",
+      "legal_ref": "Art. 401 ET",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["compras"],
+      "enabled": true,
+      "threshold_uvt": 27,
+      "rate": 0.025,
+      "overrides": [
+        {
+          "_comment": "Sin factura o sin RUT",
+          "condition_key": "sin_factura",
+          "condition_value": true,
+          "rate": 0.035
+        }
+      ]
+    },
+
+    {
+      "id": "rete_fuente_servicios",
+      "name": "ReteFuente — Servicios generales",
+      "legal_ref": "Art. 392 ET",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["servicios"],
+      "enabled": true,
+      "threshold_uvt": 4,
+      "rate": 0.04,
+      "subtype_rates": [
+        { "subtype": "aseo_vigilancia",      "rate": 0.02,  "threshold_uvt": 4  },
+        { "subtype": "transporte_carga",     "rate": 0.01,  "threshold_uvt": 27 },
+        { "subtype": "transporte_pasajeros", "rate": 0.035, "threshold_uvt": 27 },
+        { "subtype": "servicios_publicos",   "rate": 0.025, "threshold_uvt": 27 },
+        { "subtype": "mantenimiento",        "rate": 0.04,  "threshold_uvt": 4  }
+      ]
+    },
+
+    {
+      "id": "rete_fuente_honorarios",
+      "name": "ReteFuente — Honorarios y Comisiones",
+      "legal_ref": "Art. 383 ET",
+      "type": "withholding_conditional_rate",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["honorarios", "comisiones"],
+      "enabled": true,
+      "threshold_uvt": 0,
+      "rate_conditions": [
+        { "issuer_type": "natural", "is_declarante": true,  "rate": 0.10 },
+        { "issuer_type": "natural", "is_declarante": false, "rate": 0.11 },
+        { "issuer_type": "juridica",                        "rate": 0.11 }
+      ],
+      "default_rate": 0.11
+    },
+
+    {
+      "id": "rete_fuente_arrendamiento_muebles",
+      "name": "ReteFuente — Arrendamiento bienes muebles",
+      "legal_ref": "Art. 395 ET",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["arrendamiento_muebles"],
+      "enabled": true,
+      "threshold_uvt": 0,
+      "rate": 0.04
+    },
+
+    {
+      "id": "rete_fuente_arrendamiento_inmuebles",
+      "name": "ReteFuente — Arrendamiento bienes inmuebles personas jurídicas",
+      "legal_ref": "Art. 401 ET",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["arrendamiento_inmuebles"],
+      "enabled": true,
+      "threshold_uvt": 27,
+      "rate": 0.035
+    },
+
+    {
+      "id": "rete_fuente_construccion",
+      "name": "ReteFuente — Contratos de construcción y urbanización",
+      "legal_ref": "Art. 401 ET",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["contratos_construccion"],
+      "enabled": true,
+      "threshold_uvt": 27,
+      "rate": 0.02
+    },
+
+    {
+      "id": "rete_fuente_rendimientos",
+      "name": "ReteFuente — Rendimientos financieros",
+      "legal_ref": "Art. 395 ET",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["rendimientos_financieros"],
+      "enabled": true,
+      "threshold_uvt": 0,
+      "rate": 0.07
+    },
+
+    {
+      "id": "rete_fuente_dividendos",
+      "name": "ReteFuente — Dividendos gravados",
+      "legal_ref": "Art. 245 ET",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["dividendos_gravados"],
+      "enabled": true,
+      "threshold_uvt": 0,
+      "rate": 0.20
+    },
+
+    {
+      "id": "ica",
+      "name": "Impuesto de Industria y Comercio",
+      "legal_ref": "Ley 14/1983, acuerdos municipales vigentes",
+      "type": "locality_withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["sales_invoice", "support_document"],
+      "enabled": true,
+      "locality_key": "municipality",
+      "activity_key": "activity_type",
+      "default_rates": {
+        "comercio":   0.00500,
+        "industria":  0.00400,
+        "servicios":  0.00500,
+        "financiero": 0.00500
+      },
+      "locality_table": {
+        "bogota":         { "comercio": 0.00690, "industria": 0.00462, "servicios": 0.00966, "financiero": 0.00500 },
+        "bogotá":         { "comercio": 0.00690, "industria": 0.00462, "servicios": 0.00966, "financiero": 0.00500 },
+        "medellin":       { "comercio": 0.00500, "industria": 0.00400, "servicios": 0.00600, "financiero": 0.00500 },
+        "medellín":       { "comercio": 0.00500, "industria": 0.00400, "servicios": 0.00600, "financiero": 0.00500 },
+        "cali":           { "comercio": 0.00550, "industria": 0.00380, "servicios": 0.00620, "financiero": 0.00500 },
+        "barranquilla":   { "comercio": 0.00500, "industria": 0.00400, "servicios": 0.00500, "financiero": 0.00500 },
+        "bucaramanga":    { "comercio": 0.00480, "industria": 0.00360, "servicios": 0.00550, "financiero": 0.00500 },
+        "cartagena":      { "comercio": 0.00500, "industria": 0.00400, "servicios": 0.00500, "financiero": 0.00500 },
+        "cucuta":         { "comercio": 0.00500, "industria": 0.00400, "servicios": 0.00480, "financiero": 0.00500 },
+        "cúcuta":         { "comercio": 0.00500, "industria": 0.00400, "servicios": 0.00480, "financiero": 0.00500 },
+        "pereira":        { "comercio": 0.00480, "industria": 0.00380, "servicios": 0.00500, "financiero": 0.00500 },
+        "manizales":      { "comercio": 0.00480, "industria": 0.00380, "servicios": 0.00500, "financiero": 0.00500 },
+        "ibague":         { "comercio": 0.00500, "industria": 0.00380, "servicios": 0.00500, "financiero": 0.00500 },
+        "ibagué":         { "comercio": 0.00500, "industria": 0.00380, "servicios": 0.00500, "financiero": 0.00500 },
+        "villavicencio":  { "comercio": 0.00500, "industria": 0.00400, "servicios": 0.00500, "financiero": 0.00500 },
+        "santa_marta":    { "comercio": 0.00480, "industria": 0.00380, "servicios": 0.00500, "financiero": 0.00500 }
+      }
+    },
+
+    {
+      "id": "rete_iva",
+      "name": "Retención del IVA",
+      "legal_ref": "Art. 437-2 ET",
+      "type": "withholding_on_tax",
+      "applies_at": "document",
+      "base_field": "tax_total",
+      "applies_to_document_types": ["support_document"],
+      "enabled": true,
+      "rate": 0.15,
+      "applies_when_agent": ["gran_contribuyente", "autorretenedor"],
+      "_comment": "Solo cuando el comprador/agente retenedor es gran contribuyente o autorretenedor DIAN"
+    },
+
+    {
+      "id": "impoconsumo_licores",
+      "name": "Impuesto al Consumo — Licores y cerveza",
+      "legal_ref": "Art. 512-1 ET",
+      "type": "percentage_line",
+      "applies_at": "line",
+      "applies_to_document_types": ["sales_invoice"],
+      "applies_to_product_categories": ["licores", "cerveza", "bebidas_alcoholicas"],
+      "enabled": false,
+      "rates": [
+        { "key": "vinos_aperitivos", "rate": 0.20 },
+        { "key": "licores_25_up",    "rate": 0.25 },
+        { "key": "cerveza",          "rate": 0.08 }
+      ],
+      "default_rate_key": "licores_25_up",
+      "_comment": "Activar por sector si la empresa maneja licores. Se combina con IVA."
+    },
+
+    {
+      "id": "bolsas_plasticas",
+      "name": "Impuesto bolsas plásticas",
+      "legal_ref": "Art. 512-15 ET",
+      "type": "fixed_per_unit",
+      "applies_at": "line",
+      "applies_to_document_types": ["sales_invoice"],
+      "applies_to_product_categories": ["bolsas_plasticas"],
+      "enabled": false,
+      "amount_per_unit": 66,
+      "_comment": "Valor 2024: $66 COP por bolsa. Actualizar según DIAN cada año."
+    }
+
+  ],
+
+  "concept_aliases": {
+    "_comment": "Normaliza conceptos del usuario al id canónico que usa applies_to_concepts",
+    "honorario":         "honorarios",
+    "honorarios":        "honorarios",
+    "servicio":          "servicios",
+    "servicios":         "servicios",
+    "compra":            "compras",
+    "compras":           "compras",
+    "comision":          "comisiones",
+    "comisión":          "comisiones",
+    "comisiones":        "comisiones",
+    "arrendamiento":     "arrendamiento_muebles",
+    "arrendamiento_muebles":   "arrendamiento_muebles",
+    "arrendamiento_inmuebles": "arrendamiento_inmuebles",
+    "alquiler":          "arrendamiento_muebles",
+    "construccion":      "contratos_construccion",
+    "construcción":      "contratos_construccion",
+    "contratos_construccion": "contratos_construccion",
+    "rendimientos":      "rendimientos_financieros",
+    "rendimientos_financieros": "rendimientos_financieros",
+    "dividendo":         "dividendos_gravados",
+    "dividendos":        "dividendos_gravados",
+    "dividendos_gravados": "dividendos_gravados"
+  }
+}
