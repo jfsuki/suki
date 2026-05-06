@@ -83,7 +83,10 @@ trait ConversationGatewayStubsTrait
 
     public function normalizeWithTraining(string $text, array $training, string $tenantId, array $profile, string $mode): string
     {
-        return $this->normalize($text);
+        $base    = $this->normalize($text);
+        $country = strtoupper(trim((string) ($profile['country'] ?? $profile['tenant_country'] ?? 'CO')));
+        $sector  = strtolower(trim((string) ($profile['sector'] ?? $profile['business_type'] ?? '')));
+        return \App\Core\Agents\OntologyNormalizer::apply($base, $country, $mode, $sector);
     }
 
     public function loadPolicy(string $tenantId = 'default'): array

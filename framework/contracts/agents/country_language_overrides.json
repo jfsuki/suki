@@ -1,77 +1,454 @@
 {
   "meta": {
     "name": "country_language_overrides",
-    "version": "1.0.0",
+    "version": "2.0.0",
     "language": "es",
-    "updated": "2026-02-21",
-    "goal": "Normalizar variaciones locales y errores ortograficos frecuentes por pais para reducir repreguntas."
-  },
-  "global": {
-    "typo_rules": [
-      { "match": "misto", "replace": "mixto" },
-      { "match": "servivios", "replace": "servicios" },
-      { "match": "prodcuto", "replace": "producto" },
-      { "match": "factrua", "replace": "factura" },
-      { "match": "formlario", "replace": "formulario" },
-      { "match": "clente", "replace": "cliente" }
-    ],
-    "synonyms": {
-      "cel": "telefono",
-      "celu": "telefono",
-      "correo": "email",
-      "mail": "email",
-      "nit": "documento"
+    "updated": "2026-05-05",
+    "goal": "Ontología LATAM universal. Normaliza modismos, regionalismos, equivalentes fiscales y vocabulario sectorial para que el mismo motor semántico sirva a cualquier país latino y cualquier tipo de empresa.",
+    "structure": {
+      "global": "Reglas y sinónimos neutros aplicables a todo LATAM",
+      "countries.<CC>": "Overrides por código ISO-3166-1 alpha-2",
+      "fiscal_equivalents.<CC>": "Nombre local de la autoridad fiscal → 'autoridad_fiscal' canónico",
+      "sectors.<name>": "Vocabulario sectorial universal (commerce, health, production, services, legal, education, hospitality)",
+      "how_to_add_country": "Añadir entrada en 'countries' y 'fiscal_equivalents'. No tocar PHP.",
+      "how_to_add_sector": "Añadir entrada en 'sectors' con clave snake_case. Sin reiniciar servidor."
     }
   },
+
+  "global": {
+    "typo_rules": [
+      { "match": "misto",      "replace": "mixto" },
+      { "match": "servivios",  "replace": "servicios" },
+      { "match": "prodcuto",   "replace": "producto" },
+      { "match": "factrua",    "replace": "factura" },
+      { "match": "formlario",  "replace": "formulario" },
+      { "match": "clente",     "replace": "cliente" },
+      { "match": "provedor",   "replace": "proveedor" },
+      { "match": "imventario", "replace": "inventario" },
+      { "match": "cobransa",   "replace": "cobranza" },
+      { "match": "pagare",     "replace": "pagare" },
+      { "match": "vendido",    "replace": "vendido" }
+    ],
+    "synonyms": {
+      "cel":    "telefono",
+      "celu":   "telefono",
+      "cello":  "telefono",
+      "correo": "email",
+      "mail":   "email",
+      "nit":    "documento",
+      "wsp":    "whatsapp",
+      "ws":     "whatsapp",
+      "wasap":  "whatsapp"
+    }
+  },
+
   "countries": {
     "CO": {
+      "label": "Colombia",
       "typo_rules": [
-        { "match": "ferreteriaa", "replace": "ferreteria" },
+        { "match": "ferreteriaa",  "replace": "ferreteria" },
         { "match": "veterinariaa", "replace": "veterinaria" },
-        { "match": "contaduria", "replace": "contabilidad" }
+        { "match": "contaduria",   "replace": "contabilidad" },
+        { "match": "apartado",     "replace": "apartado postal" }
       ],
       "synonyms": {
-        "celular": "telefono",
-        "cel": "telefono",
-        "nit": "documento",
-        "ruc": "documento"
+        "celular":  "telefono",
+        "nit":      "documento",
+        "ruc":      "documento",
+        "pagar":    "pagar",
+        "plata":    "dinero",
+        "billete":  "dinero",
+        "lucas":    "dinero",
+        "chepito":  "efectivo",
+        "efectivo": "efectivo",
+        "cheque":   "cheque",
+        "cupo":     "credito",
+        "cartera":  "cuentas por cobrar",
+        "encargo":  "pedido",
+        "domicilio":"entrega",
+        "merca":    "mercancia",
+        "tienda":   "punto de venta",
+        "local":    "punto de venta",
+        "parcero":  "",
+        "parce":    "",
+        "chino":    "",
+        "bacano":   "excelente",
+        "chimba":   "excelente",
+        "berraco":  "excelente"
       }
     },
     "MX": {
+      "label": "México",
       "typo_rules": [
-        { "match": "facturacion", "replace": "facturacion" },
-        { "match": "cotisacion", "replace": "cotizacion" }
+        { "match": "cotisacion",  "replace": "cotizacion" },
+        { "match": "soluicion",   "replace": "solucion" }
       ],
       "synonyms": {
-        "rfc": "documento",
-        "cel": "telefono"
+        "rfc":       "documento",
+        "curp":      "documento",
+        "cel":       "telefono",
+        "lana":      "dinero",
+        "varo":      "dinero",
+        "feria":     "dinero",
+        "cuate":     "",
+        "mano":      "",
+        "chido":     "excelente",
+        "padrísimo": "excelente",
+        "tianguis":  "mercado",
+        "changarrito":"puesto",
+        "tlapalería":"ferreteria",
+        "torton":    "camion de carga",
+        "cuarto":    "habitacion",
+        "recibo":    "comprobante",
+        "ticket":    "comprobante",
+        "ahorita":   "ahora",
+        "horita":    "ahora"
       }
     },
     "AR": {
+      "label": "Argentina",
       "typo_rules": [
-        { "match": "factruacion", "replace": "facturacion" }
+        { "match": "factruacion", "replace": "facturacion" },
+        { "match": "presupuetos", "replace": "presupuestos" }
       ],
       "synonyms": {
-        "cuit": "documento",
-        "cel": "telefono"
+        "cuit":     "documento",
+        "cuil":     "documento",
+        "cbu":      "cuenta bancaria",
+        "cel":      "telefono",
+        "guita":    "dinero",
+        "plata":    "dinero",
+        "mango":    "dinero",
+        "laburo":   "trabajo",
+        "labura":   "trabaja",
+        "che":      "",
+        "boludo":   "",
+        "dale":     "de acuerdo",
+        "copado":   "excelente",
+        "genial":   "excelente",
+        "quilombo": "problema",
+        "kilombo":  "problema",
+        "remito":   "remision",
+        "nota de pedido": "orden de compra",
+        "proveedor": "proveedor"
       }
     },
     "PE": {
+      "label": "Perú",
       "typo_rules": [
-        { "match": "boletaas", "replace": "boletas" }
+        { "match": "boletaas", "replace": "boletas" },
+        { "match": "facturacion electronica", "replace": "facturacion electronica" }
       ],
       "synonyms": {
-        "ruc": "documento",
-        "cel": "telefono"
+        "ruc":      "documento",
+        "cel":      "telefono",
+        "causa":    "",
+        "pata":     "",
+        "oe":       "",
+        "chamba":   "trabajo",
+        "chambar":  "trabajar",
+        "plata":    "dinero",
+        "mosca":    "dinero",
+        "boleta":   "comprobante",
+        "guia de remision": "remision",
+        "nota de venta": "comprobante"
       }
     },
     "CL": {
+      "label": "Chile",
       "typo_rules": [
         { "match": "boletaa", "replace": "boleta" }
       ],
       "synonyms": {
-        "rut": "documento",
-        "cel": "telefono"
+        "rut":      "documento",
+        "cel":      "telefono",
+        "luca":     "dinero",
+        "lucas":    "dinero",
+        "palo":     "mil pesos",
+        "cacha":    "entiendes",
+        "weón":     "",
+        "bkn":      "excelente",
+        "bacán":    "excelente",
+        "boleta":   "comprobante",
+        "liquidacion": "nomina",
+        "cotizacion previsional": "seguridad social"
+      }
+    },
+    "VE": {
+      "label": "Venezuela",
+      "typo_rules": [],
+      "synonyms": {
+        "rif":      "documento",
+        "cel":      "telefono",
+        "chamo":    "",
+        "pana":     "",
+        "naguara":  "excelente",
+        "chévere":  "excelente",
+        "chevere":  "excelente",
+        "verdes":   "dolares",
+        "divisas":  "divisas",
+        "bolívar":  "moneda",
+        "nota":     "comprobante",
+        "factura":  "factura"
+      }
+    },
+    "EC": {
+      "label": "Ecuador",
+      "typo_rules": [],
+      "synonyms": {
+        "ruc":      "documento",
+        "cedula":   "documento",
+        "cel":      "telefono",
+        "bicho":    "",
+        "causa":    "",
+        "nota de venta": "comprobante",
+        "liquidacion de compras": "compra"
+      }
+    },
+    "BO": {
+      "label": "Bolivia",
+      "typo_rules": [],
+      "synonyms": {
+        "nit":      "documento",
+        "ci":       "documento",
+        "cel":      "telefono",
+        "factura":  "factura",
+        "recibo":   "comprobante"
+      }
+    },
+    "UY": {
+      "label": "Uruguay",
+      "typo_rules": [],
+      "synonyms": {
+        "rut":      "documento",
+        "ci":       "documento",
+        "cel":      "telefono",
+        "boleta":   "comprobante",
+        "remito":   "remision",
+        "guri":     ""
+      }
+    },
+    "GT": {
+      "label": "Guatemala",
+      "typo_rules": [],
+      "synonyms": {
+        "nit":      "documento",
+        "dpi":      "documento",
+        "cel":      "telefono",
+        "factura":  "factura"
+      }
+    },
+    "PA": {
+      "label": "Panamá",
+      "typo_rules": [],
+      "synonyms": {
+        "ruc":      "documento",
+        "cedula":   "documento",
+        "cel":      "telefono",
+        "factura":  "factura"
+      }
+    },
+    "DO": {
+      "label": "República Dominicana",
+      "typo_rules": [],
+      "synonyms": {
+        "rnc":      "documento",
+        "cedula":   "documento",
+        "cel":      "telefono",
+        "comprobante fiscal": "factura"
+      }
+    }
+  },
+
+  "fiscal_equivalents": {
+    "_comment": "Normaliza el nombre local de la autoridad/sistema fiscal al canónico 'autoridad_fiscal'. Permite que el mismo intent funcione en cualquier país.",
+    "CO": { "dian":   "autoridad_fiscal", "rut co":   "registro_fiscal", "muisca": "sistema_fiscal" },
+    "MX": { "sat":    "autoridad_fiscal", "cfdi":     "factura_electronica", "comprobante fiscal digital": "factura_electronica" },
+    "AR": { "afip":   "autoridad_fiscal", "arca":     "autoridad_fiscal", "cae":    "validacion_fiscal" },
+    "PE": { "sunat":  "autoridad_fiscal", "cpe":      "factura_electronica", "sire":   "sistema_fiscal" },
+    "CL": { "sii":    "autoridad_fiscal", "folios":   "timbres_fiscales",  "dte":    "factura_electronica" },
+    "VE": { "seniat": "autoridad_fiscal" },
+    "EC": { "sri":    "autoridad_fiscal", "ride":     "factura_electronica" },
+    "BO": { "sin":    "autoridad_fiscal", "nota fiscal":"factura" },
+    "UY": { "dgi":    "autoridad_fiscal" },
+    "GT": { "sat gt": "autoridad_fiscal", "fel":      "factura_electronica" },
+    "PA": { "dgi pa": "autoridad_fiscal" },
+    "DO": { "dgii":   "autoridad_fiscal", "ecf":      "factura_electronica" }
+  },
+
+  "sectors": {
+    "_comment": "Vocabulario sectorial universal. Aplica en cualquier país. 'synonyms' normaliza términos del sector al vocabulario canónico de SUKI.",
+
+    "commerce": {
+      "label": "Comercio y Retail",
+      "synonyms": {
+        "bodega":        "almacen",
+        "anaquel":       "estante",
+        "gondola":       "estante",
+        "percha":        "estante",
+        "sku":           "codigo_producto",
+        "referencia":    "codigo_producto",
+        "merma":         "perdida_inventario",
+        "averia":        "producto_danado",
+        "surtido":       "abastecimiento",
+        "surtir":        "reabastecer",
+        "reposicion":    "reabastecimiento",
+        "vitrina":       "exhibicion",
+        "exhibidor":     "exhibicion",
+        "rotura":        "faltante",
+        "agotado":       "sin_stock",
+        "desabasto":     "sin_stock",
+        "cashier":       "cajero",
+        "pos":           "punto_de_venta"
+      }
+    },
+
+    "health": {
+      "label": "Salud y Medicina",
+      "synonyms": {
+        "consultorio":   "establecimiento",
+        "eps":           "aseguradora",
+        "ips":           "prestador_salud",
+        "ars":           "aseguradora",
+        "isapre":        "aseguradora",
+        "historia clinica": "expediente_medico",
+        "hoja de vida":  "expediente_medico",
+        "cita":          "cita_medica",
+        "turno":         "cita_medica",
+        "agenda":        "calendario_citas",
+        "honorario medico": "honorario",
+        "copago":        "pago_parcial",
+        "cuota moderadora":"pago_parcial",
+        "medicamento":   "producto",
+        "farmaco":       "producto",
+        "receta":        "prescripcion",
+        "formula medica":"prescripcion",
+        "insumo medico": "suministro",
+        "paciente":      "cliente",
+        "medico":        "profesional",
+        "doctor":        "profesional",
+        "enfermera":     "profesional",
+        "nutricionista": "profesional",
+        "fonoaudiologo": "profesional"
+      }
+    },
+
+    "production": {
+      "label": "Manufactura y Producción",
+      "synonyms": {
+        "planta":        "establecimiento",
+        "maquila":       "produccion_externa",
+        "maquiladora":   "produccion_externa",
+        "turno":         "jornada_produccion",
+        "operario":      "empleado",
+        "obrero":        "empleado",
+        "tecnico":       "empleado",
+        "materia prima": "insumo",
+        "insumo":        "insumo",
+        "semielaborado":  "producto_en_proceso",
+        "wip":           "producto_en_proceso",
+        "producto terminado": "producto",
+        "merma":         "perdida_produccion",
+        "scrap":         "residuo",
+        "orden de produccion": "orden_de_trabajo",
+        "op":            "orden_de_trabajo",
+        "ot":            "orden_de_trabajo",
+        "bom":           "lista_de_materiales",
+        "lista de materiales": "lista_de_materiales",
+        "calidad":       "control_calidad",
+        "no conformidad":"defecto",
+        "rechazo":       "defecto"
+      }
+    },
+
+    "services": {
+      "label": "Servicios Profesionales",
+      "synonyms": {
+        "honorario":     "ingreso_servicio",
+        "fee":           "ingreso_servicio",
+        "retainer":      "anticipo",
+        "anticipo":      "anticipo",
+        "orden de servicio": "orden_de_trabajo",
+        "os":            "orden_de_trabajo",
+        "ticket":        "orden_de_trabajo",
+        "caso":          "orden_de_trabajo",
+        "despacho":      "entrega",
+        "visita":        "visita_tecnica",
+        "instalacion":   "servicio",
+        "mantenimiento": "servicio",
+        "garantia":      "servicio_garantia",
+        "soporte":       "servicio",
+        "incidencia":    "problema_reportado",
+        "reclamo":       "queja",
+        "peticion":      "solicitud",
+        "solicitud":     "solicitud",
+        "contrato de servicios": "contrato"
+      }
+    },
+
+    "legal": {
+      "label": "Servicios Jurídicos y Notariales",
+      "synonyms": {
+        "expediente":    "caso",
+        "causa":         "caso",
+        "proceso":       "caso",
+        "poder notarial":"documento_legal",
+        "mandato":       "documento_legal",
+        "escritura":     "documento_legal",
+        "protocolizacion":"registro_notarial",
+        "arancel notarial":"honorario",
+        "cliente":       "cliente",
+        "litigante":     "cliente",
+        "demandante":    "cliente",
+        "juzgado":       "entidad_judicial",
+        "tribunal":      "entidad_judicial",
+        "auto":          "resolucion_judicial",
+        "sentencia":     "resolucion_judicial",
+        "recurso":       "apelacion"
+      }
+    },
+
+    "education": {
+      "label": "Educación",
+      "synonyms": {
+        "matricula":     "inscripcion",
+        "pension":       "cuota",
+        "mensualidad":   "cuota",
+        "colegiatura":   "cuota",
+        "alumno":        "cliente",
+        "estudiante":    "cliente",
+        "acudiente":     "representante",
+        "tutor":         "representante",
+        "docente":       "profesional",
+        "profesor":      "profesional",
+        "clase":         "servicio",
+        "curso":         "producto",
+        "beca":          "descuento",
+        "certificado":   "documento",
+        "diploma":       "documento"
+      }
+    },
+
+    "hospitality": {
+      "label": "Hoteles y Restaurantes",
+      "synonyms": {
+        "habitacion":    "producto",
+        "cuarto":        "producto",
+        "suite":         "producto",
+        "mesa":          "mesa_servicio",
+        "comanda":       "orden",
+        "comensales":    "personas",
+        "cubiertos":     "servicios",
+        "cover":         "cargo_servicio",
+        "propina":       "propina",
+        "servicio al cuarto": "servicio_habitacion",
+        "room service":  "servicio_habitacion",
+        "check in":      "registro_entrada",
+        "check out":     "registro_salida",
+        "reserva":       "reservacion",
+        "huesped":       "cliente",
+        "folio":         "cuenta",
+        "cargo":         "cargo"
       }
     }
   }
