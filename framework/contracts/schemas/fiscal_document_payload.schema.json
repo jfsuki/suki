@@ -67,7 +67,8 @@
       "properties": {
         "subtotal": { "type": ["number", "null"], "minimum": 0 },
         "tax_total": { "type": ["number", "null"], "minimum": 0 },
-        "total": { "type": ["number", "null"], "minimum": 0 }
+        "total": { "type": ["number", "null"], "minimum": 0 },
+        "withholding_breakdown": { "type": ["object", "null"], "additionalProperties": true }
       }
     },
     "lines": {

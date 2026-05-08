@@ -1564,9 +1564,11 @@ final class FiscalEngineService
                 'source_entity_id' => (string) ($document['source_entity_id'] ?? ''),
             ],
             'summary' => [
-                'subtotal' => $this->nullableMoney($document['subtotal'] ?? null),
-                'tax_total' => $this->nullableMoney($document['tax_total'] ?? null),
-                'total' => $this->nullableMoney($document['total'] ?? null),
+                'subtotal'             => $this->nullableMoney($document['subtotal'] ?? null),
+                'tax_total'            => $this->nullableMoney($document['tax_total'] ?? null),
+                'total'                => $this->nullableMoney($document['total'] ?? null),
+                'withholding_breakdown' => is_array($metadata['withholding_breakdown'] ?? null)
+                    ? (array) $metadata['withholding_breakdown'] : null,
             ],
             'lines' => $lines,
             'references' => $this->buildPayloadReferences($document, $appId),

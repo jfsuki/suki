@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Core;
 
 use RuntimeException;
+use App\Core\DocumentType;
 
 /**
  * AlanubePayloadBuilderCO
@@ -21,20 +22,41 @@ use RuntimeException;
  */
 final class AlanubePayloadBuilderCO
 {
-    /** @var array<string,int> */
+    /**
+     * Mapa retención → withholding_tax_id catálogo Alanube API v1 (CO).
+     * Actualizar si Alanube publica nueva versión del catálogo.
+     */
+    private const WITHHOLDING_TAX_MAP = [
+        'rete_fuente' => 3,  // Retención en la Fuente
+        'rete_ica'    => 4,  // Retención ICA
+        'rete_iva'    => 1,  // Retención IVA
+    ];
+
+    /** @var array<string,int> Mapa tipo-documento interno → catalog ID Alanube API v1 */
     private const DOCUMENT_TYPE_MAP = [
-        'sales_invoice' => 1,
-        'pos_ticket_fiscal_hook' => 1,
-        'credit_note' => 4,
-        'debit_note' => 5,
+        DocumentType::SALES_INVOICE     => 1, // Alanube API v1 catalog — actualizar si cambia versión de API
+        DocumentType::POS_TICKET_FISCAL => 1, // Alanube API v1 catalog — actualizar si cambia versión de API
+        DocumentType::CREDIT_NOTE       => 4, // Alanube API v1 catalog — actualizar si cambia versión de API
+        DocumentType::DEBIT_NOTE        => 5, // Alanube API v1 catalog — actualizar si cambia versión de API
         // export -> 6 (no mapeado en internal types: se deja manual)
     ];
 
-    private const DEFAULT_TAX_ID_IVA = 1;
-    private const DEFAULT_TAX_ID_IC = 2;
-    private const DEFAULT_TYPE_ITEM_IDENTIFICATION = 4; // referencia interna
+    public const PROVIDER_NAME = 'Alanube';
+
+    /** @var array<string,string> Mapa eventos webhook Alanube → status fiscal interno */
+    public const EVENT_MAP = [
+        'accepted'          => 'accepted',
+        'document.accepted' => 'accepted',
+        'rejected'          => 'rejected',
+        'document.rejected' => 'rejected',
+    ];
+
+    private const DEFAULT_TAX_ID_IVA  = 1;  // Alanube API v1 catalog — actualizar si cambia versión de API
+    private const DEFAULT_TAX_ID_IC   = 2;  // Alanube API v1 catalog — actualizar si cambia versión de API
+    private const DEFAULT_TYPE_ITEM_IDENTIFICATION = 4; // referencia interna — Alanube API v1 catalog
     private const DEFAULT_PAYMENT_METHOD_CODE = '10';   // efectivo
     private const DEFAULT_CURRENCY = 'COP';
+    private const FALLBACK_PRODUCT_CODE = 'SIN_CODIGO'; // Alanube acepta este valor para ítems sin SKU
 
     /**
      * @param array<string,mixed> $internalPayload Payload validado por FiscalEngineService::buildDocumentPayload()
@@ -50,7 +72,13 @@ final class AlanubePayloadBuilderCO
         $metadata = is_array($internalPayload['metadata'] ?? null) ? (array) $internalPayload['metadata'] : [];
 
         $documentType = strtolower((string) ($internalPayload['document_type'] ?? ''));
-        $typeDocumentId = self::DOCUMENT_TYPE_MAP[$documentType] ?? 1;
+        if (!isset(self::DOCUMENT_TYPE_MAP[$documentType])) {
+            throw new RuntimeException(
+                "AlanubePayloadBuilderCO: tipo de documento desconocido: '{$documentType}'. "
+                . "Agregar al DOCUMENT_TYPE_MAP con el ID de catálogo Alanube API v1 correspondiente."
+            );
+        }
+        $typeDocumentId = self::DOCUMENT_TYPE_MAP[$documentType];
 
         $issueDate = $this->normalizeDate((string) ($header['issue_date'] ?? ''));
         $dueDate = $this->normalizeDate((string) ($metadata['due_date'] ?? $header['issue_date'] ?? ''));
@@ -68,6 +96,8 @@ final class AlanubePayloadBuilderCO
         $seller = $this->buildSeller($tenantProfile, $warnings);
         $items = $this->buildItems($lines, $warnings);
 
+        $withholdingTotals = $this->buildWithholdingTaxTotals($summary);
+
         $payload = [
             'number' => $documentNumber,
             'issue_date' => $issueDate,
@@ -82,6 +112,10 @@ final class AlanubePayloadBuilderCO
             'items' => $items,
             'legal_monetary_totals' => $this->buildLegalMonetaryTotals($summary, $items),
         ];
+
+        if ($withholdingTotals !== []) {
+            $payload['withholding_tax_totals'] = $withholdingTotals;
+        }
 
         $internalWarnings = is_array($metadata['_warnings'] ?? null) ? (array) $metadata['_warnings'] : [];
         if ($warnings !== [] || $internalWarnings !== []) {
@@ -121,13 +155,19 @@ final class AlanubePayloadBuilderCO
             'issue_date' => $payload['issue_date'],
         ];
 
-        // Discrepancy response por defecto: 2=anulacion
         $metadata = is_array($internalPayload['metadata'] ?? null) ? (array) $internalPayload['metadata'] : [];
         $references = is_array($metadata['references'] ?? null) ? (array) $metadata['references'] : [];
+        if (!isset($references['discrepancy_response_code'])) {
+            throw new RuntimeException(
+                'AlanubePayloadBuilderCO: discrepancy_response_code requerido para notas crédito. '
+                . 'Valores DIAN: 1=devolución, 2=anulación, 3=descuento, 4=ajuste precio. '
+                . 'Pasar en metadata.references.discrepancy_response_code.'
+            );
+        }
         $payload['discrepancy_response'] = [
-            'reference' => $originalAlanubeId,
-            'response_code' => (int) ($references['discrepancy_response_code'] ?? 2),
-            'description' => (string) ($references['reason'] ?? 'Anulacion del documento'),
+            'reference'     => $originalAlanubeId,
+            'response_code' => (int) $references['discrepancy_response_code'],
+            'description'   => (string) ($references['reason'] ?? 'Anulacion del documento'),
         ];
 
         return $payload;
@@ -231,7 +271,10 @@ final class AlanubePayloadBuilderCO
             }
             $qty = (float) ($line['qty'] ?? 1.0);
             if ($qty <= 0) {
-                $qty = 1.0;
+                throw new RuntimeException(
+                    "AlanubePayloadBuilderCO: línea de factura con qty inválido ({$qty}). "
+                    . 'La cantidad debe ser mayor a 0.'
+                );
             }
             $unitAmount = (float) ($line['unit_amount'] ?? 0.0);
             $lineTotal = (float) ($line['line_total'] ?? ($qty * $unitAmount));
@@ -248,15 +291,28 @@ final class AlanubePayloadBuilderCO
                 ? (float) $pricing['line_tax']
                 : round($lineTotal - $lineExtensionAmount, 4);
 
+            $unspscCode = trim((string) ($line['codigo_unspsc'] ?? $line['unspsc_code'] ?? ''));
+            $internalCode = trim((string) ($line['product_id'] ?? $line['sku'] ?? self::FALLBACK_PRODUCT_CODE));
+
             $item = [
                 'line_extension_amount' => round($lineExtensionAmount, 2),
                 'tax_totals' => [],
                 'description' => (string) ($line['description'] ?? 'Producto'),
-                'code' => (string) ($line['product_id'] ?? 'SIN_CODIGO'),
+                'code' => $internalCode,
                 'type_item_identification_id' => self::DEFAULT_TYPE_ITEM_IDENTIFICATION,
                 'price_amount' => round($unitAmount, 2),
                 'base_quantity' => round($qty, 4),
             ];
+
+            if ($unspscCode !== '') {
+                // standardItemIdentification: código UNSPSC requerido por DIAN para FE
+                $item['standard_item_identification'] = [
+                    'identification' => $unspscCode,
+                    'identification_type' => 'UNSPSC',
+                ];
+            } else {
+                $warnings[] = 'line_missing_unspsc_code_product_' . $internalCode;
+            }
 
             if ($taxRate > 0 || $taxAmount > 0) {
                 $item['tax_totals'][] = [
@@ -274,7 +330,7 @@ final class AlanubePayloadBuilderCO
     }
 
     /**
-     * @param array<string,mixed>          $summary
+     * @param array<string,mixed>            $summary
      * @param array<int,array<string,mixed>> $items
      * @return array<string,mixed>
      */
@@ -282,7 +338,7 @@ final class AlanubePayloadBuilderCO
     {
         $subtotal = $this->nullableFloat($summary['subtotal'] ?? null);
         $taxTotal = $this->nullableFloat($summary['tax_total'] ?? null);
-        $total = $this->nullableFloat($summary['total'] ?? null);
+        $total    = $this->nullableFloat($summary['total'] ?? null);
 
         if ($subtotal === null) {
             $subtotal = 0.0;
@@ -302,12 +358,60 @@ final class AlanubePayloadBuilderCO
             $total = $subtotal + $taxTotal;
         }
 
-        return [
+        $wb               = is_array($summary['withholding_breakdown'] ?? null) ? (array) $summary['withholding_breakdown'] : [];
+        $totalWithholding = (float) ($wb['total_withholding'] ?? 0.0);
+        $netPayable       = (float) ($wb['net_payable'] ?? ($wb['net_payable'] !== null ? $wb['net_payable'] : $total - $totalWithholding));
+        if ($netPayable <= 0.0 || $totalWithholding === 0.0) {
+            $netPayable = $total;
+        }
+
+        $result = [
             'line_extension_amount' => round($subtotal, 2),
-            'tax_exclusive_amount' => round($subtotal, 2),
-            'tax_inclusive_amount' => round($total, 2),
-            'payable_amount' => round($total, 2),
+            'tax_exclusive_amount'  => round($subtotal, 2),
+            'tax_inclusive_amount'  => round($total, 2),
+            'payable_amount'        => round($netPayable, 2),
         ];
+
+        if ($totalWithholding > 0.0) {
+            $result['allowance_total_amount'] = round($totalWithholding, 2);
+        }
+
+        return $result;
+    }
+
+    /**
+     * Construye el array withholding_tax_totals para el payload Alanube (Resolución DIAN 0042/2020).
+     *
+     * @param array<string,mixed> $summary
+     * @return array<int,array<string,mixed>>
+     */
+    private function buildWithholdingTaxTotals(array $summary): array
+    {
+        $wb = is_array($summary['withholding_breakdown'] ?? null) ? (array) $summary['withholding_breakdown'] : [];
+        if ($wb === []) {
+            return [];
+        }
+
+        $subtotal = (float) ($summary['subtotal'] ?? 0.0);
+        $taxTotal = (float) ($summary['tax_total'] ?? 0.0);
+        $totals   = [];
+
+        foreach (self::WITHHOLDING_TAX_MAP as $key => $taxId) {
+            $amount = (float) ($wb[$key] ?? 0.0);
+            if ($amount <= 0.0) {
+                continue;
+            }
+            $rate = (float) ($wb[$key . '_rate'] ?? 0.0);
+            $base = ($key === 'rete_iva') ? $taxTotal : $subtotal;
+            $totals[] = [
+                'withholding_tax_id'    => $taxId,
+                'withholding_tax_amount' => round($amount, 2),
+                'percent'               => round($rate * 100, 4),
+                'taxable_amount'        => round($base, 2),
+            ];
+        }
+
+        return $totals;
     }
 
     private function normalizeDate(string $value): string
