@@ -492,7 +492,10 @@
             "keywords": [
                 "listar archivos",
                 "ver adjuntos",
-                "mostrar documentos"
+                "mostrar documentos",
+                "archivos producto",
+                "archivos compra",
+                "entity_id"
             ],
             "execution_mode": "tool",
             "allowed_tools": [
@@ -724,7 +727,8 @@
             "keywords": [
                 "agregar linea pos",
                 "agregar producto al borrador",
-                "sumar item al draft"
+                "sumar item al draft",
+                "draft_id"
             ],
             "execution_mode": "tool",
             "allowed_tools": [
@@ -1964,7 +1968,9 @@
             "keywords": [
                 "registrar metadata documento compra",
                 "actualizar datos factura proveedor",
-                "completar documento purchase"
+                "completar documento purchase",
+                "purchase_document_id",
+                "metadata documento"
             ],
             "execution_mode": "tool",
             "allowed_tools": [
@@ -2938,7 +2944,9 @@
             ],
             "keywords": [
                 "registrar snapshot pedido ecommerce",
-                "pull pedido ecommerce"
+                "pull pedido ecommerce",
+                "snapshot pedido",
+                "store_id"
             ],
             "execution_mode": "tool",
             "allowed_tools": [
@@ -4697,6 +4705,235 @@
             "channel_capabilities": [
                 "chat"
             ]
+        },
+        {
+            "name": "create_app",
+            "description": "Crea una nueva app personalizada para una empresa. Primero hace preguntas al usuario (entrevista) para entender el negocio, luego genera un system prompt personalizado e instala agentes especializados. Soporta combinaciones (ej: veterinaria + contabilidad) vía mixins.",
+            "intent_patterns": [
+                "re:(crea|crear|quiero|necesito).*(app|aplicaci[oó]n|sistema|plataforma)",
+                "re:(app|aplicaci[oó]n|sistema).*(dental|m[eé]dico|colegio|iglesia|veterinar|contab|tienda|empresa|negocio|cl[ií]nica|restaurant|salon|gimnasio|farmacia|logistica|construc|moda|servicio)",
+                "re:(instala|configurar|montar).*(app|sistema|m[oó]dulo)",
+                "re:nueva.*(app|aplicaci[oó]n|empresa|organizaci[oó]n)",
+                "re:(salon de belleza|barberia|restaurante|gimnasio|farmacia|constructora|moda|calzado|logistica).*(app|sistema|digital)"
+            ],
+            "keywords": [
+                "crear app", "nueva app", "crear aplicación", "instalar app",
+                "app dental", "app médica", "app colegio", "app iglesia",
+                "app veterinaria", "app contabilidad", "app tienda", "app clínica",
+                "app restaurante", "app salón", "app gimnasio", "app farmacia",
+                "app construcción", "app moda", "app logística", "app servicios"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": ["AppInstallService", "AppCatalogManager"],
+            "priority": 200,
+            "memory_type": null,
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "sector": {
+                        "type": "string",
+                        "description": "Sector del negocio detectado en la conversación"
+                    },
+                    "app_id": {
+                        "type": "string",
+                        "description": "ID del app_catalog a instalar (opcional — se infiere del sector si no se provee)"
+                    },
+                    "business_name": {
+                        "type": "string",
+                        "description": "Nombre de la empresa o negocio"
+                    },
+                    "requirements": {
+                        "type": "string",
+                        "description": "Requerimientos del negocio capturados en la conversación: especialidades, número de empleados, servicios, necesidades específicas, módulos adicionales que quiere"
+                    },
+                    "mixins": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "Módulos adicionales a combinar: accounting, pos, billing_dian, inventory, crm"
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": ["create", "propose_new_type"],
+                        "description": "Omitir para creación normal. 'propose_new_type' cuando el sector no existe y necesita agregarse al catálogo."
+                    }
+                },
+                "required": []
+            },
+            "channel_capabilities": ["chat", "builder"]
+        },
+        {
+            "name": "propose_app_type",
+            "description": "Agrega un nuevo tipo de app al catálogo en tiempo real. El agente usa esta herramienta cuando el usuario describe un sector que no existe en el catálogo, para expandirlo con la nueva definición.",
+            "intent_patterns": [
+                "re:(agregar|añadir|crear).*(tipo|sector|categor[ií]a).*(app|catálogo|catalogo)",
+                "re:nuevo tipo de (negocio|empresa|sector)"
+            ],
+            "keywords": [
+                "nuevo tipo app", "agregar sector", "añadir al catálogo", "tipo de empresa nuevo"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": ["AppCatalogManager"],
+            "priority": 190,
+            "memory_type": null,
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "id":          {"type": "string", "description": "ID único snake_case para la nueva app"},
+                    "name":        {"type": "string", "description": "Nombre visible de la app"},
+                    "category":    {"type": "string", "description": "Categoría (Salud, Comercio, Educación, etc.)"},
+                    "sector":      {"type": "string", "description": "Sector del negocio en slug"},
+                    "description": {"type": "string", "description": "Descripción breve de para qué sirve la app"},
+                    "enabled_agents": {"type": "array", "items": {"type": "string"}, "description": "Agentes que activa"},
+                    "modules":        {"type": "array", "items": {"type": "string"}, "description": "Módulos que incluye"},
+                    "config_fields":  {"type": "array", "items": {"type": "string"}, "description": "Campos de configuración requeridos"},
+                    "interview_questions": {"type": "array", "items": {"type": "string"}, "description": "Preguntas para entrevistar al usuario antes de crear"}
+                },
+                "required": ["id", "name", "category", "sector", "description", "enabled_agents", "modules", "config_fields"]
+            },
+            "channel_capabilities": ["chat", "builder"]
+        },
+        {
+            "name": "query_app_data",
+            "description": "Consulta y muestra registros de una entidad de app creada por el usuario. Retorna un reporte con datos reales de la tabla, columnas calculadas y un enlace seguro al reporte HTML/PDF.",
+            "intent_patterns": [
+                "re:(ver|mostrar|listar|consultar|buscar).*(registros?|datos?|lista|tabla|pacientes?|clientes?|productos?|servicios?|inventario)",
+                "re:(cu[aá]ntos?|cu[aá]ntas?).*(registros?|pacientes?|clientes?|productos?)",
+                "re:(reporte|informe|resumen).*(app|datos?|registros?)",
+                "re:(dame|muéstrame|enséñame).*(datos?|lista|registros?)"
+            ],
+            "keywords": [
+                "ver registros", "mostrar datos", "listar", "consultar", "ver tabla",
+                "cuántos registros", "dame los datos", "reporte de datos", "ver pacientes",
+                "ver clientes", "ver productos", "ver inventario", "mis datos"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": ["AppDataService"],
+            "priority": 185,
+            "memory_type": null,
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "app_id":  {"type": "string",  "description": "ID de la app creada"},
+                    "entity":  {"type": "string",  "description": "Nombre de la entidad/tabla a consultar (sin prefijo app_...)"},
+                    "format":  {"type": "string",  "enum": ["html", "json", "pdf"], "description": "Formato del reporte (default: html)"},
+                    "limit":   {"type": "integer", "description": "Número máximo de registros (default: 50)"},
+                    "filters": {"type": "object",  "description": "Filtros opcionales campo: valor"}
+                },
+                "required": ["app_id"]
+            },
+            "channel_capabilities": ["chat", "builder"]
+        },
+        {
+            "name": "insert_app_data",
+            "description": "Registra un nuevo dato en una entidad de la app del usuario. Por ejemplo: registrar un nuevo paciente, cliente, producto, servicio u otro registro de negocio.",
+            "intent_patterns": [
+                "re:(registra|agregar|guardar|crear|nuevo|añadir|ingresa).*(paciente|cliente|producto|servicio|registro|dato|empleado|proveedor|venta|cita|reserva|animal|vehiculo)",
+                "re:(nuevo|nueva).*(paciente|cliente|producto|registro|empleado|cita|reserva|caso)",
+                "re:(quiero|necesito).*(registrar|agregar|guardar|añadir|crear).*(un|una|el|la)"
+            ],
+            "keywords": [
+                "registra", "registrar", "nuevo registro", "agregar", "añadir", "guardar",
+                "nuevo paciente", "nueva cita", "nuevo cliente", "nuevo producto",
+                "crear registro", "ingresar dato", "cargar dato"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": ["AppDataService"],
+            "priority": 196,
+            "memory_type": null,
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "app_id":  {"type": "string", "description": "ID de la app"},
+                    "entity":  {"type": "string", "description": "Nombre de la entidad donde insertar"},
+                    "action":  {"type": "string", "enum": ["insert"], "description": "Siempre 'insert'"},
+                    "data":    {"type": "object", "description": "Campos y valores del nuevo registro según el schema de la entidad"}
+                },
+                "required": ["app_id", "entity", "data"]
+            },
+            "channel_capabilities": ["chat", "builder"]
+        },
+        {
+            "name": "update_app_data",
+            "description": "Actualiza un registro existente en una entidad de la app. Modifica los campos indicados de un registro específico por ID.",
+            "intent_patterns": [
+                "re:(actualiza|modifica|cambia|edita|corrige).*(registro|paciente|cliente|producto|dato|informaci[oó]n)",
+                "re:(actualizar|modificar|cambiar|editar).*(el|la|los|las).*(registro|dato|campo|informaci[oó]n)",
+                "re:(id|registro).*(actualiza|cambia|modifica)"
+            ],
+            "keywords": [
+                "actualizar", "modificar", "cambiar dato", "editar registro", "corregir",
+                "actualiza el registro", "cambia el dato", "modifica la información"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": ["AppDataService"],
+            "priority": 194,
+            "memory_type": null,
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "app_id":  {"type": "string",  "description": "ID de la app"},
+                    "entity":  {"type": "string",  "description": "Nombre de la entidad"},
+                    "action":  {"type": "string",  "enum": ["update"], "description": "Siempre 'update'"},
+                    "id":      {"type": "integer", "description": "ID del registro a actualizar"},
+                    "data":    {"type": "object",  "description": "Campos y nuevos valores a actualizar"}
+                },
+                "required": ["app_id", "entity", "id", "data"]
+            },
+            "channel_capabilities": ["chat", "builder"]
+        },
+        {
+            "name": "delete_app_data",
+            "description": "Elimina un registro de una entidad de la app. Operación segura con confirmación implícita del contexto conversacional.",
+            "intent_patterns": [
+                "re:(elimina|borra|quita|remove|borrar|eliminar).*(registro|paciente|cliente|producto|dato|cita|reserva)",
+                "re:(borra|elimina).*(el|la|los|las).*(registro|dato|id)"
+            ],
+            "keywords": [
+                "eliminar", "borrar", "elimina el registro", "borra el dato",
+                "quitar registro", "borrar paciente", "eliminar cliente"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": ["AppDataService"],
+            "priority": 192,
+            "memory_type": null,
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "app_id":  {"type": "string",  "description": "ID de la app"},
+                    "entity":  {"type": "string",  "description": "Nombre de la entidad"},
+                    "action":  {"type": "string",  "enum": ["delete"], "description": "Siempre 'delete'"},
+                    "id":      {"type": "integer", "description": "ID del registro a eliminar"}
+                },
+                "required": ["app_id", "entity", "id"]
+            },
+            "channel_capabilities": ["chat", "builder"]
+        },
+        {
+            "name": "find_app_data",
+            "description": "Busca y muestra un registro específico por su ID en una entidad de la app.",
+            "intent_patterns": [
+                "re:(busca|encuentra|muéstrame|ver).*(el|la|registro|paciente|cliente).*(id|número|#)\\s*\\d+",
+                "re:(id|registro).*(\\d+).*(busca|muéstrame|ver|dame)"
+            ],
+            "keywords": [
+                "buscar por id", "ver registro id", "muéstrame el registro", "busca el id",
+                "ver detalles", "detalle del registro"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": ["AppDataService"],
+            "priority": 188,
+            "memory_type": null,
+            "input_schema": {
+                "type": "object",
+                "properties": {
+                    "app_id":  {"type": "string",  "description": "ID de la app"},
+                    "entity":  {"type": "string",  "description": "Nombre de la entidad"},
+                    "action":  {"type": "string",  "enum": ["find"], "description": "Siempre 'find'"},
+                    "id":      {"type": "integer", "description": "ID del registro a buscar"}
+                },
+                "required": ["app_id", "entity", "id"]
+            },
+            "channel_capabilities": ["chat", "builder"]
         }
     ]
 }

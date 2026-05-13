@@ -240,6 +240,42 @@ final class SkillExecutor
                     $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
                     break;
                 }
+                if ($name === 'create_app' || $name === 'propose_app_type') {
+                    $toolOutcome = $this->executeCreateAppSkill($context, $name);
+                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
+                    $reply = (string) ($toolOutcome['reply'] ?? '');
+                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
+                    $skillResultStatus = $toolOutcome['ok'] ?? false ? 'success' : 'safe_fallback';
+                    $skillFallbackReason = 'none';
+                    $skillFailed = !($toolOutcome['ok'] ?? false);
+                    $routingHintSteps = ['cache', 'rules', 'skills'];
+                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    break;
+                }
+                if ($name === 'query_app_data' || $name === 'app_report' || $name === 'view_app_data') {
+                    $toolOutcome = $this->executeAppReportSkill($context);
+                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
+                    $reply = (string) ($toolOutcome['reply'] ?? '');
+                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
+                    $skillResultStatus = ($toolOutcome['status'] ?? '') === 'success' ? 'success' : 'safe_fallback';
+                    $skillFallbackReason = 'none';
+                    $skillFailed = ($toolOutcome['status'] ?? '') === 'error';
+                    $routingHintSteps = ['cache', 'rules', 'skills'];
+                    $telemetryOverrides = [];
+                    break;
+                }
+                if ($name === 'insert_app_data' || $name === 'update_app_data' || $name === 'delete_app_data' || $name === 'find_app_data') {
+                    $toolOutcome = $this->executeAppCrudSkill($context);
+                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
+                    $reply = (string) ($toolOutcome['reply'] ?? '');
+                    $command = [];
+                    $skillResultStatus = ($toolOutcome['status'] ?? '') === 'success' ? 'success' : 'safe_fallback';
+                    $skillFallbackReason = 'none';
+                    $skillFailed = ($toolOutcome['status'] ?? '') === 'error';
+                    $routingHintSteps = ['cache', 'rules', 'skills'];
+                    $telemetryOverrides = [];
+                    break;
+                }
                 if ($this->isAccountingSkill($name)) {
                     $toolOutcome = $this->executeAccountingSkill($name, $context);
                     $action = (string) ($toolOutcome['action'] ?? 'respond_local');
@@ -621,6 +657,28 @@ final class SkillExecutor
 
         if ((string) ($parsed['kind'] ?? '') === 'command') {
             $cmd = is_array($parsed['command'] ?? null) ? (array) $parsed['command'] : [];
+
+            if ($name === 'pos_finalize_sale') {
+                $qty = (int) ($cmd['args']['quantity'] ?? $context['quantity'] ?? $context['explicit_args']['quantity'] ?? 0);
+                $stock = (int) ($context['available_stock'] ?? $context['explicit_args']['available_stock'] ?? PHP_INT_MAX);
+                $validation = $this->supervisorValidate('STOCK_RESERVED', [
+                    'quantity' => $qty,
+                    'available_stock' => $stock,
+                ]);
+                if (($validation['status'] ?? 'APPROVED') === 'REJECTED') {
+                    return [
+                        'action' => 'ask_user',
+                        'reply' => $validation['message'] ?? 'Venta rechazada: stock insuficiente según el supervisor.',
+                        'command' => [],
+                        'skill_result_status' => 'validation_failed',
+                        'skill_fallback_reason' => 'supervisor_rejected',
+                        'skill_failed' => true,
+                        'routing_hint_steps' => ['cache', 'rules', 'skills'],
+                        'telemetry' => array_merge($telemetry, ['supervisor_trace' => $validation['supervisor_trace'] ?? '']),
+                    ];
+                }
+            }
+
             return [
                 'action' => 'execute_command',
                 'reply' => '',
@@ -1229,6 +1287,46 @@ final class SkillExecutor
             return ['action' => 'respond_local', 'reply' => (string)$reply, 'command' => [], 'skill_result_status' => 'ok', 'skill_fallback_reason' => 'none', 'skill_failed' => false, 'telemetry' => []];
         } catch (\Throwable $e) {
             return ['action' => 'respond_local', 'reply' => 'No pude consultar CRM: ' . $e->getMessage(), 'command' => [], 'skill_result_status' => 'error', 'skill_fallback_reason' => 'exception', 'skill_failed' => true, 'telemetry' => []];
+        }
+    }
+
+    private function executeCreateAppSkill(array $context, string $skillName = 'create_app'): array
+    {
+        try {
+            $args = is_array($context['explicit_args'] ?? null) ? (array) $context['explicit_args'] : [];
+            // propose_app_type routes through CreateAppSkill with action=propose_new_type
+            if ($skillName === 'propose_app_type') {
+                $args['action'] = 'propose_new_type';
+                $args['definition'] = $args;
+            }
+            $skill = new \App\Core\Skills\CreateAppSkill();
+            return $skill->handle($args, $context);
+        } catch (\Throwable $e) {
+            return ['ok' => false, 'action' => 'respond_local', 'reply' => 'No pude crear la app: ' . $e->getMessage(), 'skill_result_status' => 'error', 'skill_fallback_reason' => 'exception', 'skill_failed' => true];
+        }
+    }
+
+    private function executeAppReportSkill(array $context): array
+    {
+        try {
+            $args     = is_array($context['explicit_args'] ?? null) ? (array) $context['explicit_args'] : [];
+            $tenantId = (string) ($context['tenant_id'] ?? '');
+            $skill    = new \App\Core\Skills\AppReportSkill();
+            return $skill->execute($args, $tenantId);
+        } catch (\Throwable $e) {
+            return ['action' => 'respond_local', 'reply' => 'No pude consultar los datos de la app: ' . $e->getMessage(), 'status' => 'error'];
+        }
+    }
+
+    private function executeAppCrudSkill(array $context): array
+    {
+        try {
+            $args     = is_array($context['explicit_args'] ?? null) ? (array) $context['explicit_args'] : [];
+            $tenantId = (string) ($context['tenant_id'] ?? '');
+            $skill    = new \App\Core\Skills\AppCrudSkill();
+            return $skill->execute($args, $tenantId);
+        } catch (\Throwable $e) {
+            return ['action' => 'respond_local', 'reply' => 'No pude completar la operación: ' . $e->getMessage(), 'status' => 'error'];
         }
     }
 }

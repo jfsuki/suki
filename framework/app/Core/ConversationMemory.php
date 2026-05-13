@@ -34,23 +34,40 @@ class ConversationMemory
      * @param string $threadId The unique identifier for the conversation thread.
      * @return array List of message capsules ['role' => ..., 'content' => ...].
      */
-    public function load(string $threadId): array
+    public function load(string $threadId, string $tenantId = ''): array
     {
+        // Extract tenant_id from thread_id (format "tenantId:sessionId") when not provided explicitly
+        $resolvedTenant = $tenantId !== '' ? $tenantId : explode(':', $threadId, 2)[0];
+
         try {
-            $stmt = $this->db->prepare("
-                SELECT role, content 
-                FROM conversation_memory 
-                WHERE thread_id = :thread_id 
-                ORDER BY id ASC 
-                LIMIT :limit
-            ");
-            $stmt->bindValue(':thread_id', $threadId);
-            $stmt->bindValue(':limit', $this->limit, PDO::PARAM_INT);
+            // Use tenant-scoped query when tenant is identifiable; fall back to thread-only for legacy rows
+            if ($resolvedTenant !== '' && $resolvedTenant !== 'default') {
+                $stmt = $this->db->prepare("
+                    SELECT role, content
+                    FROM conversation_memory
+                    WHERE thread_id = :thread_id
+                      AND (tenant_id = :tenant_id OR tenant_id = '')
+                    ORDER BY id ASC
+                    LIMIT :limit
+                ");
+                $stmt->bindValue(':thread_id', $threadId);
+                $stmt->bindValue(':tenant_id', $resolvedTenant);
+                $stmt->bindValue(':limit', $this->limit, PDO::PARAM_INT);
+            } else {
+                $stmt = $this->db->prepare("
+                    SELECT role, content
+                    FROM conversation_memory
+                    WHERE thread_id = :thread_id
+                    ORDER BY id ASC
+                    LIMIT :limit
+                ");
+                $stmt->bindValue(':thread_id', $threadId);
+                $stmt->bindValue(':limit', $this->limit, PDO::PARAM_INT);
+            }
             $stmt->execute();
-            
+
             return $stmt->fetchAll(PDO::FETCH_ASSOC);
         } catch (\PDOException $e) {
-            // Log error but don't break the user flow
             error_log("ConversationMemory::load error: " . $e->getMessage());
             return [];
         }
@@ -96,15 +113,24 @@ class ConversationMemory
     }
 
     /**
-     * Clears all history for a specific thread.
-     * 
-     * @param string $threadId The thread identifier.
+     * Clears all history for a specific thread, scoped to the owning tenant.
+     *
+     * @param string $threadId The thread identifier (format: "tenantId:sessionId").
+     * @param string $tenantId Explicit tenant. When empty, extracted from $threadId.
      */
-    public function clear(string $threadId): void
+    public function clear(string $threadId, string $tenantId = ''): void
     {
+        $resolvedTenant = $tenantId !== '' ? $tenantId : explode(':', $threadId, 2)[0];
         try {
-            $stmt = $this->db->prepare("DELETE FROM conversation_memory WHERE thread_id = :thread_id");
-            $stmt->execute([':thread_id' => $threadId]);
+            if ($resolvedTenant !== '' && $resolvedTenant !== 'default') {
+                $stmt = $this->db->prepare(
+                    "DELETE FROM conversation_memory WHERE thread_id = :thread_id AND tenant_id = :tenant_id"
+                );
+                $stmt->execute([':thread_id' => $threadId, ':tenant_id' => $resolvedTenant]);
+            } else {
+                $stmt = $this->db->prepare("DELETE FROM conversation_memory WHERE thread_id = :thread_id");
+                $stmt->execute([':thread_id' => $threadId]);
+            }
         } catch (\PDOException $e) {
             error_log("ConversationMemory::clear error: " . $e->getMessage());
         }

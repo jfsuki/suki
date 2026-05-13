@@ -122,15 +122,16 @@ class ChatOrchestrator
     private function executeAgentWorkflow(array $workflow, string $text, array $state, MemoryWindow $memory): array
     {
         $results = [];
-        $tenantId = $state['tenant_id'] ?? 'default';
 
         $this->eventBus->emit(['type'=>'WORKFLOW_STARTED', 'payload'=>['wf'=>$workflow['description']]]);
 
         foreach ($workflow['sequence'] as $stepArea) {
             $this->eventBus->emit(['type'=>'AGENT_INVOKED', 'payload'=>['area'=>$stepArea]]);
+            $persona = \App\Core\Agents\Registry\SpecialistPersonas::getPersona($stepArea);
+            $agentOutput = $this->callSpecialistLLM($persona, $text, $state);
             $results[$stepArea] = [
                 'status' => 'SUCCESS',
-                'output' => "Análisis de $stepArea completado positivamente para: $text"
+                'output' => $agentOutput,
             ];
             $this->eventBus->emit(['type'=>'HANDOVER', 'payload'=>['from'=>$stepArea, 'next'=>'Next']]);
         }
@@ -143,6 +144,37 @@ class ChatOrchestrator
             'reply' => $finalResponse,
             'intent' => 'COLLABORATIVE_WORKFLOW'
         ];
+    }
+
+    private function callSpecialistLLM(array $persona, string $userText, array $state): string
+    {
+        if ($this->llmRouter === null) {
+            return $persona['description'] . ': sin acceso LLM configurado.';
+        }
+        try {
+            $llmParams = is_array($persona['llm_params'] ?? null) ? (array) $persona['llm_params'] : [];
+            $capsule = [
+                'policy' => [
+                    'max_output_tokens' => (int) ($llmParams['max_tokens'] ?? 400),
+                    'requires_strict_json' => false,
+                ],
+                'prompt_contract' => [
+                    'SYSTEM' => trim((string) ($persona['prompt_base'] ?? $persona['description'])),
+                    'USER_MESSAGE' => $userText,
+                    'TENANT_CONTEXT' => [
+                        'tenant_id' => $state['tenant_id'] ?? 'default',
+                        'project_id' => $state['project_id'] ?? '',
+                    ],
+                ],
+            ];
+            $result = $this->llmRouter->chat($capsule, [
+                'temperature' => (float) ($llmParams['temperature'] ?? 0.3),
+            ]);
+            $content = (string) ($result['text'] ?? $result['content'] ?? '');
+            return $content !== '' ? $content : $persona['description'];
+        } catch (\Throwable $e) {
+            return $persona['description'] . ' — error: ' . $e->getMessage();
+        }
     }
 
     private function fallbackReply(string $message): array

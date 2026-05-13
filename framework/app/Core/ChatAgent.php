@@ -718,12 +718,40 @@ final class ChatAgent
                     $systemPrompt = $personaPrompt . "\n\n" . $systemPrompt;
                 }
             }
+            // Inject active app-creation interview context into system prompt
+            try {
+                $interviewState = new \App\Core\AppInterviewState();
+                $activeInterview = $interviewState->load($tenantId, $sessionId);
+                if (!empty($activeInterview['developer_instructions'])) {
+                    $systemPrompt .= "\n\n---\n" . $activeInterview['developer_instructions'] . "\n---";
+                } elseif (!empty($activeInterview['app_id'])) {
+                    // Interview is active but instructions not yet saved — inject app memory context
+                    $appMemory = new \App\Core\AppMemoryService();
+                    $devCtx = $appMemory->buildDeveloperContext($tenantId, (string) $activeInterview['app_id']);
+                    if ($devCtx !== '') {
+                        $systemPrompt .= "\n\n---\n" . $devCtx . "\n---";
+                    }
+                }
+            } catch (\Throwable $ignored) {}
+            // Intentar workflow multi-agente antes de LLM directo
+            $orchestratorReply = $this->tryMultiAgentOrchestration($text, $tenantId, $userId, $projectId, $mode);
+            if ($orchestratorReply !== null) {
+                $memory->append($threadId, 'assistant', $orchestratorReply);
+                $this->assistantSaved = true;
+                return $this->attachTestInfo(
+                    $this->reply($orchestratorReply, $channel, $sessionId, $userId),
+                    $testMode, $telemetry,
+                    ['action' => 'multi_agent_workflow', 'resolved_locally' => false, 'llm_called' => true, 'provider_used' => 'orchestrator']
+                );
+            }
             $messages = [['role' => 'system', 'content' => $systemPrompt]];
             foreach ($history as $msg) { $messages[] = ['role' => $msg['role'], 'content' => $msg['content']]; }
             $messages = $this->promptOptimizer()->optimize($messages, $mode, (string) ($telemetry['classification'] ?? ''));
+            $toolDefinitions = $this->loadToolDefinitions();
             $llmResult = $this->llmRouter()->complete($messages, [
                 'mode' => $mode, 'tenant_id' => $tenantId, 'project_id' => $projectId,
                 'session_id' => $sessionId, 'user_id' => $userId, 'policy' => $route->llmRequest()['policy'] ?? [],
+                'tools' => $toolDefinitions !== [] ? $toolDefinitions : null,
             ]);
         } catch (\Throwable $e) {
             $llmFailure = $this->extractLlmFailureDetails($e);
@@ -792,9 +820,15 @@ final class ChatAgent
         $provider    = $llmResult['provider'] ?? 'llm';
         $usage       = $this->normalizeUsage((array) ($llmResult['usage'] ?? []));
         $json        = $llmResult['json'] ?? null;
+        $toolCalls   = is_array($llmResult['tool_calls'] ?? null) ? (array) $llmResult['tool_calls'] : [];
         $responseKind = 'send_to_llm';
         $responseText = '';
-        if (is_array($json)) {
+        if ($toolCalls !== [] && $json === null) {
+            $loopResult   = $this->executeToolCallLoop($toolCalls, $messages, $tenantId, $mode, $sessionId);
+            $responseText = $loopResult['text'];
+            $responseKind = 'tool_execution';
+            $reply        = $this->reply($responseText, $channel, $sessionId, $userId);
+        } elseif (is_array($json)) {
             $reply        = $this->executeLlmJson($json, $channel, $sessionId, $userId, $mode);
             $responseText = (string) (($reply['data']['reply'] ?? $reply['reply'] ?? $reply['message'] ?? ''));
             $responseKind = (isset($json['command']) || (isset($json['actions']) && is_array($json['actions']) && $json['actions'] !== [])) ? 'execute_command' : 'respond_local';
@@ -2751,6 +2785,163 @@ final class ChatAgent
         return new \App\Core\WorkflowExecutor([
             'calculator' => fn(array $in, array $ctx) => $calculator->handle($in, $ctx)
         ]);
+    }
+
+    /**
+     * Intenta resolver el mensaje vía ChatOrchestrator (multi-agente).
+     * Retorna null si no hay workflow coincidente — el llamador continúa con LLM directo.
+     */
+    private function tryMultiAgentOrchestration(string $text, string $tenantId, string $userId, string $projectId, string $mode): ?string
+    {
+        try {
+            $registry   = $this->projectRegistry();
+            $supervisor = new \App\Core\Agents\Orchestrator\MultiAgentSupervisor($registry);
+            $supervisor->forContext($tenantId);
+
+            $classifier = new \App\Core\Agents\IntentClassifier(null, null, $tenantId);
+            $appProcess = new \App\Core\Agents\Processes\AppExecutionProcess($classifier);
+            $intent     = $appProcess->detectIntent($text, $this->llmRouter());
+
+            $workflow = $supervisor->coordinateWorkflow($intent, ['text' => $text]);
+            if (!is_array($workflow) || empty($workflow['sequence'])) {
+                return null;
+            }
+
+            $budgeter  = new \App\Core\Agents\Memory\TokenBudgeter();
+            $cache     = new \App\Core\Agents\Memory\SemanticCache();
+            $eventBus  = new \App\Core\Agents\Orchestrator\InternalEventBus();
+            $builder   = new \App\Core\Agents\Processes\BuilderOnboardingProcess();
+            $orchestrator = new \App\Core\Agents\Orchestrator\ChatOrchestrator(
+                $budgeter, $cache, $builder, $appProcess,
+                $eventBus, $registry, $supervisor,
+                null, null, $this->llmRouter()
+            );
+
+            $result = $orchestrator->handle($tenantId, $userId, $text, $mode, $projectId);
+            $reply  = (string) ($result['reply'] ?? '');
+            return $reply !== '' ? $reply : null;
+        } catch (\Throwable $e) {
+            error_log('[ChatAgent] tryMultiAgentOrchestration error: ' . $e->getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Carga las definiciones de skills del catálogo y las convierte al formato
+     * de tools que espera la API de Claude/LLM.
+     *
+     * @return array<int,array<string,mixed>>
+     */
+    private function loadToolDefinitions(): array
+    {
+        try {
+            $catalogPath = dirname(__DIR__, 3) . '/docs/contracts/skills_catalog.json';
+            if (!file_exists($catalogPath)) {
+                return [];
+            }
+            $raw = file_get_contents($catalogPath);
+            if ($raw === false) {
+                return [];
+            }
+            $contract = json_decode($raw, true);
+            if (!is_array($contract)) {
+                return [];
+            }
+            $registry = new \App\Core\SkillRegistry($contract);
+            $adapter  = new \App\Core\LLM\Adapters\ClaudeToolAdapter();
+            return $adapter->map($registry);
+        } catch (\Throwable $e) {
+            error_log('[ChatAgent] loadToolDefinitions error: ' . $e->getMessage());
+            return [];
+        }
+    }
+
+    /**
+     * Ejecuta el loop tool_use: despacha cada tool_call a SkillExecutor,
+     * inyecta resultados en el historial y re-llama al LLM (máx 3 iteraciones).
+     *
+     * @param array<int,array<string,mixed>> $toolCalls
+     * @param array<int,array<string,mixed>> $messages
+     * @return array{text:string,iterations:int,tools_called:list<string>}
+     */
+    private function executeToolCallLoop(array $toolCalls, array $messages, string $tenantId, string $mode, string $sessionId = ''): array
+    {
+        $executor    = new \App\Core\SkillExecutor();
+        $history     = $messages;
+        $allCalled   = [];
+        $maxIter     = 3;
+        $finalText   = '';
+
+        for ($i = 0; $i < $maxIter; $i++) {
+            foreach ($toolCalls as $call) {
+                $toolName  = (string) ($call['name'] ?? ($call['function']['name'] ?? 'unknown'));
+                $toolInput = is_array($call['input'] ?? null)
+                    ? (array) $call['input']
+                    : (isset($call['function']['arguments'])
+                        ? (json_decode((string) $call['function']['arguments'], true) ?? [])
+                        : []);
+                $allCalled[] = $toolName;
+                try {
+                    $result  = $executor->executeWithExplicitArgs($toolName, $toolInput, [
+                        'tenant_id' => $tenantId,
+                        'session_id' => $sessionId,
+                        'mode'      => $mode,
+                        'source'    => 'tool_loop',
+                    ]);
+
+                    // Persist developer interview context so subsequent turns have it
+                    if (($result['action'] ?? '') === 'interview_mode' && $sessionId !== '') {
+                        try {
+                            $interviewState = new \App\Core\AppInterviewState();
+                            $state = $interviewState->load($tenantId, $sessionId);
+                            if (empty($state)) {
+                                $state = $interviewState->initialize($tenantId, $sessionId, (string) ($result['app_id'] ?? ''));
+                            }
+                            if (!empty($result['developer_instructions'])) {
+                                $state['developer_instructions'] = $result['developer_instructions'];
+                                $interviewState->save($tenantId, $sessionId, $state);
+                            }
+                        } catch (\Throwable $ignored) {}
+                    }
+
+                    $encoded = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+                    $history[] = ['role' => 'user', 'content' => "RESULTADO HERRAMIENTA ({$toolName}): {$encoded}"];
+                } catch (\Throwable $e) {
+                    $history[] = ['role' => 'user', 'content' => "ERROR EN HERRAMIENTA ({$toolName}): " . $e->getMessage()];
+                }
+            }
+
+            // Re-llamar al LLM con los resultados incorporados
+            try {
+                $nextResult = $this->llmRouter()->complete($history, [
+                    'mode'      => $mode,
+                    'tenant_id' => $tenantId,
+                    'tools'     => $this->loadToolDefinitions() ?: null,
+                ]);
+            } catch (\Throwable $e) {
+                $finalText = 'Error al procesar herramientas: ' . $e->getMessage();
+                break;
+            }
+
+            $toolCalls = is_array($nextResult['tool_calls'] ?? null) ? (array) $nextResult['tool_calls'] : [];
+            $finalText = (string) ($nextResult['text'] ?? '');
+
+            if ($toolCalls === []) {
+                break;
+            }
+
+            $history[] = ['role' => 'assistant', 'content' => $finalText !== '' ? $finalText : '(procesando)'];
+        }
+
+        if ($finalText === '') {
+            $finalText = 'Proceso completado.';
+        }
+
+        return [
+            'text'        => $finalText,
+            'iterations'  => $i + 1,
+            'tools_called' => $allCalled,
+        ];
     }
 }
 
