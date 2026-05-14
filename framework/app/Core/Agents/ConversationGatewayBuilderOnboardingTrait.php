@@ -2402,7 +2402,7 @@ trait ConversationGatewayBuilderOnboardingTrait
     {
         $n = $this->normalize($text);
         // Fast-path exact matches (zero-cost, highest confidence)
-        if (in_array($n, ['hola', 'buenos dias', 'buenos', 'buenas', 'quetal', 'que tal', 'holi', 'hey', 'epa', 'epale', 'buena'], true)) {
+        if (in_array($n, ['hola', 'buenos dias', 'buenas tardes', 'buenas noches', 'buenos', 'buenas', 'quetal', 'que tal', 'holi', 'hey', 'epa', 'epale', 'buena'], true)) {
             return true;
         }
         // Semantic fallback via IntentClassifier (Qdrant → LLM → keyword)

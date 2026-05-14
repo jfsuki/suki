@@ -79,6 +79,41 @@ trait ConversationGatewayHandlePipelineTrait
             }
         }
 
+        // Jailbreak / identity guardrail — always local, never reaches LLM
+        $normalizedTrim = trim($normalizedBase);
+        if (preg_match('/\b(actua como|actúa como|eres ahora|olvida todo|forget everything|ignore.*instructions|pretend you are|you are now)\b/ui', $normalizedTrim) === 1
+            || preg_match('/\b(admin override|system prompt|jailbreak|ignore all|bypass.*rules)\b/ui', $raw) === 1) {
+            $reply = 'Soy SUKI y solo opero como SUKI. ¿En qué puedo ayudarte con tu negocio?';
+            $state = $this->updateState($state, $raw, $reply, 'jailbreak_blocked', null, [], null);
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('jailbreak_blocked', true));
+        }
+
+        // Acknowledgements and farewells — always local, never LLM — checked BEFORE isPureGreeting
+        // to avoid the slow intentClassifier semantic check for trivial phrases.
+        $thankYouExact = ['gracias', 'muchas gracias', 'ok gracias', 'genial gracias', 'perfecto gracias', 'gracias suki', 'gracias!'];
+        if (in_array($normalizedTrim, $thankYouExact, true) || preg_match('/^(gracias|thank you)\b/u', $normalizedTrim) === 1) {
+            $reply = 'De nada. ¿En qué más puedo ayudarte?';
+            $state = $this->updateState($state, $raw, $reply, 'acknowledgement', null, [], null);
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('acknowledgement', true));
+        }
+
+        $farewellExact = ['adios', 'chao', 'chau', 'bye', 'goodbye', 'hasta luego', 'hasta pronto', 'nos vemos', 'hasta manana', 'hasta la proxima'];
+        if (in_array($normalizedTrim, $farewellExact, true)) {
+            if ($mode === 'builder') {
+                $this->clearBuilderPendingCommand($state);
+                $state['builder_calc_prompt'] = null;
+                $state['active_task'] = null;
+                $state['missing'] = [];
+                $state['requested_slot'] = null;
+            }
+            $reply = '¡Hasta luego! Si necesitas algo más, no dudes en volver.';
+            $state = $this->updateState($state, $raw, $reply, 'farewell', null, [], null);
+            $this->saveState($tenantId, $userId, $state);
+            return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('farewell', true));
+        }
+
         if ($this->isPureGreeting($normalizedBase) && !$this->isStatusQuestion($normalizedBase)) {
             if ($mode === 'builder') {
                 $this->clearBuilderPendingCommand($state);
@@ -120,7 +155,7 @@ trait ConversationGatewayHandlePipelineTrait
             $state['active_task'] = null;
             $state['missing'] = [];
             $state['requested_slot'] = null;
-            $reply = 'Listo. Cuando quieras seguimos.';
+            $reply = '¡Hasta luego! Si necesitas algo más, no dudes en volver.';
             $state = $this->updateState($state, $raw, $reply, 'farewell', null, [], null);
             $this->saveState($tenantId, $userId, $state);
             return $this->result('respond_local', $reply, null, null, $state, $this->telemetry('farewell', true));
@@ -196,9 +231,13 @@ trait ConversationGatewayHandlePipelineTrait
                 }
             }
 
+            // If fast path is at operation_model step but didn't map the field, fall through to
+            // heuristics — the LLM may understand the intent but failed to extract the value.
+            $fastPathBlocked = ($currentStep === 'operation_model' && !isset($fastPath['mapped_fields']['operation_model']));
+
             // If Agent is confident, take the fast path (only for normal onboarding,
             // and NOT for business_type step which requires unknown-business detection logic).
-            if (!$isUnknownDiscoveryActive && $currentStep !== 'business_type' && ($fastPath['confidence'] ?? 0) >= 0.6) {
+            if (!$isUnknownDiscoveryActive && $currentStep !== 'business_type' && ($fastPath['confidence'] ?? 0) >= 0.6 && !$fastPathBlocked) {
                 if (!empty($fastPath['mapped_fields'])) {
                     foreach ($fastPath['mapped_fields'] as $f => $v) {
                         $profile[$f] = is_array($v) ? $v : (string)$v;
