@@ -1575,6 +1575,273 @@ if ($route === 'report/dynamic') {
     }
 }
 
+// ─── App Creator Reports — token-based masked URL ─────────────────────────────
+// Entry point:   POST/GET api/reports/app  (authenticated users generate a signed token)
+// Short URL:     /r/{token}               (web.config rewrites → api/reports/view?token=…)
+// Download:      /api/reports/download?token={download_token}
+// ──────────────────────────────────────────────────────────────────────────────
+
+// reports/app — generate a signed token and redirect/return it
+if ($route === 'reports/app') {
+    $rAuth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($rAuth)) {
+        http_response_code(401);
+        echo $response->json('error', 'Autenticación requerida.');
+        return;
+    }
+    $appId      = trim((string) ($_GET['app_id']   ?? ($_POST['app_id']   ?? '')));
+    $entityName = trim((string) ($_GET['entity']    ?? ($_POST['entity']   ?? '')));
+    $tenantId   = trim((string) ($_GET['tenant_id'] ?? ($rAuth['tenant_id'] ?? '')));
+    $format     = strtolower(trim((string) ($_GET['format'] ?? 'html')));
+    $limit      = max(1, min(500, (int) ($_GET['limit'] ?? 100)));
+    $filters    = is_array($_GET['filter'] ?? null) ? array_map('strval', (array) $_GET['filter']) : [];
+
+    if ($appId === '' || $tenantId === '') {
+        respondJson($response, 'error', 'app_id y tenant_id son requeridos.', [], 400);
+        return;
+    }
+
+    // JSON API: return data directly (no redirect)
+    if ($format === 'json') {
+        try {
+            $appData    = new \App\Core\AppDataService();
+            if ($entityName === '') {
+                $ents       = $appData->getEntityNames($tenantId, $appId);
+                $entityName = $ents[0]['table'] ?? '';
+            }
+            $columns = $appData->getColumns($tenantId, $appId, $entityName);
+            $rows    = $appData->listRecords($tenantId, $appId, $entityName, $filters, $limit);
+            respondJson($response, 'success', 'Datos', [
+                'app_id'  => $appId,
+                'entity'  => $entityName,
+                'columns' => $columns,
+                'rows'    => $rows,
+                'count'   => count($rows),
+            ]);
+        } catch (\Throwable $e) {
+            respondJson($response, 'error', 'Error al leer datos.', [], 500);
+        }
+        return;
+    }
+
+    // For HTML/PDF: generate a signed token and redirect to reports/view
+    $tokenSvc = new \App\Core\ReportTokenService();
+    $params   = ['app_id' => $appId, 'entity' => $entityName, 'tenant_id' => $tenantId,
+                 'format' => $format, 'limit'  => $limit];
+    if (!empty($filters)) { $params['filters'] = $filters; }
+    $token    = $tokenSvc->generate($params);
+    $base     = rtrim((string) (getenv('SUKI_BASE_URL') ?: ''), '/');
+    $viewUrl  = $base . '/api/reports/view?token=' . urlencode($token);
+
+    header('Location: ' . $viewUrl, true, 302);
+    return;
+}
+
+// reports/view — decode signed token and render report (HTML/PDF)
+// Accessed directly via /api/reports/view?token=…
+// or via short URL /r/{token} → web.config rewrites to this route
+if ($route === 'reports/view') {
+    $token    = trim((string) ($_GET['token'] ?? ''));
+    $tokenSvc = new \App\Core\ReportTokenService();
+    $params   = $token !== '' ? $tokenSvc->decode($token) : null;
+
+    if ($params === null) {
+        http_response_code(403);
+        while (ob_get_level() > 0) { ob_end_clean(); }
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!doctype html><html><head><meta charset="utf-8"><title>Acceso no válido</title></head>'
+           . '<body style="font-family:Arial;text-align:center;padding:60px;color:#374151">'
+           . '<h2 style="color:#dc2626">Enlace no válido o expirado</h2>'
+           . '<p>Solicita un nuevo enlace desde la aplicación.</p></body></html>';
+        return;
+    }
+
+    $appId      = (string) ($params['app_id']    ?? '');
+    $tenantId   = (string) ($params['tenant_id'] ?? '');
+    $entityName = (string) ($params['entity']    ?? '');
+    $format     = strtolower((string) ($params['format'] ?? 'html'));
+    $limit      = max(1, min(500, (int) ($params['limit']  ?? 100)));
+    $filters    = is_array($params['filters'] ?? null) ? (array) $params['filters'] : [];
+
+    if ($appId === '' || $tenantId === '') {
+        http_response_code(400);
+        respondJson($response, 'error', 'Token inválido.', [], 400);
+        return;
+    }
+
+    try {
+        $appData = new \App\Core\AppDataService();
+
+        if ($entityName === '') {
+            $ents       = $appData->getEntityNames($tenantId, $appId);
+            $entityName = $ents[0]['table'] ?? '';
+        }
+        if ($entityName === '') {
+            respondJson($response, 'error', 'App sin entidades.', [], 404);
+            return;
+        }
+
+        $columns     = $appData->getColumns($tenantId, $appId, $entityName);
+        $rows        = $appData->listRecords($tenantId, $appId, $entityName, $filters, $limit);
+        $entityLabel = $entityName;
+        foreach ($appData->getEntityNames($tenantId, $appId) as $e) {
+            if ($e['table'] === $entityName) { $entityLabel = $e['label']; break; }
+        }
+
+        if ($format === 'pdf') {
+            $pdfCols = array_map(fn($c) => ['key' => $c['name'], 'label' => $c['label']], $columns);
+            $pdf     = (new \App\Core\SimplePdf())->renderReport([
+                'title'  => $entityLabel,
+                'fields' => [['label' => 'Generado', 'value' => date('Y-m-d H:i')]],
+                'grid'   => ['columns' => $pdfCols, 'rows' => $rows],
+                'totals' => [['label' => 'Total registros', 'value' => (string) count($rows)]],
+            ]);
+
+            // Persist PDF so user can re-download
+            $storage      = new \App\Core\ReportStorageService();
+            $downloadToken = $storage->save($tenantId, $pdf, 'pdf', [
+                'app_id'  => $appId,
+                'entity'  => $entityName,
+                'label'   => $entityLabel,
+            ]);
+
+            $base        = rtrim((string) (getenv('SUKI_BASE_URL') ?: ''), '/');
+            $downloadUrl = $base . '/api/reports/download?token=' . urlencode($downloadToken);
+
+            while (ob_get_level() > 0) { ob_end_clean(); }
+            header('Content-Type: application/pdf');
+            header('Content-Disposition: attachment; filename="' . preg_replace('/[^a-z0-9_]/', '_', strtolower($entityLabel)) . '.pdf"');
+            header('X-Report-Download-URL: ' . $downloadUrl); // client can store for re-download
+            echo $pdf;
+            return;
+        }
+
+        // HTML report — signed PDF download link embedded
+        $tokenSvc    = new \App\Core\ReportTokenService();
+        $pdfToken    = $tokenSvc->generate(array_merge($params, ['format' => 'pdf']));
+        $base        = rtrim((string) (getenv('SUKI_BASE_URL') ?: ''), '/');
+        $pdfUrl      = $base . '/r/' . $pdfToken;
+
+        $title       = \App\Core\Html::e($entityLabel);
+        $count       = count($rows);
+        $computedCols = array_values(array_filter($columns, fn($c) => $c['computed'] ?? false));
+
+        $html  = "<!doctype html><html><head><meta charset='utf-8'>";
+        $html .= "<meta name='viewport' content='width=device-width,initial-scale=1'>";
+        $html .= "<title>{$title}</title>";
+        $html .= "<script src='https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js'></script>";
+        $html .= "<style>";
+        $html .= "*{box-sizing:border-box}body{font-family:Arial,sans-serif;margin:0;padding:20px;color:#1f2937;background:#f9fafb}";
+        $html .= ".card{background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:16px;margin-bottom:16px}";
+        $html .= "h1{font-size:18px;color:#0891b2;margin:0 0 4px}.meta{font-size:12px;color:#6b7280;margin-bottom:12px}";
+        $html .= ".grid{width:100%;border-collapse:collapse;font-size:12px}";
+        $html .= "th,td{border:1px solid #e5e7eb;padding:6px 8px;text-align:left}";
+        $html .= "th{background:#f0f9ff;color:#0891b2;font-weight:600}";
+        $html .= "td.computed{background:#fefce8;color:#92400e}";
+        $html .= ".btn{display:inline-block;padding:6px 14px;background:#0891b2;color:#fff;border:none;border-radius:4px;cursor:pointer;font-size:12px;text-decoration:none;margin-right:8px}";
+        $html .= ".btn-outline{background:#fff;color:#0891b2;border:1px solid #0891b2}";
+        $html .= ".badge{display:inline-block;background:#fef3c7;color:#92400e;padding:1px 6px;border-radius:3px;font-size:10px;margin-left:4px}";
+        $html .= ".empty{color:#6b7280;font-style:italic}";
+        $html .= "@media print{.noprint{display:none}}";
+        $html .= "</style></head><body>";
+
+        $html .= "<div class='card'>";
+        $html .= "<h1>{$title}</h1>";
+        $html .= "<div class='meta'>{$count} registro(s)";
+        if (!empty($computedCols)) {
+            $html .= " &nbsp;|&nbsp; <span class='badge'>Fórmulas activas</span>";
+        }
+        $html .= "</div>";
+        $html .= "<div class='noprint'>";
+        $html .= "<button class='btn' onclick='window.print()'>Imprimir</button>";
+        $html .= "<a class='btn btn-outline' href='" . htmlspecialchars($pdfUrl) . "'>Descargar PDF</a>";
+        $html .= "</div></div>";
+
+        // Chart — registros por fecha
+        $hasDate = !empty(array_filter($rows, fn($r) => !empty($r['created_at'])));
+        if ($hasDate && $count > 0) {
+            $byDay = [];
+            foreach ($rows as $row) {
+                $day = substr((string) ($row['created_at'] ?? ''), 0, 10);
+                if ($day !== '') { $byDay[$day] = ($byDay[$day] ?? 0) + 1; }
+            }
+            ksort($byDay);
+            $chartLabels = json_encode(array_keys($byDay),   JSON_UNESCAPED_UNICODE);
+            $chartData   = json_encode(array_values($byDay), JSON_UNESCAPED_UNICODE);
+            $html .= "<div class='card noprint'><canvas id='appChart' height='80'></canvas></div>";
+            $html .= "<script>new Chart(document.getElementById('appChart'),{type:'bar',data:{labels:{$chartLabels},";
+            $html .= "datasets:[{label:'Registros',data:{$chartData},backgroundColor:'rgba(8,145,178,0.5)',borderColor:'#0891b2',borderWidth:1}]},";
+            $html .= "options:{responsive:true,plugins:{legend:{display:false},title:{display:true,text:'Registros por Fecha'}}}});</script>";
+        }
+
+        // Data table
+        $html .= "<div class='card'><table class='grid'><thead><tr>";
+        foreach ($columns as $col) {
+            $label = \App\Core\Html::e($col['label']);
+            $badge = ($col['computed'] ?? false) ? "<span class='badge'>calc</span>" : '';
+            $html .= "<th>{$label}{$badge}</th>";
+        }
+        $html .= "</tr></thead><tbody>";
+        if (empty($rows)) {
+            $html .= "<tr><td colspan='" . count($columns) . "' class='empty'>Sin registros para mostrar.</td></tr>";
+        } else {
+            foreach ($rows as $row) {
+                $html .= "<tr>";
+                foreach ($columns as $col) {
+                    $val   = (string) ($row[$col['name']] ?? '');
+                    $class = ($col['computed'] ?? false) ? " class='computed'" : '';
+                    $html .= "<td{$class}>" . \App\Core\Html::e($val) . "</td>";
+                }
+                $html .= "</tr>";
+            }
+        }
+        $html .= "</tbody></table></div></body></html>";
+
+        while (ob_get_level() > 0) { ob_end_clean(); }
+        header('Content-Type: text/html; charset=utf-8');
+        header('X-Content-Type-Options: nosniff');
+        header('X-Frame-Options: SAMEORIGIN');
+        echo $html;
+        return;
+    } catch (\Throwable $e) {
+        http_response_code(500);
+        while (ob_get_level() > 0) { ob_end_clean(); }
+        header('Content-Type: text/html; charset=utf-8');
+        echo '<!doctype html><html><body style="font-family:Arial;padding:40px;color:#374151">'
+           . '<h2 style="color:#dc2626">Error al generar el reporte</h2>'
+           . '<p>Por favor intenta nuevamente o contacta soporte.</p></body></html>';
+        return;
+    }
+}
+
+// reports/download — serve a previously saved report by signed download token
+if ($route === 'reports/download') {
+    $dlToken  = trim((string) ($_GET['token'] ?? ''));
+    if ($dlToken === '') {
+        http_response_code(400);
+        respondJson($response, 'error', 'token requerido.', [], 400);
+        return;
+    }
+    $storage  = new \App\Core\ReportStorageService();
+    $result   = $storage->serveByToken($dlToken);
+    if ($result === null) {
+        http_response_code(404);
+        respondJson($response, 'error', 'Reporte no encontrado o token expirado.', [], 404);
+        return;
+    }
+    [$content, $ext] = $result;
+    while (ob_get_level() > 0) { ob_end_clean(); }
+    if ($ext === 'pdf') {
+        header('Content-Type: application/pdf');
+        header('Content-Disposition: attachment; filename="reporte.pdf"');
+    } else {
+        header('Content-Type: text/html; charset=utf-8');
+    }
+    header('X-Content-Type-Options: nosniff');
+    echo $content;
+    return;
+}
+
 if (str_starts_with($route, 'reports/')) {
     $parts = explode('/', $route);
     $action = $parts[1] ?? 'preview';
@@ -2068,6 +2335,37 @@ if ($route === 'chat/quality') {
             'tenant_id' => $tenantId,
             'project_id' => $projectId,
             'report' => $report,
+        ]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
+if ($route === 'chat/feedback') {
+    $auth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    $tenantId = (string) ($auth['tenant_id'] ?? ($_GET['tenant_id'] ?? ''));
+    $appId = (string) ($_GET['app_id'] ?? 'default');
+
+    try {
+        $feedbackSvc = new \App\Core\AppFeedbackService();
+        $summary = $feedbackSvc->getPendingSummary($tenantId, $appId);
+        $logPath = dirname(__DIR__, 2) . '/project/storage/meta/app_feedback/feedback.jsonl';
+        $items = [];
+        if (file_exists($logPath)) {
+            $lines = file($logPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+            foreach (array_reverse($lines) as $line) {
+                $d = json_decode($line, true);
+                if (is_array($d) && ($tenantId === '' || ($d['tenant_id'] ?? '') === $tenantId)) {
+                    $items[] = $d;
+                    if (count($items) >= 50) break;
+                }
+            }
+        }
+        respondJson($response, 'success', 'Feedback cargado.', [
+            'items'        => $items,
+            'count'        => count($items),
+            'summary_text' => $summary,
         ]);
     } catch (\Throwable $e) {
         respondJson($response, 'error', $e->getMessage(), [], 500);
@@ -3387,6 +3685,29 @@ if ($route === 'integrations/alanube/webhook') {
         if ($externalId) {
             $store->updateDocumentStatus($integrationId, $externalId, $event ?: 'webhook', $payload);
         }
+
+        // Cerrar ciclo DIAN: mapear evento Alanube → status fiscal_documents
+        $mappedStatus = \App\Core\AlanubePayloadBuilderCO::EVENT_MAP[$event] ?? null;
+        if ($externalId !== null && $externalId !== '' && $mappedStatus !== null) {
+            try {
+                $fiscalRepo = new FiscalEngineRepository();
+                $docRow = $fiscalRepo->findByExternalReference($externalId, \App\Core\AlanubePayloadBuilderCO::PROVIDER_NAME);
+                if ($docRow !== null) {
+                    $fiscalService = new FiscalEngineService();
+                    $fiscalService->updateStatus([
+                        'tenant_id'          => $docRow['tenant_id'],
+                        'fiscal_document_id' => $docRow['id'],
+                        'app_id'             => $docRow['app_id'],
+                        'status'             => $mappedStatus,
+                        'reason'             => \App\Core\AlanubePayloadBuilderCO::PROVIDER_NAME . ' webhook: ' . $event,
+                    ]);
+                }
+            } catch (\Throwable $fiscalEx) {
+                // No devolver error — Alanube reintentaría el webhook y generaría duplicados
+                error_log('[SUKI_WEBHOOK] fiscal_documents update failed for ' . $externalId . ': ' . $fiscalEx->getMessage());
+            }
+        }
+
         respondJson($response, 'success', 'Webhook recibido', ['external_id' => $externalId]);
         return;
     } catch (\Throwable $e) {
@@ -6121,6 +6442,101 @@ if ($route === 'command') {
         respondJson($response, 'error', $e->getMessage(), [], 500);
         return;
     }
+}
+
+// ─── Sistema: estado real del pipeline y agentes ──────────────────────────
+if ($route === 'agents/status') {
+    $auth     = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    $tenantId = (string) ($auth['tenant_id'] ?? $_GET['tenant_id'] ?? 'default');
+
+    // Componentes del pipeline — siempre presentes (clases PHP del núcleo)
+    $pipeline = [
+        ['id' => 'intent_router',  'name' => 'IntentRouter',    'type' => 'core',  'status' => 'active'],
+        ['id' => 'semantic_cache', 'name' => 'SemanticCache',   'type' => 'cache', 'status' => 'active'],
+        ['id' => 'command_bus',    'name' => 'CommandBus',      'type' => 'tools', 'status' => 'active'],
+        ['id' => 'llm_router',     'name' => 'LLMRouter',       'type' => 'llm',   'status' => 'active'],
+        ['id' => 'qdrant',         'name' => 'QdrantClassifier','type' => 'rag',
+            'status' => (trim((string) (getenv('QDRANT_URL') ?: getenv('QDRANT_HOST'))) !== '') ? 'active' : 'unconfigured'],
+    ];
+
+    // LLM providers — estado real según variables de entorno
+    $providers = [];
+    foreach (['mistral' => 'MISTRAL_API_KEY', 'openrouter' => 'OPENROUTER_API_KEY', 'deepseek' => 'DEEPSEEK_API_KEY'] as $name => $envKey) {
+        $providers[] = [
+            'name'   => $name,
+            'status' => !empty(trim((string) getenv($envKey))) ? 'configured' : 'unconfigured',
+        ];
+    }
+
+    // Agentes especialistas del tenant en DB
+    $specialists = [];
+    try {
+        $registry    = new ProjectRegistry();
+        $specialists = $registry->getAgentsByTenant($tenantId);
+    } catch (\Throwable $e) { /* no bloquea */ }
+
+    respondJson($response, 'success', 'Estado del sistema', [
+        'pipeline'    => $pipeline,
+        'providers'   => $providers,
+        'specialists' => $specialists,
+    ]);
+    return;
+}
+
+if ($route === 'apps/install') {
+    $auth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($auth)) {
+        respondJson($response, 'error', 'No autenticado', [], 401);
+        return;
+    }
+    $tenantId = (string) ($auth['tenant_id'] ?? 'default');
+    $payload  = requestData();
+    $appId    = trim((string) ($payload['app_id'] ?? ''));
+    if ($appId === '') {
+        respondJson($response, 'error', 'app_id es obligatorio', [], 422);
+        return;
+    }
+    try {
+        $registry = new ProjectRegistry();
+        $service  = new \App\Core\AppInstallService($registry);
+        $result   = $service->seedAgents($tenantId, $appId);
+        respondJson($response, 'success', 'App instalada', $result);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
+if ($route === 'agents/create') {
+    $auth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($auth)) {
+        respondJson($response, 'error', 'No autenticado', [], 401);
+        return;
+    }
+    $tenantId  = (string) ($auth['tenant_id'] ?? 'default');
+    $projectId = (string) ($auth['project_id'] ?? 'default');
+    $payload   = requestData();
+    $role      = trim((string) ($payload['role'] ?? ''));
+    $area      = trim((string) ($payload['area'] ?? ''));
+    $config    = is_array($payload['config'] ?? null) ? $payload['config'] : [];
+    if ($role === '' || $area === '') {
+        respondJson($response, 'error', 'role y area son obligatorios', [], 422);
+        return;
+    }
+    try {
+        $registry = new ProjectRegistry();
+        $agentId  = $registry->createAgent($tenantId, $role, $area, $config, $projectId);
+        respondJson($response, 'success', 'Agente creado', [
+            'agent_id'  => $agentId,
+            'tenant_id' => $tenantId,
+            'role'      => $role,
+            'area'      => $area,
+            'status'    => 'IDLE',
+        ]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
 }
 
 // --------------------------------

@@ -27,9 +27,27 @@ $registry = new ProjectRegistry();
 $metricsRepo = new SqlMetricsRepository();
 $knowledgeRepo = new KnowledgeRegistryRepository();
 
-$tab = $_GET['tab'] ?? 'executive';
+$tab   = $_GET['tab']   ?? 'executive';
 $range = $_GET['range'] ?? 'today';
 $error = '';
+
+// Tenant scope — '' = all companies (Torre universal view)
+$tower_tenant = $_SESSION['tower_tenant_scope'] ?? '';
+
+// Handle scope changes from sidebar
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['scope_tenant'])) {
+    $scopeVal = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $_POST['scope_tenant']);
+    $_SESSION['tower_tenant_scope'] = $scopeVal;
+    $tower_tenant = $scopeVal;
+    header('Location: ?tab=' . urlencode($tab));
+    exit;
+}
+if (isset($_GET['clear_scope'])) {
+    unset($_SESSION['tower_tenant_scope']);
+    $tower_tenant = '';
+    header('Location: ?tab=' . urlencode($tab));
+    exit;
+}
 
 // 2. Actions & Data Aggregation
 $action = $_GET['action'] ?? '';
@@ -141,10 +159,35 @@ try {
         exit;
     }
 
-    // Fetch Agents for Mission Control
-    $activeAgents = $registry->getAgentsByTenant('default'); 
+    // Fetch Agents for Mission Control (respect tenant scope)
+    $activeAgents = $registry->getAgentsByTenant($tower_tenant !== '' ? $tower_tenant : 'default');
 } catch (\Exception $e) {
     $error = "Fallo crítico en telemetría: " . $e->getMessage();
+}
+
+// Cross-tenant overview for Empresas tab
+$tenantStats = [];
+$allTenants  = [];
+try {
+    $pdo = $registry->db();
+    $stmt = $pdo->query("
+        SELECT t.tenant_id,
+               (SELECT COUNT(*) FROM ai_agents    WHERE tenant_id = t.tenant_id) AS agent_count,
+               (SELECT COUNT(*) FROM chat_sessions WHERE tenant_id = t.tenant_id) AS session_count,
+               (SELECT COUNT(*) FROM auth_users   WHERE tenant_id = t.tenant_id) AS user_count
+        FROM (
+            SELECT DISTINCT tenant_id FROM ai_agents    WHERE tenant_id != ''
+            UNION
+            SELECT DISTINCT tenant_id FROM chat_sessions WHERE tenant_id != ''
+            UNION
+            SELECT DISTINCT tenant_id FROM auth_users   WHERE tenant_id != ''
+        ) t
+        ORDER BY t.tenant_id
+    ");
+    $tenantStats = $stmt ? $stmt->fetchAll(\PDO::FETCH_ASSOC) : [];
+    $allTenants  = array_column($tenantStats, 'tenant_id');
+} catch (\Exception $e) {
+    // Non-critical — Empresas tab shows empty state
 }
 
 // Stats
@@ -254,22 +297,37 @@ function safeStr($s): string {
     <aside>
         <div class="brand"><span>Neural Engine</span><h1>SUKI TOWER</h1></div>
         <nav>
+            <a href="?tab=empresas" class="<?= $tab==='empresas'?'active':'' ?>">🏢 Empresas</a>
             <a href="?tab=executive" class="<?= $tab==='executive'?'active':'' ?>">Control Principal</a>
             <a href="?tab=mission" class="<?= $tab==='mission'?'active':'' ?>">🛰️ Misión Control</a>
             <a href="?tab=library" class="<?= $tab==='library'?'active':'' ?>">Biblioteca Conocimiento</a>
             <a href="?tab=catalog" class="<?= $tab==='catalog'?'active':'' ?>">Catálogo Apps</a>
             <a href="?tab=creators" class="<?= $tab==='creators'?'active':'' ?>">Creators Hub</a>
             <a href="?tab=training" class="<?= $tab==='training'?'active':'' ?>">🧠 Entrenamiento AI</a>
-            
-            <div style="margin: 20px 0 10px 10px; font-size: 9px; color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">⚡ Herramientas</div>
-            <?php $__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : ''; ?>
-            <a href="<?= $__base ?>/builder" target="_blank" style="background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.1);">
-                🚀 Ir al Builder
-            </a>
-            <a href="<?= $__base ?>/editor" target="_blank" style="background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.1);">
-                🛠️ Ir al Studio
-            </a>
+            <a href="?tab=feedback" class="<?= $tab==='feedback'?'active':'' ?>">Feedback</a>
         </nav>
+
+        <div style="margin: 20px 0 8px 0; font-size: 9px; color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">🔭 Empresa activa</div>
+        <form method="POST" style="margin-bottom: 4px;">
+            <select name="scope_tenant" onchange="this.form.submit()" style="width:100%; background:var(--surface-light); border:1px solid var(--border); color:#fff; padding:8px 10px; border-radius:10px; font-size:11px; cursor:pointer;">
+                <option value="">— Todas las empresas —</option>
+                <?php foreach ($allTenants as $t): ?>
+                    <option value="<?= htmlspecialchars($t) ?>" <?= ($tower_tenant === $t) ? 'selected' : '' ?>><?= htmlspecialchars($t) ?></option>
+                <?php endforeach; ?>
+            </select>
+        </form>
+        <?php if ($tower_tenant !== ''): ?>
+            <a href="?clear_scope=1&tab=<?= $tab ?>" style="display:block; text-align:center; font-size:10px; color:var(--text-dim); margin-bottom:10px;">✕ Ver todas</a>
+        <?php endif; ?>
+
+        <div style="margin: 15px 0 8px 0; font-size: 9px; color: var(--accent); font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">⚡ Herramientas</div>
+        <?php $__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : ''; ?>
+        <a href="<?= $__base ?>/builder" target="_blank" style="display:flex; align-items:center; padding:10px 14px; border-radius:12px; color:var(--text-dim); text-decoration:none; font-size:13px; font-weight:600; background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.1); margin-bottom:8px;">
+            🚀 Builder
+        </a>
+        <a href="<?= $__base ?>/editor" target="_blank" style="display:flex; align-items:center; padding:10px 14px; border-radius:12px; color:var(--text-dim); text-decoration:none; font-size:13px; font-weight:600; background: rgba(56,189,248,0.05); border: 1px solid rgba(56,189,248,0.1);">
+            🛠️ Studio
+        </a>
         <div style="margin-top:auto; font-family:'JetBrains Mono'; font-size:10px; color:var(--text-dim);">
             <p>v4.1.0-STABLE</p>
             <p>ENCODING: UTF-8 STRIKT</p>
@@ -278,6 +336,100 @@ function safeStr($s): string {
 
     <main>
         <?php if($error): ?><div class="card" style="border-color:var(--danger); color:var(--danger);"><?= $error ?></div><?php endif; ?>
+
+        <!-- TAB: EMPRESAS — Universal Control Panel -->
+        <div id="empresas" class="tab-pane <?= $tab==='empresas'?'active':'' ?>">
+            <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:40px;">
+                <div>
+                    <h2 style="font-size:32px; font-weight:800; margin-bottom:8px;">Control de Empresas</h2>
+                    <p style="color:var(--text-dim); font-size:14px;">Vista universal de todos los tenants activos en SUKI OS.</p>
+                </div>
+                <div class="stat-badge badge-success"><?= count($tenantStats) ?> EMPRESAS ACTIVAS</div>
+            </div>
+
+            <?php if (empty($tenantStats)): ?>
+                <div class="card" style="text-align:center; padding:60px; color:var(--text-dim);">
+                    <div style="font-size:48px; margin-bottom:20px;">🏢</div>
+                    <p style="font-size:16px; font-weight:600; margin-bottom:8px;">Sin empresas registradas</p>
+                    <p style="font-size:13px;">Aún no hay tenants en el sistema. Las empresas aparecen al registrarse en el Marketplace.</p>
+                </div>
+            <?php else: ?>
+                <!-- Resumen rápido -->
+                <div style="display:grid; grid-template-columns: repeat(4, 1fr); gap:20px; margin-bottom:30px;">
+                    <?php
+                        $totAgents   = array_sum(array_column($tenantStats, 'agent_count'));
+                        $totSessions = array_sum(array_column($tenantStats, 'session_count'));
+                        $totUsers    = array_sum(array_column($tenantStats, 'user_count'));
+                    ?>
+                    <div class="card" style="text-align:center; padding:20px; margin-bottom:0;">
+                        <div style="font-size:11px; color:var(--text-dim); font-weight:800; text-transform:uppercase; margin-bottom:8px;">Empresas</div>
+                        <div style="font-size:32px; font-weight:800; color:var(--accent);"><?= count($tenantStats) ?></div>
+                    </div>
+                    <div class="card" style="text-align:center; padding:20px; margin-bottom:0;">
+                        <div style="font-size:11px; color:var(--text-dim); font-weight:800; text-transform:uppercase; margin-bottom:8px;">Agentes IA</div>
+                        <div style="font-size:32px; font-weight:800; color:var(--accent);"><?= $totAgents ?></div>
+                    </div>
+                    <div class="card" style="text-align:center; padding:20px; margin-bottom:0;">
+                        <div style="font-size:11px; color:var(--text-dim); font-weight:800; text-transform:uppercase; margin-bottom:8px;">Sesiones Chat</div>
+                        <div style="font-size:32px; font-weight:800; color:var(--accent);"><?= $totSessions ?></div>
+                    </div>
+                    <div class="card" style="text-align:center; padding:20px; margin-bottom:0;">
+                        <div style="font-size:11px; color:var(--text-dim); font-weight:800; text-transform:uppercase; margin-bottom:8px;">Usuarios</div>
+                        <div style="font-size:32px; font-weight:800; color:var(--accent);"><?= $totUsers ?></div>
+                    </div>
+                </div>
+
+                <!-- Tabla de empresas -->
+                <div class="card" style="padding:0; overflow:hidden;">
+                    <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                        <thead style="background:rgba(0,0,0,0.2);">
+                            <tr style="text-align:left; color:var(--text-dim);">
+                                <th style="padding:18px 20px; border-bottom:1px solid var(--border);">Tenant ID / Empresa</th>
+                                <th style="padding:18px 20px; border-bottom:1px solid var(--border); text-align:center;">Agentes IA</th>
+                                <th style="padding:18px 20px; border-bottom:1px solid var(--border); text-align:center;">Sesiones</th>
+                                <th style="padding:18px 20px; border-bottom:1px solid var(--border); text-align:center;">Usuarios</th>
+                                <th style="padding:18px 20px; border-bottom:1px solid var(--border);">Estado</th>
+                                <th style="padding:18px 20px; border-bottom:1px solid var(--border);">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <?php foreach ($tenantStats as $ts):
+                                $isActive = ((int)$ts['session_count'] > 0 || (int)$ts['user_count'] > 0);
+                            ?>
+                            <tr style="border-bottom:1px solid rgba(255,255,255,0.04); transition:0.2s;" onmouseover="this.style.background='rgba(56,189,248,0.04)'" onmouseout="this.style.background=''">
+                                <td style="padding:16px 20px;">
+                                    <div style="font-weight:800; font-size:14px; color:#fff; margin-bottom:3px;"><?= safeStr($ts['tenant_id']) ?></div>
+                                    <div style="font-family:'JetBrains Mono'; font-size:10px; color:var(--text-dim);">tenant_id</div>
+                                </td>
+                                <td style="padding:16px 20px; text-align:center;">
+                                    <span style="font-size:18px; font-weight:800; color:var(--accent);"><?= (int)$ts['agent_count'] ?></span>
+                                </td>
+                                <td style="padding:16px 20px; text-align:center;">
+                                    <span style="font-size:18px; font-weight:800; color:var(--text-dim);"><?= (int)$ts['session_count'] ?></span>
+                                </td>
+                                <td style="padding:16px 20px; text-align:center;">
+                                    <span style="font-size:18px; font-weight:800; color:var(--text-dim);"><?= (int)$ts['user_count'] ?></span>
+                                </td>
+                                <td style="padding:16px 20px;">
+                                    <span class="stat-badge <?= $isActive ? 'badge-success' : 'badge-gap' ?>">
+                                        <?= $isActive ? '● ACTIVO' : '○ SIN ACTIVIDAD' ?>
+                                    </span>
+                                </td>
+                                <td style="padding:16px 20px;">
+                                    <form method="POST" style="display:inline;">
+                                        <input type="hidden" name="scope_tenant" value="<?= htmlspecialchars($ts['tenant_id']) ?>">
+                                        <button type="submit" style="background:rgba(56,189,248,0.1); border:1px solid rgba(56,189,248,0.3); color:var(--accent); padding:6px 14px; border-radius:8px; cursor:pointer; font-size:11px; font-weight:800; font-family:inherit;">
+                                            Ver detalle →
+                                        </button>
+                                    </form>
+                                </td>
+                            </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                </div>
+            <?php endif; ?>
+        </div>
 
         <!-- TAB 1: EXECUTIVE DASHBOARD -->
         <div id="executive" class="tab-pane <?= $tab==='executive'?'active':'' ?>">
@@ -324,7 +476,11 @@ function safeStr($s): string {
                 </div>
                 <div style="display:flex; gap:10px;">
                     <button onclick="document.getElementById('modalCreateAgent').style.display='flex'" class="btn btn-primary" style="background:var(--accent); color:#000;">+ Crear Especialista</button>
-                    <div class="stat-badge badge-success">SISTEMA NOMINAL</div>
+                    <?php
+                    $missionStatus = !empty($activeAgents) ? 'ACTIVOS: '.count($activeAgents).' AGENTES' : 'SIN AGENTES';
+                    $missionBadge  = !empty($activeAgents) ? 'badge-success' : 'badge-gap';
+                    ?>
+                    <div class="stat-badge <?= $missionBadge ?>"><?= $missionStatus ?></div>
                 </div>
             </div>
 
@@ -371,7 +527,7 @@ function safeStr($s): string {
                     </thead>
                     <tbody>
                         <?php
-                            $entries = $registry->getAgentEvents('default', 20);
+                            $entries = $registry->getAgentEvents($tower_tenant !== '' ? $tower_tenant : 'default', 20);
                             if (empty($entries)):
                         ?>
                             <tr>
@@ -575,7 +731,8 @@ function safeStr($s): string {
                         </p>
                      </div>
                      <div style="text-align:right;">
-                        <span class="stat-badge badge-success">SISTEMA NOMINAL</span>
+                        <?php $ktcOk = !isset($error) || $error === ''; ?>
+                        <span class="stat-badge <?= $ktcOk ? 'badge-success' : 'badge-gap' ?>"><?= $ktcOk ? 'KTC OPERATIVO' : 'KTC ERROR' ?></span>
                         <div style="font-family:'JetBrains Mono'; font-size:10px; margin-top:10px; color:var(--accent);">KTC_PROTOCOL: v1.0_SECURE</div>
                      </div>
                  </div>
@@ -629,17 +786,60 @@ function safeStr($s): string {
                          </tr>
                      </thead>
                      <tbody>
-                        <!-- Aquí se listarían los últimos registros de ingestion_log -->
-                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
-                            <td style="padding:15px;"><?= date('Y-m-d') ?></td>
-                            <td style="padding:15px; font-weight:600;">fiscal_col</td>
-                            <td style="padding:15px;"><span class="stat-badge badge-success">1.0</span></td>
-                            <td style="padding:15px; color:var(--accent);">dian.gov.co</td>
-                            <td style="padding:15px; color:var(--success);">✅ VECTORIZED</td>
+                        <?php
+                        $ingestLog = [];
+                        try {
+                            $stmtLog = $registry->db()->query(
+                                "SELECT * FROM ktc_ingestion_log ORDER BY created_at DESC LIMIT 10"
+                            );
+                            $ingestLog = $stmtLog ? $stmtLog->fetchAll(\PDO::FETCH_ASSOC) : [];
+                        } catch (\Exception $e) { /* tabla aún no creada */ }
+                        if (empty($ingestLog)): ?>
+                        <tr>
+                            <td colspan="5" style="padding:30px; text-align:center; color:var(--text-dim); font-style:italic; font-size:13px;">
+                                Sin aprendizajes registrados. Usa "Inyección de Conocimiento" para entrenar al sistema.
+                            </td>
                         </tr>
+                        <?php else: foreach ($ingestLog as $entry): ?>
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);">
+                            <td style="padding:15px;"><?= safeStr($entry['created_at'] ?? '') ?></td>
+                            <td style="padding:15px; font-weight:600;"><?= safeStr($entry['sector'] ?? '') ?></td>
+                            <td style="padding:15px;"><span class="stat-badge badge-success"><?= safeStr($entry['trust_score'] ?? '') ?></span></td>
+                            <td style="padding:15px; color:var(--accent);"><?= safeStr($entry['source_uri'] ?? '—') ?></td>
+                            <td style="padding:15px; color:var(--success);">✅ <?= safeStr(strtoupper($entry['status'] ?? 'INGESTED')) ?></td>
+                        </tr>
+                        <?php endforeach; endif; ?>
                      </tbody>
                  </table>
              </div>
+        </div>
+
+        <!-- TAB: FEEDBACK v1.0 -->
+        <div id="feedback" class="tab-pane <?= $tab==='feedback'?'active':'' ?>">
+            <div class="section-title">Feedback de Agentes</div>
+            <div class="card" style="margin-bottom:20px;">
+                <p style="font-size:13px; color:var(--text-dim); margin-bottom:16px;">
+                    Gaps e intents no resueltos capturados en tiempo real por los agentes. Se registran cuando el intent queda <code>unknown</code> con score &lt; 0.65 o cuando el usuario expresa frustración.
+                </p>
+                <button onclick="loadFeedback()" style="background:var(--accent); color:#000; border:none; padding:8px 20px; border-radius:8px; font-weight:700; cursor:pointer; font-size:12px;">Cargar feedback</button>
+                <span id="feedback-count" style="font-size:11px; color:var(--text-dim); margin-left:12px;"></span>
+            </div>
+            <div class="card" style="padding:0; overflow:hidden;">
+                <table id="feedback-table" style="width:100%; border-collapse:collapse; font-size:12px;">
+                    <thead>
+                        <tr style="background:rgba(56,189,248,0.08); border-bottom:1px solid var(--border);">
+                            <th style="padding:10px 14px; text-align:left; font-weight:700; color:var(--accent);">Fecha</th>
+                            <th style="padding:10px 14px; text-align:left; font-weight:700; color:var(--accent);">Tenant</th>
+                            <th style="padding:10px 14px; text-align:left; font-weight:700; color:var(--accent);">Tipo</th>
+                            <th style="padding:10px 14px; text-align:left; font-weight:700; color:var(--accent);">Resumen</th>
+                            <th style="padding:10px 14px; text-align:left; font-weight:700; color:var(--accent);">Estado</th>
+                        </tr>
+                    </thead>
+                    <tbody id="feedback-tbody">
+                        <tr><td colspan="5" style="padding:30px; text-align:center; color:var(--text-dim);">Pulsa "Cargar feedback" para ver los items.</td></tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </main>
 
@@ -751,7 +951,7 @@ function safeStr($s): string {
             <button onclick="this.parentElement.parentElement.style.display='none'" style="position:absolute; top:15px; right:15px; background:none; border:none; color:var(--text-dim); cursor:pointer; font-size:20px;">&times;</button>
             <h2 style="margin-bottom:20px;">Instanciar Agente Especialista</h2>
             <form action="?action=create_agent" method="POST">
-                <input type="hidden" name="tenant_id" value="default">
+                <input type="hidden" name="tenant_id" value="<?= htmlspecialchars($tower_tenant ?: 'default') ?>">
                 <div style="margin-bottom:20px;">
                     <label style="display:block; font-size:11px; color:var(--text-dim); margin-bottom:8px; text-transform:uppercase;">Área de Especialidad</label>
                     <select name="area" class="input" style="width:100%;">
@@ -780,7 +980,7 @@ function safeStr($s): string {
             <h2 style="margin-bottom:10px;">Entrenamiento Autónomo</h2>
             <p style="color:var(--text-dim); font-size:12px; margin-bottom:20px;">El agente buscará fuentes académicas y leyes oficiales para auto-instruirse.</p>
             <form id="researchForm" onsubmit="event.preventDefault(); startNeuralResearch();">
-                <input type="hidden" name="tenant_id" value="default">
+                <input type="hidden" name="tenant_id" value="<?= htmlspecialchars($tower_tenant ?: 'default') ?>">
                 <input type="hidden" id="research_agent_id" name="agent_id" value="">
                 <div style="margin-bottom:20px;">
                     <label style="display:block; font-size:11px; color:var(--text-dim); margin-bottom:8px; text-transform:uppercase;">Tema de Investigación</label>
@@ -830,7 +1030,7 @@ function safeStr($s): string {
                 const response = await fetch('?action=research_topic', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: `agent_id=${agentId}&topic=${topic}&tenant_id=default&ajax=1`
+                    body: `agent_id=${agentId}&topic=${encodeURIComponent(topic)}&tenant_id=<?= htmlspecialchars($tower_tenant ?: 'default') ?>&ajax=1`
                 });
 
                 const result = await response.json();
@@ -885,7 +1085,7 @@ function safeStr($s): string {
             document.getElementById('neural-pulse').style.display = 'inline-block';
             const pollId = setInterval(async () => {
                 try {
-                    const res = await fetch('?action=get_live_events&tenant_id=default&limit=10');
+                    const res = await fetch('?action=get_live_events&tenant_id=<?= htmlspecialchars($tower_tenant ?: 'default') ?>&limit=10');
                     const events = await res.json();
                     
                     events.forEach(ev => {
@@ -933,6 +1133,39 @@ function safeStr($s): string {
                 }
             } catch(e) {
                 document.getElementById('trace-response-text').innerText = 'Error en la traza de conocimiento.';
+            }
+        }
+        async function loadFeedback() {
+            const tbody = document.getElementById('feedback-tbody');
+            const countEl = document.getElementById('feedback-count');
+            tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:var(--text-dim);">Cargando...</td></tr>';
+            try {
+                const res = await fetch('api/chat/feedback');
+                const json = await res.json();
+                const items = json.data?.items || [];
+                countEl.textContent = items.length + ' items';
+                if (items.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="padding:30px; text-align:center; color:var(--text-dim);">Sin feedback registrado aun.</td></tr>';
+                    return;
+                }
+                const typeLabels = { missing_skill: 'Skill faltante', bad_response: 'Mala respuesta', missing_field: 'Campo faltante', error: 'Error' };
+                tbody.innerHTML = items.slice(0, 20).map(item => {
+                    const ts = item.created_at || '';
+                    const tenant = item.tenant_id || '-';
+                    const type = typeLabels[item.type] || item.type || '-';
+                    const summary = (item.summary || '').substring(0, 120);
+                    const status = item.status || 'pending';
+                    const statusColor = status === 'applied' ? 'var(--success)' : 'var(--warning)';
+                    return `<tr style="border-bottom:1px solid var(--border);">
+                        <td style="padding:8px 14px; color:var(--text-dim); white-space:nowrap;">${ts}</td>
+                        <td style="padding:8px 14px;">${tenant}</td>
+                        <td style="padding:8px 14px; font-weight:700;">${type}</td>
+                        <td style="padding:8px 14px; color:var(--text-dim);">${summary}</td>
+                        <td style="padding:8px 14px; color:${statusColor}; font-weight:700;">${status}</td>
+                    </tr>`;
+                }).join('');
+            } catch(e) {
+                tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:var(--danger);">Error al cargar feedback: ' + e.message + '</td></tr>';
             }
         }
     </script>

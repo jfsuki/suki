@@ -306,6 +306,35 @@ final class ChatAgent
         $state = $route->state();
         $task = $this->controlTowerRecordRoute($task, $telemetry, (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'));
 
+        // ── Feedback loop: reportGap para intents no resueltos y frustración ──
+        try {
+            $feedbackIntent = (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown');
+            $feedbackScore  = (float)  ($telemetry['retrieval_top_score'] ?? $telemetry['semantic_intent_similarity_score'] ?? 1.0);
+            $feedbackSvc    = new \App\Core\AppFeedbackService();
+            // Condición A: intent unknown/out_of_scope con score bajo
+            if (in_array($feedbackIntent, ['unknown', 'out_of_scope'], true) && $feedbackScore < 0.65) {
+                $feedbackSvc->reportGap(
+                    $tenantId,
+                    $projectId !== '' ? $projectId : 'default',
+                    'missing_skill',
+                    "Intent no resuelto: \"{$text}\" (intent={$feedbackIntent}, score={$feedbackScore})",
+                    ['intent' => $feedbackIntent, 'score' => $feedbackScore, 'session_id' => $sessionId]
+                );
+            }
+            // Condición B: frases de frustración detectadas
+            if (!empty($frustration)) {
+                $feedbackSvc->reportGap(
+                    $tenantId,
+                    $projectId !== '' ? $projectId : 'default',
+                    'bad_response',
+                    "Frustración detectada: \"{$text}\" (intent={$feedbackIntent})",
+                    ['intent' => $feedbackIntent, 'score' => $feedbackScore, 'session_id' => $sessionId]
+                );
+            }
+        } catch (\Throwable $ignored) {
+            // El feedback nunca debe romper la respuesta al usuario
+        }
+
         $securityBlock = $this->enforceExecutableChatSecurity(
             $route,
             $result,
@@ -526,7 +555,7 @@ final class ChatAgent
         $reply = $this->annotateReplyWithTrainingHint($reply, $telemetry, $mode);
         return $this->attachTestInfo($reply, $testMode, $telemetry, [
             'action' => $action, 'resolved_locally' => true, 'llm_called' => false, 'provider_used' => 'none',
-        ]);
+        ], $requestStartedAt);
     }
 
     private function handleCommand(IntentRouteResult $route, string $action, array $telemetry, array $state, array $task, string $tenantId, string $projectId, string $sessionId, string $userId, string $mode, string $channel, string $messageId, string $conversationId, string $text, array $payload, bool $isAuthenticated, string $role, string $authTenantId, bool $testMode, array $frustration, array $result, float $requestStartedAt): array
@@ -578,7 +607,7 @@ final class ChatAgent
             )));
             return $this->attachTestInfo($blockedReply, $testMode, $telemetry, [
                 'action' => 'execute_command', 'resolved_locally' => true, 'llm_called' => false, 'provider_used' => 'none',
-            ]);
+            ], $requestStartedAt);
         }
         try {
             $reply = $this->dispatchCommandPayload($commandPayload, $channel, $sessionId, $userId, $mode);
@@ -665,7 +694,7 @@ final class ChatAgent
         $reply = $this->annotateReplyWithFrustration($reply, $frustration);
         return $this->attachTestInfo($reply, $testMode, $commandTelemetry, [
             'action' => $action, 'resolved_locally' => true, 'llm_called' => false, 'provider_used' => 'none',
-        ]);
+        ], $requestStartedAt);
     }
 
     private function handleLlmRequest(IntentRouteResult $route, string $action, array $telemetry, array $state, array $task, string $tenantId, string $projectId, string $sessionId, string $userId, string $mode, string $channel, string $messageId, string $conversationId, string $text, array $payload, bool $isAuthenticated, string $role, bool $testMode, string $threadId, object $memory, array $result, float $requestStartedAt): array
@@ -696,7 +725,7 @@ final class ChatAgent
                  'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId]
             )));
             try { $this->telemetryService()->recordIntentMetric(['tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId, 'mode' => $mode, 'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'), 'action' => 'respond_local', 'latency_ms' => $this->latencyMs($requestStartedAt), 'status' => 'success']); } catch (\Throwable $ignored) {}
-            return $this->attachTestInfo($semanticReply, $testMode, $telemetry, ['action' => 'respond_local', 'resolved_locally' => true, 'llm_called' => false, 'provider_used' => 'semantic_memory']);
+            return $this->attachTestInfo($semanticReply, $testMode, $telemetry, ['action' => 'respond_local', 'resolved_locally' => true, 'llm_called' => false, 'provider_used' => 'semantic_memory'], $requestStartedAt);
         }
 
         $task = $this->controlTowerMarkRunning($task, ['route_path' => (string) ($telemetry['route_path'] ?? ''), 'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown')]);
@@ -741,7 +770,8 @@ final class ChatAgent
                 return $this->attachTestInfo(
                     $this->reply($orchestratorReply, $channel, $sessionId, $userId),
                     $testMode, $telemetry,
-                    ['action' => 'multi_agent_workflow', 'resolved_locally' => false, 'llm_called' => true, 'provider_used' => 'orchestrator']
+                    ['action' => 'multi_agent_workflow', 'resolved_locally' => false, 'llm_called' => true, 'provider_used' => 'orchestrator'],
+                    $requestStartedAt
                 );
             }
             $messages = [['role' => 'system', 'content' => $systemPrompt]];
@@ -787,7 +817,7 @@ final class ChatAgent
                      'semantic_fallback_used' => true, 'task_id' => (string) ($task['task_id'] ?? ''), 'conversation_id' => $conversationId]
                 )));
                 try { $this->telemetryService()->recordIntentMetric(['tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId, 'mode' => $mode, 'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'), 'action' => 'respond_local', 'latency_ms' => $this->latencyMs($requestStartedAt), 'status' => 'success']); } catch (\Throwable $ignored) {}
-                return $this->attachTestInfo($semanticReply, $testMode, $telemetry, ['action' => 'respond_local', 'resolved_locally' => true, 'llm_called' => true, 'provider_used' => 'semantic_memory', 'llm_provider_attempted' => 'llm', 'llm_error' => $llmFailure['message'], 'provider_errors' => $llmFailure['provider_errors'], 'provider_statuses' => $llmFailure['provider_statuses'], 'semantic_fallback_used' => true]);
+                return $this->attachTestInfo($semanticReply, $testMode, $telemetry, ['action' => 'respond_local', 'resolved_locally' => true, 'llm_called' => true, 'provider_used' => 'semantic_memory', 'llm_provider_attempted' => 'llm', 'llm_error' => $llmFailure['message'], 'provider_errors' => $llmFailure['provider_errors'], 'provider_statuses' => $llmFailure['provider_statuses'], 'semantic_fallback_used' => true], $requestStartedAt);
             }
             $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
                 'llm_called' => true, 'error_flag' => true, 'error_type' => 'llm_unavailable',
@@ -814,7 +844,7 @@ final class ChatAgent
             )));
             try { $this->telemetryService()->recordIntentMetric(['tenant_id' => $tenantId, 'project_id' => $projectId, 'session_id' => $sessionId, 'mode' => $mode, 'intent' => (string) ($telemetry['classification'] ?? $result['intent'] ?? 'unknown'), 'action' => $action, 'latency_ms' => $this->latencyMs($requestStartedAt), 'status' => 'error']); } catch (\Throwable $ignored) {}
             $errorReply = $this->annotateReplyWithControlTower($this->reply($userSafeLlmUnavailableReply, $channel, $sessionId, $userId), $task, $failure['incident']);
-            return $this->attachTestInfo($errorReply, $testMode, $telemetry, ['action' => $action, 'resolved_locally' => true, 'llm_called' => true, 'provider_used' => 'llm', 'llm_provider_attempted' => 'llm', 'llm_error' => $llmFailure['message'], 'provider_errors' => $llmFailure['provider_errors'], 'provider_statuses' => $llmFailure['provider_statuses']]);
+            return $this->attachTestInfo($errorReply, $testMode, $telemetry, ['action' => $action, 'resolved_locally' => true, 'llm_called' => true, 'provider_used' => 'llm', 'llm_provider_attempted' => 'llm', 'llm_error' => $llmFailure['message'], 'provider_errors' => $llmFailure['provider_errors'], 'provider_statuses' => $llmFailure['provider_statuses']], $requestStartedAt);
         }
 
         $provider    = $llmResult['provider'] ?? 'llm';
@@ -887,7 +917,7 @@ final class ChatAgent
         return $this->attachTestInfo($reply, $testMode, $telemetry, [
             'action' => $action, 'resolved_locally' => false, 'llm_called' => true,
             'provider_used' => (string) $provider, 'llm_result' => is_array($llmResult) ? $llmResult : [],
-        ]);
+        ], $requestStartedAt);
     }
 
     private function handleRouteError(string $action, array $telemetry, array $task, string $tenantId, string $projectId, string $sessionId, string $userId, string $mode, string $channel, string $messageId, string $conversationId, string $text, array $payload, bool $isAuthenticated, string $role, array $result, float $requestStartedAt): array
@@ -1418,10 +1448,14 @@ final class ChatAgent
      * @param array<string,mixed> $runtime
      * @return array<string,mixed>
      */
-    private function attachTestInfo(array $reply, bool $testMode, array $telemetry, array $runtime = []): array
+    private function attachTestInfo(array $reply, bool $testMode, array $telemetry, array $runtime = [], float $startedAt = 0.0): array
     {
         if (!$testMode) {
             return $reply;
+        }
+
+        if ($startedAt > 0.0 && !isset($runtime['elapsed_ms'])) {
+            $runtime['elapsed_ms'] = (int) round((microtime(true) - $startedAt) * 1000);
         }
 
         $data = is_array($reply['data'] ?? null) ? (array) $reply['data'] : [];
@@ -1528,6 +1562,7 @@ final class ChatAgent
             'llm_error' => trim((string) ($runtime['llm_error'] ?? '')),
             'provider_errors' => $this->normalizeTestModeProviderMap($providerErrorsRaw),
             'provider_statuses' => $this->normalizeTestModeProviderMap($providerStatusesRaw),
+            'elapsed_ms' => (int) ($runtime['elapsed_ms'] ?? 0),
             'semantic_fallback_used' => (bool) ($runtime['semantic_fallback_used'] ?? false),
             'agents_used' => $this->collectTestModeAgentsUsed(
                 $telemetry,
