@@ -32,6 +32,7 @@ User Chat
 - Tenant isolation mandatory on every query
 - Contracts are source of truth (preserve JSON keys always)
 - Only incremental, backward-compatible changes
+- **App Creator DB law**: tables are created ONCE per app_type (NOT per tenant). StorageModel CANONICAL. Naming: `app_{app_id}__{entity}`. See `docs/technical/APP_CREATOR_DB_ARCHITECTURE.md` and canon §13.
 
 ---
 
@@ -68,7 +69,7 @@ User Chat
 | FORM_STORE solo en localStorage (no DB) | P1 | `FEATURE_MATRIX.md:11` — confirmado. Formularios se pierden si cierra browser |
 | Score Qdrant 0.65 (docs decían 0.72) | P2 | `IntentClassifier.php:24` — desincronización docs vs código |
 | Skills catálogo ≠ clases PHP | P2 | `skills_catalog.json` nombres vs `Skills/*.php` — no coinciden 1:1 |
-| ChatAgent 4652 líneas (Strangler pendiente) | P2 | `ChatAgent.php` — Strangler apenas iniciado vs ConversationGateway ya en 245L |
+| ChatAgent 2958 líneas (Strangler pendiente) | P2 | `ChatAgent.php` — Strangler iniciado, fases 3-6 extraídas. ConversationGateway ya en 245L |
 | Gemini ausente como chat provider | P2 | `LLMRouter.php:169-177` — solo en embeddings, no en chat failover |
 | Semantic memory cold start en deploy nuevo | P3 | Qdrant vacío sin seed en deploy fresco |
 
@@ -76,9 +77,10 @@ User Chat
 
 ## STATUS
 
-✅ **PASS**: 71/71 unit tests, 24/24 chat golden, DB health OK, security hardening complete  
+✅ **PASS**: 121/121 unit tests, DB health OK, security hardening complete, TC01-TC23 integration tests  
 ❌ **FAIL**: `llm_smoke.php` (credentials, not code bug)  
-⚠️ **YELLOW**: Ready for ops but LLM credential blocker prevents training phase
+❌ **ELIMINADO**: `chat_golden.php` — era smoke puro (str_contains sobre respuestas LLM), no medía calidad real  
+⚠️ **YELLOW**: 6 gaps abiertos para producción — ver docs/audit/AUDIT_MAYO2026.md
 
 ---
 
@@ -105,8 +107,11 @@ php framework/scripts/codex_self_check.php --strict
 # Read relevant docs, preserve contracts, no rewrites
 
 # 3. Test locally
-php framework/tests/run.php                    # All unit tests
-ENFORCEMENT_MODE=strict php framework/tests/chat_golden.php  # Chat routes
+php framework/tests/run.php                    # All unit tests (121/121)
+php framework/tests/fase1_tc01_tc04.php        # Chat básico, guardrails
+php framework/tests/fase3_tc09_tc11.php        # POS, Compras, Contabilidad
+php framework/tests/fase4_tc12_tc15.php        # Memoria, multi-agente
+php framework/tests/fase5_7_tc16_tc23.php      # Seguridad, observabilidad, fallos
 php framework/tests/db_health.php              # DB integrity
 
 # 4. Post-check
@@ -125,9 +130,9 @@ git commit -m "feat(module): description. Tests: [pass/fail evidence]"
 
 ```bash
 # Testing
-php framework/tests/run.php                                 # All tests
-ENFORCEMENT_MODE=strict php framework/tests/chat_golden.php  # Strict mode
-php framework/tests/db_health.php                          # DB check
+php framework/tests/run.php                    # All unit tests
+php framework/tests/fase5_7_tc16_tc23.php      # Integration full (TC16-TC23)
+php framework/tests/db_health.php              # DB check
 
 # Database
 php framework/scripts/db_backup.php                        # Backup before changes
@@ -160,7 +165,7 @@ tail -f project/storage/logs/transcripts/history_*.txt     # Conversations
 3. **Alanube XML/UBL** → Completar payload DIAN en `AlanubeIntegrationAdapter` (HTTP client real, payload vacío)
 4. **E2E HTTP tests** → Añadir pruebas HTTP reales sobre POS→Fiscal→Invoice flow
 5. **ReportEngine financiero** → Balance general, P&G, Flujo de efectivo real
-6. **Strangler ChatAgent** → Continuar extracción (hoy 4652 líneas, era objetivo -15%)
+6. **Strangler ChatAgent** → Continuar extracción (hoy 2958 líneas, era 4652 — -36% logrado)
 
 ---
 

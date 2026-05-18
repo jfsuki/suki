@@ -23,9 +23,10 @@ final class AppInstallService
      * Creates ai_agents rows for each enabled_agent declared in the app catalog.
      * Idempotent: skips agents that already exist for the tenant+area combination.
      *
-     * @return array{seeded:int,skipped:int,agents:array<int,string>}
+     * @param array $metadata Optional: system_prompt, requirements, mixins, business_name
+     * @return array{seeded:int,skipped:int,agents_created:array<int,array{area:string,agent_id:string}>}
      */
-    public function seedAgents(string $tenantId, string $appId): array
+    public function seedAgents(string $tenantId, string $appId, array $metadata = []): array
     {
         $catalog = $this->loadCatalog();
         $app = null;
@@ -37,28 +38,53 @@ final class AppInstallService
         }
 
         if ($app === null) {
-            return ['seeded' => 0, 'skipped' => 0, 'agents' => [], 'error' => "App '$appId' no encontrada en catálogo"];
+            return ['seeded' => 0, 'skipped' => 0, 'agents_created' => [], 'error' => "App '$appId' no encontrada en catálogo"];
         }
 
+        // Merge extra agents from composed mixins
         $enabledAgents = is_array($app['enabled_agents'] ?? null) ? (array) $app['enabled_agents'] : [];
+        $composedAgents = is_array($metadata['composed_agents'] ?? null) ? (array) $metadata['composed_agents'] : [];
+        $enabledAgents  = array_unique(array_merge($enabledAgents, $composedAgents));
+
         if (empty($enabledAgents)) {
-            return ['seeded' => 0, 'skipped' => 0, 'agents' => []];
+            return ['seeded' => 0, 'skipped' => 0, 'agents_created' => []];
         }
 
-        $db      = $this->registry->db();
-        $seeded  = 0;
-        $skipped = 0;
-        $created = [];
+        $db           = $this->registry->db();
+        $seeded       = 0;
+        $skipped      = 0;
+        $created      = [];
+        $systemPrompt = (string) ($metadata['system_prompt'] ?? '');
+        $requirements = (string) ($metadata['requirements']  ?? '');
+
+        // Ensure prompt_override column exists (additive, safe on older installs)
+        try {
+            $db->exec("ALTER TABLE ai_agents ADD COLUMN prompt_override TEXT");
+        } catch (\Throwable $ignored) {}
+        try {
+            $db->exec("ALTER TABLE ai_agents ADD COLUMN requirements TEXT");
+        } catch (\Throwable $ignored) {}
+        try {
+            $db->exec("ALTER TABLE ai_agents ADD COLUMN business_name VARCHAR(200)");
+        } catch (\Throwable $ignored) {}
+
+        $businessName = (string) ($metadata['business_name'] ?? '');
 
         foreach ($enabledAgents as $area) {
             $area = (string) $area;
-            // Check if already exists
-            $stmt = $db->prepare(
-                'SELECT COUNT(*) FROM ai_agents WHERE tenant_id = ? AND area = ? AND source = ?'
-            );
+
+            $stmt = $db->prepare('SELECT agent_id FROM ai_agents WHERE tenant_id = ? AND area = ? AND source = ?');
             $stmt->execute([$tenantId, $area, 'catalog']);
-            if ((int) $stmt->fetchColumn() > 0) {
+            $existingId = $stmt->fetchColumn();
+
+            if ($existingId !== false) {
+                // Update prompt on existing agent (safe: no data destruction)
+                if ($systemPrompt !== '') {
+                    $db->prepare('UPDATE ai_agents SET prompt_override = ?, requirements = ?, business_name = ?, app_id = ? WHERE agent_id = ?')
+                       ->execute([$systemPrompt, $requirements, $businessName, $appId, $existingId]);
+                }
                 $skipped++;
+                $created[] = ['area' => $area, 'agent_id' => (string) $existingId, 'status' => 'updated'];
                 continue;
             }
 
@@ -70,16 +96,21 @@ final class AppInstallService
                 $appId
             );
 
-            // Update app_id and source on the newly created agent
             $db->prepare(
-                'UPDATE ai_agents SET app_id = ?, source = ? WHERE agent_id = ?'
-            )->execute([$appId, 'catalog', $agentId]);
+                'UPDATE ai_agents SET app_id = ?, source = ?, prompt_override = ?, requirements = ?, business_name = ? WHERE agent_id = ?'
+            )->execute([$appId, 'catalog', $systemPrompt, $requirements, $businessName, $agentId]);
 
-            $created[] = $area;
+            $created[] = ['area' => $area, 'agent_id' => (string) $agentId, 'status' => 'created'];
             $seeded++;
         }
 
-        return ['seeded' => $seeded, 'skipped' => $skipped, 'agents' => $created];
+        // Seed default accounting roles (idempotent — safe to call on existing tenants)
+        try {
+            $accountingRepo = new AccountingRepository($this->registry->db());
+            $accountingRepo->seedDefaultRolesForTenant($tenantId);
+        } catch (\Throwable $ignored) {}
+
+        return ['seeded' => $seeded, 'skipped' => $skipped, 'agents_created' => $created];
     }
 
     /** @return array<string,mixed> */

@@ -1,4 +1,9 @@
-<?php $__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : ''; ?>
+<?php
+$__base     = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
+$_sTenant   = htmlspecialchars((string) ($_SESSION['tenant_id']  ?? ''), ENT_QUOTES, 'UTF-8');
+$_sUser     = htmlspecialchars((string) ($_SESSION['user_id']    ?? ''), ENT_QUOTES, 'UTF-8');
+$_sProject  = htmlspecialchars((string) ($_SESSION['project_id'] ?? 'default'), ENT_QUOTES, 'UTF-8');
+?>
 <!doctype html>
 <html lang="es">
 <head>
@@ -6,6 +11,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <meta name="description" content="SUKI App — Opera tu negocio por conversación">
   <title>SUKI App · Web App OS</title>
+  <script>
+    window.SUKI_BASE    = '<?= $__base ?>';
+    window.SUKI_TENANT  = '<?= $_sTenant ?>';
+    window.SUKI_USER    = '<?= $_sUser ?>';
+    window.SUKI_PROJECT = '<?= $_sProject ?>';
+  </script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
   <style>
@@ -505,33 +516,11 @@
         </div>
       </div>
 
-      <!-- Agents -->
+      <!-- Agents — cargado dinámicamente desde api/agents/status -->
       <div class="rp-body">
-        <div class="section-label">Agentes activos</div>
-        <div class="agent-row">
-          <div class="agent-status on"></div>
-          <span class="agent-name">ChatOrchestrator</span>
-          <span class="agent-type at-core">core</span>
-        </div>
-        <div class="agent-row">
-          <div class="agent-status on"></div>
-          <span class="agent-name">AppExecutionProcess</span>
-          <span class="agent-type at-tools">tools</span>
-        </div>
-        <div class="agent-row">
-          <div class="agent-status on"></div>
-          <span class="agent-name">SemanticCache</span>
-          <span class="agent-type at-cache">cache</span>
-        </div>
-        <div class="agent-row">
-          <div class="agent-status on"></div>
-          <span class="agent-name">ToolExecutionLoop</span>
-          <span class="agent-type at-tools">heal</span>
-        </div>
-        <div class="agent-row">
-          <div class="agent-status on"></div>
-          <span class="agent-name">TokenBudgeter</span>
-          <span class="agent-type at-guard">guard</span>
+        <div class="section-label">Pipeline del sistema</div>
+        <div id="agentsList" style="min-height:80px;">
+          <div style="font-size:11px;color:var(--text-dim);padding:8px 0;">Cargando...</div>
         </div>
 
         <!-- Test toggle -->
@@ -600,7 +589,7 @@
   window.loadSessions = async () => {
     const sList = document.getElementById('sessionList');
     try {
-        const res = await fetch('api/chat/list');
+        const res = await fetch(SUKI_BASE + '/api/chat/sessions/list');
         if (!res.ok) throw new Error('Network error: ' + res.status);
         
         const json = await res.json();
@@ -617,7 +606,7 @@
           item.className = 'session-item' + (s.session_id === ACTIVE_SESSION_ID ? ' active' : '');
           item.onclick = () => switchSession(s.session_id);
           item.innerHTML = `<div class="dot"></div><div class="session-title text-truncate" style="max-width:140px">${s.title || 'Conversación'}</div>`;
-          list.appendChild(item);
+          sList.appendChild(item);
         });
         
         // Initial history load
@@ -652,12 +641,12 @@
     msgs.innerHTML = '<div style="text-align:center;padding:40px;opacity:.5;font-size:12px">Cargando historial...</div>';
     
     try {
-        const res = await fetch(`api/chat/history?session_id=${sid}`);
+        const res = await fetch(`${SUKI_BASE}/api/chat/history?session_id=${sid}`);
         const json = await res.json();
         msgs.innerHTML = '';
         if (json.data.history) {
             json.data.history.forEach(m => {
-                addMsg(m.dir === 'in' ? 'user' : 'bot', m.msg, m.ts ? new Date(m.ts * 1000).toLocaleTimeString() : '');
+                addMsg(m.direction === 'in' ? 'user' : 'bot', m.message, m.created_at ? new Date(m.created_at).toLocaleTimeString() : '');
             });
         }
     } catch (e) { console.error('Error loading history', e); }
@@ -665,7 +654,7 @@
 
   window.createNewSession = async () => {
     try {
-        const res = await fetch('api/chat/sessions/create');
+        const res = await fetch(SUKI_BASE + '/api/chat/sessions/create');
         const json = await res.json();
         if (json.status === 'success') {
             ACTIVE_SESSION_ID = json.data.session_id;
@@ -678,7 +667,7 @@
 
   window.loadJournal = async () => {
     try {
-        const res = await fetch(`api/chat/journal/get?role=admin`);
+        const res = await fetch(`${SUKI_BASE}/api/chat/journal/get?role=admin`);
         const json = await res.json();
         if (json.status === 'success') {
             const j = json.data.journal;
@@ -700,19 +689,51 @@
     } catch (e) { console.error('Error loading journal', e); }
   };
 
+  // Carga real del panel de pipeline / agentes del tenant
+  async function loadAgentStatus() {
+    const container = document.getElementById('agentsList');
+    if (!container) return;
+    try {
+      const res  = await fetch(SUKI_BASE + '/api/agents/status?tenant_id=' + encodeURIComponent(TENANT_ID || 'default'));
+      const json = await res.json();
+      if (json.status !== 'success') { container.innerHTML = ''; return; }
+
+      const typeClass = { core:'at-core', cache:'at-cache', tools:'at-tools', llm:'at-guard', rag:'at-cache' };
+      let html = '';
+      (json.data.pipeline || []).forEach(c => {
+        const on  = c.status === 'active' ? 'on' : '';
+        const cls = typeClass[c.type] || 'at-core';
+        html += `<div class="agent-row"><div class="agent-status ${on}"></div><span class="agent-name">${c.name}</span><span class="agent-type ${cls}">${c.type}</span></div>`;
+      });
+
+      const specs = json.data.specialists || [];
+      if (specs.length > 0) {
+        html += '<div class="section-label" style="margin-top:10px">Especialistas</div>';
+        specs.forEach(s => {
+          let pname = s.area || 'Especialista';
+          try { const cfg = JSON.parse(s.config_json || '{}'); pname = cfg.persona_name || pname; } catch(e){}
+          html += `<div class="agent-row"><div class="agent-status on"></div><span class="agent-name">${pname}</span><span class="agent-type at-core">${(s.area||'').toLowerCase()}</span></div>`;
+        });
+      }
+
+      container.innerHTML = html || '<div style="font-size:11px;color:var(--text-dim)">Sin agentes</div>';
+    } catch(e) { container.innerHTML = '<div style="font-size:11px;color:var(--text-dim)">No disponible</div>'; }
+  }
+
   // Initial load
   setTimeout(() => {
     loadSessions();
     loadJournal();
+    loadAgentStatus();
   }, 1000);
 
-  const API_URL    = 'api/chat/message';
+  const API_URL    = SUKI_BASE + '/api/chat/message';
   const MODE       = 'app';
-  const TENANT_ID  = _cfg('tenant_id',  'demo');
-  const USER_ID    = _cfg('user_id',    'admin');
-  const PROJECT_ID = _cfg('project_id', 'default');
-
+  // Session values injected from PHP; cookies only as legacy fallback
   function _cfg(k,d){ const m=document.cookie.match(new RegExp('(?:^|;)\\s*'+k+'=([^;]*)'));return m?decodeURIComponent(m[1]):d; }
+  const TENANT_ID  = window.SUKI_TENANT  || _cfg('tenant_id',  '');
+  const USER_ID    = window.SUKI_USER    || _cfg('user_id',    '');
+  const PROJECT_ID = window.SUKI_PROJECT || _cfg('project_id', 'default');
 
   // counters
   let msgCount=0, tokenCount=0, cacheHits=0, latencies=[], recent=[];

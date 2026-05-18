@@ -1,7 +1,12 @@
 <?php
 $current_page = 'chat';
-$__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
+$__base     = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
+$_bTenant   = htmlspecialchars((string) ($_SESSION['tenant_id']  ?? ''), ENT_QUOTES, 'UTF-8');
+$_bUser     = htmlspecialchars((string) ($_SESSION['user_id']    ?? ''), ENT_QUOTES, 'UTF-8');
+$_bProject  = htmlspecialchars((string) ($_SESSION['project_id'] ?? 'default'), ENT_QUOTES, 'UTF-8');
 include __DIR__ . '/includes/header.php';
+// Inject session + base into JS globals (must come after <head> is opened by header.php)
+echo "<script>window.SUKI_BASE='". $__base ."';window.SUKI_TENANT='". $_bTenant ."';window.SUKI_USER='". $_bUser ."';window.SUKI_PROJECT='". $_bProject ."';</script>";
 include __DIR__ . '/includes/navbar.php';
 ?>
 <style>
@@ -536,9 +541,6 @@ include __DIR__ . '/includes/navbar.php';
       <a href="<?= $__base ?>/apps/dashboard" target="_blank" class="action-btn primary">
         <i>📊</i> Ver Dashboard de Reportes
       </a>
-      <button class="action-btn" onclick="openSmtpSettings()">
-        <i>📧</i> Configurar Correo (SMTP)
-      </button>
 
       <div class="section-lbl">Tablas creadas</div>
       <div class="entity-list" id="entityList">
@@ -859,16 +861,16 @@ include __DIR__ . '/includes/navbar.php';
   let latencies  = [];
 
   // Config
-  const API_URL   = 'api/chat/message';
+  const API_URL   = (window.SUKI_BASE || '') + '/api/chat/message';
   const MODE      = 'builder';
-  const TENANT_ID = _cfg('tenant_id', 'demo');
-  const USER_ID   = _cfg('user_id',   'admin');
-  const PROJECT_ID = _cfg('project_id', 'default');
-
   function _cfg(k, def) {
     const m = document.cookie.match(new RegExp('(?:^|;)\\s*' + k + '=([^;]*)'));
     return m ? decodeURIComponent(m[1]) : def;
   }
+  // Session values from PHP; cookies only as legacy fallback
+  const TENANT_ID  = window.SUKI_TENANT  || _cfg('tenant_id',  '');
+  const USER_ID    = window.SUKI_USER    || _cfg('user_id',    '');
+  const PROJECT_ID = window.SUKI_PROJECT || _cfg('project_id', 'default');
 
   // ── Test mode ─────────────────────────────
   function setTestMode(on) {
@@ -1059,7 +1061,7 @@ include __DIR__ . '/includes/navbar.php';
         chatMsgs.innerHTML = '';
         if (json.data.history) {
             json.data.history.forEach(m => {
-                addMsg(m.dir === 'in' ? 'user' : 'bot', m.msg, m.ts ? new Date(m.ts * 1000).toLocaleTimeString() : '');
+                addMsg(m.direction === 'in' ? 'user' : 'bot', m.message, m.created_at ? new Date(m.created_at).toLocaleTimeString() : '');
             });
         }
     } catch (e) { console.error('Error switching session', e); }
@@ -1214,56 +1216,6 @@ include __DIR__ . '/includes/navbar.php';
       input.focus();
     }
   }
-
-  // ── SMTP Modal ──────────────────────────────
-  const smtpModal = document.getElementById('smtpModal');
-  const smtpFields = ['smtp_host', 'smtp_port', 'smtp_user', 'smtp_pass'];
-
-  window.openSmtpSettings = async () => {
-    smtpModal.classList.add('open');
-    try {
-      const res = await fetch('api/config/get');
-      const json = await res.json();
-      if (json.status === 'success') {
-        const d = json.data;
-        smtpFields.forEach(f => document.getElementById(f).value = d[f] || '');
-      }
-    } catch (e) { console.error('Error loading config', e); }
-  };
-
-  window.closeSmtpSettings = () => {
-    smtpModal.classList.remove('open');
-  };
-
-  window.saveSmtpSettings = async () => {
-    const payload = {};
-    smtpFields.forEach(f => payload[f] = document.getElementById(f).value);
-    
-    const btn = document.querySelector('#smtpModal .primary');
-    const oldText = btn.textContent;
-    btn.textContent = 'Guardando...';
-    btn.disabled = true;
-
-    try {
-      const res = await fetch('api/config/save', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const json = await res.json();
-      if (json.status === 'success') {
-        alert('✅ Configuración de correo guardada correctamente.');
-        closeSmtpSettings();
-      } else {
-        alert('❌ Error: ' + (json.message || 'Fallo desconocido'));
-      }
-    } catch (e) {
-      alert('❌ Error de conexión al guardar.');
-    } finally {
-      btn.textContent = oldText;
-      btn.disabled = false;
-    }
-  };
 
   function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
