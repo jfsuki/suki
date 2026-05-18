@@ -77,10 +77,11 @@ User Chat
 
 ## STATUS
 
-✅ **PASS**: 121/121 unit tests, DB health OK, security hardening complete, TC01-TC23 integration tests  
+✅ **PASS**: 121/121 unit tests, DB health OK, security hardening complete, TC01-TC26 integration tests (Fases 1-8)  
+✅ **FASE 8**: TC24-TC26 feedback loop 21/21 PASS — AppFeedbackService wired, auto-promote a Qdrant, Torre tab activo  
 ❌ **FAIL**: `llm_smoke.php` (credentials, not code bug)  
 ❌ **ELIMINADO**: `chat_golden.php` — era smoke puro (str_contains sobre respuestas LLM), no medía calidad real  
-⚠️ **YELLOW**: 6 gaps abiertos para producción — ver docs/audit/AUDIT_MAYO2026.md
+⚠️ **YELLOW**: 6 gaps abiertos para producción — ver docs/troubleshooting/FAILURE_MAP.md
 
 ---
 
