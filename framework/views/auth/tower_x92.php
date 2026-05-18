@@ -833,12 +833,34 @@ function safeStr($s): string {
                             <th style="padding:10px 14px; text-align:left; font-weight:700; color:var(--accent);">Tipo</th>
                             <th style="padding:10px 14px; text-align:left; font-weight:700; color:var(--accent);">Resumen</th>
                             <th style="padding:10px 14px; text-align:left; font-weight:700; color:var(--accent);">Estado</th>
+                            <th style="padding:10px 14px; text-align:left; font-weight:700; color:var(--accent);">Acción</th>
                         </tr>
                     </thead>
                     <tbody id="feedback-tbody">
-                        <tr><td colspan="5" style="padding:30px; text-align:center; color:var(--text-dim);">Pulsa "Cargar feedback" para ver los items.</td></tr>
+                        <tr><td colspan="6" style="padding:30px; text-align:center; color:var(--text-dim);">Pulsa "Cargar feedback" para ver los items.</td></tr>
                     </tbody>
                 </table>
+            </div>
+            <!-- Modal para promover missing_skill manualmente -->
+            <div id="promote-modal" style="display:none; position:fixed; inset:0; background:rgba(0,0,0,0.8); z-index:2000; align-items:center; justify-content:center;">
+                <div class="card" style="width:480px; border:1px solid var(--accent);">
+                    <div class="section-title">Asignar Intent y Promover a Qdrant</div>
+                    <p style="font-size:12px; color:var(--text-dim); margin-bottom:16px;">El agente no pudo clasificar este mensaje. Asigna el intent correcto para que aprenda.</p>
+                    <input type="hidden" id="promote-fb-id">
+                    <div style="margin-bottom:14px;">
+                        <label style="font-size:11px; color:var(--text-dim);">UTTERANCE DEL USUARIO</label>
+                        <input id="promote-utterance" type="text" style="width:100%; background:var(--bg); border:1px solid var(--border); padding:10px; border-radius:8px; color:#fff; margin-top:6px; font-size:12px;">
+                    </div>
+                    <div style="margin-bottom:20px;">
+                        <label style="font-size:11px; color:var(--text-dim);">INTENT CORRECTO (ej: pos_create, create_app, list_records)</label>
+                        <input id="promote-intent" type="text" style="width:100%; background:var(--bg); border:1px solid var(--border); padding:10px; border-radius:8px; color:#fff; margin-top:6px; font-size:12px;" placeholder="pos_create">
+                    </div>
+                    <div style="display:flex; gap:10px;">
+                        <button onclick="submitPromote()" style="flex:1; background:var(--accent); color:#000; border:none; padding:12px; border-radius:8px; font-weight:800; cursor:pointer; font-size:12px;">Promover a Qdrant</button>
+                        <button onclick="document.getElementById('promote-modal').style.display='none'" style="flex:1; background:var(--surface-light); color:#fff; border:none; padding:12px; border-radius:8px; font-weight:800; cursor:pointer; font-size:12px;">Cancelar</button>
+                    </div>
+                    <div id="promote-result" style="margin-top:12px; font-size:12px;"></div>
+                </div>
             </div>
         </div>
     </main>
@@ -1138,34 +1160,79 @@ function safeStr($s): string {
         async function loadFeedback() {
             const tbody = document.getElementById('feedback-tbody');
             const countEl = document.getElementById('feedback-count');
-            tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:var(--text-dim);">Cargando...</td></tr>';
+            tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color:var(--text-dim);">Cargando...</td></tr>';
             try {
                 const res = await fetch('api/chat/feedback');
                 const json = await res.json();
                 const items = json.data?.items || [];
-                countEl.textContent = items.length + ' items';
+                const pending = items.filter(i => i.status === 'pending').length;
+                countEl.textContent = items.length + ' total · ' + pending + ' pendientes';
                 if (items.length === 0) {
-                    tbody.innerHTML = '<tr><td colspan="5" style="padding:30px; text-align:center; color:var(--text-dim);">Sin feedback registrado aun.</td></tr>';
+                    tbody.innerHTML = '<tr><td colspan="6" style="padding:30px; text-align:center; color:var(--text-dim);">Sin feedback registrado aun.</td></tr>';
                     return;
                 }
-                const typeLabels = { missing_skill: 'Skill faltante', bad_response: 'Mala respuesta', missing_field: 'Campo faltante', error: 'Error' };
-                tbody.innerHTML = items.slice(0, 20).map(item => {
-                    const ts = item.created_at || '';
-                    const tenant = item.tenant_id || '-';
+                const typeLabels = { missing_skill: '❓ Skill faltante', bad_response: '😤 Mala respuesta', missing_field: '📋 Campo faltante', error: '❌ Error' };
+                const statusColors = { pending: 'var(--warning)', auto_promoted: 'var(--success)', promoted: 'var(--success)', applied: 'var(--success)' };
+                tbody.innerHTML = items.slice(0, 30).map(item => {
+                    const ts = (item.created_at || '').substring(0, 16);
+                    const tenant = (item.tenant_id || '-').substring(0, 12);
                     const type = typeLabels[item.type] || item.type || '-';
-                    const summary = (item.summary || '').substring(0, 120);
+                    const summary = (item.summary || '').substring(0, 100);
                     const status = item.status || 'pending';
-                    const statusColor = status === 'applied' ? 'var(--success)' : 'var(--warning)';
+                    const statusColor = statusColors[status] || 'var(--text-dim)';
+                    // Solo mostrar botón Promover para missing_skill pendientes
+                    const canPromote = item.type === 'missing_skill' && status === 'pending';
+                    const utteranceRaw = (item.summary || '').replace(/^[^"]*"([^"]*)".*$/, '$1');
+                    const actionCell = canPromote
+                        ? `<button onclick="openPromoteModal('${item.id}','${utteranceRaw.replace(/'/g,"\\'")}\")" style="background:var(--accent); color:#000; border:none; padding:5px 12px; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer;">Promover</button>`
+                        : `<span style="color:var(--text-dim); font-size:11px;">${status === 'auto_promoted' ? '✅ auto' : status === 'promoted' ? '✅ manual' : '—'}</span>`;
                     return `<tr style="border-bottom:1px solid var(--border);">
-                        <td style="padding:8px 14px; color:var(--text-dim); white-space:nowrap;">${ts}</td>
-                        <td style="padding:8px 14px;">${tenant}</td>
-                        <td style="padding:8px 14px; font-weight:700;">${type}</td>
-                        <td style="padding:8px 14px; color:var(--text-dim);">${summary}</td>
-                        <td style="padding:8px 14px; color:${statusColor}; font-weight:700;">${status}</td>
+                        <td style="padding:8px 14px; color:var(--text-dim); white-space:nowrap; font-size:11px;">${ts}</td>
+                        <td style="padding:8px 14px; font-size:11px;">${tenant}</td>
+                        <td style="padding:8px 14px; font-weight:700; font-size:11px; white-space:nowrap;">${type}</td>
+                        <td style="padding:8px 14px; color:var(--text-dim); font-size:11px;">${summary}</td>
+                        <td style="padding:8px 14px; color:${statusColor}; font-weight:700; font-size:11px;">${status}</td>
+                        <td style="padding:8px 14px;">${actionCell}</td>
                     </tr>`;
                 }).join('');
             } catch(e) {
-                tbody.innerHTML = '<tr><td colspan="5" style="padding:20px; text-align:center; color:var(--danger);">Error al cargar feedback: ' + e.message + '</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color:var(--danger);">Error: ' + e.message + '</td></tr>';
+            }
+        }
+
+        function openPromoteModal(fbId, utterance) {
+            document.getElementById('promote-fb-id').value = fbId;
+            document.getElementById('promote-utterance').value = utterance;
+            document.getElementById('promote-intent').value = '';
+            document.getElementById('promote-result').textContent = '';
+            document.getElementById('promote-modal').style.display = 'flex';
+        }
+
+        async function submitPromote() {
+            const fbId     = document.getElementById('promote-fb-id').value;
+            const utterance = document.getElementById('promote-utterance').value.trim();
+            const intent   = document.getElementById('promote-intent').value.trim();
+            const resultEl = document.getElementById('promote-result');
+            if (!intent) { resultEl.textContent = 'Escribe el intent correcto.'; return; }
+            resultEl.textContent = 'Vectorizando...';
+            try {
+                const res = await fetch('api/chat/feedback/promote', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ feedback_id: fbId, utterance, intent })
+                });
+                const json = await res.json();
+                if (json.status === 'success') {
+                    resultEl.style.color = 'var(--success)';
+                    resultEl.textContent = '✅ Promovido. El agente aprenderá este utterance en la próxima clasificación.';
+                    setTimeout(() => { document.getElementById('promote-modal').style.display = 'none'; loadFeedback(); }, 2000);
+                } else {
+                    resultEl.style.color = 'var(--danger)';
+                    resultEl.textContent = '❌ ' + (json.message || 'Error');
+                }
+            } catch(e) {
+                resultEl.style.color = 'var(--danger)';
+                resultEl.textContent = '❌ ' + e.message;
             }
         }
     </script>

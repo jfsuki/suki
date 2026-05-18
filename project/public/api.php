@@ -2373,6 +2373,73 @@ if ($route === 'chat/feedback') {
     return;
 }
 
+// Torre: asignar intent manualmente a un gap missing_skill y vectorizar a Qdrant
+if ($route === 'chat/feedback/promote' && $method === 'POST') {
+    $isTowerUser = isset($_SESSION['suki_tower_auth']) && $_SESSION['suki_tower_auth'] === true;
+    if (!$isTowerUser) {
+        respondJson($response, 'error', 'Solo accesible desde Torre.', [], 403);
+        return;
+    }
+    $payload      = requestData();
+    $feedbackId   = (string) ($payload['feedback_id'] ?? '');
+    $intentLabel  = trim(strtolower((string) ($payload['intent'] ?? '')));
+    $utterance    = trim((string) ($payload['utterance'] ?? ''));
+
+    if ($feedbackId === '' || $intentLabel === '' || $utterance === '') {
+        respondJson($response, 'error', 'feedback_id, intent y utterance son requeridos.', [], 400);
+        return;
+    }
+
+    try {
+        $embedding = new \App\Core\GeminiEmbeddingService();
+        $vector    = $embedding->embed($utterance);
+        if (empty($vector)) {
+            respondJson($response, 'error', 'No se pudo generar embedding (verificar GEMINI_ENABLED).', [], 500);
+            return;
+        }
+        $store = new \App\Core\QdrantVectorStore(null, null, null, null, null, null, null, 'agent_training');
+        $store->upsertPoints([[
+            'id'      => abs(crc32($utterance . $intentLabel)) ?: 1,
+            'vector'  => $vector,
+            'payload' => [
+                'memory_type' => 'agent_training',
+                'tenant_id'   => 'shared_agent_training',
+                'source_type' => 'feedback_manual',
+                'chunk_id'    => 'fb_manual_' . substr(md5($utterance), 0, 8),
+                'metadata'    => [
+                    'intent'     => $intentLabel,
+                    'intent_key' => $intentLabel,
+                    'source_kind' => 'feedback_torre',
+                ],
+            ],
+        ]]);
+        // Marcar el feedback_id como promoted en el log
+        $logPath = dirname(__DIR__, 2) . '/project/storage/meta/app_feedback/feedback.jsonl';
+        if (file_exists($logPath)) {
+            $lines  = file($logPath, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) ?: [];
+            $output = [];
+            foreach ($lines as $line) {
+                $e = json_decode($line, true);
+                if (is_array($e) && ($e['id'] ?? '') === $feedbackId) {
+                    $e['status']      = 'promoted';
+                    $e['promoted_at'] = date('Y-m-d H:i:s');
+                    $e['intent_assigned'] = $intentLabel;
+                }
+                $output[] = json_encode($e, JSON_UNESCAPED_UNICODE);
+            }
+            file_put_contents($logPath, implode("\n", $output) . "\n", LOCK_EX);
+        }
+        respondJson($response, 'success', "Utterance promovido al intent '{$intentLabel}' en Qdrant.", [
+            'feedback_id' => $feedbackId,
+            'intent'      => $intentLabel,
+            'utterance'   => $utterance,
+        ]);
+    } catch (\Throwable $e) {
+        respondJson($response, 'error', $e->getMessage(), [], 500);
+    }
+    return;
+}
+
 if ($route === 'chat/sessions/list') {
     $auth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
     if (empty($auth)) {
