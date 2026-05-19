@@ -51,6 +51,8 @@ final class ChatAgent
     private string $activeProjectId = '';
     private string $activeMode = '';
     private bool $journalNoteSaved = false;
+    private string $activeOnboardingStepContext = ''; // Capa 2G: perfil usuario onboarding
+    private string $activeAppConfigContext = '';       // Capa 2H: configuración app específica pendiente
     private FormWizard $wizard;
     private ContractWriter $writer;
     private $memory; // Changed from LocalJsonMemoryRepository to allow SQL
@@ -181,7 +183,47 @@ final class ChatAgent
         $this->assistantSaved = false;
         $this->journalNoteSaved = false;
         $memory = $this->conversationMemory();
-        
+
+        // === GATEKEEPER (Capa 1): perfil de usuario + config de app — LLM-driven, sin strings hardcodeadas ===
+        // Solo canales interactivos. El LLM genera las preguntas; PHP detecta el paso y extrae respuestas.
+        $this->activeOnboardingStepContext = '';
+        $this->activeAppConfigContext = '';
+        $isInteractiveChannel = in_array($channel, ['local', 'web', 'portal', 'app'], true);
+        if ($mode === 'app' && !$testMode && $isInteractiveChannel) {
+            try {
+                $profileSvc = new \App\Core\UserProfileService();
+                $onboardSvc = new \App\Core\AppUserOnboarding($profileSvc);
+
+                // Capa 2G: perfil de usuario (nombre, rol, tareas) — genérico, una vez por usuario
+                if (!$onboardSvc->isComplete($resolvedTenantId, $userId)) {
+                    $stepCtx = $onboardSvc->processAnswerAndGetContext($resolvedTenantId, $userId, $text);
+                    if ($stepCtx !== null) {
+                        $this->activeOnboardingStepContext = $stepCtx;
+                    }
+                }
+
+                // Capa 2H: configuración de la app instalada (NIT, razón social, campos específicos)
+                // Solo se ejecuta si el perfil de usuario ya está completo y hay un projectId real.
+                // Los campos requeridos vienen de app_catalog.json para la app instalada en este tenant.
+                if ($this->activeOnboardingStepContext === '' && $projectId !== '') {
+                    try {
+                        $configSvc    = new \App\Core\AppTenantConfigService();
+                        $appConfigSvc = new \App\Core\AppConfigOnboarding($configSvc);
+                        if (!$appConfigSvc->isComplete($resolvedTenantId, $projectId)) {
+                            $cfgCtx = $appConfigSvc->processAnswerAndGetContext($resolvedTenantId, $projectId, $text);
+                            if ($cfgCtx !== null) {
+                                $this->activeAppConfigContext = $cfgCtx;
+                            }
+                        }
+                    } catch (\Throwable $ignored) {}
+                }
+
+                $profileSvc->touchLastSeen($resolvedTenantId, $userId, 'app');
+            } catch (\Throwable $ignored) {
+                // Gatekeeper nunca bloquea el flujo si falla
+            }
+        }
+
         // --- MEMORY FLOW STEP 10: Clear Memory Command ---
         if (($local['command'] ?? '') === 'ClearMemory') {
             $memory->clear($threadId);
@@ -731,37 +773,7 @@ final class ChatAgent
         $task = $this->controlTowerMarkRunning($task, ['route_path' => (string) ($telemetry['route_path'] ?? ''), 'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown')]);
         try {
             $history = $memory->load($threadId, $tenantId);
-            $systemPrompt = @file_get_contents(dirname(__DIR__, 2) . '/prompts/builder_system_prompt.txt') ?: "Eres SUKI. Responde breve y claro.";
-            if ($mode === 'builder') {
-                try {
-                    $journalCtx = (new AgentJournalService())->buildContextBlock($tenantId, $projectId, 'architect', $sessionId);
-                    if ($journalCtx !== '') { $systemPrompt .= "\n\n---\nBITÁCORA DE ARQUITECTURA (no olvides esto):\n" . $journalCtx . "\n---"; }
-                } catch (\Throwable $ignored) {}
-            }
-            // Inject SpecialistPersonas system prompt based on Qdrant-classified skill
-            $specialistArea = $this->resolveSpecialistArea($telemetry, $mode);
-            if ($specialistArea !== null) {
-                $persona = \App\Core\Agents\Registry\SpecialistPersonas::getPersona($specialistArea);
-                $personaPrompt = trim((string) ($persona['prompt_base'] ?? ''));
-                if ($personaPrompt !== '') {
-                    $systemPrompt = $personaPrompt . "\n\n" . $systemPrompt;
-                }
-            }
-            // Inject active app-creation interview context into system prompt
-            try {
-                $interviewState = new \App\Core\AppInterviewState();
-                $activeInterview = $interviewState->load($tenantId, $sessionId);
-                if (!empty($activeInterview['developer_instructions'])) {
-                    $systemPrompt .= "\n\n---\n" . $activeInterview['developer_instructions'] . "\n---";
-                } elseif (!empty($activeInterview['app_id'])) {
-                    // Interview is active but instructions not yet saved — inject app memory context
-                    $appMemory = new \App\Core\AppMemoryService();
-                    $devCtx = $appMemory->buildDeveloperContext($tenantId, (string) $activeInterview['app_id']);
-                    if ($devCtx !== '') {
-                        $systemPrompt .= "\n\n---\n" . $devCtx . "\n---";
-                    }
-                }
-            } catch (\Throwable $ignored) {}
+            $systemPrompt = $this->buildSystemPrompt($mode, $role, $resolvedTenantId, $userId, $sessionId, $projectId, $telemetry);
             // Intentar workflow multi-agente antes de LLM directo
             $orchestratorReply = $this->tryMultiAgentOrchestration($text, $tenantId, $userId, $projectId, $mode);
             if ($orchestratorReply !== null) {
@@ -890,6 +902,21 @@ final class ChatAgent
         } catch (\Throwable $e) {}
         $memory->append($threadId, 'assistant', $responseText);
         $this->assistantSaved = true;
+
+        // Capa 5: Feedback Loop — ingestar en user_memory (Qdrant) para memoria semántica personal
+        try {
+            if ($this->semanticMemory !== null) {
+                $this->semanticMemory->ingestUserInteraction(
+                    $resolvedTenantId, $userId,
+                    "Usuario: {$text}\nSUKI: {$responseText}",
+                    ['session_id' => $sessionId, 'intent' => (string) ($telemetry['classification'] ?? 'unknown'),
+                     'mode' => $mode, 'world' => $channel]
+                );
+            }
+        } catch (\Throwable $ignored) {
+            // La memoria semántica nunca bloquea la respuesta al usuario
+        }
+
         $task  = $this->controlTowerCompleteTask($task, ['result_status' => 'success', 'response_kind' => $responseKind, 'response_text' => $responseText, 'provider' => (string) $provider]);
         $reply = $this->annotateReplyWithControlTower($reply, $task);
         $this->rememberAgentOpsTrace($tenantId, $userId, $projectId, $mode, $telemetry, $this->latencyMs($requestStartedAt), [
@@ -1091,6 +1118,101 @@ final class ChatAgent
     public function parseLocal(string $text): array
     {
         return $this->commandParser()->parse($text);
+    }
+
+    private function buildSystemPrompt(
+        string $mode, string $role,
+        string $tenantId, string $userId, string $sessionId,
+        string $projectId, array $telemetry
+    ): string {
+        $promptsDir = dirname(__DIR__, 2) . '/prompts';
+
+        // Capa 2A: Selección de prompt base según mundo y rol
+        if ($mode === 'builder') {
+            $base = @file_get_contents("{$promptsDir}/builder_system_prompt.txt") ?: '';
+        } elseif ($mode === 'torre' || $role === 'architect') {
+            $base = @file_get_contents("{$promptsDir}/torre_system_prompt.txt")
+                 ?: @file_get_contents("{$promptsDir}/builder_system_prompt.txt") ?: '';
+        } else {
+            $roleFile = match($role) {
+                'admin', 'owner'  => "{$promptsDir}/app_system_prompt_admin.txt",
+                'seller'          => "{$promptsDir}/app_system_prompt_seller.txt",
+                'accountant'      => "{$promptsDir}/app_system_prompt_accountant.txt",
+                'guest'           => "{$promptsDir}/app_system_prompt_guest.txt",
+                default           => "{$promptsDir}/app_system_prompt_base.txt",
+            };
+            $base = @file_get_contents($roleFile)
+                 ?: @file_get_contents("{$promptsDir}/app_system_prompt_base.txt") ?: '';
+        }
+        if ($base === '') {
+            $base = @file_get_contents("{$promptsDir}/builder_system_prompt.txt") ?: "Eres SUKI. Responde breve y claro.";
+        }
+
+        // Capa 2B: Perfil del usuario
+        try {
+            $userCtx = (new \App\Core\UserProfileService())->buildContextBlock($tenantId, $userId,
+                $mode === 'builder' ? 'builder' : ($mode === 'torre' ? 'torre' : 'app'));
+            if ($userCtx !== '') {
+                $base .= "\n\n---\n" . $userCtx . "\n---";
+            }
+        } catch (\Throwable $ignored) {}
+
+        // Capa 2C: Memoria cross-sesión
+        try {
+            $historyCtx = (new \App\Core\CrossSessionMemory())->buildHistoryContextBlock($tenantId, $userId);
+            if ($historyCtx !== '') {
+                $base .= "\n\n---\n" . $historyCtx . "\n---";
+            }
+        } catch (\Throwable $ignored) {}
+
+        // Capa 2D: Bitácora del arquitecto (builder mode)
+        if ($mode === 'builder') {
+            try {
+                $journalCtx = (new AgentJournalService())->buildContextBlock($tenantId, $projectId, 'architect', $sessionId);
+                if ($journalCtx !== '') {
+                    $base .= "\n\n---\nBITÁCORA DE ARQUITECTURA:\n" . $journalCtx . "\n---";
+                }
+            } catch (\Throwable $ignored) {}
+        }
+
+        // Capa 2E: Persona especialista (Qdrant-classified)
+        $specialistArea = $this->resolveSpecialistArea($telemetry, $mode);
+        if ($specialistArea !== null) {
+            try {
+                $persona = \App\Core\Agents\Registry\SpecialistPersonas::getPersona($specialistArea);
+                $personaPrompt = trim((string) ($persona['prompt_base'] ?? ''));
+                if ($personaPrompt !== '') {
+                    $base = $personaPrompt . "\n\n" . $base;
+                }
+            } catch (\Throwable $ignored) {}
+        }
+
+        // Capa 2F: Contexto de entrevista activa (app creation)
+        try {
+            $interviewState  = new \App\Core\AppInterviewState();
+            $activeInterview = $interviewState->load($tenantId, $sessionId);
+            if (!empty($activeInterview['developer_instructions'])) {
+                $base .= "\n\n---\n" . $activeInterview['developer_instructions'] . "\n---";
+            } elseif (!empty($activeInterview['app_id'])) {
+                $devCtx = (new \App\Core\AppMemoryService())->buildDeveloperContext($tenantId, (string) $activeInterview['app_id']);
+                if ($devCtx !== '') {
+                    $base .= "\n\n---\n" . $devCtx . "\n---";
+                }
+            }
+        } catch (\Throwable $ignored) {}
+
+        // Capa 2G: Perfil usuario onboarding — el LLM genera la pregunta natural desde aquí
+        if ($this->activeOnboardingStepContext !== '') {
+            $base .= "\n\n---\n" . $this->activeOnboardingStepContext . "\n---";
+        }
+
+        // Capa 2H: Configuración de app pendiente — campos específicos de la app instalada
+        // El LLM recibe qué dato falta (con descripción) y genera la pregunta naturalmente.
+        if ($this->activeAppConfigContext !== '') {
+            $base .= "\n\n---\n" . $this->activeAppConfigContext . "\n---";
+        }
+
+        return $base;
     }
 
     private function resolveSpecialistArea(array $telemetry, string $mode): ?string
@@ -2531,6 +2653,7 @@ final class ChatAgent
                 'channel' => $channel,
                 'session_id' => $sessionId,
                 'user_id' => $userId,
+                'tenant_id' => $this->activeTenantStrId,
                 'mode' => $mode,
                 'reply' => $reply,
                 'entity_exists' => fn(string $entity): bool => $this->entityExists($entity),

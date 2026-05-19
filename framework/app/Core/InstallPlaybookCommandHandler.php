@@ -63,6 +63,22 @@ final class InstallPlaybookCommandHandler implements CommandHandlerInterface
             );
         }
 
+        // Pre-populate app_tenant_config with data already gathered during Builder interview.
+        // This prevents App Chat from asking the user again for data they already provided.
+        $initialConfig = is_array($command['initial_config'] ?? null) ? $command['initial_config'] : [];
+        if (!$isDryRun && $initialConfig !== []) {
+            try {
+                $tenantId     = (string) ($context['tenant_id'] ?? '');
+                $appId        = strtolower($sectorKey);
+                $configSvc    = new \App\Core\AppTenantConfigService();
+                foreach ($initialConfig as $fieldKey => $fieldValue) {
+                    if (is_string($fieldKey) && is_string($fieldValue) && $fieldValue !== '') {
+                        $configSvc->saveField($tenantId, $appId, $fieldKey, $fieldValue);
+                    }
+                }
+            } catch (\Throwable $ignored) {}
+        }
+
         $created = is_array($result['created'] ?? null) ? $result['created'] : [];
         $skipped = is_array($result['skipped'] ?? null) ? $result['skipped'] : [];
         $replyText = $isDryRun

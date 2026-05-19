@@ -1,0 +1,107 @@
+{
+  "meta": {
+    "name": "builder_interview_steps",
+    "version": "1.0",
+    "world": "builder",
+    "description": "Pasos de entrevista para crear una app en Builder Chat. 8 pasos core + soporte de pasos dinámicos. PHP lee los goals y questions; el LLM extrae datos estructurados.",
+    "updated_at": "2026-05-19"
+  },
+  "core_steps": [
+    {
+      "key": "business_type",
+      "field_map": ["sector", "business_type"],
+      "question": "¿A qué se dedica el negocio? (por ejemplo: ferretería, veterinaria, restaurante, clínica, papelería...)",
+      "goal": "Identificar el sector y la actividad principal del negocio para seleccionar el playbook adecuado.",
+      "extraction_hint": "Extrae el tipo de negocio y sector. Busca palabras como ferretería, droguería, restaurante, etc.",
+      "examples": ["ferretería en Medellín", "droguería familiar", "taller de motos", "consultorio odontológico"]
+    },
+    {
+      "key": "operation_model",
+      "field_map": ["payment_model", "credit_enabled"],
+      "question": "¿Cómo manejas los pagos? (solo contado, a crédito con algunos clientes, o los dos)",
+      "goal": "Determinar si el negocio necesita módulo de cartera y crédito o solo manejo de contado.",
+      "extraction_hint": "Detecta: contado, crédito, mixto. Si dice 'fiado', 'cuotas', 'crédito' → credit_enabled=true.",
+      "examples": ["solo contado", "a crédito con clientes frecuentes", "los dos — contado y crédito"]
+    },
+    {
+      "key": "needs_scope",
+      "field_map": ["modules"],
+      "question": "¿Qué quieres controlar primero? (inventario y ventas, clientes, facturación, gastos...)",
+      "goal": "Definir los módulos prioritarios: POS, inventario, CRM, facturación, compras, contabilidad.",
+      "extraction_hint": "Lista de módulos mencionados. Mapear: 'ventas' → POS, 'clientes' → CRM, 'inventario' → inventory.",
+      "examples": ["inventario y ventas", "solo facturación DIAN", "clientes y pedidos", "todo lo anterior"]
+    },
+    {
+      "key": "documents",
+      "field_map": ["document_types"],
+      "question": "¿Qué documentos usas en tu negocio? (factura electrónica, cotización, remisión, orden de trabajo, recibo...)",
+      "goal": "Identificar los tipos de documentos comerciales que el sistema debe generar.",
+      "extraction_hint": "Lista de tipos de documento. Importante: si menciona DIAN → factura_electronica=true.",
+      "examples": ["factura electrónica DIAN", "cotización y remisión", "orden de trabajo", "recibo de caja"]
+    },
+    {
+      "key": "user_roles",
+      "field_map": ["roles"],
+      "question": "¿Quiénes van a usar el sistema? Cuéntame los cargos y qué puede hacer cada uno (por ejemplo: el dueño ve todo, el cajero solo registra ventas).",
+      "goal": "Definir los roles de usuario y sus permisos para configurar el control de acceso.",
+      "extraction_hint": "Array de objetos {role, permissions}. Cada cargo mencionado → un rol. Permisos inferidos del contexto.",
+      "examples": [
+        "dueño con acceso total, cajero solo ventas",
+        "contador ve finanzas, vendedor solo productos",
+        "solo yo — soy el único"
+      ]
+    },
+    {
+      "key": "fiscal_config",
+      "field_map": ["fiscal"],
+      "question": "¿Tu negocio cobra IVA? ¿Eres responsable de IVA o estás en régimen simple? ¿Aplicas retenciones a tus clientes corporativos?",
+      "goal": "Configurar el motor fiscal: régimen tributario, tarifa de IVA, ReteFuente, ICA, régimen simplificado.",
+      "extraction_hint": "Extraer: regimen (ordinario/simplificado), iva_rate (0/5/19), retefuente (true/false), ica_rate (número).",
+      "examples": [
+        "régimen ordinario, IVA 19%",
+        "régimen simple, sin retenciones",
+        "IVA 19%, ReteFuente 3.5% a empresas, ICA en Medellín"
+      ]
+    },
+    {
+      "key": "formulas_and_rules",
+      "field_map": ["business_rules"],
+      "question": "¿Tienes reglas especiales de precio o descuento? Por ejemplo: comisión de vendedores, descuento por volumen, precio especial para clientes frecuentes, liquidación de inventario.",
+      "goal": "Capturar las reglas de negocio y fórmulas de cálculo específicas para implementarlas en el motor de reglas.",
+      "extraction_hint": "Array de objetos {name, type: formula|rule, condition, action, variables, constants}. Si no tiene reglas: [].",
+      "examples": [
+        "3% de comisión sobre ventas netas",
+        "10% descuento si compra más de 10 unidades",
+        "precio especial para clientes con más de 6 meses",
+        "ninguna, precio fijo"
+      ],
+      "structured_output": {
+        "type": "array",
+        "items": {
+          "name": "string",
+          "type": "formula|rule|discount|commission",
+          "description": "string",
+          "condition": "string|null",
+          "action": "string",
+          "variables": "array",
+          "constants": "object"
+        }
+      }
+    },
+    {
+      "key": "integrations",
+      "field_map": ["integrations"],
+      "question": "¿Necesitas conectar tu sistema con algo externo? (facturación electrónica DIAN, tienda virtual como WooCommerce o Tienda Nube, pasarela de pagos, banco...)",
+      "goal": "Identificar integraciones externas requeridas: DIAN/Alanube, ecommerce, pagos, bancos.",
+      "extraction_hint": "Array de strings: 'dian', 'alanube', 'woocommerce', 'tiendanube', 'wompi', 'pse', 'bancolombia', etc.",
+      "examples": [
+        "factura electrónica con Alanube",
+        "WooCommerce para mi tienda online",
+        "ninguna por ahora",
+        "Wompi para pagos en línea"
+      ]
+    }
+  ],
+  "dynamic_steps_instructions": "Si el usuario menciona una necesidad de negocio NO cubierta por los pasos anteriores, usa la herramienta add_interview_step para crear un nuevo paso. Ejemplos: 'manejo lotes con fecha de vencimiento' → paso 'batch_tracking'; 'trabajo con consignación' → paso 'consignment_rules'; 'tengo torneos o eventos' → paso 'event_management'.",
+  "completion_hint": "Cuando todos los pasos estén completos, genera el schema de la app consolidando todos los datos recopilados. El schema debe incluir entidades, campos, relaciones, roles y reglas de negocio."
+}

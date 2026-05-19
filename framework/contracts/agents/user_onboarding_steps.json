@@ -1,0 +1,75 @@
+{
+  "meta": {
+    "name": "user_onboarding_steps",
+    "version": "1.0",
+    "world": "app",
+    "description": "Pasos de entrevista inicial para usuarios App Chat. PHP lee los goals y rules; el LLM genera las preguntas naturalmente.",
+    "updated_at": "2026-05-19"
+  },
+  "steps": [
+    {
+      "key": "name",
+      "field": "display_name",
+      "required": true,
+      "goal": "Conocer el nombre o apodo del usuario para personalizar cada conversación futura.",
+      "llm_hint": "Preséntate brevemente como SUKI y haz UNA pregunta natural para saber cómo llamarle. No menciones 'perfil', 'sistema' ni 'base de datos'. Sé cálido y breve.",
+      "extraction": "text_trim",
+      "max_length": 128
+    },
+    {
+      "key": "role",
+      "field": "role_label",
+      "required": true,
+      "goal": "Conocer el cargo o rol del usuario en la empresa para adaptar las respuestas a sus responsabilidades.",
+      "llm_hint": "Usa el nombre que ya conoces. Pregunta UNA cosa: cuál es su cargo o papel en la empresa. Ejemplos orientativos (no los listes): dueño, gerente, cajero, contador, vendedor, bodeguero.",
+      "extraction": "text_trim",
+      "max_length": 64,
+      "role_normalize_map": {
+        "dueño": "Dueño", "dueno": "Dueño", "propietario": "Dueño", "propietaria": "Dueña",
+        "gerente": "Gerente", "gerencia": "Gerente",
+        "cajero": "Cajero", "cajera": "Cajera",
+        "vendedor": "Vendedor", "vendedora": "Vendedora",
+        "contador": "Contador", "contadora": "Contadora", "contabilidad": "Contador",
+        "admin": "Administrador", "administrador": "Administrador", "administradora": "Administradora",
+        "bodeguero": "Bodeguero", "bodeguera": "Bodeguera", "almacenista": "Almacenista",
+        "sistemas": "Sistemas", "tecnologia": "Tecnología", "tecnología": "Tecnología"
+      }
+    },
+    {
+      "key": "frequent_tasks",
+      "field": "frequent_tasks",
+      "required": true,
+      "goal": "Conocer las 2 o 3 tareas que el usuario realizará más frecuentemente para priorizar la ayuda del agente.",
+      "llm_hint": "Usa el nombre y cargo del usuario. Pregunta UNA cosa: qué actividades hará más seguido en el sistema. No listes opciones — deja que el usuario responda libremente.",
+      "extraction": "keyword_array",
+      "task_keywords": [
+        "ventas", "venta", "pos", "ticket",
+        "facturas", "factura", "facturación", "facturacion", "dian",
+        "reportes", "reporte", "informe",
+        "inventario", "stock", "productos", "producto",
+        "compras", "compra", "proveedores", "proveedor",
+        "clientes", "cliente", "crm",
+        "pagos", "pago", "cobros", "cobro", "cartera",
+        "cotizaciones", "cotización", "cotizacion",
+        "gastos", "gasto", "egresos",
+        "nomina", "nómina", "empleados",
+        "contabilidad", "cuentas", "saldos"
+      ]
+    },
+    {
+      "key": "tech_level",
+      "field": "tech_level",
+      "required": false,
+      "goal": "Conocer el nivel de comodidad del usuario con sistemas digitales para calibrar la complejidad del lenguaje.",
+      "llm_hint": "Última pregunta. Usa el nombre. Pregunta de forma simple y sin tecnicismos si se siente cómodo con sistemas o tecnología. Acepta cualquier respuesta — no hay respuesta incorrecta.",
+      "extraction": "tech_level_enum",
+      "enum_values": ["basic", "intermediate", "advanced"],
+      "level_patterns": {
+        "advanced": ["mucho", "bastante", "avanzado", "avanzada", "experto", "experta", "muy bien", "sin problema", "3", "alto"],
+        "intermediate": ["regular", "medio", "media", "algo", "moderado", "moderada", "más o menos", "mas o menos", "2", "intermedio"],
+        "basic": ["poco", "poca", "básico", "basico", "básica", "basica", "difícil", "dificil", "no mucho", "1", "bajo"]
+      }
+    }
+  ],
+  "completion_hint": "El onboarding acaba de completarse. Recuerda el nombre y cargo del usuario. Ofrece ayuda de forma natural, sin mencionar que terminó un proceso de registro."
+}

@@ -1,0 +1,45 @@
+{
+  "meta": {
+    "name": "global_onboarding_fields",
+    "version": "1.0",
+    "description": "Campos universales requeridos para CUALQUIER app instalada en SUKI. El LLM lee field_name + description y genera la pregunta naturalmente. Sin strings de preguntas hardcodeadas aquí.",
+    "updated_at": "2026-05-19"
+  },
+  "fields": [
+    {
+      "key": "razon_social",
+      "type": "text",
+      "required": true,
+      "description": "Nombre legal o razón social de la empresa o negocio. Puede ser persona natural o jurídica.",
+      "llm_hint": "Pregunta el nombre del negocio o empresa de forma natural. No uses palabras técnicas como 'razón social'.",
+      "max_length": 200,
+      "validation": "min_length:3"
+    },
+    {
+      "key": "nit",
+      "type": "text",
+      "required": true,
+      "description": "NIT o cédula del responsable del negocio (Colombia). Necesario para facturación y documentos fiscales.",
+      "llm_hint": "Pregunta por el NIT o cédula del negocio. Si es persona natural, puede ser cédula. Sé claro pero no técnico.",
+      "max_length": 20,
+      "validation": "numeric_like"
+    },
+    {
+      "key": "municipio",
+      "type": "text",
+      "required": true,
+      "description": "Ciudad o municipio donde opera el negocio. Requerido para ICA municipal y documentos.",
+      "llm_hint": "Pregunta en qué ciudad o municipio está ubicado el negocio.",
+      "max_length": 100
+    },
+    {
+      "key": "telefono",
+      "type": "text",
+      "required": false,
+      "description": "Teléfono o celular de contacto del negocio.",
+      "llm_hint": "Pregunta el número de teléfono o celular del negocio de forma natural.",
+      "max_length": 20
+    }
+  ],
+  "completion_hint": "Con estos datos básicos el sistema puede funcionar. Los campos adicionales se capturan según la app instalada."
+}
