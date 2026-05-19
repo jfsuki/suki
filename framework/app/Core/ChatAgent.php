@@ -773,7 +773,7 @@ final class ChatAgent
         $task = $this->controlTowerMarkRunning($task, ['route_path' => (string) ($telemetry['route_path'] ?? ''), 'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown')]);
         try {
             $history = $memory->load($threadId, $tenantId);
-            $systemPrompt = $this->buildSystemPrompt($mode, $role, $resolvedTenantId, $userId, $sessionId, $projectId, $telemetry);
+            $systemPrompt = $this->buildSystemPrompt($mode, $role, $tenantId, $userId, $sessionId, $projectId, $telemetry);
             // Intentar workflow multi-agente antes de LLM directo
             $orchestratorReply = $this->tryMultiAgentOrchestration($text, $tenantId, $userId, $projectId, $mode);
             if ($orchestratorReply !== null) {
@@ -907,7 +907,7 @@ final class ChatAgent
         try {
             if ($this->semanticMemory !== null) {
                 $this->semanticMemory->ingestUserInteraction(
-                    $resolvedTenantId, $userId,
+                    $tenantId, $userId,
                     "Usuario: {$text}\nSUKI: {$responseText}",
                     ['session_id' => $sessionId, 'intent' => (string) ($telemetry['classification'] ?? 'unknown'),
                      'mode' => $mode, 'world' => $channel]
