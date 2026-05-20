@@ -142,7 +142,12 @@ class BuilderOnboardingProcess
                     'options'         => $collected,
                     // Pre-populate app_tenant_config with data gathered during Builder interview.
                     // Keys must match field_definitions in app_catalog.json.
-                    'initial_config'  => $this->extractInitialAppConfig($allFacts),
+                    'initial_config'   => $this->extractInitialAppConfig($allFacts),
+                    // Catalog app id (e.g. "vet_clinic") for AppConfigOnboarding.
+                    // Derived from business type so the onboarding asks the right fields.
+                    'catalog_app_id'   => $this->matchCatalogAppId($allFacts),
+                    // Mixins the tenant explicitly wants (e.g. ["billing_dian", "inventory"]).
+                    'active_mixins'    => $this->extractActiveMixins($allFacts),
                 ],
                 'reply'         => '¡Todo listo! Estoy construyendo tu aplicación de '
                                  . ($collected['business_type'] ?? $context['long_term_facts']['business_type'] ?? 'negocio')
@@ -319,6 +324,87 @@ RESPONDE ÚNICAMENTE CON JSON VÁLIDO:
         }
 
         return array_filter($config, static fn($v) => $v !== '' && $v !== null);
+    }
+
+    /**
+     * Maps free-text business type to the catalog app id.
+     * Keyword patterns cover the most common LATAM PYME sectors.
+     */
+    private function matchCatalogAppId(array $facts): string
+    {
+        $raw = strtolower(implode(' ', array_filter([
+            $facts['business_type'] ?? '',
+            $facts['sector'] ?? '',
+            $facts['actividad'] ?? '',
+        ], 'is_string')));
+
+        $patterns = [
+            'veterinar|vet\b|animal|mascota|ica sanidad'            => 'vet_clinic',
+            'dental|odontolog|dentist|boca'                         => 'dental_clinic',
+            'farmacia|drogueria|pharmacy|medicamento'               => 'pharmacy',
+            'logistica|transporte\b|mensajer|courier|flete'         => 'logistics_transport',
+            'clinica|m[eé]dic[oa]|salud|health|hospital|consultor'  => 'health_clinic',
+            'restaurante|restaurant|bar\b|cafe\b|cafeter|comida|cocina' => 'restaurant',
+            'belleza|salon\b|spa\b|peluchi|estetica|cosmet|nail'    => 'beauty_salon',
+            'gimnasio|gym\b|fitness|\bdeport|\bsport\b'             => 'gym_fitness',
+            'construc|contratista|obra\b|builder'                   => 'construction',
+            'moda|confeccion|ropa\b|calzado|fashion|textil'         => 'fashion_clothing',
+            'contabilidad|contador|accounting|firma conta'          => 'accounting_firm',
+            'educacion|colegio|escuela|academia|school|instituto'   => 'education_center',
+            'iglesia|church|religion|ministerio|congregac'          => 'church_org',
+            'agente.venta|vendedor|sales.agent'                     => 'sales_agent',
+            'ecommerce|tienda.virtual|woocommerce|tienda.nube'      => 'store_hub',
+        ];
+
+        foreach ($patterns as $pattern => $appId) {
+            if (preg_match('/(' . $pattern . ')/i', $raw)) {
+                return $appId;
+            }
+        }
+
+        return 'suki_erp';
+    }
+
+    /**
+     * Determines which mixins the tenant explicitly activated during the Builder interview.
+     * Defaults conservative: billing_dian requires explicit mention; others default active.
+     *
+     * Returns e.g. ["accounting", "inventory"] — stored as _active_mixins in app_tenant_config.
+     */
+    private function extractActiveMixins(array $facts): array
+    {
+        $active = [];
+
+        // Accounting active if fiscal_config step mentioned anything accounting-related
+        $fiscal = is_array($facts['fiscal'] ?? null) ? $facts['fiscal'] : [];
+        if (!empty($fiscal['regimen']) || !empty($facts['regimen_tributario']) || !empty($facts['contador'])) {
+            $active[] = 'accounting';
+        }
+
+        // POS active if needs_scope mentions POS / caja
+        $needs = strtolower((string) ($facts['needs_scope'] ?? ''));
+        if (preg_match('/\b(pos|caja|venta|punto.de.venta)\b/', $needs)) {
+            $active[] = 'pos';
+        }
+
+        // Inventory active if mentioned in needs_scope or business_type
+        $ctx = strtolower(($facts['needs_scope'] ?? '') . ' ' . ($facts['business_type'] ?? ''));
+        if (preg_match('/\b(inventario|stock|bodega|almacen|producto)\b/', $ctx)) {
+            $active[] = 'inventory';
+        }
+
+        // CRM active if clients / seguimiento mentioned
+        if (preg_match('/\b(crm|clientes|seguimiento|fideliz)\b/', $ctx)) {
+            $active[] = 'crm';
+        }
+
+        // billing_dian: only if explicitly mentioned (it requires DIAN resolution number)
+        $integrations = strtolower((string) ($facts['integrations'] ?? ''));
+        if (preg_match('/\b(dian|factura.electr|facturacion.electr|e-?billing)\b/', $integrations . ' ' . $ctx)) {
+            $active[] = 'billing_dian';
+        }
+
+        return array_values(array_unique($active));
     }
 
     private function loadStepsConfig(): array

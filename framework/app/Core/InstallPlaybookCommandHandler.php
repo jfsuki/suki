@@ -65,16 +65,34 @@ final class InstallPlaybookCommandHandler implements CommandHandlerInterface
 
         // Pre-populate app_tenant_config with data already gathered during Builder interview.
         // This prevents App Chat from asking the user again for data they already provided.
-        $initialConfig = is_array($command['initial_config'] ?? null) ? $command['initial_config'] : [];
-        if (!$isDryRun && $initialConfig !== []) {
+        $initialConfig  = is_array($command['initial_config'] ?? null) ? $command['initial_config'] : [];
+        $catalogAppId   = trim((string) ($command['catalog_app_id'] ?? ''));
+        $activeMixins   = is_array($command['active_mixins'] ?? null) ? $command['active_mixins'] : null;
+
+        if (!$isDryRun) {
             try {
-                $tenantId     = (string) ($context['tenant_id'] ?? '');
-                $appId        = strtolower($sectorKey);
-                $configSvc    = new \App\Core\AppTenantConfigService();
+                $tenantId  = (string) ($context['tenant_id'] ?? '');
+                $appId     = ($catalogAppId !== '') ? $catalogAppId : strtolower($sectorKey);
+                $configSvc = new \App\Core\AppTenantConfigService();
+
+                // Persist interview fields so App Chat doesn't ask again
                 foreach ($initialConfig as $fieldKey => $fieldValue) {
                     if (is_string($fieldKey) && is_string($fieldValue) && $fieldValue !== '') {
                         $configSvc->saveField($tenantId, $appId, $fieldKey, $fieldValue);
                     }
+                }
+
+                // Store the resolved catalog app id — ChatAgent reads this instead of the manifest id
+                if ($appId !== '') {
+                    $configSvc->saveField($tenantId, $appId, '_installed_app_id', $appId);
+                    // Also record it under the generic tenant slot so ChatAgent can find it
+                    // regardless of which $projectId the manifest sends.
+                    $configSvc->saveField($tenantId, 'tenant_meta', '_installed_app_id', $appId);
+                }
+
+                // Store active mixins so AppConfigOnboarding only asks relevant fields
+                if ($activeMixins !== null) {
+                    $configSvc->saveField($tenantId, $appId, '_active_mixins', implode(',', $activeMixins));
                 }
             } catch (\Throwable $ignored) {}
         }

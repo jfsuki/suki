@@ -205,12 +205,14 @@ final class ChatAgent
                 // Capa 2H: configuración de la app instalada (NIT, razón social, campos específicos)
                 // Solo se ejecuta si el perfil de usuario ya está completo y hay un projectId real.
                 // Los campos requeridos vienen de app_catalog.json para la app instalada en este tenant.
-                if ($this->activeOnboardingStepContext === '' && $projectId !== '') {
+                // resolveInstalledAppId() devuelve el catalog id real (ej "vet_clinic") en vez del manifest id ("suki_erp").
+                if ($this->activeOnboardingStepContext === '') {
                     try {
                         $configSvc    = new \App\Core\AppTenantConfigService();
                         $appConfigSvc = new \App\Core\AppConfigOnboarding($configSvc);
-                        if (!$appConfigSvc->isComplete($resolvedTenantId, $projectId)) {
-                            $cfgCtx = $appConfigSvc->processAnswerAndGetContext($resolvedTenantId, $projectId, $text);
+                        $installedAppId = $appConfigSvc->resolveInstalledAppId($resolvedTenantId, $projectId);
+                        if ($installedAppId !== '' && !$appConfigSvc->isComplete($resolvedTenantId, $installedAppId)) {
+                            $cfgCtx = $appConfigSvc->processAnswerAndGetContext($resolvedTenantId, $installedAppId, $text);
                             if ($cfgCtx !== null) {
                                 $this->activeAppConfigContext = $cfgCtx;
                             }

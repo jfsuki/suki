@@ -37,6 +37,33 @@ final class AppConfigOnboarding
     }
 
     /**
+     * Resolves the catalog app id actually installed for this tenant.
+     *
+     * Priority:
+     * 1. _installed_app_id saved in app_tenant_config under 'tenant_meta' slot
+     * 2. _installed_app_id saved under $fallbackAppId slot
+     * 3. $fallbackAppId as-is (e.g. 'suki_erp' from manifest)
+     */
+    public function resolveInstalledAppId(string $tenantId, string $fallbackAppId): string
+    {
+        // Check tenant_meta first (written by InstallPlaybookCommandHandler regardless of catalog_app_id)
+        $meta = $this->configSvc->loadAll($tenantId, 'tenant_meta');
+        $resolved = trim((string) ($meta['_installed_app_id'] ?? ''));
+        if ($resolved !== '') {
+            return $resolved;
+        }
+
+        // Check under the fallback app slot (written when catalog_app_id === fallbackAppId)
+        $slot = $this->configSvc->loadAll($tenantId, $fallbackAppId);
+        $resolved = trim((string) ($slot['_installed_app_id'] ?? ''));
+        if ($resolved !== '') {
+            return $resolved;
+        }
+
+        return $fallbackAppId;
+    }
+
+    /**
      * Returns true when the app configuration is complete for this tenant.
      */
     public function isComplete(string $tenantId, string $appId): bool
@@ -133,7 +160,7 @@ final class AppConfigOnboarding
      */
     private function getPendingFields(string $tenantId, string $appId): array
     {
-        $allFields  = $this->resolveAllFieldsForApp($appId);
+        $allFields  = $this->resolveAllFieldsForApp($appId, $tenantId);
         $configured = $this->configSvc->loadAll($tenantId, $appId);
         $pending    = [];
 
@@ -151,8 +178,12 @@ final class AppConfigOnboarding
     /**
      * Merges: global fields + app-specific config_fields + active mixin fields.
      * Fields are resolved from JSON definitions so the LLM gets rich descriptions.
+     *
+     * Mixin fields are only included for mixins the tenant explicitly activated
+     * (stored as _active_mixins in app_tenant_config). Falls back to all compatible
+     * mixins if no _active_mixins record exists (first-install scenario).
      */
-    private function resolveAllFieldsForApp(string $appId): array
+    private function resolveAllFieldsForApp(string $appId, string $tenantId = ''): array
     {
         $globalFields = $this->loadGlobalFields();
         $appDef       = $this->findAppDefinition($appId);
@@ -166,16 +197,31 @@ final class AppConfigOnboarding
         $appFieldKeys = is_array($appDef['config_fields'] ?? null) ? $appDef['config_fields'] : [];
         $appFields    = $this->resolveFieldsFromKeys($appFieldKeys, $catalog['field_definitions'] ?? []);
 
-        // Mixin fields (if app has compatible_mixins and they are activated)
+        // Determine which mixins are active for this tenant
+        $compatibleMixins = is_array($appDef['compatible_mixins'] ?? null) ? $appDef['compatible_mixins'] : [];
+        $activeMixins     = $compatibleMixins; // default: all compatible
+        if ($tenantId !== '') {
+            $stored = $this->configSvc->loadAll($tenantId, $appId);
+            $rawMixins = trim((string) ($stored['_active_mixins'] ?? ''));
+            if ($rawMixins !== '') {
+                $activeMixins = array_filter(
+                    array_map('trim', explode(',', $rawMixins)),
+                    static fn(string $m) => $m !== ''
+                );
+                $activeMixins = array_values($activeMixins);
+            }
+        }
+
+        // Mixin fields — only for active mixins
         $mixinFields = [];
         $mixins      = $catalog['mixins'] ?? [];
-        foreach ($appDef['compatible_mixins'] ?? [] as $mixinKey) {
+        foreach ($activeMixins as $mixinKey) {
             if (!isset($mixins[$mixinKey])) {
                 continue;
             }
             $mixinFieldKeys = $mixins[$mixinKey]['additional_config_fields'] ?? [];
             if (is_array($mixinFieldKeys)) {
-                $resolved   = $this->resolveFieldsFromKeys($mixinFieldKeys, $catalog['field_definitions'] ?? []);
+                $resolved    = $this->resolveFieldsFromKeys($mixinFieldKeys, $catalog['field_definitions'] ?? []);
                 $mixinFields = array_merge($mixinFields, $resolved);
             }
         }
