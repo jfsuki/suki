@@ -1,81 +1,63 @@
 <?php
 // framework/config/llm.php
+// Lee toda la configuración desde llm_providers.json + variables de entorno.
+// Cero strings hardcodeados aquí: los modelos, clases y cascade viven en el JSON.
+
+$jsonPath = dirname(__DIR__) . '/data/llm_providers.json';
+$jsonCfg  = [];
+if (is_file($jsonPath)) {
+    $decoded = json_decode((string) file_get_contents($jsonPath), true);
+    if (is_array($decoded)) {
+        $jsonCfg = $decoded;
+    }
+}
 
 $envFlag = static function (string $name, bool $default): bool {
     $raw = getenv($name);
-    if ($raw === false) {
-        return $default;
-    }
+    if ($raw === false) { return $default; }
     $value = strtolower(trim((string) $raw));
-    if ($value === '') {
-        return $default;
-    }
+    if ($value === '') { return $default; }
     return in_array($value, ['1', 'true', 'yes', 'on'], true);
 };
 
-$hasGroq = trim((string) getenv('GROQ_API_KEY')) !== '';
-$hasGemini = trim((string) getenv('GEMINI_API_KEY')) !== '';
-$hasDeepSeek = trim((string) getenv('DEEPSEEK_API_KEY')) !== '';
-$hasOpenRouter = trim((string) getenv('OPENROUTER_API_KEY')) !== '';
-$hasClaude = trim((string) getenv('CLAUDE_API_KEY')) !== '';
-$hasMistral = trim((string) getenv('MISTRAL_API_KEY')) !== '';
+// Construir providers desde JSON + env (API keys y enable flags)
+$providers = [];
+foreach ((array) ($jsonCfg['providers'] ?? []) as $name => $def) {
+    $name      = (string) $name;
+    $envKey    = (string) ($def['env_key']    ?? '');
+    $envEnable = (string) ($def['env_enable'] ?? '');
+    $hasKey    = $envKey !== '' && trim((string) getenv($envKey)) !== '';
+    $enabled   = $envEnable !== '' ? $envFlag($envEnable, $hasKey) : $hasKey;
+
+    // Model: env override > JSON default
+    $modelEnv     = strtoupper($name) . '_MODEL';
+    $modelDefault = (string) ($def['model'] ?? '');
+    $model        = trim((string) (getenv($modelEnv) ?: $modelDefault));
+
+    $providers[$name] = [
+        'enabled' => $enabled,
+        'class'   => (string) ($def['class'] ?? ''),
+        'model'   => $model,
+    ];
+}
+
+// Cascade: env override > JSON > fallback implícito de los providers del JSON
+$cascadeEnv = trim((string) (getenv('LLM_CASCADE') ?: ''));
+if ($cascadeEnv !== '') {
+    $cascade = array_values(array_filter(array_map('trim', explode(',', $cascadeEnv)), static fn(string $p): bool => $p !== ''));
+} else {
+    $cascade = is_array($jsonCfg['cascade'] ?? null) ? array_values((array) $jsonCfg['cascade']) : array_keys($providers);
+}
 
 return [
-    'providers' => [
-        'mistral' => [
-            'enabled' => $envFlag('MISTRAL_ENABLED', $hasMistral),
-            'class' => \App\Core\LLM\Providers\MistralProvider::class,
-        ],
-        'groq' => [
-            'enabled' => $envFlag('GROQ_ENABLED', $hasGroq),
-            'class' => \App\Core\LLM\Providers\GroqProvider::class,
-        ],
-        'gemini' => [
-            'enabled' => $envFlag('GEMINI_ENABLED', $hasGemini),
-            'chat_enabled' => (bool) (getenv('GEMINI_CHAT_ENABLED') !== false ? getenv('GEMINI_CHAT_ENABLED') : getenv('GEMINI_ENABLED')),
-            'embedding_enabled' => (bool) (getenv('GEMINI_EMBEDDING_ENABLED') !== false ? getenv('GEMINI_EMBEDDING_ENABLED') : getenv('GEMINI_ENABLED')),
-            'class' => \App\Core\LLM\Providers\GeminiProvider::class,
-        ],
-        'deepseek' => [
-            'enabled' => $envFlag('DEEPSEEK_ENABLED', $hasDeepSeek),
-            'class' => \App\Core\LLM\Providers\DeepSeekProvider::class,
-        ],
-        'openrouter' => [
-            'enabled' => $envFlag('OPENROUTER_ENABLED', $hasOpenRouter),
-            'class' => \App\Core\LLM\Providers\OpenRouterProvider::class,
-        ],
-        'claude' => [
-            'enabled' => $envFlag('CLAUDE_ENABLED', $hasClaude),
-            'class' => \App\Core\LLM\Providers\ClaudeProvider::class,
-        ],
+    'providers' => $providers,
+    'routing'   => [
+        'primary'   => strtolower(trim((string) (getenv('LLM_PRIMARY_PROVIDER')   ?: ($jsonCfg['primary']   ?? 'openrouter')))),
+        'secondary' => strtolower(trim((string) (getenv('LLM_SECONDARY_PROVIDER') ?: ($jsonCfg['secondary'] ?? 'gemini')))),
+        'cascade'   => $cascade,
     ],
-    'models' => [
-        'fast' => [
-            'groq' => getenv('GROQ_MODEL') ?: 'llama-3.1-8b-instant',
-            'gemini' => getenv('GEMINI_MODEL') ?: 'gemini-2.5-flash-lite',
-            'deepseek' => getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat',
-            'openrouter' => getenv('OPENROUTER_MODEL') ?: 'qwen/qwen-2.5-coder-32b-instruct',
-        ],
-        'default' => [
-            'groq' => getenv('GROQ_MODEL') ?: 'llama-3.1-8b-instant',
-            'gemini' => getenv('GEMINI_MODEL') ?: 'gemini-2.5-flash-lite',
-            'deepseek' => getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat',
-            'openrouter' => getenv('OPENROUTER_MODEL') ?: 'qwen/qwen-2.5-coder-32b-instruct',
-        ],
-        'fallback' => [
-            'openrouter' => getenv('OPENROUTER_MODEL') ?: 'qwen/qwen-2.5-coder-32b-instruct',
-            'deepseek' => getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat',
-        ],
-        'premium' => [
-            'claude' => getenv('CLAUDE_MODEL') ?: 'claude-3-5-haiku-latest',
-        ],
-    ],
-    'routing' => [
-        'primary' => strtolower(trim((string) (getenv('LLM_PRIMARY_PROVIDER') ?: 'openrouter'))),
-        'secondary' => strtolower(trim((string) (getenv('LLM_SECONDARY_PROVIDER') ?: 'deepseek'))),
-    ],
-    'limits' => [
-        'timeout' => 20,
-        'max_tokens' => 600,
+    'limits'    => [
+        'timeout'    => (int) (getenv('LLM_TIMEOUT')    ?: ($jsonCfg['limits']['timeout']    ?? 20)),
+        'max_tokens' => (int) (getenv('LLM_MAX_TOKENS') ?: ($jsonCfg['limits']['max_tokens'] ?? 600)),
     ],
 ];

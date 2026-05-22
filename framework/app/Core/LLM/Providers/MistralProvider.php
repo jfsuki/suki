@@ -7,10 +7,13 @@ use RuntimeException;
 
 final class MistralProvider
 {
+    private array $config;
+    public function __construct(array $config = []) { $this->config = $config; }
+
     public function sendChat(array $messages, array $params = []): array
     {
         $apiKey = getenv('MISTRAL_API_KEY') ?: '';
-        $model = getenv('MISTRAL_MODEL') ?: 'mistral-small-latest';
+        $model = getenv('MISTRAL_MODEL') ?: ($this->config['model'] ?? 'mistral-small-latest');
         $baseUrl = 'https://api.mistral.ai/v1/chat/completions';
 
         if ($apiKey === '') {

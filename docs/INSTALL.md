@@ -26,8 +26,8 @@ DB_USERNAME=root
 DB_PASSWORD=
 
 # At least one LLM provider (system has 6 with failover)
-OPENROUTER_API_KEY=sk-...
-GEMINI_API_KEY=...
+OPENROUTER_API_KEY=your_openrouter_key_here
+GEMINI_API_KEY=your_gemini_key_here
 
 # Qdrant (optional — falls back to rules without it)
 QDRANT_HOST=http://localhost:6333

@@ -10,7 +10,7 @@ final class OpenRouterProvider
     public function sendChat(array $messages, array $params = []): array
     {
         $apiKey = getenv('OPENROUTER_API_KEY') ?: '';
-        $model = getenv('OPENROUTER_MODEL') ?: 'qwen/qwen-2.5-coder-32b-instruct';
+        $model = getenv('OPENROUTER_MODEL') ?: ($this->config['model'] ?? 'qwen/qwen-2.5-coder-32b-instruct');
         $baseUrl = $this->normalizeBaseUrl((string) (getenv('OPENROUTER_BASE_URL') ?: 'https://openrouter.ai/api/v1'));
 
         if ($apiKey === '') {
@@ -27,13 +27,58 @@ final class OpenRouterProvider
             $payload['response_format'] = ['type' => 'json_object'];
         }
 
+        // Tool calling: convert Claude format (input_schema) → OpenAI format (parameters)
+        $rawTools = $params['tools'] ?? null;
+        if (!empty($rawTools) && is_array($rawTools)) {
+            $openAiTools = [];
+            foreach ($rawTools as $tool) {
+                $name   = (string) ($tool['name'] ?? '');
+                $desc   = (string) ($tool['description'] ?? '');
+                $schema = is_array($tool['input_schema'] ?? null) ? (array) $tool['input_schema'] : ['type' => 'object', 'properties' => []];
+                if ($name === '') continue;
+                $openAiTools[] = [
+                    'type'     => 'function',
+                    'function' => ['name' => $name, 'description' => $desc, 'parameters' => $schema],
+                ];
+            }
+            if ($openAiTools !== []) {
+                $payload['tools'] = $openAiTools;
+                if (!empty($params['tool_choice'])) {
+                    $payload['tool_choice'] = $params['tool_choice'];
+                }
+            }
+        }
+
         $response = $this->request($baseUrl, $payload, $this->buildHeaders($apiKey));
 
-        $content = $response['data']['choices'][0]['message']['content'] ?? '';
+        $choice  = $response['data']['choices'][0] ?? [];
+        $message = $choice['message'] ?? [];
+        $content = (string) ($message['content'] ?? '');
+
+        // Parse tool_calls from OpenAI format → SUKI internal format
+        $toolCalls = [];
+        if (!empty($message['tool_calls']) && is_array($message['tool_calls'])) {
+            foreach ($message['tool_calls'] as $tc) {
+                $fn   = is_array($tc['function'] ?? null) ? (array) $tc['function'] : [];
+                $name = (string) ($fn['name'] ?? '');
+                $args = [];
+                if (!empty($fn['arguments'])) {
+                    $decoded = json_decode((string) $fn['arguments'], true);
+                    if (is_array($decoded)) {
+                        $args = $decoded;
+                    }
+                }
+                if ($name !== '') {
+                    $toolCalls[] = ['id' => (string) ($tc['id'] ?? ''), 'name' => $name, 'input' => $args];
+                }
+            }
+        }
+
         return [
-            'text' => $content,
-            'usage' => $response['data']['usage'] ?? [],
-            'raw' => $response,
+            'text'       => $content,
+            'tool_calls' => $toolCalls,
+            'usage'      => $response['data']['usage'] ?? [],
+            'raw'        => $response,
         ];
     }
 

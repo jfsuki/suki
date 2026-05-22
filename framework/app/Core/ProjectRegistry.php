@@ -404,7 +404,14 @@ final class ProjectRegistry
         $stmt = $this->db->prepare('SELECT code, created_at FROM auth_codes WHERE project_id = :project AND phone = :phone');
         $stmt->execute([':project' => $projectId, ':phone' => $phone]);
         $row = $stmt->fetch(PDO::FETCH_ASSOC);
-        if (!$row) return false;
+        if (!$row) {
+            return false;
+        }
+        // OTP expira en 15 minutos
+        $created = strtotime((string) ($row['created_at'] ?? '1970-01-01'));
+        if (time() - $created > 900) {
+            return false;
+        }
         return hash_equals((string) $row['code'], (string) $code);
     }
 
@@ -487,6 +494,27 @@ final class ProjectRegistry
                 default => "TEXT"
             };
             $this->db->exec("ALTER TABLE auth_users ADD COLUMN $col $def");
+        }
+    }
+
+    private function ensureAgentColumns(): void
+    {
+        try {
+            $stmt = $this->db->query("PRAGMA table_info(ai_agents)");
+            $cols = $stmt->fetchAll(\PDO::FETCH_COLUMN, 1);
+        } catch (\Throwable $e) {
+            return;
+        }
+        $needed = [
+            'app_id'           => 'TEXT',
+            'source'           => "TEXT DEFAULT 'catalog'",
+            'prompt_override'  => 'TEXT',
+            'qdrant_collection' => 'TEXT',
+        ];
+        foreach ($needed as $col => $def) {
+            if (!in_array($col, $cols, true)) {
+                $this->db->exec("ALTER TABLE ai_agents ADD COLUMN $col $def");
+            }
         }
     }
 
@@ -709,9 +737,14 @@ final class ProjectRegistry
             area TEXT,
             status TEXT,
             config_json TEXT,
+            app_id TEXT,
+            source TEXT DEFAULT \'catalog\',
+            prompt_override TEXT,
+            qdrant_collection TEXT,
             created_at TEXT,
             updated_at TEXT
         )');
+        $this->ensureAgentColumns();
         $this->db->exec('CREATE TABLE IF NOT EXISTS ai_agent_events (
             id           INTEGER PRIMARY KEY AUTOINCREMENT,
             agent_id     TEXT,

@@ -2803,6 +2803,32 @@
         "tenant_scope_guard",
         "audit_guard"
       ]
+    },
+    {
+      "name": "add_interview_step",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "low",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard"
+      ],
+      "description": "Agrega un nuevo paso a la entrevista del Builder cuando el agente detecta una necesidad de negocio no cubierta por los pasos estándar",
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "step_key": { "type": "string" },
+          "question": { "type": "string" },
+          "reason": { "type": "string" }
+        },
+        "required": ["step_key", "question"]
+      }
     }
   ]
 }

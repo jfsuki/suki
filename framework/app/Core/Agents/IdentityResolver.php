@@ -81,7 +81,12 @@ final class IdentityResolver
                 return $this->error('Esta sesion pertenece a otro usuario.', $resolvedTenantId, $userId, $authUserId, $authTenantId, $projectId, $role, $mode);
             }
             if ($boundProject !== '' && $projectId !== '' && $boundProject !== $projectId) {
-                return $this->error('Esta sesion ya esta enlazada a otro proyecto.', $resolvedTenantId, $userId, $authUserId, $authTenantId, $projectId, $role, $mode);
+                // Si es el mismo tenant, permitir re-binding al nuevo proyecto
+                if ($boundTenant !== '' && $boundTenant !== $tenantId && $boundTenant !== $resolvedTenantId) {
+                    return $this->error('Esta sesion ya esta enlazada a otro proyecto.', $resolvedTenantId, $userId, $authUserId, $authTenantId, $projectId, $role, $mode);
+                }
+                // Mismo tenant: actualizar binding silenciosamente
+                $registry->touchSession($sessionId, $userId, $projectId, $tenantId, $channel);
             }
             if ($boundTenant !== '' && $boundTenant !== $tenantId && $boundTenant !== $resolvedTenantId) {
                 return $this->error('Esta sesion pertenece a otro tenant.', $resolvedTenantId, $userId, $authUserId, $authTenantId, $projectId, $role, $mode);

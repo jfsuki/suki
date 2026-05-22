@@ -20,6 +20,7 @@ Bienvenido a la documentación centralizada de SUKI (AI-AOS). Toda la autoridad 
 ## 3. Documentación Técnica (`/docs/technical/`)
 *Detalles implementación, modelos de datos y módulos.*
 - [07_DATABASE_MODEL](file:///c:/laragon/www/suki/docs/technical/07_DATABASE_MODEL.md)
+- [**APP_CREATOR_DB_ARCHITECTURE**](file:///c:/laragon/www/suki/docs/technical/APP_CREATOR_DB_ARCHITECTURE.md) — Tablas compartidas por app_type, StorageModel CANONICAL, escala a millones *(2026-05-11)*
 - [AGENTS_CONVERSATION_GATEWAY](file:///c:/laragon/www/suki/docs/technical/AGENTS_CONVERSATION_GATEWAY.md)
 - [AGENT_SKILLS_MATRIX](file:///c:/laragon/www/suki/docs/technical/AGENT_SKILLS_MATRIX.md)
 - [CODEX_SELF_CHECKLIST](file:///c:/laragon/www/suki/docs/technical/CODEX_SELF_CHECKLIST.md)

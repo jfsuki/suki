@@ -46,6 +46,33 @@ Security:
 - Block dangerous patterns
 - Centralize escaping and validation
 
+## App Creator Architecture — Shared Tables per app_type (2026-05-11)
+When CreateAppSkill installs an app from the catalog, tables are created ONCE globally per app_type.
+All tenants using the same app share the same physical tables. Row-level isolation via tenant_id.
+
+Table naming convention:
+  app_{app_id}__{entity_name}
+  Examples: app_vet_clinic__pacientes, app_restaurant__mesas
+
+Rules:
+- StorageModel MUST be CANONICAL for all app catalog table creation
+- DB_NAMESPACE_BY_PROJECT must NOT apply to app template tables
+- Every app table requires: tenant_id (NOT NULL), app_id (NOT NULL)
+- CREATE TABLE IF NOT EXISTS — idempotent, safe for multiple tenant installs
+- INDEX (tenant_id, id) and INDEX (tenant_id, created_at) required on every app table
+
+Anti-pattern (forbidden):
+- Creating separate physical tables per tenant for the same app_type
+- Using project hash namespace (p_<hash>__table) for catalog app tables
+
+Scalability:
+  1-10K tenants:      LEGACY mode, shared tables + tenant_id, single MySQL DB
+  10K-1M tenants:     CANONICAL mode + app_id column, shard by tenant_range
+  >1M tenants:        CANONICAL + MySQL Cluster, shard key = tenant_id hash
+
+See: docs/technical/APP_CREATOR_DB_ARCHITECTURE.md
+See: docs/canon/SUKI_ARCHITECTURE_CANON.md section 13
+
 ---
 
 # Modelo de Base de Datos — ES
@@ -95,5 +122,32 @@ Seguridad:
 - valida identificadores
 - bloquea patrones peligrosos
 - centraliza validación/escape
+
+## Arquitectura App Creator — Tablas compartidas por app_type (2026-05-11)
+Cuando CreateAppSkill instala un app del catálogo, las tablas se crean UNA SOLA VEZ globalmente por tipo de app.
+Todos los tenants que usan el mismo app comparten las mismas tablas físicas. Aislamiento por fila con tenant_id.
+
+Convención de nombres:
+  app_{app_id}__{nombre_entidad}
+  Ejemplos: app_vet_clinic__pacientes, app_restaurant__mesas
+
+Reglas:
+- StorageModel DEBE ser CANONICAL para toda creación de tablas del catálogo de apps
+- DB_NAMESPACE_BY_PROJECT NO debe aplicarse a tablas de app templates
+- Toda tabla de app requiere: tenant_id (NOT NULL), app_id (NOT NULL)
+- CREATE TABLE IF NOT EXISTS — idempotente, seguro para instalaciones de múltiples tenants
+- INDEX (tenant_id, id) e INDEX (tenant_id, created_at) requeridos en cada tabla de app
+
+Anti-patrón (PROHIBIDO):
+- Crear tablas físicas separadas por tenant para el mismo tipo de app
+- Usar namespace por hash de proyecto (p_<hash>__tabla) para tablas de apps del catálogo
+
+Escalabilidad:
+  1-10K tenants:    LEGACY, tablas shared + tenant_id, una DB MySQL
+  10K-1M tenants:   CANONICAL + columna app_id, sharding por rango de tenant
+  >1M tenants:      CANONICAL + MySQL Cluster, shard key = hash de tenant_id
+
+Ver: docs/technical/APP_CREATOR_DB_ARCHITECTURE.md
+Ver: docs/canon/SUKI_ARCHITECTURE_CANON.md sección 13
 
 

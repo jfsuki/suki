@@ -54,11 +54,30 @@ class DashboardService
             }
         }
 
-        // Simulación de serie temporal para gráficos (últimos 7 días)
+        // Serie temporal real — últimos 7 días agrupados por fecha
+        $dayNames  = ['Dom','Lun','Mar','Mié','Jue','Vie','Sáb'];
+        $last7     = [];
+        $labels    = [];
+        for ($i = 6; $i >= 0; $i--) {
+            $ts        = strtotime("-{$i} days");
+            $date      = date('Y-m-d', $ts);
+            $last7[]   = $date;
+            $labels[]  = $dayNames[(int) date('w', $ts)];
+        }
+        $salesByDay    = array_fill_keys($last7, 0.0);
+        $expensesByDay = array_fill_keys($last7, 0.0);
+        foreach ($sales as $s) {
+            $d = substr((string) ($s['created_at'] ?? ''), 0, 10);
+            if (isset($salesByDay[$d])) { $salesByDay[$d] += (float) ($s['total'] ?? 0); }
+        }
+        foreach ($purchases as $p) {
+            $d = substr((string) ($p['created_at'] ?? ''), 0, 10);
+            if (isset($expensesByDay[$d])) { $expensesByDay[$d] += (float) ($p['total'] ?? 0); }
+        }
         $chartData = [
-            'labels' => ['Lun', 'Mar', 'Mie', 'Jue', 'Vie', 'Sab', 'Dom'],
-            'sales' => [rand(100,500), rand(200,600), rand(150,450), rand(300,700), rand(400,800), rand(500,900), rand(600,1000)],
-            'expenses' => [rand(50,200), rand(100,300), rand(80,250), rand(150,400), rand(200,500), rand(250,600), rand(300,700)]
+            'labels'   => $labels,
+            'sales'    => array_values($salesByDay),
+            'expenses' => array_values($expensesByDay),
         ];
 
         return [

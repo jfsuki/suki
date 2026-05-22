@@ -48,6 +48,17 @@ final class BuilderFastPathParser
 
     private const DEFAULT_FALLBACK = 'Ayúdame con un dato más para continuar.';
 
+    // Whitelist of fields the LLM is allowed to map per step.
+    // Prevents the LLM from hallucinating fields from future steps and jumping the flow.
+    private const STEP_ALLOWED_FIELDS = [
+        'business_type'   => ['business_type', 'proposed_profile'],
+        'operation_model' => ['operation_model'],
+        'needs_scope'     => ['needs_scope', 'needs_scope_items'],
+        'documents_scope' => ['documents_scope', 'documents_scope_items'],
+        'confirm_scope'   => ['confirmed'],
+        'plan_ready'      => [],
+    ];
+
     /**
      * Parse a raw user message for the builder fast path.
      *
@@ -206,6 +217,10 @@ final class BuilderFastPathParser
                 $safeFields[$key] = is_scalar($v) ? $v : json_encode($v, JSON_UNESCAPED_UNICODE);
             }
         }
+        // Step isolation: discard any field the LLM mapped outside the current step's scope.
+        // This prevents the LLM from hallucinating future-step fields and jumping the flow.
+        $allowedForStep = self::STEP_ALLOWED_FIELDS[$step] ?? [];
+        $safeFields = array_intersect_key($safeFields, array_flip($allowedForStep));
 
         $reply = trim((string) ($json['reply'] ?? ''));
         if ($reply === '') {

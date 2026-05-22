@@ -52,3 +52,22 @@ codex_error.log
 # Generated training artifacts (auto-generated, not source)
 /framework/framework/
 /framework/project/
+
+# Temporary prompt/context files created at root during development sessions
+prompt_mayo*.txt
+prompt_mayo*.txt
+test_results_tmp.json
+__*.php
+
+# Runtime storage — auto-generated, not source
+/project/storage/project_registry.sqlite
+/project/storage/reports/
+/project/storage/meta/app_memory/
+/project/storage/meta/app_versions/
+/project/storage/meta/intent_training_log.sqlite
+/project/storage/meta/ops_semantic_cache.sqlite
+/project/storage/meta/knowledge_catalog.sqlite
+/framework/storage/orchestrator/
+
+# Claude Code internal files
+/.claude/

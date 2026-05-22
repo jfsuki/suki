@@ -12,9 +12,12 @@ use RuntimeException;
  */
 class KnowledgeProvider
 {
+    /** Máximo de entidades (productos/clientes) a cargar para enriquecer el lexicon */
+    private const LEXICON_ENTITY_LIMIT = 500;
+
     private string $projectRoot;
     private MemoryRepositoryInterface $memory;
-    
+
     // Caches internos para evitar recargas constantes de JSON
     private ?array $domainPlaybookCache = null;
     private ?array $accountingKnowledgeCache = null;
@@ -529,15 +532,47 @@ class KnowledgeProvider
 
     public function loadLexicon(string $tenantId): array
     {
-        $default = [
-            'synonyms' => [],
-            'shortcuts' => [],
-            'stop_phrases' => [],
-            'entity_aliases' => ['cliente' => 'cliente', 'factura' => 'factura'],
-            'field_aliases' => ['nit' => 'nit', 'telefono' => 'telefono', 'correo' => 'email'],
-        ];
+        // Defaults desde JSON canónico (framework/data/lexicon_defaults.json)
+        $frameworkRoot = defined('FRAMEWORK_ROOT') ? FRAMEWORK_ROOT : dirname(__DIR__, 3);
+        $defaultsPath = $frameworkRoot . '/data/lexicon_defaults.json';
+        $default = $this->readJson($defaultsPath, [
+            'synonyms' => [], 'shortcuts' => [], 'stop_phrases' => [],
+            'entity_aliases' => [], 'field_aliases' => [],
+            'product_names' => [], 'customer_names' => [],
+        ]);
+
         $stored = $this->memory->getTenantMemory($tenantId, 'lexicon', []);
-        return !empty($stored) ? array_merge($default, $stored) : $default;
+        $base = !empty($stored) ? array_merge($default, $stored) : $default;
+
+        // Enriquecer con nombres reales de productos y clientes del tenant desde DB
+        try {
+            $pdo = \App\Core\Database::getConnection();
+
+            $productTable  = 'productos';
+            $customerTable = 'clientes';
+
+            $stmt = $pdo->prepare(
+                "SELECT nombre, sku FROM {$productTable} WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY nombre ASC LIMIT " . self::LEXICON_ENTITY_LIMIT
+            );
+            $stmt->execute([$tenantId]);
+            $products = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            if (!empty($products)) {
+                $base['product_names'] = array_values(array_filter(array_column($products, 'nombre')));
+            }
+
+            $stmt = $pdo->prepare(
+                "SELECT nombre FROM {$customerTable} WHERE tenant_id = ? AND deleted_at IS NULL ORDER BY nombre ASC LIMIT " . self::LEXICON_ENTITY_LIMIT
+            );
+            $stmt->execute([$tenantId]);
+            $customers = $stmt->fetchAll(\PDO::FETCH_ASSOC);
+            if (!empty($customers)) {
+                $base['customer_names'] = array_values(array_filter(array_column($customers, 'nombre')));
+            }
+        } catch (\Throwable $e) {
+            // DB no disponible (tests unitarios, cold start) — continúa con base
+        }
+
+        return $base;
     }
 
     public function loadPolicy(string $tenantId): array

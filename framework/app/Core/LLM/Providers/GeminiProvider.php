@@ -17,7 +17,8 @@ final class GeminiProvider
     public function sendChat(array $messages, array $params = []): array
     {
         $prompt = $this->messagesToPrompt($messages);
-        $client = new GeminiClient();
+        $model  = getenv('GEMINI_MODEL') ?: ($this->config['model'] ?? null);
+        $client = new GeminiClient(null, $model ?: null);
         $result = $client->generate($prompt, $params);
         $content = (string) ($result['content'] ?? '');
         return [

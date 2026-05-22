@@ -7,10 +7,13 @@ use RuntimeException;
 
 final class DeepSeekProvider
 {
+    private array $config;
+    public function __construct(array $config = []) { $this->config = $config; }
+
     public function sendChat(array $messages, array $params = []): array
     {
         $apiKey = getenv('DEEPSEEK_API_KEY') ?: '';
-        $model = getenv('DEEPSEEK_MODEL') ?: 'deepseek-chat';
+        $model = getenv('DEEPSEEK_MODEL') ?: ($this->config['model'] ?? 'deepseek-chat');
         $baseUrl = $this->normalizeBaseUrl((string) (getenv('DEEPSEEK_BASE_URL') ?: 'https://api.deepseek.com/v1'));
 
         if ($apiKey === '') {

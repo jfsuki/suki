@@ -244,6 +244,25 @@ final class FiscalEngineRepository
     }
 
     /**
+     * Busca documento por external_reference (e.g. alanube_id) sin conocer tenant_id de antemano.
+     * Usado por el webhook de Alanube para cerrar el ciclo DIAN → fiscal_documents.
+     * @return array<string, mixed>|null
+     */
+    public function findByExternalReference(string $externalRef, string $provider = 'Alanube'): ?array
+    {
+        $table = self::DOCUMENT_TABLE;
+        $stmt = $this->db->prepare(
+            "SELECT * FROM {$table} WHERE external_reference = :ref AND external_provider = :provider LIMIT 1"
+        );
+        $stmt->bindValue(':ref', $externalRef);
+        $stmt->bindValue(':provider', $provider);
+        $stmt->execute();
+        $row = $stmt->fetch(\PDO::FETCH_ASSOC);
+
+        return is_array($row) ? $this->normalizeDocumentRow($row) : null;
+    }
+
+    /**
      * @return array<string, mixed>|null
      */
     public function loadDocumentAggregate(string $tenantId, string $documentId, ?string $appId = null): ?array

@@ -36,6 +36,7 @@ final class IntegrationMigrator
 
         $this->db->exec("CREATE TABLE IF NOT EXISTS integration_connections (
             id {$idType} PRIMARY KEY {$auto},
+            tenant_id VARCHAR(64) NOT NULL DEFAULT '',
             integration_id VARCHAR(64) NOT NULL,
             provider VARCHAR(64) NOT NULL,
             type VARCHAR(32) NOT NULL,
@@ -50,6 +51,7 @@ final class IntegrationMigrator
 
         $this->db->exec("CREATE TABLE IF NOT EXISTS integration_tokens (
             id {$idType} PRIMARY KEY {$auto},
+            tenant_id VARCHAR(64) NOT NULL DEFAULT '',
             integration_id VARCHAR(64) NOT NULL,
             token_env VARCHAR(128) NULL,
             expires_at DATETIME NULL,
@@ -58,6 +60,7 @@ final class IntegrationMigrator
 
         $this->db->exec("CREATE TABLE IF NOT EXISTS integration_documents (
             id {$idType} PRIMARY KEY {$auto},
+            tenant_id VARCHAR(64) NOT NULL DEFAULT '',
             integration_id VARCHAR(64) NOT NULL,
             entity VARCHAR(64) NULL,
             record_id VARCHAR(64) NULL,
@@ -84,12 +87,37 @@ final class IntegrationMigrator
 
         $this->db->exec("CREATE TABLE IF NOT EXISTS integration_webhooks (
             id {$idType} PRIMARY KEY {$auto},
+            tenant_id VARCHAR(64) NOT NULL DEFAULT '',
             integration_id VARCHAR(64) NOT NULL,
             event VARCHAR(64) NULL,
             external_id VARCHAR(64) NULL,
             payload {$jsonType} NULL,
             created_at DATETIME NOT NULL
         )");
+
+        // Forward-compat: añadir tenant_id en instalaciones existentes sin la columna
+        $this->ensureColumns();
+    }
+
+    /**
+     * Añade tenant_id en tablas de integración existentes que aún no lo tienen.
+     * Idempotente — silencioso si la columna ya existe.
+     */
+    private function ensureColumns(): void
+    {
+        $addCols = [
+            'integration_connections' => "tenant_id VARCHAR(64) NOT NULL DEFAULT ''",
+            'integration_documents'   => "tenant_id VARCHAR(64) NOT NULL DEFAULT ''",
+            'integration_webhooks'    => "tenant_id VARCHAR(64) NOT NULL DEFAULT ''",
+            'integration_tokens'      => "tenant_id VARCHAR(64) NOT NULL DEFAULT ''",
+        ];
+        foreach ($addCols as $table => $colDef) {
+            try {
+                $this->db->exec("ALTER TABLE {$table} ADD COLUMN IF NOT EXISTS {$colDef}");
+            } catch (\Throwable $ignored) {
+                // La columna ya existe o el driver no soporta IF NOT EXISTS — silencioso es correcto aquí
+            }
+        }
     }
 
     /**

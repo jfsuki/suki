@@ -295,3 +295,117 @@ This document treats those sets as complementary:
 
 ## 11) Non-Goal
 This canon defines architecture and authority boundaries only. It does not implement runtime classes, database migrations, or behavior changes by itself.
+
+## 12) Ley Contable Colombia — PUC y Parametrización por Tenant
+Fuente normativa: Decreto 2650 de 1993 (Plan Único de Cuentas) + puc.com.co
+
+### 12.1 Estructura PUC (inmutable — norma nacional)
+El PUC tiene 4 niveles fijos definidos por el Decreto 2650/1993:
+- Clase (1 dígito): 1=Activo, 2=Pasivo, 3=Patrimonio, 4=Ingresos, 5=Gastos, 6=Costos ventas, 7=Costos producción
+- Grupo (2 dígitos): e.g. 11=Disponible, 13=Deudores
+- Cuenta (4 dígitos): e.g. 1105=Caja, 1110=Bancos
+- Subcuenta (6 dígitos): e.g. 111005=Moneda nacional, 111010=Moneda extranjera
+- Auxiliar (7+ dígitos): LIBRE, definido por cada empresa (e.g. 1110050001=Bancolombia CC)
+
+El catálogo nacional vive en `puc_nacional` (tabla read-only, compartida entre todos los tenants).
+El JSON fuente es `framework/data/puc_colombia_base.json` — actualizable sin tocar PHP.
+
+### 12.2 Catálogo Activo del Tenant (cuentas_contables)
+Cada tenant activa únicamente las cuentas PUC que usa según su actividad económica.
+- Una empresa de servicios NO activa cuentas 14xx (inventario).
+- Una empresa con múltiples bancos crea auxiliares propios (7+ dígitos).
+- La tabla `cuentas_contables` almacena el catálogo activado + auxiliares custom del tenant.
+- Campos requeridos: tenant_id, codigo (variable hasta 12+ dígitos), nombre, tipo, naturaleza, parent_codigo, nivel, es_auxiliar.
+
+### 12.3 Parametrización Contable por Tenant (parametros_contables_tenant)
+Cada tenant configura qué cuenta usar para cada tipo de evento de negocio mediante roles semánticos:
+- rol: 'recaudo_efectivo'     → codigo elegido por el tenant (e.g. '110501', '1105001')
+- rol: 'recaudo_bancolombia'  → codigo auxiliar del tenant (e.g. '1110050001')
+- rol: 'ingresos_ventas'      → '4135' (comercio) ó '4145' (servicios)
+- rol: 'iva_ventas'           → '2408'
+
+Esta configuración la hace el contador/empresario desde la UI. No la infiere el sistema.
+
+### 12.4 Medios de Pago (formas_pago_config)
+Cada tenant mapea sus medios de pago a roles contables:
+- 'efectivo'           → rol: 'recaudo_efectivo'
+- 'nequi'              → rol: 'recaudo_nequi'
+- 'transferencia_bcol' → rol: 'recaudo_bancolombia'
+
+### 12.5 LEY ABSOLUTA — Nunca hardcodear códigos PUC en PHP
+**PROHIBIDO en cualquier archivo PHP:**
+```php
+// ❌ NUNCA — el código asume la cuenta del tenant
+$cuentaId = 1; // hardcoded ID
+$cuentaId = $repo->findByCodigo('1105'); // hardcoded código PUC
+```
+
+**OBLIGATORIO — siempre resolver por rol semántico:**
+```php
+// ✅ SIEMPRE — el tenant configuró qué cuenta quiere usar
+$cuentaId = $repo->findAccountByRole($tenantId, 'recaudo_efectivo');
+```
+
+Si el rol no está configurado para el tenant → el agente pregunta, NO asume.
+Si no hay parametros_contables_tenant para el tenant → ejecutar `seedDefaultRolesForTenant()` y notificar que debe revisar la configuración.
+
+Esta ley aplica a: AccountingService, Skills, CommandHandlers, y cualquier código que genere asientos contables.
+
+## 13) App Creator DB Law — Tablas Compartidas por app_type (2026-05-11)
+
+### 13.1 Principio fundamental
+Las tablas creadas por el App Creator (CreateAppSkill, EntityMigrator invocado desde flujo de creación de apps) **se crean UNA SOLA VEZ por tipo de app**, no una vez por tenant instalador.
+
+El aislamiento de datos entre empresas es **SIEMPRE por fila** (`tenant_id`), nunca por tabla separada.
+
+### 13.2 Naming convention canónico
+```
+app_{app_id}__{entity_name}
+Ejemplos correctos:
+  app_vet_clinic__pacientes
+  app_vet_clinic__citas
+  app_restaurant__mesas
+  app_dental__historias_clinicas
+
+❌ PROHIBIDO — namespace por tenant/proyecto:
+  p_a1b2c3__pacientes      (hash del proyecto del tenant)
+  tenant_42__pacientes     (prefijo por tenant)
+```
+
+### 13.3 Columnas de aislamiento obligatorias
+Toda tabla de app del catálogo debe tener, sin excepción:
+- `tenant_id VARCHAR(100) NOT NULL` — aísla datos por empresa
+- `app_id VARCHAR(120) NOT NULL` — identifica el app que generó la tabla
+- Índice compuesto `(tenant_id, id)` — obligatorio
+- Índice compuesto `(tenant_id, created_at)` — obligatorio para queries temporales
+
+### 13.4 Modo StorageModel requerido
+- Todo código que cree tablas de apps del catálogo DEBE operar con `StorageModel::CANONICAL`
+- `TableNamespace::resolve()` con `isCanonical()=true` NO aplica prefijo por proyecto
+- `DB_NAMESPACE_BY_PROJECT=1` en `.env` **no aplica** a tablas de apps del catálogo
+
+### 13.5 Idempotencia de instalación
+- `CREATE TABLE IF NOT EXISTS` — si otro tenant instaló el mismo app antes, las tablas ya existen
+- EntityMigrator detecta la tabla existente y aplica solo columnas nuevas (ADD COLUMN)
+- Al instalar el mismo app en el tenant N, no se crean N copias de tablas
+
+### 13.6 Anti-patrón explícito — prohibido
+```
+❌ empresa_1 instala vet_clinic → crea p_abc123__pacientes
+❌ empresa_2 instala vet_clinic → crea p_def456__pacientes
+❌ empresa_N instala vet_clinic → crea p_hash_N__pacientes
+```
+Para 1 millón de empresas: 1 millón × N_tablas = explosión de tablas MySQL.
+Consecuencias: metadata locks, open table cache pressure, degradación irrecuperable.
+
+### 13.7 Estrategia de escalabilidad por rango
+| Rango tenants | Estrategia |
+|---|---|
+| 1 — 10,000 | LEGACY: tablas shared + tenant_id, una DB MySQL |
+| 10,000 — 1,000,000 | CANONICAL: tablas shared + tenant_id + app_id, sharding por tenant_range |
+| >1,000,000 | CANONICAL + MySQL Cluster horizontal, shard key = tenant_id hash |
+
+### 13.8 Referencia técnica
+- Implementación: `docs/technical/APP_CREATOR_DB_ARCHITECTURE.md`
+- Código clave: `StorageModel.php`, `TableNamespace.php`, `EntityMigrator.php`, `BaseRepository.php`
+- Skill: `framework/app/Core/Skills/CreateAppSkill.php` → `executeCreation()`

@@ -20,6 +20,7 @@ class BaseRepository
     protected bool $canonicalScoped;
     protected string $appId;
     protected array $allowedColumns = [];
+    protected bool $userTracked = false;
 
     public function __construct(array $entity, ?PDO $db = null, ?int $tenantId = null)
     {
@@ -57,6 +58,13 @@ class BaseRepository
         if ($this->canonicalScoped) {
             $payload['app_id'] = $this->appId;
         }
+        if ($this->userTracked) {
+            $userId = RoleContext::getUserId();
+            if ($userId !== null) {
+                $payload['created_by_user_id'] = $userId;
+                $payload['updated_by_user_id']  = $userId;
+            }
+        }
 
         $qb = $this->newQuery();
         return $qb->insert($payload);
@@ -76,6 +84,12 @@ class BaseRepository
     {
         $this->guardTenant();
         $payload = $this->filterData($data);
+        if ($this->userTracked) {
+            $userId = RoleContext::getUserId();
+            if ($userId !== null) {
+                $payload['updated_by_user_id'] = $userId;
+            }
+        }
         if (empty($payload)) {
             throw new InvalidArgumentException('No hay datos permitidos para actualizar.');
         }
@@ -96,7 +110,15 @@ class BaseRepository
         $this->applyTenantScope($qb);
 
         if ($this->softDelete) {
-            return $qb->update(['deleted_at' => date('Y-m-d H:i:s')]);
+            $deletePayload = ['deleted_at' => date('Y-m-d H:i:s')];
+            if ($this->userTracked) {
+                $userId = RoleContext::getUserId();
+                if ($userId !== null) {
+                    $deletePayload['deleted_by_user_id'] = $userId;
+                    $deletePayload['updated_by_user_id']  = $userId;
+                }
+            }
+            return $qb->update($deletePayload);
         }
 
         return $qb->delete();
@@ -181,6 +203,10 @@ class BaseRepository
             if ($this->softDelete && $key === 'deleted_at') {
                 continue;
             }
+            // User-tracking columns are system-managed — cannot be set from external input
+            if ($this->userTracked && in_array($key, ['created_by_user_id', 'updated_by_user_id', 'deleted_by_user_id'], true)) {
+                continue;
+            }
             if (!in_array($key, $this->allowedColumns, true)) {
                 continue;
             }
@@ -204,6 +230,14 @@ class BaseRepository
         }
         if ($this->softDelete) {
             $columns[] = 'deleted_at';
+        }
+        // Auto-detect user tracking: active when entity declares created_by_user_id
+        $declaredFields = array_column($this->entity['fields'] ?? [], 'name');
+        $this->userTracked = in_array('created_by_user_id', $declaredFields, true);
+        if ($this->userTracked) {
+            $columns[] = 'created_by_user_id';
+            $columns[] = 'updated_by_user_id';
+            $columns[] = 'deleted_by_user_id';
         }
 
         return array_values(array_unique($columns));

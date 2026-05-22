@@ -9,10 +9,12 @@ final class IntegrationStore
 {
     private PDO $db;
     private IntegrationMigrator $migrator;
+    private string $tenantId;
 
-    public function __construct(?PDO $db = null)
+    public function __construct(?PDO $db = null, string $tenantId = '')
     {
         $this->db = $db ?? Database::connection();
+        $this->tenantId = $tenantId;
         $this->migrator = new IntegrationMigrator($this->db);
         $this->migrator->bootstrapSchemaPolicy();
     }
@@ -30,14 +32,26 @@ final class IntegrationStore
 
         $now = date('Y-m-d H:i:s');
 
-        $sql = "SELECT id FROM integration_connections WHERE integration_id = :integration_id LIMIT 1";
-        $stmt = $this->db->prepare($sql);
-        $stmt->bindValue(':integration_id', $id);
+        // Si tenantId está definido, el SELECT/UPDATE/INSERT incluyen tenant_id para isolation
+        if ($this->tenantId !== '') {
+            $stmt = $this->db->prepare("SELECT id FROM integration_connections WHERE integration_id = :integration_id AND tenant_id = :tenant_id LIMIT 1");
+            $stmt->bindValue(':integration_id', $id);
+            $stmt->bindValue(':tenant_id', $this->tenantId);
+        } else {
+            // Backward compat: registros históricos sin tenant_id
+            $stmt = $this->db->prepare("SELECT id FROM integration_connections WHERE integration_id = :integration_id LIMIT 1");
+            $stmt->bindValue(':integration_id', $id);
+        }
         $stmt->execute();
         $existing = $stmt->fetchColumn();
 
         if ($existing) {
-            $upd = $this->db->prepare("UPDATE integration_connections SET provider = :provider, type = :type, country = :country, environment = :environment, base_url = :base_url, token_env = :token_env, enabled = :enabled, updated_at = :updated_at WHERE integration_id = :integration_id");
+            if ($this->tenantId !== '') {
+                $upd = $this->db->prepare("UPDATE integration_connections SET provider = :provider, type = :type, country = :country, environment = :environment, base_url = :base_url, token_env = :token_env, enabled = :enabled, updated_at = :updated_at WHERE integration_id = :integration_id AND tenant_id = :tenant_id");
+                $upd->bindValue(':tenant_id', $this->tenantId);
+            } else {
+                $upd = $this->db->prepare("UPDATE integration_connections SET provider = :provider, type = :type, country = :country, environment = :environment, base_url = :base_url, token_env = :token_env, enabled = :enabled, updated_at = :updated_at WHERE integration_id = :integration_id");
+            }
             $upd->bindValue(':provider', $provider);
             $upd->bindValue(':type', $type);
             $upd->bindValue(':country', $country);
@@ -51,7 +65,8 @@ final class IntegrationStore
             return;
         }
 
-        $ins = $this->db->prepare("INSERT INTO integration_connections (integration_id, provider, type, country, environment, base_url, token_env, enabled, created_at, updated_at) VALUES (:integration_id, :provider, :type, :country, :environment, :base_url, :token_env, :enabled, :created_at, :updated_at)");
+        $ins = $this->db->prepare("INSERT INTO integration_connections (tenant_id, integration_id, provider, type, country, environment, base_url, token_env, enabled, created_at, updated_at) VALUES (:tenant_id, :integration_id, :provider, :type, :country, :environment, :base_url, :token_env, :enabled, :created_at, :updated_at)");
+        $ins->bindValue(':tenant_id', $this->tenantId);
         $ins->bindValue(':integration_id', $id);
         $ins->bindValue(':provider', $provider);
         $ins->bindValue(':type', $type);
@@ -70,8 +85,9 @@ final class IntegrationStore
         $now = date('Y-m-d H:i:s');
         $sanitizedRequest = LogSanitizer::sanitizeArray($request);
         $sanitizedResponse = LogSanitizer::sanitizeArray($response);
-        $sql = "INSERT INTO integration_documents (integration_id, entity, record_id, external_id, status, request_payload, response_payload, created_at, updated_at) VALUES (:integration_id, :entity, :record_id, :external_id, :status, :request_payload, :response_payload, :created_at, :updated_at)";
+        $sql = "INSERT INTO integration_documents (tenant_id, integration_id, entity, record_id, external_id, status, request_payload, response_payload, created_at, updated_at) VALUES (:tenant_id, :integration_id, :entity, :record_id, :external_id, :status, :request_payload, :response_payload, :created_at, :updated_at)";
         $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':tenant_id', $this->tenantId);
         $stmt->bindValue(':integration_id', $integrationId);
         $stmt->bindValue(':entity', $entity);
         $stmt->bindValue(':record_id', $recordId);
@@ -100,8 +116,9 @@ final class IntegrationStore
     public function logWebhook(string $integrationId, ?string $event, ?string $externalId, array $payload): void
     {
         $sanitizedPayload = LogSanitizer::sanitizeArray($payload);
-        $sql = "INSERT INTO integration_webhooks (integration_id, event, external_id, payload, created_at) VALUES (:integration_id, :event, :external_id, :payload, :created_at)";
+        $sql = "INSERT INTO integration_webhooks (tenant_id, integration_id, event, external_id, payload, created_at) VALUES (:tenant_id, :integration_id, :event, :external_id, :payload, :created_at)";
         $stmt = $this->db->prepare($sql);
+        $stmt->bindValue(':tenant_id', $this->tenantId);
         $stmt->bindValue(':integration_id', $integrationId);
         $stmt->bindValue(':event', $event);
         $stmt->bindValue(':external_id', $externalId);

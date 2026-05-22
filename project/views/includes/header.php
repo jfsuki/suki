@@ -1,7 +1,12 @@
-<?php 
+<?php
 // Cargamos el array del menú
 $frameworkRoot = defined('APP_ROOT') ? APP_ROOT : dirname(__DIR__, 3) . '/framework';
-$menuItems = include $frameworkRoot . '/config/menu.php'; 
+$menuItems = include $frameworkRoot . '/config/menu.php';
+
+// Base path relativo: detecta /suki/ en Laragon local, vacío en hosting raíz
+if (!isset($__base)) {
+    $__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
+}
 
 function normalize_menu_url(string $url): string
 {
@@ -11,7 +16,9 @@ function normalize_menu_url(string $url): string
     if (preg_match('/^(https?:)?\\/\\//', $url)) {
         return $url;
     }
-    return $url[0] === '/' ? $url : '/' . $url;
+    global $__base;
+    $path = $url[0] === '/' ? $url : '/' . $url;
+    return $__base . $path;
 }
 ?>
 <!DOCTYPE html>

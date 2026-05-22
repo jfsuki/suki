@@ -12,10 +12,13 @@ use RuntimeException;
  */
 final class ClaudeProvider
 {
+    private array $config;
+    public function __construct(array $config = []) { $this->config = $config; }
+
     public function sendChat(array $messages, array $params = []): array
     {
         $apiKey = getenv('CLAUDE_API_KEY') ?: '';
-        $model = getenv('CLAUDE_MODEL') ?: 'claude-3-5-sonnet-latest';
+        $model = getenv('CLAUDE_MODEL') ?: ($this->config['model'] ?? 'claude-3-5-haiku-latest');
         $baseUrl = getenv('CLAUDE_BASE_URL') ?: 'https://api.anthropic.com/v1/messages';
 
         if ($apiKey === '') {

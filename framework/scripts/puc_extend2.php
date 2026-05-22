@@ -1,0 +1,126 @@
+<?php
+declare(strict_types=1);
+
+require __DIR__ . '/../vendor/autoload.php';
+require __DIR__ . '/../app/autoload.php';
+
+$pdo = \App\Core\Database::connection();
+
+$extra = [
+    ['510598', 'Nomina integral', 'G', 'DB', 'subcuenta', '5105'],
+    ['510599', 'Contrato a destajo', 'G', 'DB', 'subcuenta', '5105'],
+    ['513570', 'Streaming y software SaaS', 'G', 'DB', 'subcuenta', '5135'],
+    ['513575', 'Dominio y hosting web', 'G', 'DB', 'subcuenta', '5135'],
+    ['513580', 'Suscripcion ERP y CRM', 'G', 'DB', 'subcuenta', '5135'],
+    ['517080', 'Uniformes personal', 'G', 'DB', 'subcuenta', '5170'],
+    ['517085', 'Gastos de mudanza', 'G', 'DB', 'subcuenta', '5170'],
+    ['517090', 'Gastos de inauguracion', 'G', 'DB', 'subcuenta', '5170'],
+    ['511040', 'Consultoria estrategica', 'G', 'DB', 'subcuenta', '5110'],
+    ['511045', 'Peritajes y avaluos', 'G', 'DB', 'subcuenta', '5110'],
+    ['511550', 'Estampilla pro-universidad', 'G', 'DB', 'subcuenta', '5115'],
+    ['511555', 'Tasa aeroportuaria', 'G', 'DB', 'subcuenta', '5115'],
+    ['512025', 'Arrendamiento de bodega', 'G', 'DB', 'subcuenta', '5120'],
+    ['512030', 'Arrendamiento deposito', 'G', 'DB', 'subcuenta', '5120'],
+    ['513035', 'Seguro de mercancias en transito', 'G', 'DB', 'subcuenta', '5130'],
+    ['513040', 'Seguro de responsabilidad patronal', 'G', 'DB', 'subcuenta', '5130'],
+    ['513045', 'Seguro de robo y hurto', 'G', 'DB', 'subcuenta', '5130'],
+    ['514525', 'Mantenimiento de ascensores', 'G', 'DB', 'subcuenta', '5145'],
+    ['514530', 'Mantenimiento de planta fisica', 'G', 'DB', 'subcuenta', '5145'],
+    ['515520', 'Gastos de representacion exterior', 'G', 'DB', 'subcuenta', '5155'],
+    ['130525', 'Cheques posfechados', 'A', 'DB', 'subcuenta', '1305'],
+    ['130530', 'Tarjetas por cobrar', 'A', 'DB', 'subcuenta', '1305'],
+    ['111015', 'Fondos de inversion colectiva', 'A', 'DB', 'subcuenta', '1110'],
+    ['111020', 'Fiducias de tesoreria', 'A', 'DB', 'subcuenta', '1110'],
+    ['132525', 'Prestamos de vivienda empleados', 'A', 'DB', 'subcuenta', '1325'],
+    ['132530', 'Prestamos educativos empleados', 'A', 'DB', 'subcuenta', '1325'],
+    ['234550', 'Retencion loterias', 'P', 'CR', 'subcuenta', '2345'],
+    ['234555', 'Retencion seguros', 'P', 'CR', 'subcuenta', '2345'],
+    ['234560', 'Retencion ventas activos', 'P', 'CR', 'subcuenta', '2345'],
+    ['250510', 'Salarios por pagar contratistas', 'P', 'CR', 'subcuenta', '2505'],
+    ['251520', 'Prima semestral', 'P', 'CR', 'subcuenta', '2520'],
+    ['253020', 'Bonificacion especial', 'P', 'CR', 'subcuenta', '2530'],
+    ['415585', 'Servicios de call center', 'I', 'CR', 'subcuenta', '4155'],
+    ['415590', 'Servicios de transporte de valores', 'I', 'CR', 'subcuenta', '4155'],
+    ['415595', 'Servicios de arrendamiento operativo', 'I', 'CR', 'subcuenta', '4155'],
+    ['420535', 'Valorizacion de inversiones', 'I', 'CR', 'subcuenta', '4205'],
+    ['420540', 'Ingresos por CDT', 'I', 'CR', 'subcuenta', '4205'],
+    ['613515', 'Costo flete nacional', 'C', 'DB', 'subcuenta', '6135'],
+    ['613520', 'Costo de almacenamiento', 'C', 'DB', 'subcuenta', '6135'],
+    ['613525', 'Seguros de inventario', 'C', 'DB', 'subcuenta', '6135'],
+    ['615530', 'Materiales consumidos en servicio', 'C', 'DB', 'subcuenta', '6155'],
+    ['615535', 'Mano de obra del servicio', 'C', 'DB', 'subcuenta', '6155'],
+    ['730525', 'Embalaje secundario', 'C', 'DB', 'subcuenta', '7305'],
+    ['730530', 'Instrumentos de medicion', 'C', 'DB', 'subcuenta', '7305'],
+    ['731025', 'Bodegueros y almacenistas', 'C', 'DB', 'subcuenta', '7310'],
+    ['731030', 'Operarios de logistica', 'C', 'DB', 'subcuenta', '7310'],
+    ['731525', 'Telecomunicaciones planta', 'C', 'DB', 'subcuenta', '7315'],
+    ['731530', 'Recoleccion de residuos', 'C', 'DB', 'subcuenta', '7315'],
+    ['241215', 'ICA Bogota', 'P', 'CR', 'subcuenta', '2412'],
+    ['241220', 'ICA Medellin', 'P', 'CR', 'subcuenta', '2412'],
+    ['241225', 'ICA Cali', 'P', 'CR', 'subcuenta', '2412'],
+    ['241230', 'ICA Barranquilla', 'P', 'CR', 'subcuenta', '2412'],
+    ['241235', 'ICA Bucaramanga', 'P', 'CR', 'subcuenta', '2412'],
+    ['139020', 'Provision cartera dudosa', 'A', 'CR', 'subcuenta', '1390'],
+    ['149910', 'Provision inventario danado', 'A', 'CR', 'subcuenta', '1499'],
+    ['170530', 'Mantenimiento prepagado', 'A', 'DB', 'subcuenta', '1705'],
+    ['170535', 'Software en licencia prepagada', 'A', 'DB', 'subcuenta', '1705'],
+    ['171025', 'Gastos de adecuacion diferidos', 'A', 'DB', 'subcuenta', '1710'],
+    ['331530', 'Reserva especial decretada', 'P', 'CR', 'subcuenta', '3315'],
+    ['331535', 'Reserva por actualizacion', 'P', 'CR', 'subcuenta', '3315'],
+    ['531010', 'Perdidas en cambio de activos', 'G', 'DB', 'subcuenta', '5310'],
+    ['532010', 'Correcciones fiscales años anteriores', 'G', 'DB', 'subcuenta', '5320'],
+    ['424525', 'Recuperacion seguros', 'I', 'CR', 'subcuenta', '4245'],
+    ['424530', 'Recuperacion deterioro inventario', 'I', 'CR', 'subcuenta', '4245'],
+    ['163515', 'Derechos de marca', 'A', 'DB', 'subcuenta', '1635'],
+    ['163520', 'Derechos de distribucion', 'A', 'DB', 'subcuenta', '1635'],
+    ['159255', 'Depreciacion mobiliario', 'A', 'CR', 'subcuenta', '1592'],
+    ['159260', 'Depreciacion servidores', 'A', 'CR', 'subcuenta', '1592'],
+    ['527025', 'Gastos de despacho', 'G', 'DB', 'subcuenta', '5270'],
+    ['527030', 'Demostraciones de producto', 'G', 'DB', 'subcuenta', '5270'],
+    ['523545', 'Marketing digital', 'G', 'DB', 'subcuenta', '5235'],
+    ['523550', 'Influencer marketing', 'G', 'DB', 'subcuenta', '5235'],
+    ['416520', 'Comision por administracion inmuebles', 'I', 'CR', 'subcuenta', '4165'],
+    ['416525', 'Ingresos por subarrendamiento', 'I', 'CR', 'subcuenta', '4165'],
+    ['417515', 'Inscripciones y matriculas', 'I', 'CR', 'subcuenta', '4175'],
+    ['417520', 'Diplomados y especializaciones', 'I', 'CR', 'subcuenta', '4175'],
+    ['417525', 'Certificaciones profesionales', 'I', 'CR', 'subcuenta', '4175'],
+    ['414015', 'Banquetes y eventos', 'I', 'CR', 'subcuenta', '4140'],
+    ['414020', 'Servicio de catering', 'I', 'CR', 'subcuenta', '4140'],
+    ['413520', 'Ventas en linea ecommerce', 'I', 'CR', 'subcuenta', '4135'],
+    ['413525', 'Ventas por catalogo', 'I', 'CR', 'subcuenta', '4135'],
+    ['413530', 'Ventas a gobierno', 'I', 'CR', 'subcuenta', '4135'],
+    ['410515', 'Ganaderia de levante', 'I', 'CR', 'subcuenta', '4105'],
+    ['410520', 'Flores y plantas', 'I', 'CR', 'subcuenta', '4105'],
+    ['531015', 'Perdida en retiro por obsolescencia', 'G', 'DB', 'subcuenta', '5310'],
+    ['539515', 'Gastos por cierre de proyecto', 'G', 'DB', 'subcuenta', '5395'],
+    ['539520', 'Gastos de desinversion', 'G', 'DB', 'subcuenta', '5395'],
+    ['526010', 'Depreciacion stand y exhibidores', 'G', 'DB', 'subcuenta', '5260'],
+    ['526015', 'Depreciacion vehiculos de entrega', 'G', 'DB', 'subcuenta', '5260'],
+    ['519525', 'Provision retiro de activos', 'G', 'DB', 'subcuenta', '5195'],
+    ['519530', 'Provision garantias postventa', 'G', 'DB', 'subcuenta', '5195'],
+    ['260515', 'Provision para multas', 'P', 'CR', 'subcuenta', '2605'],
+    ['260520', 'Provision para contratos', 'P', 'CR', 'subcuenta', '2605'],
+    ['262015', 'Provision para arbitramentos', 'P', 'CR', 'subcuenta', '2620'],
+    ['262020', 'Provision para restitucion', 'P', 'CR', 'subcuenta', '2620'],
+    ['171030', 'Costos de arranque nuevos negocios', 'A', 'DB', 'subcuenta', '1710'],
+    ['171035', 'Costos de registro de marca', 'A', 'DB', 'subcuenta', '1710'],
+    ['181020', 'Terrenos recibidos en pago', 'A', 'DB', 'subcuenta', '1810'],
+    ['181025', 'Maquinaria recibida en pago', 'A', 'DB', 'subcuenta', '1810'],
+    ['125510', 'Derechos en patrimonio autonomo', 'A', 'DB', 'subcuenta', '1255'],
+    ['320510', 'Prima colocacion derechos', 'P', 'CR', 'subcuenta', '3205'],
+    ['345005', 'Ajuste por inflacion patrimonio', 'P', 'CR', 'cuenta', '34'],
+];
+
+$stmt = $pdo->prepare('INSERT IGNORE INTO puc_nacional (codigo, nombre, tipo, naturaleza, nivel, parent) VALUES (?,?,?,?,?,?)');
+$ok = 0; $skip = 0;
+foreach ($extra as $row) {
+    $stmt->execute($row);
+    if ($stmt->rowCount() > 0) {
+        $ok++;
+    } else {
+        $skip++;
+    }
+}
+echo "Insertados: {$ok}, Omitidos (duplicados): {$skip}" . PHP_EOL;
+echo "Total puc_nacional: " . $pdo->query('SELECT COUNT(*) FROM puc_nacional')->fetchColumn() . PHP_EOL;
+echo "Subcuentas: " . $pdo->query("SELECT COUNT(*) FROM puc_nacional WHERE nivel='subcuenta'")->fetchColumn() . PHP_EOL;

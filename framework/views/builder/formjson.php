@@ -1,8 +1,10 @@
+<?php $__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : ''; ?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <script>window.SUKI_BASE = '<?= htmlspecialchars($__base, ENT_QUOTES) ?>';</script>
     <title>Suki Form Builder - Editor Visual JSON (Mejorado)</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
@@ -3090,7 +3092,7 @@
                 async saveEntityToServer() {
                     try {
                         const entity = JSON.parse(this.buildEntityContract());
-                        const res = await fetch('/api/entity/save', {
+                        const res = await fetch(SUKI_BASE + '/api/entity/save', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ entity })
@@ -3122,7 +3124,7 @@
                             payload.report_type = 'report';
                             payload.template = 'basic';
                         }
-                        const res = await fetch('/api/wizard/form-from-entity', {
+                        const res = await fetch(SUKI_BASE + '/api/wizard/form-from-entity', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -3159,7 +3161,7 @@
                             columns,
                             createForm: true
                         };
-                        const res = await fetch('/api/import/csv', {
+                        const res = await fetch(SUKI_BASE + '/api/import/csv', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -4169,7 +4171,7 @@ ${'?'}>
                             this.alanubeStatus = { ok: false, message: 'Completa los datos de integracion.' };
                             return;
                         }
-                        const res = await fetch('/api/integrations/alanube/test', {
+                        const res = await fetch(SUKI_BASE + '/api/integrations/alanube/test', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -4207,7 +4209,7 @@ ${'?'}>
 
                         await this.mergeManifestIntegration(projectRoot, integration);
                         try {
-                            const res = await fetch('/api/integrations/alanube/save', {
+                            const res = await fetch(SUKI_BASE + '/api/integrations/alanube/save', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
                                 body: JSON.stringify({ integration })
@@ -4384,7 +4386,7 @@ ${'?'}>
                             return;
                         }
                         this.alanubeStatus = { ok: true, message: 'Enviando a sandbox...' };
-                        const res = await fetch('/api/integrations/alanube/emit', {
+                        const res = await fetch(SUKI_BASE + '/api/integrations/alanube/emit', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({
@@ -4489,7 +4491,7 @@ ${'?'}>
                 },
                 async refreshRegistryStatus() {
                     try {
-                        const res = await fetch('/api/registry/status');
+                        const res = await fetch(SUKI_BASE + '/api/registry/status');
                         const json = await res.json();
                         if (json && json.status === 'success') {
                             this.projectSnapshot.registry = {
@@ -4506,7 +4508,7 @@ ${'?'}>
                 },
                 async refreshRegistryUsers() {
                     try {
-                        const res = await fetch('/api/registry/users');
+                        const res = await fetch(SUKI_BASE + '/api/registry/users');
                         const json = await res.json();
                         if (json && json.status === 'success') {
                             this.projectSnapshot.registry = {
@@ -4523,7 +4525,7 @@ ${'?'}>
                 },
                 async refreshAuthUsers() {
                     try {
-                        const res = await fetch('/api/auth/users');
+                        const res = await fetch(SUKI_BASE + '/api/auth/users');
                         const json = await res.json();
                         if (json && json.status === 'success') {
                             this.projectSnapshot.registry = {
@@ -4540,7 +4542,7 @@ ${'?'}>
                 },
                 async refreshDeploys() {
                     try {
-                        const res = await fetch('/api/registry/deploys');
+                        const res = await fetch(SUKI_BASE + '/api/registry/deploys');
                         const json = await res.json();
                         if (json && json.status === 'success') {
                             this.projectSnapshot.registry = {
@@ -4557,7 +4559,7 @@ ${'?'}>
                 },
                 async refreshProjects() {
                     try {
-                        const res = await fetch('/api/registry/projects');
+                        const res = await fetch(SUKI_BASE + '/api/registry/projects');
                         const json = await res.json();
                         if (json && json.status === 'success') {
                             this.projectList = json.data?.projects || [];
@@ -4574,7 +4576,7 @@ ${'?'}>
                 async selectProject(projectId) {
                     if (!projectId) return;
                     try {
-                        const res = await fetch('/api/registry/select', {
+                        const res = await fetch(SUKI_BASE + '/api/registry/select', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ project_id: projectId })
@@ -4609,7 +4611,7 @@ ${'?'}>
                         tenant_mode: this.projectForm.tenant_mode || 'shared'
                     };
                     try {
-                        const res = await fetch('/api/registry/project', {
+                        const res = await fetch(SUKI_BASE + '/api/registry/project', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -4641,7 +4643,7 @@ ${'?'}>
                         tenant_id: (this.userForm.tenant_id || 'default').trim()
                     };
                     try {
-                        const res = await fetch('/api/registry/user', {
+                        const res = await fetch(SUKI_BASE + '/api/registry/user', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -4694,7 +4696,7 @@ ${'?'}>
                         label: (this.authForm.label || id).trim()
                     };
                     try {
-                        const res = await fetch('/api/auth/register', {
+                        const res = await fetch(SUKI_BASE + '/api/auth/register', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -4721,7 +4723,7 @@ ${'?'}>
                         return;
                     }
                     try {
-                        const res = await fetch('/api/auth/login', {
+                        const res = await fetch(SUKI_BASE + '/api/auth/login', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify({ id, password })
@@ -4748,7 +4750,7 @@ ${'?'}>
                 },
                 async logoutAuthUser() {
                     try {
-                        await fetch('/api/auth/logout', { method: 'POST' });
+                        await fetch(SUKI_BASE + '/api/auth/logout', { method: 'POST' });
                         this.currentAuthUser = null;
                         this.notify('success', 'Sesion cerrada.');
                     } catch (e) {
@@ -4757,7 +4759,7 @@ ${'?'}>
                 },
                 async refreshAuthMe() {
                     try {
-                        const res = await fetch('/api/auth/me');
+                        const res = await fetch(SUKI_BASE + '/api/auth/me');
                         const json = await res.json();
                         if (json && json.status === 'success') {
                             this.currentAuthUser = json.data?.user || null;
@@ -4788,7 +4790,7 @@ ${'?'}>
                         status: (this.deployForm.status || 'pending').trim()
                     };
                     try {
-                        const res = await fetch('/api/registry/deploy', {
+                        const res = await fetch(SUKI_BASE + '/api/registry/deploy', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload)
@@ -4808,7 +4810,7 @@ ${'?'}>
                 },
                 async checkLlmHealth() {
                     try {
-                        const res = await fetch('/api/llm/health', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'ping' }) });
+                        const res = await fetch(SUKI_BASE + '/api/llm/health', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'ping' }) });
                         const json = await res.json();
                         if (json && json.status === 'success') {
                             this.llmHealth.providers = json.data?.providers || {};
@@ -4830,7 +4832,7 @@ ${'?'}>
                 async refreshAcidReport() {
                     try {
                         const tenantId = this.chatTest.tenant_id || 'default';
-                        const res = await fetch(`/api/chat/acid-report?tenant_id=${encodeURIComponent(tenantId)}`);
+                        const res = await fetch(SUKI_BASE + `/api/chat/acid-report?tenant_id=${encodeURIComponent(tenantId)}`);
                         const json = await res.json();
                         if (json && json.status === 'success') {
                             this.projectSnapshot.acid = json.data?.report || { summary: null, results: [] };
@@ -4846,7 +4848,7 @@ ${'?'}>
                             user_id: this.chatTest.user_id || 'builder_demo',
                             project_id: this.chatTest.project_id || '',
                         };
-                        const res = await fetch('/api/chat/acid-test', {
+                        const res = await fetch(SUKI_BASE + '/api/chat/acid-test', {
                             method: 'POST',
                             headers: { 'Content-Type': 'application/json' },
                             body: JSON.stringify(payload),

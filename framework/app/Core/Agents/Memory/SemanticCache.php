@@ -124,7 +124,8 @@ class SemanticCache
     public function prune(): void
     {
         $cutoff = date('Y-m-d H:i:s', time() - $this->ttlSeconds);
-        $this->db->exec("DELETE FROM ops_semantic_cache WHERE created_at < '$cutoff'");
+        $stmt = $this->db->prepare('DELETE FROM ops_semantic_cache WHERE created_at < ?');
+        $stmt->execute([$cutoff]);
     }
 
     private function ensureSchema(): void

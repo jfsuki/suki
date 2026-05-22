@@ -31,13 +31,14 @@ if ($masterKey === '') {
 }
 $error = '';
 
-// Detectar subdirectorio base (/suki en Laragon, vacío en vhost raíz)
+// Detectar subdirectorio base — igual que los demás mundos (str_contains /suki/ en URL directa)
 $__baseTower = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
 
 // Procesar Login si se envía el formulario
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['master_key'])) {
     if ($_POST['master_key'] === $masterKey) {
         $_SESSION['suki_tower_auth'] = true;
+        unset($_SESSION['tower_tenant_scope']); // reset scope on re-login — Tower shows all tenants by default
         header("Location: {$__baseTower}/torre");
         exit;
     } else {
@@ -45,14 +46,28 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['master_key'])) {
     }
 }
 
+// Procesar selección de tenant
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['tower_tenant'])) {
+    if (isset($_SESSION['suki_tower_auth']) && $_SESSION['suki_tower_auth'] === true) {
+        $selectedTenant = preg_replace('/[^a-zA-Z0-9_\-]/', '', (string) $_POST['tower_tenant']);
+        if ($selectedTenant !== '') {
+            $_SESSION['tower_tenant_scope'] = $selectedTenant;
+            header("Location: {$__baseTower}/torre");
+            exit;
+        }
+    }
+}
+
 $is_authenticated = isset($_SESSION['suki_tower_auth']) && $_SESSION['suki_tower_auth'] === true;
+$tower_tenant     = $_SESSION['tower_tenant_scope'] ?? '';
 
 // 3. Mapa de Rutas de la Torre (Vistas ocultas en framework/views/auth/)
 $viewsDir = __DIR__ . '/../../framework/views/auth/';
 $routes = [
-    'dashboard' => $viewsDir . 'tower_x92.php',
-    'editor'    => __DIR__ . '/../../framework/views/builder/formjson.php',
-    'builder'   => __DIR__ . '/../../project/views/chat/builder.php',
+    'dashboard'     => $viewsDir . 'tower_x92.php',
+    'editor'        => __DIR__ . '/../../framework/views/builder/formjson.php',
+    'builder'       => __DIR__ . '/../../project/views/chat/builder.php',
+    'select-tenant' => $viewsDir . 'tower_tenant_select.php',
 ];
 
 // Forzar noindex para todo el mundo Tower
@@ -60,11 +75,11 @@ header('X-Robots-Tag: noindex, nofollow', true);
 
 // 4. Lógica de Enrutado
 if (!$is_authenticated) {
-    // Si no está autenticado, cargamos el formulario Master Key
     require_once $viewsDir . 'tower_login.php';
     exit;
 }
 
+// select-tenant still available as optional scope setter — no longer a mandatory gate
 if (array_key_exists($url, $routes)) {
     $file = $routes[$url];
     if (file_exists($file)) {

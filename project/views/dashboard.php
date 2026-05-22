@@ -1,6 +1,7 @@
 <?php
 // project/views/dashboard.php
-?>
+$__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
+?><script>var SUKI_BASE = '<?= htmlspecialchars($__base, ENT_QUOTES) ?>';</script>
 <div class="max-w-6xl mx-auto p-6 space-y-6">
     <div class="bg-white p-4 rounded-lg shadow-sm border">
         <h1 class="text-xl font-bold text-gray-800">Dashboard runtime</h1>
@@ -105,7 +106,7 @@
         setMessage('Cargando dashboard...');
         clear();
         try {
-            const url = `/api/dashboards?form=${encodeURIComponent(form)}&dashboard=${encodeURIComponent(dash)}&entity=${encodeURIComponent(entity)}`;
+            const url = SUKI_BASE + `/api/dashboards?form=${encodeURIComponent(form)}&dashboard=${encodeURIComponent(dash)}&entity=${encodeURIComponent(entity)}`;
             const res = await fetch(url);
             const json = await res.json();
             if (json.status !== 'success') {

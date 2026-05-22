@@ -3267,6 +3267,8 @@ if ($route === 'auth/register') {
         $userId = (string) ($payload['id'] ?? $payload['user_id'] ?? '');
         $password = (string) ($payload['password'] ?? '');
         $role = (string) ($payload['role'] ?? 'admin');
+        // tenant_id del payload solo permitido en registros internos/admin
+        // Para auto-registro de tenants externos usar POST /auth/tenant-register
         $tenantId = (string) ($payload['tenant_id'] ?? 'default');
         $label = (string) ($payload['label'] ?? $userId);
         $registry->createAuthUser($projectId, $userId, $password, $role, $tenantId, $label);
@@ -3297,9 +3299,9 @@ if ($route === 'auth/request_code') {
         }
         $code = (string) random_int(100000, 999999);
         $registry->storeAuthCode($projectId, $phone, $code);
-        respondJson($response, 'success', 'Codigo generado (simulado)', [
+        // El OTP se pasa al canal externo (SMS/email) — NUNCA en la respuesta HTTP
+        respondJson($response, 'success', 'Codigo enviado al canal registrado', [
             'phone' => $phone,
-            'code' => $code,
         ]);
         return;
     } catch (\Throwable $e) {
@@ -3326,7 +3328,10 @@ if ($route === 'auth/verify_code') {
             respondJson($response, 'error', 'Codigo invalido', [], 401);
             return;
         }
-        $registry->createAuthUser($projectId, $phone, $code, $role, $tenantId, $phone);
+        // Contraseña real del request o aleatoria segura — el OTP NO se usa como contraseña
+        $newPassword = (string) ($payload['password'] ?? bin2hex(random_bytes(16)));
+        $passwordHash = password_hash($newPassword, PASSWORD_BCRYPT);
+        $registry->createAuthUser($projectId, $phone, $passwordHash, $role, $tenantId, $phone);
         $registry->touchUser($phone, $role, 'auth', $tenantId, $phone);
         $registry->assignUserToProject($projectId, $phone, $role);
         respondJson($response, 'success', 'Telefono verificado', [
@@ -3358,6 +3363,11 @@ if ($route === 'auth/login') {
             respondJson($response, 'error', 'Credenciales invalidas', [], 401);
             return;
         }
+        // Usuarios con is_active=0 no pueden iniciar sesión (pendiente verificación OTP)
+        if (!($user['is_active'] ?? true)) {
+            respondJson($response, 'error', 'Cuenta pendiente de verificacion. Revisar email.', [], 403);
+            return;
+        }
         $_SESSION['auth_user'] = [
             'id' => $user['id'],
             'project_id' => $projectId,
@@ -3374,6 +3384,36 @@ if ($route === 'auth/login') {
         respondJson($response, 'error', $e->getMessage(), [], 500);
         return;
     }
+}
+
+// POST /api/auth/tenant-register — Paso 1: solicitar registro con email OTP
+if ($route === 'auth/tenant-register') {
+    $body = requestData();
+    $svc = new \App\Core\TenantSelfRegistrationService(
+        \App\Core\Database::connection(),
+        new \App\Core\OtpService(\App\Core\Database::connection()),
+        new \App\Core\EmailService()
+    );
+    $result = $svc->requestRegistration($body);
+    respondJson($response, $result['ok'] ? 'success' : 'error', $result['message'], $result);
+    return;
+}
+
+// POST /api/auth/tenant-verify-otp — Paso 2: verificar OTP y activar cuenta
+if ($route === 'auth/tenant-verify-otp') {
+    $body = requestData();
+    $svc = new \App\Core\TenantSelfRegistrationService(
+        \App\Core\Database::connection(),
+        new \App\Core\OtpService(\App\Core\Database::connection()),
+        new \App\Core\EmailService()
+    );
+    $result = $svc->verifyAndActivate(
+        (string) ($body['tenant_id'] ?? ''),
+        (string) ($body['email'] ?? ''),
+        (string) ($body['code'] ?? '')
+    );
+    respondJson($response, $result['ok'] ? 'success' : 'error', $result['message'], $result);
+    return;
 }
 
 if ($route === 'auth/me') {
@@ -3548,7 +3588,7 @@ if ($route === 'integrations/alanube/save') {
         $path = PROJECT_ROOT . '/contracts/integrations/' . $id . '.integration.json';
         writeJsonFile($path, $integration);
 
-        $store = new IntegrationStore();
+        $store = new IntegrationStore(null, (string)(getenv('TENANT_KEY') ?: ''));
         $store->saveConnection($integration);
 
         respondJson($response, 'success', 'Integracion guardada', [
@@ -3621,7 +3661,7 @@ if ($route === 'integrations/alanube/emit') {
         $result = $client->emitDocument($endpoint, $payloadData);
         $externalId = $result['data']['id'] ?? ($result['data']['documentId'] ?? null);
 
-        $store = new IntegrationStore();
+        $store = new IntegrationStore(null, (string)(getenv('TENANT_KEY') ?: ''));
         $store->saveDocument($integrationId, $entityName, $recordId ? (string) $recordId : null, $externalId ? (string) $externalId : null, 'sent', $payloadData, $result['data']);
 
         respondJson($response, 'success', 'Documento emitido', [
@@ -3656,7 +3696,7 @@ if ($route === 'integrations/alanube/status') {
         $client = new AlanubeClient($integration['base_url'], $token);
         $endpoint = (string) ($payload['endpoint'] ?? '/documents');
         $result = $client->getDocument($endpoint, $externalId);
-        $store = new IntegrationStore();
+        $store = new IntegrationStore(null, (string)(getenv('TENANT_KEY') ?: ''));
         $store->updateDocumentStatus($integrationId, $externalId, 'status', $result['data']);
         respondJson($response, 'success', 'Estado consultado', $result);
         return;
@@ -3686,7 +3726,7 @@ if ($route === 'integrations/alanube/cancel') {
         $client = new AlanubeClient($integration['base_url'], $token);
         $endpoint = (string) ($payload['endpoint'] ?? '/documents');
         $result = $client->cancelDocument($endpoint, $externalId, $payload['payload'] ?? []);
-        $store = new IntegrationStore();
+        $store = new IntegrationStore(null, (string)(getenv('TENANT_KEY') ?: ''));
         $store->updateDocumentStatus($integrationId, $externalId, 'cancelled', $result['data']);
         respondJson($response, 'success', 'Documento anulado', $result);
         return;
@@ -3747,7 +3787,7 @@ if ($route === 'integrations/alanube/webhook') {
     }
 
     try {
-        $store = new IntegrationStore();
+        $store = new IntegrationStore(null, (string)(getenv('TENANT_KEY') ?: ''));
         $store->logWebhook($integrationId, $event ?: null, $externalId, $payload);
         if ($externalId) {
             $store->updateDocumentStatus($integrationId, $externalId, $event ?: 'webhook', $payload);

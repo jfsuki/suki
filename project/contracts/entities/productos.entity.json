@@ -72,6 +72,14 @@
             "label": "Categoría",
             "required": false,
             "source": "form"
+        },
+        {
+            "name": "codigo_unspsc",
+            "type": "string",
+            "label": "Código UNSPSC",
+            "required": false,
+            "source": "form",
+            "help": "Código de clasificación UNSPSC (ej: 50101501). Requerido para Factura Electrónica DIAN. El contador o el agente puede ayudarle a encontrar el código correcto."
         }
     ],
     "permissions": {

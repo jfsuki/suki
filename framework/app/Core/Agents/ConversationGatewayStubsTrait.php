@@ -306,7 +306,32 @@ trait ConversationGatewayStubsTrait
     public function isOutOfScopeQuestion(string $text, string $mode): bool
     {
         $result = $this->intentClassifier()->classify($text);
-        return $result['intent'] === 'out_of_scope' && $result['score'] >= self::QDRANT_MIN_SCORE;
+
+        // Clasificación semántica directa (Qdrant tiene training de out_of_scope)
+        if ($result['intent'] === 'out_of_scope' && $result['score'] >= self::QDRANT_MIN_SCORE) {
+            return true;
+        }
+
+        // Fallback: intent desconocido con score muy bajo = probablemente fuera de dominio
+        if (in_array($result['intent'], ['unknown', ''], true) && $result['score'] < 0.40) {
+            // Si el texto contiene tokens de negocio, dejarlo pasar al pipeline normal
+            $businessTokens = [
+                'crea', 'app', 'venta', 'factura', 'producto', 'cliente', 'inventario',
+                'compra', 'pago', 'cuenta', 'precio', 'pedido', 'empresa', 'módulo',
+                'reporte', 'usuario', 'suki', 'ayuda', 'qué puedes', 'cómo funciona',
+                'instala', 'configura', 'listame', 'muéstrame', 'dame', 'agregar',
+                'registrar', 'buscar', 'ver', 'editar', 'eliminar',
+            ];
+            $normalized = mb_strtolower(trim($text));
+            foreach ($businessTokens as $token) {
+                if (str_contains($normalized, $token)) {
+                    return false;
+                }
+            }
+            return true;
+        }
+
+        return false;
     }
 
     public function buildOutOfScopeReply(string $mode): string

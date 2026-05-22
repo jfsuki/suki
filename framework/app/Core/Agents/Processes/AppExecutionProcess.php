@@ -36,6 +36,23 @@ class AppExecutionProcess
      * @param IntentRouter|null $router Clasificador Qdrant/NLU
      * @param LLMRouter|null    $llm    Fallback semántico si el router no resuelve (FIX A4)
      */
+    /**
+     * Clasifica el intent semántico del texto via Qdrant.
+     * Requerido por ChatOrchestrator::route().
+     */
+    public function detectIntent(string $userText, ?LLMRouter $llm = null): string
+    {
+        if ($this->intentClassifier !== null) {
+            try {
+                $classification = $this->intentClassifier->classify($userText);
+                return (string) ($classification['intent'] ?? 'unknown');
+            } catch (\Throwable $e) {
+                error_log('[AppExecutionProcess] detectIntent error: ' . $e->getMessage());
+            }
+        }
+        return 'unknown';
+    }
+
     public function execute(
         string $userText,
         MemoryWindow $memory,

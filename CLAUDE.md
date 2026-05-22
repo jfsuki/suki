@@ -58,7 +58,7 @@ User Chat
 |-------|----------|-----------|---------|
 | Login individual por tenant (OTP) | P0 | Solo `SUKI_MASTER_KEY` global. `register.php:21` captura phone, falta OTP | 5-8d |
 | FE electrónica DIAN — XML/UBL/CUFE/firma | P0 | `AlanubeClient.php:51` HTTP real, `AlanubeIntegrationAdapter.php:8` payload vacío | 15-20d |
-| PUC real + ReteFuente + ICA | P1 | `AccountingRepository.php:13` — cuentas 1/2/99 sintéticas. Retención solo en prompts | 8-12d |
+| PUC real + ReteFuente + ICA | ~~P1~~ RESUELTO | PUC 1002 cuentas en `puc_nacional`. ReteFuente+ICA en `FiscalRulesEngine.php` + `fiscal_rules_co.json` | — |
 | Control Tower dashboards (KPIs, tokens, inbox) | P1 | `SPRINT_TRACKER.md` — S6.A-F = 100% sin iniciar | 10-15d |
 | Tests E2E HTTP + CI remoto | P1 | `run.php:7` — PHP interno, sin HTTP real, sin CI | 5-8d |
 
@@ -77,7 +77,7 @@ User Chat
 
 ## STATUS
 
-✅ **PASS**: 121/121 unit tests, DB health OK, security hardening complete, TC01-TC26 integration tests (Fases 1-8)  
+✅ **PASS**: 121/121 unit tests (requiere INSTALL.md sin keys reales — ver FIX 1), DB health OK, security hardening complete, TC01-TC26 integration tests (Fases 1-8)  
 ✅ **FASE 8**: TC24-TC26 feedback loop 21/21 PASS — AppFeedbackService wired, auto-promote a Qdrant, Torre tab activo  
 ❌ **FAIL**: `llm_smoke.php` (credentials, not code bug)  
 ❌ **ELIMINADO**: `chat_golden.php` — era smoke puro (str_contains sobre respuestas LLM), no medía calidad real  
@@ -161,12 +161,10 @@ tail -f project/storage/logs/transcripts/history_*.txt     # Conversations
 
 ## NEXT STEPS (orden por impacto real)
 
-1. **PUC colombiano** → Implementar catálogo real en `AccountingRepository` (hoy son cuentas 1/2/99)
-2. **ReteFuente + ICA** → Añadir cálculo real en `AccountingService` (hoy solo en prompts)
-3. **Alanube XML/UBL** → Completar payload DIAN en `AlanubeIntegrationAdapter` (HTTP client real, payload vacío)
-4. **E2E HTTP tests** → Añadir pruebas HTTP reales sobre POS→Fiscal→Invoice flow
-5. **ReportEngine financiero** → Balance general, P&G, Flujo de efectivo real
-6. **Strangler ChatAgent** → Continuar extracción (hoy 2958 líneas, era 4652 — -36% logrado)
+1. **Alanube XML/UBL** → Completar payload DIAN en `AlanubeIntegrationAdapter` (HTTP client real, payload vacío)
+2. **E2E HTTP tests** → Añadir pruebas HTTP reales sobre POS→Fiscal→Invoice flow
+3. **ReportEngine financiero** → Balance general, P&G, Flujo de efectivo real
+4. **Strangler ChatAgent** → Continuar extracción (hoy 2958 líneas, era 4652 — -36% logrado)
 
 ---
 

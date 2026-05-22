@@ -48,6 +48,7 @@
           "ref": { "type": "string" },
           "enum": { "type": "array", "items": { "type": "string" } },
           "index": { "type": "boolean" },
+          "help": { "type": "string" },
           "params": { "type": "object", "additionalProperties": true }
         }
       }

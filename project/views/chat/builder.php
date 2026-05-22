@@ -1,8 +1,13 @@
-<?php 
+<?php
 $current_page = 'chat';
 $frameworkRoot = dirname(__DIR__, 3) . '/framework';
-include $frameworkRoot . '/views/builder/includes/header.php'; 
-include $frameworkRoot . '/views/builder/includes/navbar.php'; 
+$__base    = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
+$_bTenant  = htmlspecialchars((string) ($_SESSION['tenant_id']  ?? ''), ENT_QUOTES, 'UTF-8');
+$_bUser    = htmlspecialchars((string) ($_SESSION['user_id']    ?? ''), ENT_QUOTES, 'UTF-8');
+$_bProject = htmlspecialchars((string) ($_SESSION['project_id'] ?? 'default'), ENT_QUOTES, 'UTF-8');
+include $frameworkRoot . '/views/builder/includes/header.php';
+echo "<script>window.SUKI_BASE='". $__base ."';window.SUKI_TENANT='". $_bTenant ."';window.SUKI_USER='". $_bUser ."';window.SUKI_PROJECT='". $_bProject ."';</script>";
+include $frameworkRoot . '/views/builder/includes/navbar.php';
 ?>
 <style>
     /* ─── CHAT-SPECIFIC LAYOUT (PROJECT SYNC) ───────────────── */
@@ -479,7 +484,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
             <div class="ob-dot"></div>
             <div>
               <div class="ob-text">ChatOrchestrator v2</div>
-              <div class="ob-sub">Multi-Agent Pipeline · CrewAI</div>
+              <div class="ob-sub">Multi-Agent Pipeline · SUKI OS</div>
             </div>
           </div>
 
@@ -586,19 +591,18 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
   let cacheHits  = 0;
   let latencies  = [];
 
-  // Config
-  const API_URL   = 'api/chat/message';
+  // Config — sesión desde PHP (inyectado en header); cookie como fallback
+  const API_URL   = (window.SUKI_BASE || '') + '/api/chat/message';
   const MODE      = 'builder';
-  const TENANT_ID = _cfg('tenant_id', 'demo');
-  const USER_ID   = _cfg('user_id',   'admin');
-  const PROJECT_ID = _cfg('project_id', 'default');
-  
-  let ACTIVE_SESSION_ID = localStorage.getItem('suki_builder_session') || '';
-
   function _cfg(k, def) {
     const m = document.cookie.match(new RegExp('(?:^|;)\\s*' + k + '=([^;]*)'));
     return m ? decodeURIComponent(m[1]) : def;
   }
+  const TENANT_ID  = window.SUKI_TENANT  || _cfg('tenant_id',  '');
+  const USER_ID    = window.SUKI_USER    || _cfg('user_id',    '');
+  const PROJECT_ID = window.SUKI_PROJECT || _cfg('project_id', 'default');
+
+  let ACTIVE_SESSION_ID = localStorage.getItem('suki_builder_session') || '';
 
   // ── SESSION & JOURNAL MANAGEMENT ──────────────────
   window.showPane = (pane) => {

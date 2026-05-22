@@ -17,7 +17,8 @@ final class GroqProvider
 
     public function sendChat(array $messages, array $params = []): array
     {
-        $client = new GroqClient();
+        $model  = getenv('GROQ_MODEL') ?: ($this->config['model'] ?? null);
+        $client = new GroqClient(null, $model ?: null);
         $result = $client->chat($messages, $params);
         $content = (string) ($result['content'] ?? '');
         return [

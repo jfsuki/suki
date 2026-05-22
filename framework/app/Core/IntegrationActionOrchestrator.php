@@ -16,10 +16,11 @@ final class IntegrationActionOrchestrator
         ?IntegrationRegistry $registry = null,
         ?IntegrationStore $store = null,
         ?IntegrationAdapterFactory $factory = null,
-        ?AuditLogger $audit = null
+        ?AuditLogger $audit = null,
+        string $tenantId = ''
     ) {
         $this->registry = $registry ?? new IntegrationRegistry();
-        $this->store = $store ?? new IntegrationStore();
+        $this->store = $store ?? new IntegrationStore(null, $tenantId);
         $this->factory = $factory ?? new IntegrationAdapterFactory();
         $this->audit = $audit ?? new AuditLogger();
     }

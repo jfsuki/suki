@@ -90,15 +90,15 @@ Leer el output y verificar:
 php -r "
 require 'framework/vendor/autoload.php'; require 'framework/app/autoload.php';
 \$db = new \App\Core\Database();
-\$rows = \$db->query('SELECT COUNT(*) as c FROM mensajes WHERE tenant_id IS NOT NULL');
+\$rows = \$db->query('SELECT COUNT(*) as c FROM chat_log WHERE tenant_id IS NOT NULL');
 echo 'Mensajes con tenant_id: ' . \$rows[0]['c'] . PHP_EOL;
-\$sinTenant = \$db->query('SELECT COUNT(*) as c FROM mensajes WHERE tenant_id IS NULL OR tenant_id = \"\"');
+\$sinTenant = \$db->query('SELECT COUNT(*) as c FROM chat_log WHERE tenant_id IS NULL OR tenant_id = \"\"');
 echo 'Mensajes SIN tenant_id: ' . \$sinTenant[0]['c'] . PHP_EOL;
 "
 ```
 
 PASS: `Mensajes SIN tenant_id: 0`
-FAIL: cualquier valor > 0 en mensajes sin tenant_id
+FAIL: cualquier valor > 0 en chat_log sin tenant_id
 
 ### 1.3 Comportamiento con input inválido
 
@@ -132,7 +132,7 @@ echo 'SQL injection — responde JSON: ' . (json_decode(\$out) ? 'SÍ' : 'NO') .
 php -r "
 require 'framework/vendor/autoload.php'; require 'framework/app/autoload.php';
 \$db = new \App\Core\Database();
-\$last = \$db->query('SELECT id, tenant_id, role, created_at FROM mensajes ORDER BY id DESC LIMIT 3');
+\$last = \$db->query('SELECT id, tenant_id, role, created_at FROM chat_log ORDER BY id DESC LIMIT 3');
 foreach(\$last as \$r) {
     echo implode(' | ', \$r) . PHP_EOL;
 }
@@ -262,7 +262,7 @@ PASS: respuesta < 3s para mensajes sin LLM, < 10s para LLM real.
 php -r "
 require 'framework/vendor/autoload.php'; require 'framework/app/autoload.php';
 \$db = new \App\Core\Database();
-\$tables = ['mensajes', 'user_profiles', 'ai_agents', 'app_memoria'];
+\$tables = ['chat_log', 'user_profiles', 'ai_agents', 'app_memoria'];
 foreach(\$tables as \$t) {
     \$idx = \$db->query('SHOW INDEX FROM ' . \$t);
     \$cols = array_column(\$idx, 'Column_name');
@@ -271,7 +271,7 @@ foreach(\$tables as \$t) {
 " 2>&1
 ```
 
-PASS: `mensajes` tiene índice en `tenant_id`, `session_id`. `user_profiles` tiene índice en `(tenant_id, user_id, world)`.
+PASS: `chat_log` tiene índice en `tenant_id`, `session_id`. `user_profiles` tiene índice en `(tenant_id, user_id, world)`.
 
 ---
 
@@ -538,7 +538,7 @@ require 'framework/vendor/autoload.php'; require 'framework/app/autoload.php';
 
 // Verificar que query por tenant A no trae tenant B
 \$rows = \$db->query(
-    'SELECT COUNT(*) as c FROM mensajes WHERE tenant_id = ? AND tenant_id != ?',
+    'SELECT COUNT(*) as c FROM chat_log WHERE tenant_id = ? AND tenant_id != ?',
     [\$tenantA, \$tenantB]
 );
 echo 'Isolation test: ' . (\$rows[0]['c'] === 0 || \$tenantA !== \$tenantB ? 'PASS' : 'FAIL') . PHP_EOL;
@@ -685,7 +685,7 @@ ls -la framework/app/Core/UserProfileService.php 2>/dev/null || \
   echo "FAIL: UserProfileService.php NO EXISTE"
 
 # ¿Existe AppUserOnboarding?
-ls -la framework/app/Core/Agents/Processes/AppUserOnboarding.php 2>/dev/null || \
+ls -la framework/app/Core/AppUserOnboarding.php 2>/dev/null || \
   echo "FAIL: AppUserOnboarding.php NO EXISTE"
 ```
 
@@ -806,7 +806,7 @@ try {
 }
 " 2>/dev/null
 [ -f "framework/app/Core/UserProfileService.php" ] && echo "C1_SERVICE=1" || echo "C1_SERVICE=0"
-[ -f "framework/app/Core/Agents/Processes/AppUserOnboarding.php" ] && echo "C1_ONBOARD=1" || echo "C1_ONBOARD=0"
+[ -f "framework/app/Core/AppUserOnboarding.php" ] && echo "C1_ONBOARD=1" || echo "C1_ONBOARD=0"
 
 # Capa 2: Context Middleware
 grep -q "buildSystemPrompt\|build_system_prompt" framework/app/Core/ChatAgent.php 2>/dev/null && \
@@ -855,7 +855,7 @@ grep -n "CrossSessionMemory\|loadRecentTurns\|cross_session" \
   framework/app/Core/ChatAgent.php 2>/dev/null | head -5
 ```
 
-PASS: CrossSessionMemory existe, carga desde `mensajes` tabla scoped por tenant+user.
+PASS: CrossSessionMemory existe, carga desde `chat_log` tabla scoped por tenant+user.
 FAIL: si no existe → cada sesión empieza desde cero → el agente "olvida" al usuario cada vez.
 
 ### 14.8 Verificar sistema de prompts diferenciados por mundo
@@ -883,7 +883,7 @@ FAIL: solo `builder_system_prompt.txt` usado para todos.
 ```bash
 # ¿Existe flujo de onboarding para App Chat?
 grep -rn "onboarding\|first_time\|welcome_flow\|AppUserOnboarding\|nombre.*usuario\|cómo te llamo" \
-  framework/app/Core/Agents/Processes/ --include="*.php" | head -10
+  framework/app/Core/ --include="*.php" | head -10
 
 # ¿Se verifica si es primera vez antes de procesar el mensaje?
 grep -n "onboarding_completed\|is_first_time\|checkOnboarding\|hasProfile" \
@@ -896,7 +896,7 @@ FAIL: si no existe → el agente responde a un usuario nuevo sin saber su nombre
 
 ```bash
 grep -rn "display_name\|role_label\|tech_level\|frequent_tasks\|nombre\|cargo\|nivel" \
-  framework/app/Core/Agents/Processes/AppUserOnboarding.php 2>/dev/null | head -15
+  framework/app/Core/AppUserOnboarding.php 2>/dev/null | head -15
 ```
 
 PASS: captura al menos: nombre/apodo, cargo/rol, nivel técnico.
@@ -956,7 +956,7 @@ catch(\Exception \$e) { echo '  tabla user_profiles: FALTA — BLOQUEADOR' . PHP
 " 2>&1
 [ -f "framework/app/Core/UserProfileService.php" ] && \
   echo "  UserProfileService: EXISTE" || echo "  UserProfileService: FALTA — BLOQUEADOR"
-[ -f "framework/app/Core/Agents/Processes/AppUserOnboarding.php" ] && \
+[ -f "framework/app/Core/AppUserOnboarding.php" ] && \
   echo "  AppUserOnboarding: EXISTE" || echo "  AppUserOnboarding: FALTA — sin entrevista usuario"
 
 echo ""

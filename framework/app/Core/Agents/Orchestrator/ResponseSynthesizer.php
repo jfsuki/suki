@@ -26,7 +26,7 @@ class ResponseSynthesizer
             $body .= "• $statusIcon **Agente de $area**: " . $data['output'] . "\n";
         }
 
-        $summary = "\n**Conclusión Final:** El Supervisor ha validado estos reportes bajo las reglas deterministas de la empresa. El proceso ha sido marcado como **NOMINAL**.";
+        $summary = "\n**Conclusión Final:** El Supervisor ha validado estos reportes bajo las reglas deterministas de la empresa.";
 
         return $intro . $body . $summary;
     }

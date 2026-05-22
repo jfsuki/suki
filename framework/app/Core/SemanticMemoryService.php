@@ -12,7 +12,7 @@ final class SemanticMemoryService
     private const DEFAULT_MIN_EVIDENCE_CHUNKS = 1;
     private const DEFAULT_MAX_CONTEXT_CHUNKS = 3;
 
-    private GeminiEmbeddingService $embeddingService;
+    private ?GeminiEmbeddingService $embeddingService;
     private ?QdrantVectorStore $vectorStorePrototype;
     private int $defaultTopK;
 
@@ -26,7 +26,11 @@ final class SemanticMemoryService
         ?QdrantVectorStore $vectorStore = null,
         ?int $defaultTopK = null
     ) {
-        $this->embeddingService = $embeddingService ?? new GeminiEmbeddingService();
+        try {
+            $this->embeddingService = $embeddingService ?? new GeminiEmbeddingService();
+        } catch (\Throwable $e) {
+            $this->embeddingService = null;
+        }
         $this->vectorStorePrototype = $vectorStore;
         $this->defaultTopK = max(1, (int) ($defaultTopK ?? getenv('SEMANTIC_MEMORY_TOP_K') ?: 5));
     }
@@ -104,6 +108,9 @@ final class SemanticMemoryService
      */
     public function ingest(array $chunks, array $options = []): array
     {
+        if ($this->embeddingService === null) {
+            return self::disabledResult('embedding_service_unavailable');
+        }
         $requestedMemoryType = trim((string) ($options['memory_type'] ?? ''));
         $received = count($chunks);
         $sanitized = $this->sanitizeChunks($chunks, $requestedMemoryType !== '' ? $requestedMemoryType : null);
@@ -292,6 +299,9 @@ final class SemanticMemoryService
      */
     public function retrieve(string $query, array $scope, ?int $limit = null): array
     {
+        if ($this->embeddingService === null) {
+            return self::disabledResult('embedding_service_unavailable');
+        }
         $query = trim($query);
         if ($query === '') {
             return [

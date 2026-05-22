@@ -1,3 +1,12 @@
+<?php
+$__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
+$catalogPath = dirname(__DIR__, 2) . '/project/contracts/app_catalog.json';
+$__apps = [];
+if (file_exists($catalogPath)) {
+    $raw = json_decode(file_get_contents($catalogPath), true);
+    $__apps = array_filter($raw['apps'] ?? [], fn($a) => ($a['status'] ?? '') === 'available');
+}
+?>
 <!DOCTYPE html>
 <html lang="es">
 <head>
@@ -119,8 +128,7 @@
     <nav class="nav">
         <div class="logo">SUKI <span>OS</span></div>
         <div class="auth-links">
-            <a href="login">Acceso Clientes</a>
-            <?php $__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : ''; ?>
+            <a href="<?= $__base ?>/marketplace/login">Acceso Clientes</a>
             <a href="<?= $__base ?>/apps/register-enterprise" style="background: white; color: black; padding: 10px 20px; border-radius: 10px;">Registrar Empresa</a>
         </div>
     </nav>
@@ -131,24 +139,21 @@
     </section>
 
     <div class="grid">
+        <?php if (empty($__apps)): ?>
+        <p style="color:var(--text-dim);grid-column:1/-1;text-align:center;padding:3rem 0;">No hay aplicaciones disponibles en este momento.</p>
+        <?php else: foreach ($__apps as $__app):
+            $__id   = htmlspecialchars($__app['id'],          ENT_QUOTES, 'UTF-8');
+            $__name = htmlspecialchars($__app['name'],        ENT_QUOTES, 'UTF-8');
+            $__cat  = htmlspecialchars($__app['category'],    ENT_QUOTES, 'UTF-8');
+            $__desc = htmlspecialchars($__app['description'], ENT_QUOTES, 'UTF-8');
+        ?>
         <div class="card">
-            <div class="badge">Administrativo</div>
-            <h3>SUKI ERP Core</h3>
-            <p>Control total de inventarios, compras y ventas con inteligencia fiscal integrada.</p>
-            <a href="<?= $__base ?>/apps/register-enterprise?app_id=suki_erp" class="btn">Instalar App</a>
+            <div class="badge"><?= $__cat ?></div>
+            <h3><?= $__name ?></h3>
+            <p><?= $__desc ?></p>
+            <a href="<?= $__base ?>/apps/register-enterprise?app_id=<?= $__id ?>" class="btn">Instalar App</a>
         </div>
-        <div class="card">
-            <div class="badge">Ecommerce</div>
-            <h3>Store Hub</h3>
-            <p>Conecta tu tienda física con el mundo digital y gestiona todo desde un solo chat.</p>
-            <a href="<?= $__base ?>/apps/register-enterprise?app_id=store_hub" class="btn">Instalar App</a>
-        </div>
-        <div class="card">
-            <div class="badge">Soporte</div>
-            <h3>Agent Support</h3>
-            <p>Atención al cliente automatizada con memoria semántica y resolución de dudas.</p>
-            <a href="<?= $__base ?>/apps/register-enterprise?app_id=agent_support" class="btn">Instalar App</a>
-        </div>
+        <?php endforeach; endif; ?>
     </div>
 </body>
 </html>

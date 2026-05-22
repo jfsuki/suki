@@ -121,7 +121,7 @@ final class OperationalQueueStore
     /**
      * @return array<string, mixed>|null
      */
-    public function lockNextJob(string $workerId): ?array
+    public function lockNextJob(string $workerId, ?string $tenantId = null): ?array
     {
         $workerId = $this->normText($workerId, 'worker');
         $now = $this->now();
@@ -129,19 +129,23 @@ final class OperationalQueueStore
 
         $this->db->beginTransaction();
         try {
+            $tenantFilter = ($tenantId !== null && $tenantId !== '')
+                ? ' AND tenant_id = :tenant_id'
+                : '';
             $selectSql = 'SELECT id, tenant_id, job_type, payload_json, status, attempts, available_at, locked_at, locked_by, created_at, updated_at
                 FROM jobs_queue
-                WHERE status = :status AND available_at <= :available_at
+                WHERE status = :status AND available_at <= :available_at' . $tenantFilter . '
                 ORDER BY available_at ASC, id ASC
                 LIMIT 1';
             if ($driver === 'mysql') {
                 $selectSql .= ' FOR UPDATE';
             }
             $select = $this->db->prepare($selectSql);
-            $select->execute([
-                ':status' => 'pending',
-                ':available_at' => $now,
-            ]);
+            $params = [':status' => 'pending', ':available_at' => $now];
+            if ($tenantFilter !== '') {
+                $params[':tenant_id'] = $tenantId;
+            }
+            $select->execute($params);
             $row = $select->fetch(PDO::FETCH_ASSOC) ?: null;
             if (!is_array($row)) {
                 $this->db->commit();
