@@ -2829,6 +2829,49 @@
         },
         "required": ["step_key", "question"]
       }
+    },
+    {
+      "name": "create_agent",
+      "type": "EXECUTABLE",
+      "required_role": "admin",
+      "allowed_tools": [
+        "CommandBus",
+        "CreateAgentSkill"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "high",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_guard"
+      ],
+      "description": "Crea un agente especializado personalizado via entrevista conversacional",
+      "triggers": [
+        "crear agente",
+        "nuevo agente",
+        "quiero un agente",
+        "agente para",
+        "asistente especializado",
+        "agente que analice",
+        "agente que revise"
+      ],
+      "parameters": {
+        "type": "object",
+        "properties": {
+          "confirmed":        { "type": "boolean" },
+          "area":             { "type": "string" },
+          "task_description": { "type": "string" },
+          "trigger_phrases":  { "type": "array", "items": { "type": "string" } },
+          "conditions":       { "type": "array", "items": { "type": "string" } },
+          "formulas":         { "type": "string" },
+          "document_types":   { "type": "array", "items": { "type": "string" } },
+          "prompt_override":  { "type": "string" },
+          "agent_name":       { "type": "string" }
+        }
+      }
     }
   ]
 }

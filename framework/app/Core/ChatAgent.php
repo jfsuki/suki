@@ -1177,11 +1177,14 @@ final class ChatAgent
             } catch (\Throwable $ignored) {}
         }
 
-        // Capa 2E: Persona especialista (Qdrant-classified)
+        // Capa 2E: Persona especialista — primero DB (custom del tenant), fallback JSON global
         $specialistArea = $this->resolveSpecialistArea($telemetry, $mode);
         if ($specialistArea !== null) {
             try {
-                $persona = \App\Core\Agents\Registry\SpecialistPersonas::getPersona($specialistArea);
+                $registryDb = (new \App\Core\ProjectRegistry())->db();
+                $persona    = \App\Core\Agents\Registry\SpecialistPersonas::getPersonaForTenant(
+                    $specialistArea, $tenantId, $registryDb
+                );
                 $personaPrompt = trim((string) ($persona['prompt_base'] ?? ''));
                 if ($personaPrompt !== '') {
                     $base = $personaPrompt . "\n\n" . $base;

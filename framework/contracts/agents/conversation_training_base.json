@@ -3482,6 +3482,38 @@
                 ]
             },
             "disambiguation_prompt": "Quieres que te instale esta plantilla en el Creador de apps?"
+        },
+        {
+            "name": "AGENT_CREATION",
+            "action": "AGENT_CREATION",
+            "type": "builder",
+            "utterances": [
+                "quiero crear un agente especializado",
+                "necesito un agente para analizar cotizaciones",
+                "crear un asistente para revisar contratos",
+                "crea un agente que me ayude con las cotizaciones",
+                "necesito un asistente inteligente para analizar documentos",
+                "quiero un agente que revise mis contratos automáticamente",
+                "crear agente para cotizaciones",
+                "necesito automatizar el análisis de proveedores",
+                "agente que analice facturas de compra",
+                "quiero que el sistema aprenda a evaluar contratos",
+                "crea un agente personalizado",
+                "nuevo agente especializado",
+                "quiero un agente inteligente para mi negocio",
+                "crear asistente especializado",
+                "agente que analice mis documentos"
+            ],
+            "entities": [],
+            "response_style": {
+                "tone": "profesional y guiado",
+                "format": "entrevista conversacional",
+                "guardrails": [
+                    "No crear agente sin confirmar los datos con el usuario",
+                    "No usar jerga técnica en la entrevista"
+                ]
+            },
+            "disambiguation_prompt": "¿Para qué tarea específica necesitas este agente?"
         }
     ],
     "lookup_tables": {

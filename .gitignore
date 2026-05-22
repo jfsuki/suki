@@ -69,5 +69,9 @@ __*.php
 /project/storage/meta/knowledge_catalog.sqlite
 /framework/storage/orchestrator/
 
+# Test output artifacts
+/framework/tests/_run_output.txt
+/framework/tests/*.output
+
 # Claude Code internal files
 /.claude/

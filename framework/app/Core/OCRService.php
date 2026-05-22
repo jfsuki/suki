@@ -1,11 +1,11 @@
 <?php
+declare(strict_types=1);
 // framework/app/Core/OCRService.php
 
 namespace App\Core;
 
 /**
- * OCRService
- * Simula y procesa la extracción de datos desde texto "leído" (OCR) de facturas físicas.
+ * OCRService — extrae datos estructurados de facturas a partir de texto o archivo.
  */
 class OCRService
 {
@@ -50,12 +50,53 @@ class OCRService
     }
 
     /**
-     * Procesa un archivo (en el futuro integraría Tesseract)
+     * Procesa un archivo real delegando en DocumentProcessorService.
+     * Graceful degradation: retorna estructura vacía si el archivo no existe o no se puede procesar.
      */
     public function processFile(string $filePath): array
     {
-        // Por ahora, simulamos que leemos el archivo y obtenemos texto.
-        // En producción aquí se llamaría a 'tesseract $filePath stdout'
-        return $this->extractInvoiceData("RESTAURANTE EL SABOR\nNIT: 900.123.456-1\nFACTURA NO: FE-123\nFECHA: 2026-04-07\nPRODUCTO 1 ... 50.000\nTOTAL: $50.000");
+        $processor = new \App\Core\DocumentProcessorService();
+        $result    = $processor->process($filePath, '', 'analysis');
+
+        if (isset($result['error'])) {
+            return [
+                'total'          => 0.0,
+                'vendor'         => 'No identificado',
+                'nit'            => null,
+                'date'           => date('Y-m-d'),
+                'invoice_number' => null,
+                'items'          => [],
+                'raw_text'       => $result['error'],
+            ];
+        }
+
+        if (!empty($result['text'])) {
+            $data             = $this->extractInvoiceData($result['text']);
+            $data['raw_text'] = $result['text'];
+            return $data;
+        }
+
+        // Excel/CSV: retornar primera fila como datos de factura aproximados
+        if (!empty($result['rows'])) {
+            $first = $result['rows'][0] ?? [];
+            return [
+                'total'          => (float) ($first['total'] ?? $first['valor'] ?? $first['TOTAL'] ?? 0),
+                'vendor'         => (string) ($first['proveedor'] ?? $first['vendor'] ?? $first['nombre'] ?? 'Desconocido'),
+                'nit'            => (string) ($first['nit'] ?? $first['NIT'] ?? ''),
+                'date'           => date('Y-m-d'),
+                'invoice_number' => (string) ($first['factura'] ?? $first['numero'] ?? ''),
+                'items'          => $result['rows'],
+                'raw_summary'    => $result['summary'],
+            ];
+        }
+
+        return [
+            'total'          => 0.0,
+            'vendor'         => 'No identificado',
+            'nit'            => null,
+            'date'           => date('Y-m-d'),
+            'invoice_number' => null,
+            'items'          => [],
+        ];
     }
 }

@@ -1,10 +1,11 @@
 <?php
+declare(strict_types=1);
 // framework/app/Core/Skills/MediaIngestionSkill.php
 
 namespace App\Core\Skills;
 
 /**
- * Skill especializado en la ingestion de archivos y medios durante la fase de construccion.
+ * Skill especializado en la ingestión de archivos y medios durante la fase de construcción.
  */
 class MediaIngestionSkill
 {
@@ -43,30 +44,83 @@ class MediaIngestionSkill
 
     private function handleDocumentIngestion(array &$state): array
     {
-        $state['pending_media_action'] = 'document_analysis';
+        $uploadedFile = $state['uploaded_file'] ?? $state['pending_upload'] ?? null;
+        if (!$uploadedFile) {
+            $state['pending_media_action'] = 'document_analysis';
+            return [
+                'reply' => "Adjunta el PDF o documento (RUT, factura, contrato). Extraeré los datos automáticamente.",
+                'state' => $state,
+            ];
+        }
+
+        $filePath  = is_array($uploadedFile) ? ($uploadedFile['path'] ?? '') : (string) $uploadedFile;
+        $processor = new \App\Core\DocumentProcessorService();
+        $result    = $processor->process($filePath, '', 'analysis');
+        unset($state['uploaded_file'], $state['pending_upload']);
+
         return [
-            'reply' => "Entendido. Si tienes tu RUT en PDF o facturas en XML/PDF, adjúntalos ahora.\n"
-                     . "Extraeré la información fiscal (Régimen, CIIU) automáticamente para configurar tu app.",
-            'state' => $state
+            'reply' => $result['summary'],
+            'state' => $state,
+            'data'  => $result,
         ];
     }
 
     private function handleMediaIngestion(array &$state): array
     {
-        $state['pending_media_action'] = 'media_gallery';
-        
-        // Simulación de OCR si es un recibo/factura
-        $ocr = new \App\Core\OCRService();
-        $data = $ocr->processFile('uploaded_file.jpg'); // Mock file result
+        $uploadedFile = $state['uploaded_file'] ?? $state['pending_upload'] ?? null;
+
+        if (!$uploadedFile) {
+            $state['pending_media_action'] = 'awaiting_image_upload';
+            return [
+                'reply' => "Adjunta la imagen, factura o documento. Una vez cargado, extraeré los datos automáticamente.",
+                'state' => $state,
+            ];
+        }
+
+        $filePath  = is_array($uploadedFile) ? ($uploadedFile['path'] ?? '') : (string) $uploadedFile;
+        $processor = new \App\Core\DocumentProcessorService();
+        $result    = $processor->process($filePath, is_array($uploadedFile) ? ($uploadedFile['mime'] ?? '') : '', 'analysis');
+        unset($state['uploaded_file'], $state['pending_upload']);
+
+        if (isset($result['error'])) {
+            return [
+                'reply' => "No pude procesar el archivo: {$result['error']}",
+                'state' => $state,
+            ];
+        }
+
+        if ($result['content_type'] === 'ocr_text' || $result['content_type'] === 'text') {
+            $ocr  = new \App\Core\OCRService();
+            $data = $ocr->extractInvoiceData($result['text'] ?? '');
+            return [
+                'reply' => "He extraído los siguientes datos del documento:\n"
+                         . "- Comercio: {$data['vendor']}\n"
+                         . "- Valor: $" . number_format((float) $data['total']) . "\n"
+                         . "- Documento No: {$data['invoice_number']}\n\n"
+                         . "¿Deseas que registre este gasto en tu contabilidad?",
+                'state' => $state,
+                'data'  => $data,
+            ];
+        }
+
+        if ($result['content_type'] === 'tabular') {
+            $shownHeaders = implode(', ', array_slice($result['headers'] ?? [], 0, 6));
+            return [
+                'reply' => "He leído el archivo **{$result['metadata']['filename']}**:\n\n"
+                         . "{$result['total_rows']} filas con columnas: {$shownHeaders}\n\n"
+                         . "¿Qué quieres hacer con estos datos?\n"
+                         . "- Importar al inventario\n"
+                         . "- Analizar y mostrar resumen\n"
+                         . "- Crear registros en una app",
+                'state' => array_merge($state, ['pending_excel_data' => $result]),
+                'data'  => $result,
+            ];
+        }
 
         return [
-            'reply' => "He detectado una imagen de factura o recibo. He extraído los siguientes datos:\n"
-                     . "- Comercio: {$data['vendor']}\n"
-                     . "- Valor: $".number_format($data['total'])."\n"
-                     . "- Documento No: {$data['invoice_number']}\n\n"
-                     . "¿Deseas que registre este gasto automáticamente en tu contabilidad?",
+            'reply' => $result['summary'],
             'state' => $state,
-            'data' => $data
+            'data'  => $result,
         ];
     }
 }

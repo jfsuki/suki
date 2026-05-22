@@ -3874,6 +3874,18 @@ if ($route === 'media/upload') {
             'app_id' => $payload['project_id'] !== '' ? $payload['project_id'] : null,
             'uploaded_by_user_id' => (string) ($sessionUser['id'] ?? 'anon'),
         ]);
+
+        // Guardar en sesión para que el siguiente mensaje del chat lo encuentre
+        if (session_status() === PHP_SESSION_NONE) {
+            session_start();
+        }
+        $_SESSION['uploaded_file'] = [
+            'path'    => (string) ($media['storage_path'] ?? $media['absolute_path'] ?? ''),
+            'mime'    => (string) ($media['mime_type'] ?? ''),
+            'file_id' => (string) ($media['file_id'] ?? $media['id'] ?? ''),
+            'name'    => (string) ($media['original_name'] ?? basename((string) ($media['storage_path'] ?? ''))),
+        ];
+
         respondJson($response, 'success', 'Archivo subido', ['media' => $media, 'item' => $media]);
         return;
     } catch (\Throwable $e) {
