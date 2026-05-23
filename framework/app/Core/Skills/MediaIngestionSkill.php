@@ -90,14 +90,42 @@ class MediaIngestionSkill
         }
 
         if ($result['content_type'] === 'ocr_text' || $result['content_type'] === 'text') {
-            $ocr  = new \App\Core\OCRService();
-            $data = $ocr->extractInvoiceData($result['text'] ?? '');
+            $ocr          = new \App\Core\OCRService();
+            $data         = $ocr->extractInvoiceData($result['text'] ?? '');
+            $documentText = (string) ($result['text'] ?? '');
+            $agentTrainNote = '';
+
+            // Entrenar agente activo en sesión si hay texto extraído y agente activo
+            if ($documentText !== ''
+                && !empty($state['active_agent_area'])
+                && !empty($state['agent_id'])
+                && !empty($state['tenant_id'])
+            ) {
+                try {
+                    $mysql      = \App\Core\Database::connection();
+                    $embedding  = new \App\Core\GeminiEmbeddingService();
+                    $kbService  = new \App\Core\AgentKnowledgeService($embedding, $mysql);
+                    $ingestResult = $kbService->ingest(
+                        (string) $state['tenant_id'],
+                        (string) $state['agent_id'],
+                        (string) $state['active_agent_area'],
+                        $documentText,
+                        'user_upload'
+                    );
+                    if ($ingestResult['ok']) {
+                        $agentTrainNote = "\n\n*Documento ingresado al agente: {$ingestResult['chunks_stored']} fragmentos almacenados.*";
+                    }
+                } catch (\Throwable $e) {
+                    error_log('[MediaIngestionSkill] AgentKnowledge ingest error: ' . $e->getMessage());
+                }
+            }
+
             return [
                 'reply' => "He extraído los siguientes datos del documento:\n"
                          . "- Comercio: {$data['vendor']}\n"
                          . "- Valor: $" . number_format((float) $data['total']) . "\n"
                          . "- Documento No: {$data['invoice_number']}\n\n"
-                         . "¿Deseas que registre este gasto en tu contabilidad?",
+                         . "¿Deseas que registre este gasto en tu contabilidad?" . $agentTrainNote,
                 'state' => $state,
                 'data'  => $data,
             ];

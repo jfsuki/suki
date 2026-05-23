@@ -1,4 +1,5 @@
 <?php
+declare(strict_types=1);
 
 namespace App\Core\Agents\Orchestrator;
 
@@ -144,21 +145,37 @@ class MultiAgentSupervisor
 
     /**
      * Coordina un flujo de trabajo entre múltiples agentes basado en la intención detectada.
+     * Itera triggers[] de cada workflow (data-driven), soporta exact match y prefix match.
      */
     public function coordinateWorkflow(string $intent, array $args): ?array
     {
-        $intentKey = strtoupper($intent);
-        if (!isset($this->workflowRegistry[$intentKey])) {
-            return null;
-        }
+        $normalizedIntent = strtolower(trim($intent));
 
-        $workflow = $this->workflowRegistry[$intentKey];
-        return [
-            'workflow_id'  => 'wf_' . bin2hex(random_bytes(4)),
-            'sequence'     => $workflow['sequence'],
-            'description'  => $workflow['description'],
-            'initial_args' => $args,
-        ];
+        foreach ($this->workflowRegistry as $workflowId => $workflow) {
+            // Sólo workflows con triggers y sequence (no los de proceso interno como APP_EXECUTION)
+            if (!is_array($workflow['triggers'] ?? null) || !is_array($workflow['sequence'] ?? null)) {
+                continue;
+            }
+            $triggers = (array) $workflow['triggers'];
+            foreach ($triggers as $trigger) {
+                $normalizedTrigger = strtolower(trim((string) $trigger));
+                if ($normalizedTrigger === '') {
+                    continue;
+                }
+                if ($normalizedIntent === $normalizedTrigger
+                    || str_starts_with($normalizedIntent, $normalizedTrigger)) {
+                    return [
+                        'workflow_id'  => 'wf_' . bin2hex(random_bytes(4)),
+                        'workflow_key' => $workflowId,
+                        'sequence'     => $workflow['sequence'],
+                        'parallel'     => (bool) ($workflow['parallel'] ?? false),
+                        'description'  => $workflow['description'],
+                        'initial_args' => $args,
+                    ];
+                }
+            }
+        }
+        return null;
     }
 
     // ─── Privado ────────────────────────────────────────────────────────────────

@@ -345,7 +345,17 @@
         "check inventory",
         "disponibilidad de este producto",
         "mira las existencias",
-        "tengo saldo de ese item"
+        "tengo saldo de ese item",
+        "se acabo el producto ese",
+        "ya no hay más de ese artículo",
+        "ese producto se agotó",
+        "no tenemos stock de eso",
+        "se nos acabó el cemento",
+        "el inventario está en cero",
+        "no hay existencia de ese item",
+        "agotamos ese producto",
+        "quedamos sin ese artículo",
+        "no queda nada en bodega de eso"
       ],
       "skill": "inventory_check",
       "confidence": "high",

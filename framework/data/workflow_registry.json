@@ -12,17 +12,20 @@
       "description": "Disponibilidad de Catálogo -> Optimización de Precios"
     },
     "SCHEMA_UPDATE": {
-      "triggers": [],
+      "triggers": ["erp_schema_update", "erp_entity_modify"],
+      "parallel": false,
       "sequence": ["ARCHITECT", "FINANCES"],
       "description": "Diseño de Tabla -> Validación de Impacto Contable"
     },
     "INVENTORY_REORDER": {
-      "triggers": [],
+      "triggers": ["erp_inventory_reorder", "erp_purchase_request"],
+      "parallel": false,
       "sequence": ["INVENTORY", "PURCHASES"],
       "description": "Detección de stock crítico -> Orden de reabastecimiento"
     },
     "FISCAL_CLOSE": {
       "triggers": ["erp_accounting_post", "erp_report_generate", "erp_invoice_create", "erp_tax_credit_note"],
+      "parallel": true,
       "sequence": ["ACCOUNTING", "FINANCES"],
       "description": "Cierre contable -> Validación fiscal y tributaria"
     },

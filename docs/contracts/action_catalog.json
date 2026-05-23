@@ -2872,6 +2872,35 @@
           "agent_name":       { "type": "string" }
         }
       }
+    },
+    {
+      "name": "train_agent",
+      "type": "EXECUTABLE",
+      "required_role": "operator",
+      "allowed_tools": [
+        "CommandBus",
+        "AgentKnowledgeService"
+      ],
+      "rag_required": false,
+      "json_schema_required": true,
+      "risk_level": "medium",
+      "gates_required": [
+        "mode_guard",
+        "role_guard",
+        "schema_guard",
+        "tenant_scope_guard",
+        "audit_gate"
+      ],
+      "description": "Entrenar agente custom con documento de conocimiento",
+      "requires_auth": true,
+      "audit_gate": ["tenant_id", "agent_id", "area"],
+      "trigger_phrases": [
+        "entrenar agente con este documento",
+        "agregar conocimiento al agente",
+        "subir manual al agente",
+        "enseñarle esto al agente",
+        "agregar procedimiento al agente"
+      ]
     }
   ]
 }

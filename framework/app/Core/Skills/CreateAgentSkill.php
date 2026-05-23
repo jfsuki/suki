@@ -144,19 +144,22 @@ PROMPT;
             $stmt->execute([$tenantId, $area]);
             $existingId = $stmt->fetchColumn();
 
+            // Colección Qdrant derivada internamente — nunca del payload externo
+            $agentCollection = \App\Core\AgentKnowledgeService::deriveCollection($tenantId, $area);
+
             if ($existingId !== false) {
                 $db->prepare(
-                    'UPDATE ai_agents SET prompt_override = ?, config_json = ?, status = \'active\', updated_at = ? WHERE agent_id = ?'
-                )->execute([$promptOverride, $configJson, date('Y-m-d H:i:s'), $existingId]);
+                    'UPDATE ai_agents SET prompt_override = ?, config_json = ?, qdrant_collection = ?, status = \'active\', updated_at = ? WHERE agent_id = ?'
+                )->execute([$promptOverride, $configJson, $agentCollection, date('Y-m-d H:i:s'), $existingId]);
                 $agentId = (string) $existingId;
                 $action  = 'actualizado';
             } else {
                 $db->prepare(
-                    'INSERT INTO ai_agents (agent_id, tenant_id, area, role, status, source, prompt_override, config_json, created_at, updated_at)
-                     VALUES (?, ?, ?, ?, \'active\', \'custom\', ?, ?, ?, ?)'
+                    'INSERT INTO ai_agents (agent_id, tenant_id, area, role, status, source, prompt_override, config_json, qdrant_collection, created_at, updated_at)
+                     VALUES (?, ?, ?, ?, \'active\', \'custom\', ?, ?, ?, ?, ?)'
                 )->execute([
                     $agentId, $tenantId, $area, $agentName,
-                    $promptOverride, $configJson,
+                    $promptOverride, $configJson, $agentCollection,
                     date('Y-m-d H:i:s'), date('Y-m-d H:i:s'),
                 ]);
                 $action = 'creado';
