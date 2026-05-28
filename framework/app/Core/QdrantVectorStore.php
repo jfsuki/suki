@@ -814,13 +814,15 @@ final class QdrantVectorStore
                 $sector = $payload['sector'] ?? $payload['industry'] ?? 'unknown';
                 $type = $payload['memory_type'] ?? 'unknown';
 
-                // Map to categories
-                if ($sector === 'inventory' || $sector === 'FERRETERIA_MINORISTA') $categories['base']['inventory']['percentage'] += 1;
-                elseif ($sector === 'billing' || $sector === 'sales') $categories['base']['billing']['percentage'] += 1;
-                elseif ($sector === 'accounting') $categories['base']['accounting']['percentage'] += 1;
-                elseif ($sector === 'tax') $categories['base']['tax']['percentage'] += 1;
-                elseif ($type === 'user_memory') $categories['auto']['regional_context']['percentage'] += 1;
-                // ... rest of mapping
+                // Map to categories — driven by routing_policies.json sector_category_map
+                /** @var array<string,string> $sectorMap */
+                $sectorMap = PolicyLoader::get('routing_policies', 'sector_category_map', []);
+                $catKey = (string) ($sectorMap[$sector] ?? '');
+                if ($catKey !== '' && isset($categories['base'][$catKey])) {
+                    $categories['base'][$catKey]['percentage'] += 1;
+                } elseif ($type === 'user_memory') {
+                    $categories['auto']['regional_context']['percentage'] += 1;
+                }
             }
 
             // Normalize to percentages (sample based)
@@ -843,25 +845,6 @@ final class QdrantVectorStore
             $response = $this->request('POST', $path, ['exact' => true], true);
             return (int) ($response['data']['result']['count'] ?? 0);
         } catch (\Exception $e) { return 0; }
-    }
-
-    private function countBySector(string $sectorId): int
-    {
-        $path = '/collections/' . rawurlencode($this->collection) . '/points/count';
-        $payload = [
-            'filter' => [
-                'must' => [
-                    ['key' => 'sector', 'match' => ['value' => $sectorId]]
-                ]
-            ],
-            'exact' => true
-        ];
-        try {
-            $response = $this->request('POST', $path, $payload, true);
-            return (int) ($response['data']['result']['count'] ?? 0);
-        } catch (\Exception $e) {
-            return 0;
-        }
     }
 
     private static function resolveCollectionEnv(string $envKey, string $default): string

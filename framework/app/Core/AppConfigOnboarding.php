@@ -158,7 +158,7 @@ final class AppConfigOnboarding
     /**
      * Returns the ordered list of fields not yet configured for this tenant+app.
      */
-    private function getPendingFields(string $tenantId, string $appId): array
+    public function getPendingFields(string $tenantId, string $appId): array
     {
         $allFields  = $this->resolveAllFieldsForApp($appId, $tenantId);
         $configured = $this->configSvc->loadAll($tenantId, $appId);

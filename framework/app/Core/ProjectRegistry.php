@@ -17,11 +17,8 @@ final class ProjectRegistry
         $this->db = new PDO('sqlite:' . $this->dbPath);
         $this->db->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
 
-        // Forzar entorno local y permitir cambios de esquema en tiempo de ejecución para aplicar la columna user_type
-        if (strpos($_SERVER['HTTP_HOST'] ?? '', 'localhost') !== false || strpos($_SERVER['HTTP_HOST'] ?? '', '127.0.0.1') !== false || strpos($_SERVER['HTTP_HOST'] ?? '', '.test') !== false) {
-             putenv('ALLOW_RUNTIME_SCHEMA=1');
-             putenv('APP_ENV=local');
-        }
+        // ALLOW_RUNTIME_SCHEMA es controlado exclusivamente por el entorno (.env) — no por HTTP_HOST ni por código.
+        // HTTP_HOST NO debe activar schema migrations: un staging con hostname 'localhost' no es entorno local.
 
         RuntimeSchemaPolicy::bootstrap(
             $this->db,

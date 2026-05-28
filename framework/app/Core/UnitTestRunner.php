@@ -128,6 +128,9 @@ final class UnitTestRunner
         $tests[] = $this->wrap('project_memory_system', fn() => $this->checkProjectMemorySystem());
         $tests[] = $this->wrap('learning_promotion_pipeline', fn() => $this->checkLearningPromotionPipeline());
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
+        $tests[] = $this->wrap('data_quality_guard', fn() => $this->checkDataQualityGuard());
+        $tests[] = $this->wrap('otp_flow_e2e', fn() => $this->checkOtpFlowE2E());
+        $tests[] = $this->wrap('app_config_onboarding', fn() => $this->checkAppConfigOnboarding());
 
         // ACID tests — real infrastructure, no mocks (exit 1 = real failure)
         $tests[] = $this->wrap('acid_qdrant_connectivity', fn() => $this->runExternalTestScript(FRAMEWORK_ROOT . '/tests/acid_qdrant_connectivity_test.php'));
@@ -1737,5 +1740,196 @@ final class UnitTestRunner
             'ñ' => 'n', 'ç' => 'c',
         ];
         return str_replace(array_keys($map), array_values($map), $text);
+    }
+
+    private function checkDataQualityGuard(): void
+    {
+        $ok  = static function (array $r, string $tc): void {
+            if (!empty($r['reject'])) {
+                throw new \RuntimeException($tc . ': valor válido fue rechazado — razón: ' . ($r['reject'][0]['reason'] ?? ''));
+            }
+        };
+        $rej = static function (array $r, string $tc, ?string $expectedReason = null): void {
+            if (empty($r['reject'])) {
+                throw new \RuntimeException($tc . ': valor inválido no fue rechazado');
+            }
+            if ($expectedReason !== null && ($r['reject'][0]['reason'] ?? '') !== $expectedReason) {
+                throw new \RuntimeException($tc . ': razón esperada=' . $expectedReason . ' obtenida=' . ($r['reject'][0]['reason'] ?? ''));
+            }
+        };
+
+        $g  = new \App\Core\DataQualityGuard('CO');
+        $gx = new \App\Core\DataQualityGuard('MX');
+        $gp = new \App\Core\DataQualityGuard('PE');
+
+        // TC-DQG-01: NIT CO válido (base 800123456, DV=9 por algoritmo DIAN)
+        $ok($g->validateFields(['nit' => '8001234569']), 'TC-DQG-01');
+        // TC-DQG-02: NIT CO con DV incorrecto (0 en vez de 9)
+        $rej($g->validateFields(['nit' => '8001234560']), 'TC-DQG-02', 'digito_verificador_invalido');
+        // TC-DQG-03: Celular CO válido (10 dígitos, empieza con 3)
+        $ok($g->validateFields(['celular' => '3101234567']), 'TC-DQG-03');
+        // TC-DQG-04: Celular CO inválido (empieza con 2)
+        $rej($g->validateFields(['celular' => '2101234567']), 'TC-DQG-04');
+        // TC-DQG-05: Keyboard mash en nombre
+        $rej($g->validateFields(['nombre' => 'asdfasdf']), 'TC-DQG-05');
+        // TC-DQG-06: Palabra relleno "prueba" en nombre_empresa
+        $rej($g->validateFields(['nombre_empresa' => 'prueba']), 'TC-DQG-06');
+        // TC-DQG-07: Dígitos repetidos (111111111) en cédula
+        $rej($g->validateFields(['cedula' => '111111111']), 'TC-DQG-07');
+        // TC-DQG-08: Email sin @
+        $rej($g->validateFields(['email' => 'no-es-email']), 'TC-DQG-08');
+        // TC-DQG-09: Email dominio sospechoso
+        $rej($g->validateFields(['email' => 'test@test.com']), 'TC-DQG-09');
+        // TC-DQG-10: Email real válido
+        $ok($g->validateFields(['email' => 'juan@miempresa.com.co']), 'TC-DQG-10');
+        // TC-DQG-11: Cédula válida CO (sin secuencia ni repetición)
+        $ok($g->validateFields(['cedula' => '1020304050']), 'TC-DQG-11');
+        // TC-DQG-12: RFC MX válido
+        $ok($gx->validateFields(['rfc' => 'ABC010101ABC']), 'TC-DQG-12');
+        // TC-DQG-13: Celular PE válido (9 dígitos, empieza con 9, sin secuencia)
+        $ok($gp->validateFields(['celular' => '912765430']), 'TC-DQG-13');
+        // TC-DQG-14: Nombre de 1 caracter (min_length=2)
+        $rej($g->validateFields(['nombre' => 'X']), 'TC-DQG-14');
+        // TC-DQG-15: Cédula con dígitos secuenciales ascendentes
+        $rej($g->validateFields(['cedula' => '123456789']), 'TC-DQG-15');
+    }
+
+    private function checkOtpFlowE2E(): void
+    {
+        $db = new \PDO('sqlite::memory:');
+        $db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        $svc = new \App\Core\OtpService($db, sys_get_temp_dir());
+
+        // TC-OTP-01: email inválido en send() rechaza
+        $r = $svc->send('proj', 'u1', 'not-an-email');
+        if ($r['ok'] !== false) {
+            throw new \RuntimeException('TC-OTP-01: send() con email inválido debe retornar ok=false');
+        }
+
+        // TC-OTP-02: send() válido retorna ok (SMTP ausente → log fallback)
+        $r = $svc->send('proj', 'u1', 'valid@empresa.com');
+        if ($r['ok'] !== true) {
+            throw new \RuntimeException('TC-OTP-02: send() con email válido debe retornar ok=true');
+        }
+
+        // Leer código de DB para el test (nunca expuesto por API)
+        $stmt = $db->query("SELECT code FROM otp_codes WHERE project_id='proj' AND identifier='u1' ORDER BY id DESC LIMIT 1");
+        $code = (string) ($stmt->fetchColumn() ?: '');
+        if (strlen($code) !== 6 || !ctype_digit($code)) {
+            throw new \RuntimeException('TC-OTP-03: código debe ser 6 dígitos numéricos, obtenido: ' . $code);
+        }
+
+        // TC-OTP-04: verify() con código incorrecto falla
+        $badCode = $code === '000000' ? '111111' : '000000';
+        $r = $svc->verify('proj', 'u1', $badCode);
+        if ($r['ok'] !== false) {
+            throw new \RuntimeException('TC-OTP-04: código incorrecto debe fallar');
+        }
+
+        // TC-OTP-05: verify() con código correcto OK
+        $r = $svc->verify('proj', 'u1', $code);
+        if ($r['ok'] !== true) {
+            throw new \RuntimeException('TC-OTP-05: código correcto debe verificar — error: ' . ($r['error'] ?? ''));
+        }
+
+        // TC-OTP-06: segundo verify() falla (código consumido — one-time use)
+        $r = $svc->verify('proj', 'u1', $code);
+        if ($r['ok'] !== false) {
+            throw new \RuntimeException('TC-OTP-06: código consumido debe rechazarse');
+        }
+
+        // TC-OTP-07: código de 5 dígitos rechazado por formato
+        $svc->send('proj', 'u2', 'u2@empresa.com');
+        $r = $svc->verify('proj', 'u2', '12345');
+        if ($r['ok'] !== false) {
+            throw new \RuntimeException('TC-OTP-07: código de 5 dígitos debe rechazarse');
+        }
+
+        // TC-OTP-08: código con letras rechazado por formato
+        $r = $svc->verify('proj', 'u2', '1234ab');
+        if ($r['ok'] !== false) {
+            throw new \RuntimeException('TC-OTP-08: código con letras debe rechazarse');
+        }
+
+        // TC-OTP-09: código expirado (creado hace 20 min) rechazado
+        $db->exec("DELETE FROM otp_codes WHERE identifier='expired'");
+        $stm = $db->prepare("INSERT INTO otp_codes (project_id,identifier,code,created_at,attempts) VALUES ('proj','expired','777777',:ts,0)");
+        $stm->execute([':ts' => date('Y-m-d H:i:s', time() - 1200)]);
+        $r = $svc->verify('proj', 'expired', '777777');
+        if ($r['ok'] !== false) {
+            throw new \RuntimeException('TC-OTP-09: código expirado debe rechazarse');
+        }
+        if (!str_contains((string) ($r['error'] ?? ''), 'expirado')) {
+            throw new \RuntimeException('TC-OTP-09: mensaje debe mencionar expiración, obtenido: ' . ($r['error'] ?? ''));
+        }
+
+        // TC-OTP-10: 3 intentos incorrectos → 4° bloqueado por max_attempts
+        $svc->send('proj', 'u3', 'u3@empresa.com');
+        $stmt = $db->query("SELECT code FROM otp_codes WHERE project_id='proj' AND identifier='u3' ORDER BY id DESC LIMIT 1");
+        $code3 = (string) ($stmt->fetchColumn() ?: '999999');
+        $bad3  = $code3 === '000000' ? '111111' : '000000';
+        for ($i = 0; $i < 3; $i++) {
+            $svc->verify('proj', 'u3', $bad3);
+        }
+        $r = $svc->verify('proj', 'u3', $bad3);
+        if ($r['ok'] !== false) {
+            throw new \RuntimeException('TC-OTP-10: 4° intento debe bloquearse por max_attempts');
+        }
+        if (!str_contains((string) ($r['error'] ?? ''), 'intentos')) {
+            throw new \RuntimeException('TC-OTP-10: mensaje debe mencionar intentos, obtenido: ' . ($r['error'] ?? ''));
+        }
+    }
+
+    private function checkAppConfigOnboarding(): void
+    {
+        $pdo = new \PDO('sqlite::memory:');
+        $pdo->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        $pdo->exec(
+            'CREATE TABLE app_tenant_config (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                tenant_id TEXT NOT NULL,
+                app_id TEXT NOT NULL,
+                field_key TEXT NOT NULL,
+                field_value TEXT NOT NULL DEFAULT "",
+                configured_at DATETIME
+            )'
+        );
+        $configSvc  = new \App\Core\AppTenantConfigService($pdo);
+        $onboarding = new \App\Core\AppConfigOnboarding($configSvc);
+
+        // TC-ACO-01: Nueva empresa tiene campos pendientes de configurar
+        $pending = $onboarding->getPendingFields('test_tenant', 'suki_erp');
+        if (empty($pending)) {
+            throw new \RuntimeException('TC-ACO-01: getPendingFields() debe retornar campos para tenant nuevo');
+        }
+
+        // TC-ACO-02: buildFieldContextForPrompt retorna string no vacío con datos del campo
+        $firstField = $pending[0];
+        $context = $onboarding->buildFieldContextForPrompt($firstField, 'test_tenant', 'suki_erp');
+        if ($context === '') {
+            throw new \RuntimeException('TC-ACO-02: buildFieldContextForPrompt() no debe retornar string vacío');
+        }
+        if (!str_contains($context, $firstField['key'] ?? '')) {
+            throw new \RuntimeException('TC-ACO-02: contexto debe contener el key del campo pendiente');
+        }
+
+        // TC-ACO-03: processAnswerAndGetContext guarda el valor y avanza al siguiente campo
+        $firstKey = $firstField['key'] ?? '';
+        $onboarding->processAnswerAndGetContext('test_tenant', 'suki_erp', 'Mi empresa ejemplo S.A.S.');
+        $savedFields = $configSvc->loadAll('test_tenant', 'suki_erp');
+        if (count($savedFields) === 0) {
+            throw new \RuntimeException('TC-ACO-03: después de procesar respuesta debe guardar al menos 1 campo');
+        }
+
+        // TC-ACO-04: isComplete retorna false mientras haya campos pendientes
+        if ($onboarding->isComplete('test_tenant', 'suki_erp')) {
+            throw new \RuntimeException('TC-ACO-04: isComplete() debe ser false con campos pendientes');
+        }
+
+        // TC-ACO-05: app inexistente retorna campos globales (no explota)
+        $pendingUnknown = $onboarding->getPendingFields('test_tenant', 'nonexistent_app_xyz');
+        if (!is_array($pendingUnknown)) {
+            throw new \RuntimeException('TC-ACO-05: getPendingFields() con app desconocida debe retornar array');
+        }
     }
 }

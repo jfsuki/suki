@@ -51,12 +51,17 @@ final class AppTenantConfigService
     public function saveField(string $tenantId, string $appId, string $fieldKey, string $value): void
     {
         try {
-            $stmt = $this->pdo->prepare(
-                'INSERT INTO app_tenant_config (tenant_id, app_id, field_key, field_value, configured_at)
-                 VALUES (?, ?, ?, ?, NOW())
-                 ON DUPLICATE KEY UPDATE field_value=VALUES(field_value), configured_at=NOW()'
-            );
-            $stmt->execute([$tenantId, $appId, $fieldKey, $value]);
+            $driver = (string) ($this->pdo->getAttribute(\PDO::ATTR_DRIVER_NAME) ?? 'mysql');
+            if ($driver === 'sqlite') {
+                $sql  = 'INSERT OR REPLACE INTO app_tenant_config
+                         (tenant_id, app_id, field_key, field_value, configured_at)
+                         VALUES (?, ?, ?, ?, datetime("now"))';
+            } else {
+                $sql  = 'INSERT INTO app_tenant_config (tenant_id, app_id, field_key, field_value, configured_at)
+                         VALUES (?, ?, ?, ?, NOW())
+                         ON DUPLICATE KEY UPDATE field_value=VALUES(field_value), configured_at=NOW()';
+            }
+            $this->pdo->prepare($sql)->execute([$tenantId, $appId, $fieldKey, $value]);
         } catch (\Throwable) {
             // Non-blocking — config save failure does not block the conversation
         }

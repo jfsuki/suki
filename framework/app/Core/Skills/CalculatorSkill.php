@@ -63,10 +63,127 @@ final class CalculatorSkill
 
     private function evaluateExpression(array $input): array
     {
-        $expression = (string) ($input['expression'] ?? '');
-        // BASIC EVALUATION (SECURE)
-        // In a real environment, use a math evaluator library
-        return ['result' => 0, 'notice' => 'Custom logic evaluation waiting for engine bridge'];
+        $expression = trim((string) ($input['expression'] ?? ''));
+        if ($expression === '') {
+            return ['result' => 0, 'error' => 'expression_empty'];
+        }
+
+        // Whitelist: only digits, decimal point, arithmetic operators, parentheses, spaces
+        if (!preg_match('/^[\d\s\.\+\-\*\/\(\)]+$/', $expression)) {
+            return ['result' => 0, 'error' => 'expression_contains_invalid_characters'];
+        }
+
+        try {
+            $result = $this->safeEval($expression);
+        } catch (\Throwable $e) {
+            return ['result' => 0, 'error' => 'expression_invalid: ' . $e->getMessage()];
+        }
+
+        return ['result' => $result, 'expression' => $expression];
+    }
+
+    /**
+     * Recursive descent parser: handles +, -, *, /, (, ), decimals, unary minus.
+     * No eval(), no exec(), no arbitrary code — purely arithmetic.
+     */
+    private function safeEval(string $expr): float
+    {
+        $tokens = $this->tokenize($expr);
+        $pos = 0;
+        $result = $this->parseAddSub($tokens, $pos);
+        if ($pos < count($tokens)) {
+            throw new \InvalidArgumentException('Unexpected token at position ' . $pos);
+        }
+        return $result;
+    }
+
+    /** @param array<int,string> $tokens */
+    private function parseAddSub(array $tokens, int &$pos): float
+    {
+        $left = $this->parseMulDiv($tokens, $pos);
+        while ($pos < count($tokens) && in_array($tokens[$pos], ['+', '-'], true)) {
+            $op = $tokens[$pos++];
+            $right = $this->parseMulDiv($tokens, $pos);
+            $left = $op === '+' ? $left + $right : $left - $right;
+        }
+        return $left;
+    }
+
+    /** @param array<int,string> $tokens */
+    private function parseMulDiv(array $tokens, int &$pos): float
+    {
+        $left = $this->parseUnary($tokens, $pos);
+        while ($pos < count($tokens) && in_array($tokens[$pos], ['*', '/'], true)) {
+            $op = $tokens[$pos++];
+            $right = $this->parseUnary($tokens, $pos);
+            if ($op === '/' && $right == 0.0) {
+                throw new \DivisionByZeroError('Division by zero');
+            }
+            $left = $op === '*' ? $left * $right : $left / $right;
+        }
+        return $left;
+    }
+
+    /** @param array<int,string> $tokens */
+    private function parseUnary(array $tokens, int &$pos): float
+    {
+        if ($pos < count($tokens) && $tokens[$pos] === '-') {
+            $pos++;
+            return -$this->parsePrimary($tokens, $pos);
+        }
+        if ($pos < count($tokens) && $tokens[$pos] === '+') {
+            $pos++;
+        }
+        return $this->parsePrimary($tokens, $pos);
+    }
+
+    /** @param array<int,string> $tokens */
+    private function parsePrimary(array $tokens, int &$pos): float
+    {
+        if ($pos >= count($tokens)) {
+            throw new \InvalidArgumentException('Unexpected end of expression');
+        }
+        if ($tokens[$pos] === '(') {
+            $pos++;
+            $val = $this->parseAddSub($tokens, $pos);
+            if ($pos >= count($tokens) || $tokens[$pos] !== ')') {
+                throw new \InvalidArgumentException('Missing closing parenthesis');
+            }
+            $pos++;
+            return $val;
+        }
+        if (is_numeric($tokens[$pos])) {
+            return (float) $tokens[$pos++];
+        }
+        throw new \InvalidArgumentException('Unexpected token: ' . $tokens[$pos]);
+    }
+
+    /**
+     * Tokenizes an arithmetic string into numbers and operators.
+     * @return array<int,string>
+     */
+    private function tokenize(string $expr): array
+    {
+        $tokens = [];
+        $i = 0;
+        $len = strlen($expr);
+        while ($i < $len) {
+            if ($expr[$i] === ' ') { $i++; continue; }
+            if (in_array($expr[$i], ['+', '-', '*', '/', '(', ')'], true)) {
+                $tokens[] = $expr[$i++];
+                continue;
+            }
+            if (ctype_digit($expr[$i]) || $expr[$i] === '.') {
+                $num = '';
+                while ($i < $len && (ctype_digit($expr[$i]) || $expr[$i] === '.')) {
+                    $num .= $expr[$i++];
+                }
+                $tokens[] = $num;
+                continue;
+            }
+            throw new \InvalidArgumentException('Unexpected character: ' . $expr[$i]);
+        }
+        return $tokens;
     }
 
     private function roundTo(float $value, int $multiple): float

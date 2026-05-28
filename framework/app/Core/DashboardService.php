@@ -80,12 +80,20 @@ class DashboardService
             'expenses' => array_values($expensesByDay),
         ];
 
+        $queryLimit = 100;
         return [
             'summary' => [
                 'total_sales' => $totalSales,
                 'total_purchases' => $totalPurchases,
                 'active_quotes' => $activeQuotes,
-                'balance' => $totalSales - $totalPurchases
+                'balance' => $totalSales - $totalPurchases,
+                'records_loaded' => [
+                    'sales' => count($sales),
+                    'purchases' => count($purchases),
+                    'quotes' => count($quotes),
+                ],
+                'query_limit' => $queryLimit,
+                'truncated' => count($sales) >= $queryLimit || count($purchases) >= $queryLimit || count($quotes) >= $queryLimit,
             ],
             'charts' => $chartData
         ];

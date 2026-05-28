@@ -1,7 +1,8 @@
 {
     "contract_id": "skills_catalog",
-    "version": "1.8.1",
-    "effective_date": "2026-03-14",
+    "version": "1.8.2",
+    "effective_date": "2026-05-28",
+    "_handler_migration": "Skills with 'handler' → DynamicSkillRegistry → PHP class. Skills without 'handler' → SkillExecutor legacy chain. IMPORTANT: Skills that go through SkillExecutor's internal dispatch (POS/Purchases/Fiscal/EntitySearch) MUST NOT have 'handler' — adding one creates infinite dispatch loop. All ~40 legacy skills are VERIFIED: POS→POSCommandHandler, Purchases→PurchasesCommandHandler, Fiscal→FiscalEngineMessageParser, EntitySearch→EntitySearchMessageParser. Migration target Q3-2026: create standalone PHP classes for NEW skills only.",
     "addenda_of": "1.0.0",
     "status": "canonical_draft",
     "contract_location": "docs/contracts",
@@ -149,7 +150,8 @@
             "channel_capabilities": [
                 "chat"
             ],
-            "context_hints": []
+            "context_hints": [],
+            "handler": "App\\Core\\Skills\\AccountingSkill@execute"
         },
         {
             "name": "inventory_check",
@@ -182,7 +184,8 @@
             "channel_capabilities": [
                 "chat"
             ],
-            "context_hints": []
+            "context_hints": [],
+            "handler": "App\\Core\\Skills\\InventorySkill"
         },
         {
             "name": "product_lookup",
@@ -250,7 +253,8 @@
             "channel_capabilities": [
                 "chat"
             ],
-            "context_hints": []
+            "context_hints": [],
+            "handler": "App\\Core\\Skills\\CRMSkill"
         },
         {
             "name": "create_task",
@@ -4391,7 +4395,8 @@
             "channel_capabilities": [
                 "chat"
             ],
-            "context_hints": []
+            "context_hints": [],
+            "handler": "App\\Core\\Agents\\Tools\\UpdateInternalMemorySkill"
         },
         {
             "name": "playbook_executor",
@@ -4422,7 +4427,8 @@
             "channel_capabilities": [
                 "chat"
             ],
-            "context_hints": []
+            "context_hints": [],
+            "handler": "App\\Core\\Skills\\PlaybookExecutorSkill"
         },
         {
             "name": "inventory_adjust_stock",
@@ -4452,7 +4458,8 @@
             },
             "channel_capabilities": [
                 "chat"
-            ]
+            ],
+            "handler": "App\\Core\\Skills\\InventorySkill"
         },
         {
             "name": "inventory_create_product",
@@ -4479,7 +4486,8 @@
             },
             "channel_capabilities": [
                 "chat"
-            ]
+            ],
+            "handler": "App\\Core\\Skills\\InventorySkill"
         },
         {
             "name": "inventory_check_stock",
@@ -4503,7 +4511,8 @@
             },
             "channel_capabilities": [
                 "chat"
-            ]
+            ],
+            "handler": "App\\Core\\Skills\\InventorySkill"
         },
         {
             "name": "inventory_list_products",
@@ -4527,7 +4536,8 @@
             },
             "channel_capabilities": [
                 "chat"
-            ]
+            ],
+            "handler": "App\\Core\\Skills\\InventorySkill"
         },
         {
             "name": "crm_register_lead",
@@ -4556,7 +4566,8 @@
             },
             "channel_capabilities": [
                 "chat"
-            ]
+            ],
+            "handler": "App\\Core\\Skills\\CRMSkill"
         },
         {
             "name": "crm_update_customer",
@@ -4584,7 +4595,8 @@
             },
             "channel_capabilities": [
                 "chat"
-            ]
+            ],
+            "handler": "App\\Core\\Skills\\CRMSkill"
         },
         {
             "name": "crm_search_customers",
@@ -4609,7 +4621,8 @@
             },
             "channel_capabilities": [
                 "chat"
-            ]
+            ],
+            "handler": "App\\Core\\Skills\\CRMSkill"
         },
         {
             "name": "crm_stats",
@@ -4629,7 +4642,8 @@
             "input_schema": [],
             "channel_capabilities": [
                 "chat"
-            ]
+            ],
+            "handler": "App\\Core\\Skills\\CRMSkill"
         },
         {
             "name": "accounting_record_entry",
@@ -4659,7 +4673,8 @@
             },
             "channel_capabilities": [
                 "chat"
-            ]
+            ],
+            "handler": "App\\Core\\Skills\\AccountingSkill@execute"
         },
         {
             "name": "accounting_balance_sheet",
@@ -4679,7 +4694,8 @@
             "input_schema": [],
             "channel_capabilities": [
                 "chat"
-            ]
+            ],
+            "handler": "App\\Core\\Skills\\AccountingSkill@execute"
         },
         {
             "name": "accounting_record_sale",
@@ -4704,7 +4720,94 @@
             },
             "channel_capabilities": [
                 "chat"
-            ]
+            ],
+            "handler": "App\\Core\\Skills\\AccountingSkill@execute"
+        },
+        {
+            "name": "accounting_profit_loss",
+            "description": "Estado de resultados real (P&G): ingresos menos gastos del período desde journal_entries.",
+            "intent_patterns": [
+                "estado de resultados",
+                "pérdidas y ganancias",
+                "P&G",
+                "cuánto ganamos",
+                "informe de utilidades",
+                "resultado del período"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": [
+                "CommandBus"
+            ],
+            "priority": 85,
+            "memory_type": null,
+            "input_schema": {
+                "required": [],
+                "optional": [
+                    "period_start",
+                    "period_end"
+                ]
+            },
+            "channel_capabilities": [
+                "chat"
+            ],
+            "handler": "App\\Core\\Skills\\AccountingSkill@execute"
+        },
+        {
+            "name": "accounting_cash_flow",
+            "description": "Flujo de caja real: entradas y salidas bancarias del período desde journal_entries.",
+            "intent_patterns": [
+                "flujo de caja",
+                "cash flow",
+                "movimientos de caja",
+                "entradas y salidas de dinero",
+                "flujo de efectivo"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": [
+                "CommandBus"
+            ],
+            "priority": 85,
+            "memory_type": null,
+            "input_schema": {
+                "required": [],
+                "optional": [
+                    "period_start",
+                    "period_end"
+                ]
+            },
+            "channel_capabilities": [
+                "chat"
+            ],
+            "handler": "App\\Core\\Skills\\AccountingSkill@execute"
+        },
+        {
+            "name": "accounting_financial_statements",
+            "description": "Solicita estados financieros completos: balance general, P&G o flujo de caja.",
+            "intent_patterns": [
+                "re:(balance|estado|informe).*(financiero|contable|general)",
+                "re:(balance|informe|reporte).*(general|empresa|negocio)",
+                "muéstrame el balance general",
+                "necesito el estado de resultados",
+                "informe financiero del período"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": [
+                "CommandBus"
+            ],
+            "priority": 82,
+            "memory_type": null,
+            "input_schema": {
+                "required": [],
+                "optional": [
+                    "period_start",
+                    "period_end",
+                    "as_of_date"
+                ]
+            },
+            "channel_capabilities": [
+                "chat"
+            ],
+            "handler": "App\\Core\\Skills\\AccountingSkill@execute"
         },
         {
             "name": "create_app",
@@ -4717,14 +4820,32 @@
                 "re:(salon de belleza|barberia|restaurante|gimnasio|farmacia|constructora|moda|calzado|logistica).*(app|sistema|digital)"
             ],
             "keywords": [
-                "crear app", "nueva app", "crear aplicación", "instalar app",
-                "app dental", "app médica", "app colegio", "app iglesia",
-                "app veterinaria", "app contabilidad", "app tienda", "app clínica",
-                "app restaurante", "app salón", "app gimnasio", "app farmacia",
-                "app construcción", "app moda", "app logística", "app servicios"
+                "crear app",
+                "nueva app",
+                "crear aplicación",
+                "instalar app",
+                "app dental",
+                "app médica",
+                "app colegio",
+                "app iglesia",
+                "app veterinaria",
+                "app contabilidad",
+                "app tienda",
+                "app clínica",
+                "app restaurante",
+                "app salón",
+                "app gimnasio",
+                "app farmacia",
+                "app construcción",
+                "app moda",
+                "app logística",
+                "app servicios"
             ],
             "execution_mode": "tool",
-            "allowed_tools": ["AppInstallService", "AppCatalogManager"],
+            "allowed_tools": [
+                "AppInstallService",
+                "AppCatalogManager"
+            ],
             "priority": 200,
             "memory_type": null,
             "input_schema": {
@@ -4748,18 +4869,27 @@
                     },
                     "mixins": {
                         "type": "array",
-                        "items": {"type": "string"},
+                        "items": {
+                            "type": "string"
+                        },
                         "description": "Módulos adicionales a combinar: accounting, pos, billing_dian, inventory, crm"
                     },
                     "action": {
                         "type": "string",
-                        "enum": ["create", "propose_new_type"],
+                        "enum": [
+                            "create",
+                            "propose_new_type"
+                        ],
                         "description": "Omitir para creación normal. 'propose_new_type' cuando el sector no existe y necesita agregarse al catálogo."
                     }
                 },
                 "required": []
             },
-            "channel_capabilities": ["chat", "builder"]
+            "channel_capabilities": [
+                "chat",
+                "builder"
+            ],
+            "handler": "App\\Core\\Skills\\CreateAppSkill"
         },
         {
             "name": "propose_app_type",
@@ -4769,28 +4899,85 @@
                 "re:nuevo tipo de (negocio|empresa|sector)"
             ],
             "keywords": [
-                "nuevo tipo app", "agregar sector", "añadir al catálogo", "tipo de empresa nuevo"
+                "nuevo tipo app",
+                "agregar sector",
+                "añadir al catálogo",
+                "tipo de empresa nuevo"
             ],
             "execution_mode": "tool",
-            "allowed_tools": ["AppCatalogManager"],
+            "allowed_tools": [
+                "AppCatalogManager"
+            ],
             "priority": 190,
             "memory_type": null,
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "id":          {"type": "string", "description": "ID único snake_case para la nueva app"},
-                    "name":        {"type": "string", "description": "Nombre visible de la app"},
-                    "category":    {"type": "string", "description": "Categoría (Salud, Comercio, Educación, etc.)"},
-                    "sector":      {"type": "string", "description": "Sector del negocio en slug"},
-                    "description": {"type": "string", "description": "Descripción breve de para qué sirve la app"},
-                    "enabled_agents": {"type": "array", "items": {"type": "string"}, "description": "Agentes que activa"},
-                    "modules":        {"type": "array", "items": {"type": "string"}, "description": "Módulos que incluye"},
-                    "config_fields":  {"type": "array", "items": {"type": "string"}, "description": "Campos de configuración requeridos"},
-                    "interview_questions": {"type": "array", "items": {"type": "string"}, "description": "Preguntas para entrevistar al usuario antes de crear"}
+                    "id": {
+                        "type": "string",
+                        "description": "ID único snake_case para la nueva app"
+                    },
+                    "name": {
+                        "type": "string",
+                        "description": "Nombre visible de la app"
+                    },
+                    "category": {
+                        "type": "string",
+                        "description": "Categoría (Salud, Comercio, Educación, etc.)"
+                    },
+                    "sector": {
+                        "type": "string",
+                        "description": "Sector del negocio en slug"
+                    },
+                    "description": {
+                        "type": "string",
+                        "description": "Descripción breve de para qué sirve la app"
+                    },
+                    "enabled_agents": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Agentes que activa"
+                    },
+                    "modules": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Módulos que incluye"
+                    },
+                    "config_fields": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Campos de configuración requeridos"
+                    },
+                    "interview_questions": {
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        },
+                        "description": "Preguntas para entrevistar al usuario antes de crear"
+                    }
                 },
-                "required": ["id", "name", "category", "sector", "description", "enabled_agents", "modules", "config_fields"]
+                "required": [
+                    "id",
+                    "name",
+                    "category",
+                    "sector",
+                    "description",
+                    "enabled_agents",
+                    "modules",
+                    "config_fields"
+                ]
             },
-            "channel_capabilities": ["chat", "builder"]
+            "channel_capabilities": [
+                "chat",
+                "builder"
+            ],
+            "handler": "App\\Core\\Skills\\CreateAppSkill"
         },
         {
             "name": "query_app_data",
@@ -4802,26 +4989,64 @@
                 "re:(dame|muéstrame|enséñame).*(datos?|lista|registros?)"
             ],
             "keywords": [
-                "ver registros", "mostrar datos", "listar", "consultar", "ver tabla",
-                "cuántos registros", "dame los datos", "reporte de datos", "ver pacientes",
-                "ver clientes", "ver productos", "ver inventario", "mis datos"
+                "ver registros",
+                "mostrar datos",
+                "listar",
+                "consultar",
+                "ver tabla",
+                "cuántos registros",
+                "dame los datos",
+                "reporte de datos",
+                "ver pacientes",
+                "ver clientes",
+                "ver productos",
+                "ver inventario",
+                "mis datos"
             ],
             "execution_mode": "tool",
-            "allowed_tools": ["AppDataService"],
+            "allowed_tools": [
+                "AppDataService"
+            ],
             "priority": 185,
             "memory_type": null,
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "app_id":  {"type": "string",  "description": "ID de la app creada"},
-                    "entity":  {"type": "string",  "description": "Nombre de la entidad/tabla a consultar (sin prefijo app_...)"},
-                    "format":  {"type": "string",  "enum": ["html", "json", "pdf"], "description": "Formato del reporte (default: html)"},
-                    "limit":   {"type": "integer", "description": "Número máximo de registros (default: 50)"},
-                    "filters": {"type": "object",  "description": "Filtros opcionales campo: valor"}
+                    "app_id": {
+                        "type": "string",
+                        "description": "ID de la app creada"
+                    },
+                    "entity": {
+                        "type": "string",
+                        "description": "Nombre de la entidad/tabla a consultar (sin prefijo app_...)"
+                    },
+                    "format": {
+                        "type": "string",
+                        "enum": [
+                            "html",
+                            "json",
+                            "pdf"
+                        ],
+                        "description": "Formato del reporte (default: html)"
+                    },
+                    "limit": {
+                        "type": "integer",
+                        "description": "Número máximo de registros (default: 50)"
+                    },
+                    "filters": {
+                        "type": "object",
+                        "description": "Filtros opcionales campo: valor"
+                    }
                 },
-                "required": ["app_id"]
+                "required": [
+                    "app_id"
+                ]
             },
-            "channel_capabilities": ["chat", "builder"]
+            "channel_capabilities": [
+                "chat",
+                "builder"
+            ],
+            "handler": "App\\Core\\Skills\\AppReportSkill"
         },
         {
             "name": "insert_app_data",
@@ -4832,25 +5057,60 @@
                 "re:(quiero|necesito).*(registrar|agregar|guardar|añadir|crear).*(un|una|el|la)"
             ],
             "keywords": [
-                "registra", "registrar", "nuevo registro", "agregar", "añadir", "guardar",
-                "nuevo paciente", "nueva cita", "nuevo cliente", "nuevo producto",
-                "crear registro", "ingresar dato", "cargar dato"
+                "registra",
+                "registrar",
+                "nuevo registro",
+                "agregar",
+                "añadir",
+                "guardar",
+                "nuevo paciente",
+                "nueva cita",
+                "nuevo cliente",
+                "nuevo producto",
+                "crear registro",
+                "ingresar dato",
+                "cargar dato"
             ],
             "execution_mode": "tool",
-            "allowed_tools": ["AppDataService"],
+            "allowed_tools": [
+                "AppDataService"
+            ],
             "priority": 196,
             "memory_type": null,
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "app_id":  {"type": "string", "description": "ID de la app"},
-                    "entity":  {"type": "string", "description": "Nombre de la entidad donde insertar"},
-                    "action":  {"type": "string", "enum": ["insert"], "description": "Siempre 'insert'"},
-                    "data":    {"type": "object", "description": "Campos y valores del nuevo registro según el schema de la entidad"}
+                    "app_id": {
+                        "type": "string",
+                        "description": "ID de la app"
+                    },
+                    "entity": {
+                        "type": "string",
+                        "description": "Nombre de la entidad donde insertar"
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "insert"
+                        ],
+                        "description": "Siempre 'insert'"
+                    },
+                    "data": {
+                        "type": "object",
+                        "description": "Campos y valores del nuevo registro según el schema de la entidad"
+                    }
                 },
-                "required": ["app_id", "entity", "data"]
+                "required": [
+                    "app_id",
+                    "entity",
+                    "data"
+                ]
             },
-            "channel_capabilities": ["chat", "builder"]
+            "channel_capabilities": [
+                "chat",
+                "builder"
+            ],
+            "handler": "App\\Core\\Skills\\AppCrudSkill"
         },
         {
             "name": "update_app_data",
@@ -4861,25 +5121,60 @@
                 "re:(id|registro).*(actualiza|cambia|modifica)"
             ],
             "keywords": [
-                "actualizar", "modificar", "cambiar dato", "editar registro", "corregir",
-                "actualiza el registro", "cambia el dato", "modifica la información"
+                "actualizar",
+                "modificar",
+                "cambiar dato",
+                "editar registro",
+                "corregir",
+                "actualiza el registro",
+                "cambia el dato",
+                "modifica la información"
             ],
             "execution_mode": "tool",
-            "allowed_tools": ["AppDataService"],
+            "allowed_tools": [
+                "AppDataService"
+            ],
             "priority": 194,
             "memory_type": null,
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "app_id":  {"type": "string",  "description": "ID de la app"},
-                    "entity":  {"type": "string",  "description": "Nombre de la entidad"},
-                    "action":  {"type": "string",  "enum": ["update"], "description": "Siempre 'update'"},
-                    "id":      {"type": "integer", "description": "ID del registro a actualizar"},
-                    "data":    {"type": "object",  "description": "Campos y nuevos valores a actualizar"}
+                    "app_id": {
+                        "type": "string",
+                        "description": "ID de la app"
+                    },
+                    "entity": {
+                        "type": "string",
+                        "description": "Nombre de la entidad"
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "update"
+                        ],
+                        "description": "Siempre 'update'"
+                    },
+                    "id": {
+                        "type": "integer",
+                        "description": "ID del registro a actualizar"
+                    },
+                    "data": {
+                        "type": "object",
+                        "description": "Campos y nuevos valores a actualizar"
+                    }
                 },
-                "required": ["app_id", "entity", "id", "data"]
+                "required": [
+                    "app_id",
+                    "entity",
+                    "id",
+                    "data"
+                ]
             },
-            "channel_capabilities": ["chat", "builder"]
+            "channel_capabilities": [
+                "chat",
+                "builder"
+            ],
+            "handler": "App\\Core\\Skills\\AppCrudSkill"
         },
         {
             "name": "delete_app_data",
@@ -4889,24 +5184,54 @@
                 "re:(borra|elimina).*(el|la|los|las).*(registro|dato|id)"
             ],
             "keywords": [
-                "eliminar", "borrar", "elimina el registro", "borra el dato",
-                "quitar registro", "borrar paciente", "eliminar cliente"
+                "eliminar",
+                "borrar",
+                "elimina el registro",
+                "borra el dato",
+                "quitar registro",
+                "borrar paciente",
+                "eliminar cliente"
             ],
             "execution_mode": "tool",
-            "allowed_tools": ["AppDataService"],
+            "allowed_tools": [
+                "AppDataService"
+            ],
             "priority": 192,
             "memory_type": null,
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "app_id":  {"type": "string",  "description": "ID de la app"},
-                    "entity":  {"type": "string",  "description": "Nombre de la entidad"},
-                    "action":  {"type": "string",  "enum": ["delete"], "description": "Siempre 'delete'"},
-                    "id":      {"type": "integer", "description": "ID del registro a eliminar"}
+                    "app_id": {
+                        "type": "string",
+                        "description": "ID de la app"
+                    },
+                    "entity": {
+                        "type": "string",
+                        "description": "Nombre de la entidad"
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "delete"
+                        ],
+                        "description": "Siempre 'delete'"
+                    },
+                    "id": {
+                        "type": "integer",
+                        "description": "ID del registro a eliminar"
+                    }
                 },
-                "required": ["app_id", "entity", "id"]
+                "required": [
+                    "app_id",
+                    "entity",
+                    "id"
+                ]
             },
-            "channel_capabilities": ["chat", "builder"]
+            "channel_capabilities": [
+                "chat",
+                "builder"
+            ],
+            "handler": "App\\Core\\Skills\\AppCrudSkill"
         },
         {
             "name": "find_app_data",
@@ -4916,24 +5241,343 @@
                 "re:(id|registro).*(\\d+).*(busca|muéstrame|ver|dame)"
             ],
             "keywords": [
-                "buscar por id", "ver registro id", "muéstrame el registro", "busca el id",
-                "ver detalles", "detalle del registro"
+                "buscar por id",
+                "ver registro id",
+                "muéstrame el registro",
+                "busca el id",
+                "ver detalles",
+                "detalle del registro"
             ],
             "execution_mode": "tool",
-            "allowed_tools": ["AppDataService"],
+            "allowed_tools": [
+                "AppDataService"
+            ],
             "priority": 188,
             "memory_type": null,
             "input_schema": {
                 "type": "object",
                 "properties": {
-                    "app_id":  {"type": "string",  "description": "ID de la app"},
-                    "entity":  {"type": "string",  "description": "Nombre de la entidad"},
-                    "action":  {"type": "string",  "enum": ["find"], "description": "Siempre 'find'"},
-                    "id":      {"type": "integer", "description": "ID del registro a buscar"}
+                    "app_id": {
+                        "type": "string",
+                        "description": "ID de la app"
+                    },
+                    "entity": {
+                        "type": "string",
+                        "description": "Nombre de la entidad"
+                    },
+                    "action": {
+                        "type": "string",
+                        "enum": [
+                            "find"
+                        ],
+                        "description": "Siempre 'find'"
+                    },
+                    "id": {
+                        "type": "integer",
+                        "description": "ID del registro a buscar"
+                    }
                 },
-                "required": ["app_id", "entity", "id"]
+                "required": [
+                    "app_id",
+                    "entity",
+                    "id"
+                ]
             },
-            "channel_capabilities": ["chat", "builder"]
+            "channel_capabilities": [
+                "chat",
+                "builder"
+            ],
+            "handler": "App\\Core\\Skills\\AppCrudSkill"
+        },
+        {
+            "name": "web_search",
+            "description": "Búsqueda web en tiempo real usando Tavily, Brave o DuckDuckGo. Agentes deben citar la URL fuente.",
+            "intent_patterns": [
+                "re:(busca|buscar|googlea|consulta).*(en internet|en la web|en línea|online)",
+                "re:(qué dice|qué hay|noticias|información).*(sobre|acerca de)"
+            ],
+            "keywords": [
+                "buscar en internet",
+                "busca en la web",
+                "consulta online",
+                "búsqueda web"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": [
+                "WebSearchTool"
+            ],
+            "priority": 120,
+            "memory_type": null,
+            "input_schema": {
+                "required": [
+                    "query"
+                ],
+                "optional": [
+                    "max_results"
+                ]
+            },
+            "channel_capabilities": [
+                "chat"
+            ],
+            "handler": "App\\Core\\Skills\\BusinessAutomationSkill@execute"
+        },
+        {
+            "name": "download_file",
+            "description": "Descarga documentos desde URLs autorizadas (gov.co, DIAN, Drive). Protección SSRF incluida.",
+            "intent_patterns": [
+                "re:(descarga|baja|obtén).*(documento|archivo|pdf|excel)",
+                "re:(archivo|documento).*(descarga|descargar|bajar)"
+            ],
+            "keywords": [
+                "descargar archivo",
+                "bajar documento",
+                "descarga pdf"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": [
+                "FileDownloadTool"
+            ],
+            "priority": 115,
+            "memory_type": null,
+            "input_schema": {
+                "required": [
+                    "url"
+                ],
+                "optional": []
+            },
+            "channel_capabilities": [
+                "chat"
+            ],
+            "handler": "App\\Core\\Skills\\BusinessAutomationSkill@execute"
+        },
+        {
+            "name": "validate_payment",
+            "description": "Valida notificaciones webhook de Nequi, Bancolombia, MercadoPago o Wompi y marca facturas como pagadas.",
+            "intent_patterns": [
+                "re:(validar|verificar|confirmar).*(pago|transacción|webhook)",
+                "re:(pago|notificación).*(nequi|bancolombia|mercadopago|wompi)"
+            ],
+            "keywords": [
+                "validar pago",
+                "confirmar pago",
+                "webhook pago",
+                "notificación pago"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": [
+                "PaymentNotificationTool",
+                "CommandBus"
+            ],
+            "priority": 160,
+            "memory_type": null,
+            "input_schema": {
+                "required": [
+                    "provider",
+                    "payload"
+                ],
+                "optional": []
+            },
+            "channel_capabilities": [
+                "chat",
+                "webhook"
+            ],
+            "handler": "App\\Core\\Skills\\BusinessAutomationSkill@execute"
+        },
+        {
+            "name": "business_automation",
+            "description": "Orquestador de automatización: búsqueda web, descarga archivos, validar pagos, sincronizar ecommerce, verificar despachos, procesar Excel.",
+            "intent_patterns": [
+                "re:(automatiza|automatizar|sincroniza|sincronizar).*(ecommerce|tienda|pedidos)",
+                "re:(verifica|verificar|revisa|revisar).*(despacho|envío|shipment|entrega)",
+                "re:(procesa|procesar).*(excel|csv|planilla)"
+            ],
+            "keywords": [
+                "automatización",
+                "sincronizar tienda",
+                "verificar despacho",
+                "procesar planilla"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": [
+                "BusinessAutomationSkill"
+            ],
+            "priority": 118,
+            "memory_type": null,
+            "input_schema": {
+                "required": [
+                    "action"
+                ],
+                "optional": [
+                    "params"
+                ]
+            },
+            "channel_capabilities": [
+                "chat"
+            ],
+            "handler": "App\\Core\\Skills\\BusinessAutomationSkill@execute"
+        },
+        {
+            "name": "create_tool",
+            "description": "Permite a admins crear herramientas HTTP personalizadas para integraciones. SSRF protegido.",
+            "intent_patterns": [
+                "re:(crea|crear|agrega|agregar).*(herramienta|integración|webhook|endpoint)",
+                "re:(herramienta|integración).*(crea|crear|nueva|nuevo)"
+            ],
+            "keywords": [
+                "crear herramienta",
+                "nueva integración",
+                "agregar webhook",
+                "crear endpoint"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": [
+                "ToolFactory"
+            ],
+            "priority": 110,
+            "memory_type": null,
+            "input_schema": {
+                "required": [
+                    "name",
+                    "base_url"
+                ],
+                "optional": [
+                    "description",
+                    "http_method",
+                    "auth_type",
+                    "headers",
+                    "params_schema"
+                ]
+            },
+            "channel_capabilities": [
+                "chat",
+                "builder"
+            ],
+            "handler": "App\\Core\\Skills\\BusinessAutomationSkill@execute"
+        },
+        {
+            "name": "create_agent",
+            "description": "Crea un agente especializado para el tenant. Fase 1: entrevista. Fase 2: confirmar y persistir en SQLite + vectorizar triggers a Qdrant.",
+            "intent_patterns": [
+                "re:(crea|crear|necesito|quiero).*(agente|agent|asistente|bot)",
+                "re:(agente|agent).*(especializado|personalizado|nuevo|para)",
+                "quiero un agente de ventas",
+                "crea un agente contable",
+                "necesito un bot para mi empresa"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": ["CommandBus"],
+            "priority": 90,
+            "memory_type": null,
+            "input_schema": {
+                "required": [],
+                "optional": ["name", "area", "description", "confirmed"]
+            },
+            "channel_capabilities": ["chat", "builder"],
+            "handler": "App\\Core\\Skills\\CreateAgentSkill"
+        },
+        {
+            "name": "calculator",
+            "description": "Realiza cálculos numéricos de negocio: precio con margen, redondeo a múltiplos, proyección de impuestos, evaluación de expresiones.",
+            "intent_patterns": [
+                "calcular precio con margen",
+                "cuánto cobrar con el margen",
+                "calcular impuesto",
+                "proyección de IVA",
+                "redondear al múltiplo"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": ["CommandBus"],
+            "priority": 50,
+            "memory_type": null,
+            "input_schema": {
+                "required": [],
+                "optional": ["op", "cost", "margin", "value", "multiple", "total", "iva_rate", "ica_rate", "expression"]
+            },
+            "channel_capabilities": ["chat", "api"],
+            "handler": "App\\Core\\Skills\\CalculatorSkill"
+        },
+        {
+            "name": "unit_conversion",
+            "description": "Convierte unidades de compra a unidades de venta. Útil para inventarios con factores de conversión (cajas → unidades, rollos → metros).",
+            "intent_patterns": [
+                "convertir unidades",
+                "cuántas unidades salen de una caja",
+                "factor de conversión inventario",
+                "stock en unidades de venta"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": ["CommandBus"],
+            "priority": 50,
+            "memory_type": null,
+            "input_schema": {
+                "required": ["qty_purchase", "factor"],
+                "optional": ["sales", "unit_name"]
+            },
+            "channel_capabilities": ["chat", "api"],
+            "handler": "App\\Core\\Skills\\UnitConversionSkill"
+        },
+        {
+            "name": "fiscal_tax",
+            "description": "Calcula impuestos fiscales: IVA, redondeo DIAN, desglose base/impuesto/total. Aplica reglas DIAN Colombia.",
+            "intent_patterns": [
+                "calcular IVA",
+                "cuánto es el impuesto",
+                "desglose fiscal",
+                "base e impuesto",
+                "redondeo DIAN"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": ["CommandBus"],
+            "priority": 60,
+            "memory_type": null,
+            "input_schema": {
+                "required": ["base_amount"],
+                "optional": ["tax_type", "rate", "rounding"]
+            },
+            "channel_capabilities": ["chat", "api"],
+            "handler": "App\\Core\\Skills\\FiscalTaxSkill"
+        },
+        {
+            "name": "expiry_control",
+            "description": "Controla vencimiento de lotes de inventario según normas INVIMA Colombia. Calcula días restantes y nivel de urgencia.",
+            "intent_patterns": [
+                "verificar vencimiento",
+                "control de vencidos",
+                "fecha de caducidad lote",
+                "días para vencer",
+                "INVIMA vencimiento"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": ["CommandBus"],
+            "priority": 60,
+            "memory_type": null,
+            "input_schema": {
+                "required": ["expiry_date"],
+                "optional": ["batch_number"]
+            },
+            "channel_capabilities": ["chat", "api"],
+            "handler": "App\\Core\\Skills\\ExpiryControlSkill"
+        },
+        {
+            "name": "sales_bot",
+            "description": "Agente vendedor del Marketplace de SUKI. Responde preguntas de precio, demo, funcionalidades y conduce entrevista de dolor para recomendar el módulo correcto.",
+            "intent_patterns": [
+                "cuánto cuesta SUKI",
+                "quiero una demo",
+                "cómo funciona SUKI",
+                "qué hace el sistema",
+                "precio del plan"
+            ],
+            "execution_mode": "tool",
+            "allowed_tools": ["CommandBus"],
+            "priority": 40,
+            "memory_type": null,
+            "input_schema": {
+                "required": [],
+                "optional": ["text", "message", "query"]
+            },
+            "channel_capabilities": ["chat"],
+            "handler": "App\\Core\\Skills\\SalesBotSkill"
         }
     ]
 }

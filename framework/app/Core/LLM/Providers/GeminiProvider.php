@@ -14,6 +14,11 @@ final class GeminiProvider
         $this->config = $config;
     }
 
+    public function isAvailable(): bool
+    {
+        return (getenv('GEMINI_API_KEY') ?: '') !== '' && (getenv('GEMINI_ENABLED') ?: '1') !== '0';
+    }
+
     public function sendChat(array $messages, array $params = []): array
     {
         $prompt = $this->messagesToPrompt($messages);
@@ -21,10 +26,22 @@ final class GeminiProvider
         $client = new GeminiClient(null, $model ?: null);
         $result = $client->generate($prompt, $params);
         $content = (string) ($result['content'] ?? '');
+        // Gemini tool_call extraction: parts with functionCall key
+        $toolCalls = [];
+        $parts = $result['raw']['data']['candidates'][0]['content']['parts'] ?? [];
+        if (is_array($parts)) {
+            foreach ($parts as $part) {
+                $fc = is_array($part['functionCall'] ?? null) ? (array) $part['functionCall'] : null;
+                if ($fc !== null && isset($fc['name'])) {
+                    $toolCalls[] = ['id' => '', 'name' => (string) $fc['name'], 'input' => (array) ($fc['args'] ?? [])];
+                }
+            }
+        }
         return [
-            'text' => $content,
-            'usage' => $result['raw']['data']['usageMetadata'] ?? [],
-            'raw' => $result,
+            'text'       => $content,
+            'tool_calls' => $toolCalls,
+            'usage'      => $result['raw']['data']['usageMetadata'] ?? [],
+            'raw'        => $result,
         ];
     }
 

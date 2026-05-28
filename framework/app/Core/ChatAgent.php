@@ -398,7 +398,7 @@ final class ChatAgent
         // Multi-agent workflow dispatch (workflow_registry.json — agregar triggers en JSON, cero PHP)
         $classifiedIntent = (string) ($telemetry['classification'] ?? $result['intent'] ?? '');
         if ($classifiedIntent !== '') {
-            $wfResult = (new \App\Core\Agents\AgentWorkflowDispatcher($this->llmRouter()))->dispatch(
+            $wfResult = (new \App\Core\Agents\AgentWorkflowDispatcher($this->llmRouter(), \App\Core\Database::connection()))->dispatch(
                 $classifiedIntent,
                 $text,
                 ['tenant_id' => $tenantId, 'project_id' => $projectId, 'mode' => $mode]
@@ -776,8 +776,8 @@ final class ChatAgent
         try {
             $history = $memory->load($threadId, $tenantId);
             $systemPrompt = $this->buildSystemPrompt($mode, $role, $tenantId, $userId, $sessionId, $projectId, $telemetry);
-            // Intentar workflow multi-agente antes de LLM directo
-            $orchestratorReply = $this->tryMultiAgentOrchestration($text, $tenantId, $userId, $projectId, $mode);
+            // Intentar workflow multi-agente antes de LLM directo (pasa intent ya clasificado para evitar re-clasificar)
+            $orchestratorReply = $this->tryMultiAgentOrchestration($text, $tenantId, $userId, $projectId, $mode, (string) ($telemetry['classification'] ?? $result['intent'] ?? ''));
             if ($orchestratorReply !== null) {
                 $memory->append($threadId, 'assistant', $orchestratorReply);
                 $this->assistantSaved = true;
@@ -871,6 +871,21 @@ final class ChatAgent
             $loopResult   = $this->executeToolCallLoop($toolCalls, $messages, $tenantId, $mode, $sessionId);
             $responseText = $loopResult['text'];
             $responseKind = 'tool_execution';
+            // Grounding verification — PHP-only, no LLM, corrects hallucinated numbers/IDs
+            try {
+                $groundingState = array_merge($state ?? [], ['last_tool_results' => $loopResult['last_tool_results'] ?? []]);
+                $guardResult = (new \App\Core\GroundingGuard())->verify($responseText, $groundingState);
+                if (!$guardResult['verified'] && !empty($guardResult['corrections'])) {
+                    $responseText = $guardResult['sanitizedText'];
+                }
+                // Critic evaluation only for financial/stock/date responses — uses cheapest LLM, fails silently
+                if (!empty($loopResult['last_tool_results'])) {
+                    $criticResult = (new \App\Core\CriticAgent())->evaluate($responseText, $loopResult['last_tool_results'], $tenantId ?? '');
+                    if (!$criticResult['valid'] && !empty($criticResult['correctedText'])) {
+                        $responseText = $criticResult['correctedText'];
+                    }
+                }
+            } catch (\Throwable $ignored) {}
             $reply        = $this->reply($responseText, $channel, $sessionId, $userId);
         } elseif (is_array($json)) {
             $reply        = $this->executeLlmJson($json, $channel, $sessionId, $userId, $mode);
@@ -2952,9 +2967,10 @@ final class ChatAgent
 
     /**
      * Intenta resolver el mensaje vía ChatOrchestrator (multi-agente).
+     * Acepta el intent ya clasificado por el router para evitar doble clasificación.
      * Retorna null si no hay workflow coincidente — el llamador continúa con LLM directo.
      */
-    private function tryMultiAgentOrchestration(string $text, string $tenantId, string $userId, string $projectId, string $mode): ?string
+    private function tryMultiAgentOrchestration(string $text, string $tenantId, string $userId, string $projectId, string $mode, string $classifiedIntent = ''): ?string
     {
         try {
             $registry   = $this->projectRegistry();
@@ -2963,7 +2979,8 @@ final class ChatAgent
 
             $classifier = new \App\Core\Agents\IntentClassifier(null, null, $tenantId);
             $appProcess = new \App\Core\Agents\Processes\AppExecutionProcess($classifier);
-            $intent     = $appProcess->detectIntent($text, $this->llmRouter());
+            // Usa el intent ya clasificado para evitar re-clasificar; fallback a LLM si no disponible
+            $intent     = $classifiedIntent !== '' ? $classifiedIntent : $appProcess->detectIntent($text, $this->llmRouter());
 
             $workflow = $supervisor->coordinateWorkflow($intent, ['text' => $text]);
             if (!is_array($workflow) || empty($workflow['sequence'])) {
@@ -3025,15 +3042,16 @@ final class ChatAgent
      *
      * @param array<int,array<string,mixed>> $toolCalls
      * @param array<int,array<string,mixed>> $messages
-     * @return array{text:string,iterations:int,tools_called:list<string>}
+     * @return array{text:string,iterations:int,tools_called:list<string>,last_tool_results:list<mixed>}
      */
     private function executeToolCallLoop(array $toolCalls, array $messages, string $tenantId, string $mode, string $sessionId = ''): array
     {
-        $executor    = new \App\Core\SkillExecutor();
-        $history     = $messages;
-        $allCalled   = [];
-        $maxIter     = 3;
-        $finalText   = '';
+        $executor        = new \App\Core\SkillExecutor();
+        $history         = $messages;
+        $allCalled       = [];
+        $lastToolResults = [];
+        $maxIter         = 3;
+        $finalText       = '';
 
         for ($i = 0; $i < $maxIter; $i++) {
             foreach ($toolCalls as $call) {
@@ -3067,6 +3085,7 @@ final class ChatAgent
                         } catch (\Throwable $ignored) {}
                     }
 
+                    $lastToolResults[] = $result;
                     $encoded = json_encode($result, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
                     $history[] = ['role' => 'user', 'content' => "RESULTADO HERRAMIENTA ({$toolName}): {$encoded}"];
                 } catch (\Throwable $e) {
@@ -3101,9 +3120,10 @@ final class ChatAgent
         }
 
         return [
-            'text'        => $finalText,
-            'iterations'  => $i + 1,
-            'tools_called' => $allCalled,
+            'text'             => $finalText,
+            'iterations'       => $i + 1,
+            'tools_called'     => $allCalled,
+            'last_tool_results' => $lastToolResults,
         ];
     }
 }

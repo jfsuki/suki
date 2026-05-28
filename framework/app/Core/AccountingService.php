@@ -63,7 +63,8 @@ final class AccountingService
         $base   = $total - $taxAmt;
 
         // Resolver cuentas desde parametros del tenant (nunca hardcodeadas)
-        $rolRecaudo = $this->rolFromMedioPago($tenantId, $medioPago);
+        $entryWarnings = [];
+        $rolRecaudo = $this->rolFromMedioPago($tenantId, $medioPago, $entryWarnings);
         $recaudo    = $this->resolveByRole($tenantId, $rolRecaudo);
         $ingresos   = $this->resolveByRole($tenantId, 'ingresos_ventas');
         $ivaVentas  = $this->resolveByRole($tenantId, 'iva_ventas');
@@ -79,7 +80,7 @@ final class AccountingService
                 ['cuenta_id' => $ingresos, 'debe' => 0,         'haber' => $total,'glosa_linea' => "FE Venta - {$docNum}"],
             ];
 
-        return $this->recordEntry($tenantId, [
+        $result = $this->recordEntry($tenantId, [
             'fecha'         => $fiscalDoc['issue_date'] ?? date('Y-m-d'),
             'referencia'    => $docNum,
             'glosa'         => "Factura Electrónica {$docNum} — CUFE: {$cufe}",
@@ -88,6 +89,10 @@ final class AccountingService
             'doc_type'      => DocumentType::SALES_INVOICE,
             'lines'         => $lines,
         ], $userId);
+        if ($entryWarnings !== []) {
+            $result['warnings'] = $entryWarnings;
+        }
+        return $result;
     }
 
     /**
@@ -104,11 +109,12 @@ final class AccountingService
         string $userId,
         string $medioPago = self::DEFAULT_MEDIO_PAGO
     ): array {
-        $rolRecaudo = $this->rolFromMedioPago($tenantId, $medioPago);
+        $entryWarnings = [];
+        $rolRecaudo = $this->rolFromMedioPago($tenantId, $medioPago, $entryWarnings);
         $recaudo    = $this->resolveByRole($tenantId, $rolRecaudo);
         $ingresos   = $this->resolveByRole($tenantId, 'ingresos_ventas');
 
-        return $this->recordEntry($tenantId, [
+        $result = $this->recordEntry($tenantId, [
             'fecha'         => date('Y-m-d'),
             'referencia'    => $ref,
             'glosa'         => "Venta No-FE ({$docType}) Ref {$ref} — sin validez fiscal DIAN",
@@ -120,6 +126,10 @@ final class AccountingService
                 ['cuenta_id' => $ingresos, 'debe' => 0,       'haber' => $total, 'glosa_linea' => "No-FE Venta - {$ref}"],
             ],
         ], $userId);
+        if ($entryWarnings !== []) {
+            $result['warnings'] = $entryWarnings;
+        }
+        return $result;
     }
 
     // ─── API pública ─────────────────────────────────────────────────────────
@@ -235,17 +245,21 @@ final class AccountingService
 
     /**
      * Resuelve el rol contable de recaudo según el medio de pago del tenant.
-     * Si no hay config para ese medio → usa 'recaudo_efectivo' como fallback documentado
-     * y emite WARNING para que el operador configure el medio de pago en Parámetros Contables.
+     * Si no hay config para ese medio → usa 'recaudo_efectivo' como fallback documentado,
+     * emite WARNING en log y registra el aviso en $warnings para propagarlo al agente.
+     *
+     * @param array<string> $warnings Accumulator — se modifica por referencia.
      */
-    private function rolFromMedioPago(string $tenantId, string $medioPago): string
+    private function rolFromMedioPago(string $tenantId, string $medioPago, array &$warnings = []): string
     {
         $rol = $this->repository->findRolByMedioPago($tenantId, $medioPago);
         if ($rol === null) {
-            error_log(
-                "AccountingService [WARNING]: medio de pago '{$medioPago}' no configurado para tenant '{$tenantId}'. "
-                . "Usando fallback 'recaudo_efectivo'. Configure el medio en Parámetros Contables → Medios de Pago."
-            );
+            $msg = "Medio de pago '{$medioPago}' no está configurado en Parámetros Contables. "
+                . "El asiento usó la cuenta de recaudo en efectivo como fallback. "
+                . "Configure el medio en Parámetros Contables → Medios de Pago para precisión contable.";
+            $warnings[] = $msg;
+            error_log("AccountingService [WARNING]: medio de pago '{$medioPago}' no configurado para tenant '{$tenantId}'. "
+                . "Usando fallback 'recaudo_efectivo'. Configure el medio en Parámetros Contables → Medios de Pago.");
             return 'recaudo_efectivo';
         }
         return $rol;

@@ -66,7 +66,7 @@ if (!empty($_SESSION['suki_tower_auth'])) {
     if (empty($_SESSION['auth_user']) || ($_SESSION['auth_user']['id'] ?? '') === 'master_tower') {
         $_SESSION['auth_user'] = [
             'id' => 'admin',
-            'tenant_id' => 'demo',
+            'tenant_id' => 'default',
             'project_id' => 'default',
             'role' => 'creator',
             'email' => 'architect@suki.local',
@@ -2280,6 +2280,14 @@ if ($route === 'chat/help') {
 }
 
 if ($route === 'chat/acid-test') {
+    $isTowerUser  = isset($_SESSION['suki_tower_auth']) && $_SESSION['suki_tower_auth'] === true;
+    $masterKey    = trim((string) (getenv('SUKI_MASTER_KEY') ?: ''));
+    $providedKey  = trim((string) ($_SERVER['HTTP_X_MASTER_KEY'] ?? ''));
+    $isMasterAuth = $masterKey !== '' && hash_equals($masterKey, $providedKey);
+    if (!$isTowerUser && !$isMasterAuth) {
+        respondJson($response, 'error', 'Acceso restringido.', [], 403);
+        return;
+    }
     $payload = requestData();
     $tenantId = (string) ($payload['tenant_id'] ?? $_GET['tenant_id'] ?? getenv('TENANT_KEY') ?? getenv('TENANT_ID') ?? 'default');
     $tenantId = $tenantId !== '' ? $tenantId : 'default';
@@ -2297,6 +2305,14 @@ if ($route === 'chat/acid-test') {
 }
 
 if ($route === 'chat/acid-report') {
+    $isTowerUser  = isset($_SESSION['suki_tower_auth']) && $_SESSION['suki_tower_auth'] === true;
+    $masterKey    = trim((string) (getenv('SUKI_MASTER_KEY') ?: ''));
+    $providedKey  = trim((string) ($_SERVER['HTTP_X_MASTER_KEY'] ?? ''));
+    $isMasterAuth = $masterKey !== '' && hash_equals($masterKey, $providedKey);
+    if (!$isTowerUser && !$isMasterAuth) {
+        respondJson($response, 'error', 'Acceso restringido.', [], 403);
+        return;
+    }
     $payload = requestData();
     $tenantId = (string) ($payload['tenant_id'] ?? $_GET['tenant_id'] ?? getenv('TENANT_KEY') ?? getenv('TENANT_ID') ?? 'default');
     $safeTenant = sanitizeKey($tenantId);
@@ -2316,6 +2332,14 @@ if ($route === 'chat/acid-report') {
 }
 
 if ($route === 'chat/quality') {
+    $isTowerUser  = isset($_SESSION['suki_tower_auth']) && $_SESSION['suki_tower_auth'] === true;
+    $masterKey    = trim((string) (getenv('SUKI_MASTER_KEY') ?: ''));
+    $providedKey  = trim((string) ($_SERVER['HTTP_X_MASTER_KEY'] ?? ''));
+    $isMasterAuth = $masterKey !== '' && hash_equals($masterKey, $providedKey);
+    if (!$isTowerUser && !$isMasterAuth) {
+        respondJson($response, 'error', 'Acceso restringido.', [], 403);
+        return;
+    }
     $payload = requestData();
     $tenantId = (string) ($payload['tenant_id'] ?? $_GET['tenant_id'] ?? getenv('TENANT_KEY') ?? getenv('TENANT_ID') ?? 'default');
     $tenantId = $tenantId !== '' ? $tenantId : 'default';
@@ -2560,6 +2584,14 @@ if ($route === 'chat/journal/get') {
 }
 
 if ($route === 'chat/ops-quality') {
+    $isTowerUser  = isset($_SESSION['suki_tower_auth']) && $_SESSION['suki_tower_auth'] === true;
+    $masterKey    = trim((string) (getenv('SUKI_MASTER_KEY') ?: ''));
+    $providedKey  = trim((string) ($_SERVER['HTTP_X_MASTER_KEY'] ?? ''));
+    $isMasterAuth = $masterKey !== '' && hash_equals($masterKey, $providedKey);
+    if (!$isTowerUser && !$isMasterAuth) {
+        respondJson($response, 'error', 'Acceso restringido.', [], 403);
+        return;
+    }
     $payload = requestData();
     $tenantId = (string) ($payload['tenant_id'] ?? $_GET['tenant_id'] ?? getenv('TENANT_KEY') ?? getenv('TENANT_ID') ?? 'default');
     $tenantId = $tenantId !== '' ? $tenantId : 'default';
@@ -3258,26 +3290,45 @@ if ($route === 'registry/select') {
 if ($route === 'auth/register') {
     $payload = requestData();
     try {
+        // Requiere sesión de admin O SUKI_MASTER_KEY — nunca acceso público para crear usuarios
+        $sessionUser   = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+        $sessionRole   = (string) ($sessionUser['role'] ?? '');
+        $masterKey     = trim((string) (getenv('SUKI_MASTER_KEY') ?: ''));
+        $providedKey   = trim((string) ($payload['master_key'] ?? $_SERVER['HTTP_X_MASTER_KEY'] ?? ''));
+        $isMasterAuth  = $masterKey !== '' && hash_equals($masterKey, $providedKey);
+        $isAdminSession = in_array($sessionRole, ['admin', 'creator', 'superadmin'], true);
+        if (!$isMasterAuth && !$isAdminSession) {
+            respondJson($response, 'error', 'No autorizado para crear usuarios.', [], 403);
+            return;
+        }
         $registry = new ProjectRegistry();
         $manifest = $registry->resolveProjectFromManifest();
         $projectId = resolveProjectId($payload);
         if ($projectId === '') {
             $projectId = (string) ($manifest['id'] ?? 'default');
         }
-        $userId = (string) ($payload['id'] ?? $payload['user_id'] ?? '');
+        $userId   = (string) ($payload['id'] ?? $payload['user_id'] ?? '');
         $password = (string) ($payload['password'] ?? '');
-        $role = (string) ($payload['role'] ?? 'admin');
-        // tenant_id del payload solo permitido en registros internos/admin
-        // Para auto-registro de tenants externos usar POST /auth/tenant-register
-        $tenantId = (string) ($payload['tenant_id'] ?? 'default');
+        // role nunca viene del payload externo — solo admin puede asignar 'admin' a otro
+        $allowedRoles = ['user', 'viewer', 'operator', 'admin'];
+        $requestedRole = (string) ($payload['role'] ?? 'user');
+        $role = in_array($requestedRole, $allowedRoles, true) ? $requestedRole : 'user';
+        if ($role === 'admin' && !$isAdminSession && !$isMasterAuth) {
+            $role = 'user';
+        }
+        // tenant_id desde sesión autenticada, nunca del payload
+        $tenantId = $sessionUser['tenant_id'] ?? (string) ($payload['tenant_id'] ?? 'default');
+        if ($isMasterAuth && isset($payload['tenant_id'])) {
+            $tenantId = (string) $payload['tenant_id'];
+        }
         $label = (string) ($payload['label'] ?? $userId);
         $registry->createAuthUser($projectId, $userId, $password, $role, $tenantId, $label);
         $registry->touchUser($userId, $role, 'auth', $tenantId, $label);
         $registry->assignUserToProject($projectId, $userId, $role);
         respondJson($response, 'success', 'Usuario creado', [
             'project_id' => $projectId,
-            'user_id' => $userId,
-            'role' => $role,
+            'user_id'    => $userId,
+            'role'       => $role,
         ]);
         return;
     } catch (\Throwable $e) {
@@ -3313,32 +3364,32 @@ if ($route === 'auth/request_code') {
 if ($route === 'auth/verify_code') {
     $payload = requestData();
     try {
-        $registry = new ProjectRegistry();
-        $manifest = $registry->resolveProjectFromManifest();
+        $registry  = new ProjectRegistry();
+        $manifest  = $registry->resolveProjectFromManifest();
         $projectId = (string) ($payload['project_id'] ?? $manifest['id'] ?? 'default');
-        $phone = preg_replace('/[^0-9]/', '', (string) ($payload['phone'] ?? ''));
-        $code = (string) ($payload['code'] ?? '');
-        $role = (string) ($payload['role'] ?? 'admin');
-        $tenantId = (string) ($payload['tenant_id'] ?? 'default');
+        $phone     = preg_replace('/[^0-9]/', '', (string) ($payload['phone'] ?? ''));
+        $code      = (string) ($payload['code'] ?? '');
         if ($phone === '' || $code === '') {
             respondJson($response, 'error', 'Telefono y codigo requeridos', [], 400);
             return;
         }
         if (!$registry->verifyAuthCode($projectId, $phone, $code)) {
-            respondJson($response, 'error', 'Codigo invalido', [], 401);
+            respondJson($response, 'error', 'Codigo invalido o expirado', [], 401);
             return;
         }
-        // Contraseña real del request o aleatoria segura — el OTP NO se usa como contraseña
-        $newPassword = (string) ($payload['password'] ?? bin2hex(random_bytes(16)));
+        // role y tenant_id vienen del registro almacenado en DB, nunca del payload
+        $storedUser = $registry->findAuthUserByPhone($projectId, $phone);
+        $role     = (string) ($storedUser['role']      ?? 'user');
+        $tenantId = (string) ($storedUser['tenant_id'] ?? $phone); // phone como tenant_id si es registro nuevo
+        $newPassword  = (string) ($payload['password'] ?? bin2hex(random_bytes(16)));
         $passwordHash = password_hash($newPassword, PASSWORD_BCRYPT);
         $registry->createAuthUser($projectId, $phone, $passwordHash, $role, $tenantId, $phone);
         $registry->touchUser($phone, $role, 'auth', $tenantId, $phone);
         $registry->assignUserToProject($projectId, $phone, $role);
         respondJson($response, 'success', 'Telefono verificado', [
-            'user_id' => $phone,
+            'user_id'    => $phone,
             'project_id' => $projectId,
-            'role' => $role,
-            'tenant_id' => $tenantId,
+            'role'       => $role,
         ]);
         return;
     } catch (\Throwable $e) {
@@ -3368,6 +3419,7 @@ if ($route === 'auth/login') {
             respondJson($response, 'error', 'Cuenta pendiente de verificacion. Revisar email.', [], 403);
             return;
         }
+        $csrfToken = bin2hex(random_bytes(32));
         $_SESSION['auth_user'] = [
             'id' => $user['id'],
             'project_id' => $projectId,
@@ -3375,9 +3427,14 @@ if ($route === 'auth/login') {
             'tenant_id' => $user['tenant_id'],
             'label' => $user['label'],
         ];
+        // Alias planos para compatibilidad con index.php y vistas PHP
+        $_SESSION['user_id']    = $user['id'];
+        $_SESSION['tenant_id']  = $user['tenant_id'];
+        $_SESSION['csrf_token'] = $csrfToken;
         $_SESSION['current_project_id'] = $projectId;
         respondJson($response, 'success', 'Login OK', [
-            'user' => $_SESSION['auth_user'],
+            'user'       => $_SESSION['auth_user'],
+            'csrf_token' => $csrfToken,
         ]);
         return;
     } catch (\Throwable $e) {
@@ -6477,8 +6534,13 @@ if (str_starts_with($route, 'records/')) {
 }
 
 if ($route === 'command') {
+    // Requiere sesión activa para cualquier método HTTP — tenant_id siempre del servidor
+    if (empty($_SESSION['auth_user'])) {
+        respondJson($response, 'error', 'Debes iniciar sesion para usar este endpoint.', [], 401);
+        return;
+    }
     $payload = requestData();
-    setTenantContext($payload);
+    setTenantContext($payload, true); // preferAuthenticatedTenant=true
     $commandName = $payload['command'] ?? '';
     $entity = $payload['entity'] ?? '';
     $command = new CommandLayer();

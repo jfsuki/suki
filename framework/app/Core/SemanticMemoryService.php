@@ -30,6 +30,8 @@ final class SemanticMemoryService
             $this->embeddingService = $embeddingService ?? new GeminiEmbeddingService();
         } catch (\Throwable $e) {
             $this->embeddingService = null;
+            error_log('[SUKI][WARNING] SemanticMemoryService: RAG desactivado — ' . $e->getMessage()
+                . '. Configure GEMINI_API_KEY para activar recuperación semántica.');
         }
         $this->vectorStorePrototype = $vectorStore;
         $this->defaultTopK = max(1, (int) ($defaultTopK ?? getenv('SEMANTIC_MEMORY_TOP_K') ?: 5));
@@ -317,10 +319,14 @@ final class SemanticMemoryService
             ];
         }
 
-        $memoryType = QdrantVectorStore::assertMemoryType((string) ($scope['memory_type'] ?? ''));
+        try {
+            $memoryType = QdrantVectorStore::assertMemoryType((string) ($scope['memory_type'] ?? ''));
+        } catch (\RuntimeException $e) {
+            return self::disabledResult('invalid_memory_type');
+        }
         $tenantId = trim((string) ($scope['tenant_id'] ?? ''));
         if ($tenantId === '') {
-            throw new RuntimeException('retrieve requiere tenant_id.');
+            return self::disabledResult('missing_tenant_id');
         }
 
         $appId = $this->normalizeNullableString($scope['app_id'] ?? null);

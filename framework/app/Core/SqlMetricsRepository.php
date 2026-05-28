@@ -915,7 +915,9 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
                 'status' => ($row['p95'] > 2000 || $row['errors'] > ($row['total'] * 0.1)) ? 'Lento' : 'OK',
                 'p50' => round($row['p50'], 2),
                 'p95' => round($row['p95'], 2),
-                'uptime' => 99.9 // Placeholder for hosting uptime
+                'uptime' => $row['total'] > 0
+                    ? round((1 - ($row['errors'] / $row['total'])) * 100, 2)
+                    : 100.0
             ];
         }
         return $worlds;
@@ -947,21 +949,9 @@ final class SqlMetricsRepository implements MetricsRepositoryInterface
         
         $results = $this->selectRows($sql, [':since' => $since]);
         
-        // Split Gemini into LLM and Embedding for the UI if possible
         $final = [];
         foreach ($results as $res) {
-            if ($res['provider'] === 'gemini') {
-                $final['Gemini LLM'] = $res;
-                // Dummy split for embedding if not explicitly tracked
-                $final['Gemini Embedding'] = [
-                    'provider' => 'gemini-emb',
-                    'calls' => round($res['calls']*0.2), 
-                    'tokens' => round($res['tokens']*0.05),
-                    'cost' => $res['cost']*0.01 
-                ];
-            } else {
-                $final[ucwords($res['provider'])] = $res;
-            }
+            $final[ucwords((string) ($res['provider'] ?? 'unknown'))] = $res;
         }
         return $final;
     }

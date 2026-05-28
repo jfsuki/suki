@@ -760,7 +760,7 @@ include __DIR__ . '/includes/navbar.php';
 
   window.loadKanban = async () => {
     try {
-      const res = await fetch('api/kanban/get?type=quotes');
+      const res = await fetch((window.SUKI_BASE || '') + '/api/kanban/get?type=quotes');
       const json = await res.json();
       if(json.status !== 'success') throw new Error(json.message);
       
@@ -802,7 +802,7 @@ include __DIR__ . '/includes/navbar.php';
     const id = ev.dataTransfer.getData("cardId");
     const type = ev.dataTransfer.getData("cardType");
     try {
-      await fetch('api/kanban/move', {
+      await fetch((window.SUKI_BASE || '') + '/api/kanban/move', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, type, status: newStatus })
@@ -813,7 +813,7 @@ include __DIR__ . '/includes/navbar.php';
 
   window.loadDashboard = async () => {
     try {
-      const res = await fetch('api/dashboard/metrics');
+      const res = await fetch((window.SUKI_BASE || '') + '/api/dashboard/metrics');
       const json = await res.json();
       if(json.status !== 'success') throw new Error(json.message);
       

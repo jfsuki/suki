@@ -298,6 +298,12 @@ final class FiscalEngineService
             'http_status' => $status,
         ]);
 
+        // Surface builder warnings (e.g. consumer_final fallback) so the agent can notify the operator
+        $builderWarnings = (array) ($alanubeBody['metadata']['_warnings'] ?? []);
+        if ($builderWarnings !== []) {
+            $updated['_submission_warnings'] = $builderWarnings;
+        }
+
         return $updated;
     }
 
