@@ -78,9 +78,13 @@
         "max_params_in_hint": 7,
         "max_cluster_peers": 3,
         "max_description_length": 200,
+        "max_data_value_length": 2000,
+        "max_data_depth": 5,
         "allowed_intent_pattern": "^[a-zA-Z0-9_]{1,64}$",
         "context_keys": ["tenant_id", "agent_id", "user_id", "session_id"],
-        "callable_methods": ["execute", "handle", "calculate"]
+        "callable_methods": ["execute", "handle", "calculate"],
+        "output_validator_strict": true,
+        "_comment_strict": "true=rechaza parámetros desconocidos; false=los descarta silenciosamente (útil en dev)"
     },
 
     "request_mode_budgets": {

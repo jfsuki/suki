@@ -1084,6 +1084,11 @@ final class ChatAgent
                     } elseif ($groundingResult['block'] !== '') {
                         $systemPrompt .= "\n\n" . $groundingResult['block'];
                     }
+                    // Fix Gap-SCML-4: registrar cluster actual en telemetry para el siguiente turn
+                    if (($groundingResult['cluster'] ?? '') !== '') {
+                        $telemetry['previous_topic_cluster'] = $telemetry['current_topic_cluster'] ?? '';
+                        $telemetry['current_topic_cluster']  = $groundingResult['cluster'];
+                    }
                     // Si block==='' y needs_clarification===false: intent conversacional, no se anade nada
                 } catch (\Throwable $groundingErr) {
                     error_log('[SCML] TaskGroundingManifest failed: ' . $groundingErr->getMessage());
@@ -1298,11 +1303,44 @@ final class ChatAgent
             $responseKind = 'send_to_llm';
             $responseText = '';
             if (is_array($json)) {
-                $reply = $this->executeLlmJson($json, $channel, $sessionId, $userId, $mode);
-                $responseText = (string) (($reply['data']['reply'] ?? $reply['reply'] ?? $reply['message'] ?? ''));
-                $responseKind = (isset($json['command']) || (isset($json['actions']) && is_array($json['actions']) && $json['actions'] !== []))
-                    ? 'execute_command'
-                    : 'respond_local';
+                // --- Capa 2J: SCML OutputValidator — valida {"skill":..,"data":..} antes del dispatch ---
+                $validator = new \App\Core\Grounding\OutputValidator(
+                    new \App\Core\Grounding\ExecutionRegistry()
+                );
+                if ($validator->isSkillCall($json)) {
+                    $validation = $validator->validate($json);
+                    if ($validation['valid']) {
+                        // Dispatch verificado → DynamicSkillRegistry (misma ruta que SkillExecutor)
+                        $skillDispatchResult = (new \App\Core\DynamicSkillRegistry())->dispatch(
+                            $validation['skill'],
+                            $validation['data'],
+                            [
+                                'tenant_id'  => $tenantId,
+                                'session_id' => $sessionId,
+                                'user_id'    => $userId,
+                                'mode'       => $mode,
+                                'project_id' => $projectId,
+                            ]
+                        );
+                        $skillReply  = (string) ($skillDispatchResult['reply'] ?? $skillDispatchResult['message'] ?? 'Acción ejecutada.');
+                        $reply       = $this->reply($skillReply, $channel, $sessionId, $userId);
+                        $responseKind = 'execute_command';
+                        $responseText = $skillReply;
+                    } else {
+                        // Skill inválido o params desconocidos → clarificación al usuario
+                        error_log('[SCML] OutputValidator rechazó skill call: ' . ($validation['error'] ?? 'unknown') . ' skill=' . ($validation['skill'] ?? ''));
+                        $clarification = $validation['clarification_message'] ?? 'No pude identificar la acción. Por favor describe mejor lo que necesitas.';
+                        $reply        = $this->reply($clarification, $channel, $sessionId, $userId);
+                        $responseKind = 'respond_local';
+                        $responseText = $clarification;
+                    }
+                } else {
+                    $reply = $this->executeLlmJson($json, $channel, $sessionId, $userId, $mode);
+                    $responseText = (string) (($reply['data']['reply'] ?? $reply['reply'] ?? $reply['message'] ?? ''));
+                    $responseKind = (isset($json['command']) || (isset($json['actions']) && is_array($json['actions']) && $json['actions'] !== []))
+                        ? 'execute_command'
+                        : 'respond_local';
+                }
             } else {
                 $responseText = (string) ($llmResult['text'] ?? '');
                 if ($responseText === '') {
