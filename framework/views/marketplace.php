@@ -140,7 +140,19 @@ if (file_exists($catalogPath)) {
 
     <div class="grid">
         <?php if (empty($__apps)): ?>
-        <p style="color:var(--text-dim);grid-column:1/-1;text-align:center;padding:3rem 0;">No hay aplicaciones disponibles en este momento.</p>
+        <div style="grid-column:1/-1;text-align:center;padding:5rem 2rem;">
+            <div style="font-size:3rem;margin-bottom:1rem;">🔧</div>
+            <h2 style="color:var(--text);margin-bottom:0.75rem;font-size:1.5rem;">Aún no hay apps publicadas</h2>
+            <p style="color:var(--text-dim);max-width:420px;margin:0 auto 2rem;line-height:1.7;">
+                El Marketplace está listo. Los creadores de apps pueden publicar aquí para que cualquier empresa las use.
+            </p>
+            <a href="<?= $__base ?>/builder-login" style="display:inline-block;background:var(--accent);color:#fff;padding:0.85rem 1.75rem;border-radius:10px;font-weight:700;text-decoration:none;margin-right:1rem;">
+                Crear y publicar una App
+            </a>
+            <a href="<?= $__base ?>/marketplace/login" style="display:inline-block;background:transparent;color:var(--accent);border:2px solid var(--accent);padding:0.8rem 1.75rem;border-radius:10px;font-weight:700;text-decoration:none;">
+                Soy una empresa →
+            </a>
+        </div>
         <?php else: foreach ($__apps as $__app):
             $__id   = htmlspecialchars($__app['id'],          ENT_QUOTES, 'UTF-8');
             $__name = htmlspecialchars($__app['name'],        ENT_QUOTES, 'UTF-8');

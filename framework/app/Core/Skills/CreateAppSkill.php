@@ -55,7 +55,12 @@ final class CreateAppSkill
 
         // Special: agent proposes a new app type for the catalog
         if ($action === 'propose_new_type') {
-            return $this->handlePropose($args);
+            return $this->handlePropose($args, $tenantId);
+        }
+
+        // Special: builder publishes a draft app to the Marketplace
+        if ($action === 'publish_to_marketplace') {
+            return $this->handlePublish($args, $tenantId);
         }
 
         // Phase 2: LLM has completed the interview and confirmed with schema
@@ -309,7 +314,11 @@ final class CreateAppSkill
                                     . "- ✅ Sistema personalizado para tu negocio\n"
                                     . "- ✅ Memoria completa guardada — puedo retomar en cualquier sesión sin empezar desde cero\n"
                                     . "- ✅ Actualizable en el futuro sin perder datos\n\n"
-                                    . "¿Por dónde quieres empezar? Puedo ayudarte a crear tus primeros registros, configurar usuarios o explicarte cómo funciona cada módulo.",
+                                    . "¿Por dónde quieres empezar? Puedo ayudarte a crear tus primeros registros, configurar usuarios o explicarte cómo funciona cada módulo.\n\n"
+                                    . "---\n"
+                                    . "**¿Quieres que otras empresas puedan usar esta app?**\n"
+                                    . "Puedo publicarla en el **Marketplace de SUKI** para que cualquier empresa la vea, se suscriba y la use.\n"
+                                    . "Escribe **\"publicar en marketplace\"** cuando estés listo, o **\"mantener privada\"** para uso exclusivo de tu empresa.",
             ];
 
         } catch (\Throwable $e) {
@@ -324,20 +333,78 @@ final class CreateAppSkill
 
     // ─── Propose new app type ─────────────────────────────────────────────────
 
-    private function handlePropose(array $args): array
+    private function handlePropose(array $args, string $tenantId = ''): array
     {
         $definition = is_array($args['definition'] ?? null) ? $args['definition'] : $args;
-        $result     = $this->catalog->proposeApp((array) $definition);
+        $result     = $this->catalog->proposeApp((array) $definition, $tenantId);
 
         if (!($result['ok'] ?? false)) {
             return ['ok' => false, 'action' => 'respond_local', 'reply' => 'No pude guardar el nuevo tipo de app: ' . ($result['error'] ?? 'error desconocido')];
         }
-        $app = $result['app'] ?? [];
+        $app   = $result['app'] ?? [];
+        $appId = $result['app_id'] ?? '';
+
         return [
             'ok'     => true,
-            'app_id' => $result['app_id'] ?? '',
+            'app_id' => $appId,
+            'status' => 'draft',
             'action' => 'respond_local',
-            'reply'  => "✅ Nuevo tipo de app **{$app['name']}** agregado al catálogo (sector: {$app['sector']}). Ya está disponible para crear.",
+            'reply'  => "✅ App **{$app['name']}** creada y guardada en borrador (sector: {$app['sector']}).\n\n"
+                      . "Está en modo **privado** — solo tú puedes verla y usarla por ahora.\n\n"
+                      . "**¿Quieres publicarla en el Marketplace?**\n"
+                      . "Cuando esté lista, dime **\"publicar en marketplace\"** y quedará visible para que cualquier empresa se suscriba.\n"
+                      . "O dime **\"mantener privada\"** si es solo para tu empresa.",
+        ];
+    }
+
+    // ─── Publish draft app to Marketplace ────────────────────────────────────
+
+    private function handlePublish(array $args, string $tenantId): array
+    {
+        $appId = trim((string) ($args['app_id'] ?? ''));
+
+        // Si no viene app_id, buscar el último draft de este tenant
+        if ($appId === '') {
+            $drafts = $this->catalog->getDraftsByTenant($tenantId);
+            if (empty($drafts)) {
+                return [
+                    'ok'     => false,
+                    'action' => 'respond_local',
+                    'reply'  => "No tienes apps en borrador para publicar. Crea una app primero.",
+                ];
+            }
+            if (count($drafts) === 1) {
+                $appId = $drafts[0]['id'] ?? '';
+            } else {
+                $names = implode(', ', array_column($drafts, 'name'));
+                return [
+                    'ok'     => false,
+                    'action' => 'respond_local',
+                    'reply'  => "Tienes varias apps en borrador: {$names}. ¿Cuál quieres publicar? Indícame el nombre.",
+                ];
+            }
+        }
+
+        $result = $this->catalog->publishApp($appId, $tenantId);
+
+        if (!($result['ok'] ?? false)) {
+            return [
+                'ok'     => false,
+                'action' => 'respond_local',
+                'reply'  => "No pude publicar la app: " . ($result['error'] ?? 'error desconocido'),
+            ];
+        }
+
+        $app = $result['app'] ?? [];
+        return [
+            'ok'        => true,
+            'app_id'    => $appId,
+            'status'    => 'available',
+            'action'    => 'respond_local',
+            'reply'     => "🚀 **¡App publicada en el Marketplace!**\n\n"
+                         . "**{$app['name']}** ya aparece en el Marketplace de SUKI.\n"
+                         . "Cualquier empresa puede verla, suscribirse y empezar a usarla.\n\n"
+                         . "La pueden encontrar en: `/marketplace`",
         ];
     }
 

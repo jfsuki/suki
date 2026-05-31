@@ -156,11 +156,13 @@ final class AppCatalogManager
 
     /**
      * Propose and persist a new app type to the catalog.
-     * The agent can call this to expand the catalog at runtime.
+     * Nuevas apps empiezan en status:'draft' — el creador decide cuándo publicar.
+     * Las apps del catálogo base de SUKI (sin _proposed_by_tenant) permanecen 'available'.
      *
-     * @param array $definition Must include: id, name, category, sector, description, enabled_agents, modules, config_fields
+     * @param array  $definition  Must include: id, name, category, sector, description, enabled_agents, modules, config_fields
+     * @param string $tenantId    Builder tenant que propone la app (para control de publicación)
      */
-    public function proposeApp(array $definition): array
+    public function proposeApp(array $definition, string $tenantId = ''): array
     {
         $required = ['id', 'name', 'category', 'sector', 'description', 'enabled_agents', 'modules', 'config_fields'];
         foreach ($required as $field) {
@@ -177,20 +179,21 @@ final class AppCatalogManager
         $catalog = $this->loadCatalog();
 
         $newApp = [
-            'id'                  => $appId,
-            'name'                => (string) $definition['name'],
-            'category'            => (string) $definition['category'],
-            'sector'              => (string) $definition['sector'],
-            'description'         => (string) $definition['description'],
-            'status'              => 'available',
-            'enabled_agents'      => (array) $definition['enabled_agents'],
-            'default_workflows'   => (array) ($definition['default_workflows'] ?? []),
-            'modules'             => (array) $definition['modules'],
-            'config_fields'       => (array) $definition['config_fields'],
-            'compatible_mixins'   => (array) ($definition['compatible_mixins'] ?? []),
-            'interview_questions' => (array) ($definition['interview_questions'] ?? []),
-            '_proposed_by_agent'  => true,
-            '_proposed_at'        => date('Y-m-d H:i:s'),
+            'id'                   => $appId,
+            'name'                 => (string) $definition['name'],
+            'category'             => (string) $definition['category'],
+            'sector'               => (string) $definition['sector'],
+            'description'          => (string) $definition['description'],
+            'status'               => 'draft',          // Marketplace no la muestra hasta publicar
+            'enabled_agents'       => (array) $definition['enabled_agents'],
+            'default_workflows'    => (array) ($definition['default_workflows'] ?? []),
+            'modules'              => (array) $definition['modules'],
+            'config_fields'        => (array) $definition['config_fields'],
+            'compatible_mixins'    => (array) ($definition['compatible_mixins'] ?? []),
+            'interview_questions'  => (array) ($definition['interview_questions'] ?? []),
+            '_proposed_by_agent'   => true,
+            '_proposed_by_tenant'  => $tenantId,
+            '_proposed_at'         => date('Y-m-d H:i:s'),
         ];
 
         $catalog['apps'][] = $newApp;
@@ -202,6 +205,64 @@ final class AppCatalogManager
         }
 
         return ['ok' => true, 'app_id' => $appId, 'app' => $newApp];
+    }
+
+    /**
+     * Publica una app draft al Marketplace (status: draft → available).
+     * Solo el tenant que la propuso puede publicarla.
+     */
+    public function publishApp(string $appId, string $tenantId = ''): array
+    {
+        $catalog = $this->loadCatalog();
+        $apps    = &$catalog['apps'];
+        $found   = false;
+
+        foreach ($apps as &$app) {
+            if (($app['id'] ?? '') !== $appId) {
+                continue;
+            }
+            $found = true;
+
+            if (($app['status'] ?? '') === 'available') {
+                return ['ok' => false, 'error' => "La app '{$appId}' ya está publicada en el Marketplace."];
+            }
+            if (($app['status'] ?? '') !== 'draft') {
+                return ['ok' => false, 'error' => "La app '{$appId}' no está en borrador."];
+            }
+            // Verificar propiedad: solo el creador puede publicar
+            $owner = (string) ($app['_proposed_by_tenant'] ?? '');
+            if ($tenantId !== '' && $owner !== '' && $owner !== $tenantId) {
+                return ['ok' => false, 'error' => 'No tienes permiso para publicar esta app.'];
+            }
+
+            $app['status']        = 'available';
+            $app['_published_at'] = date('Y-m-d H:i:s');
+            $this->catalog        = $catalog;
+
+            $json = json_encode($catalog, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE);
+            if ($json === false || file_put_contents($this->catalogPath, $json) === false) {
+                return ['ok' => false, 'error' => 'No se pudo guardar el catálogo'];
+            }
+
+            return ['ok' => true, 'app_id' => $appId, 'app' => $app];
+        }
+        unset($app);
+
+        return ['ok' => false, 'error' => "App '{$appId}' no encontrada en el catálogo."];
+    }
+
+    /**
+     * Retorna las apps en borrador que pertenecen a un tenant creador específico.
+     *
+     * @return list<array<string, mixed>>
+     */
+    public function getDraftsByTenant(string $tenantId): array
+    {
+        return array_values(array_filter(
+            $this->listApps(),
+            static fn($a) => ($a['status'] ?? '') === 'draft'
+                && ($a['_proposed_by_tenant'] ?? '') === $tenantId
+        ));
     }
 
     /**

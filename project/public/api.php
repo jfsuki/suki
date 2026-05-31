@@ -6664,6 +6664,46 @@ if ($route === 'agents/status') {
     return;
 }
 
+// GET /api/apps/my-drafts — lista apps en borrador del builder autenticado
+if ($route === 'apps/my-drafts' && $method === 'GET') {
+    $auth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($auth)) {
+        respondJson($response, 'error', 'No autenticado', [], 401);
+        return;
+    }
+    $tenantId = (string) ($auth['tenant_id'] ?? '');
+    $drafts   = (new \App\Core\AppCatalogManager())->getDraftsByTenant($tenantId);
+    respondJson($response, 'success', '', ['drafts' => $drafts, 'count' => count($drafts)]);
+    return;
+}
+
+// POST /api/apps/publish — publica una app draft al Marketplace
+if ($route === 'apps/publish' && $method === 'POST') {
+    $auth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
+    if (empty($auth)) {
+        respondJson($response, 'error', 'No autenticado', [], 401);
+        return;
+    }
+    $tenantId = (string) ($auth['tenant_id'] ?? '');
+    $payload  = requestData();
+    $appId    = trim((string) ($payload['app_id'] ?? ''));
+    if ($appId === '') {
+        respondJson($response, 'error', 'app_id es obligatorio', [], 422);
+        return;
+    }
+    $result = (new \App\Core\AppCatalogManager())->publishApp($appId, $tenantId);
+    if (!($result['ok'] ?? false)) {
+        respondJson($response, 'error', $result['error'] ?? 'Error desconocido', [], 422);
+        return;
+    }
+    respondJson($response, 'success', 'App publicada en el Marketplace', [
+        'app_id'    => $result['app_id'],
+        'status'    => 'available',
+        'app'       => $result['app'],
+    ]);
+    return;
+}
+
 if ($route === 'apps/install') {
     $auth = is_array($_SESSION['auth_user'] ?? null) ? (array) $_SESSION['auth_user'] : [];
     if (empty($auth)) {
