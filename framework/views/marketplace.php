@@ -1,10 +1,15 @@
 <?php
 $__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
 $catalogPath = dirname(__DIR__, 2) . '/project/contracts/app_catalog.json';
-$__apps = [];
+$__apps      = [];   // apps disponibles para instalar (status:available)
+$__templates = [];   // plantillas para builders (status:template) — sección separada
 if (file_exists($catalogPath)) {
     $raw = json_decode(file_get_contents($catalogPath), true);
-    $__apps = array_filter($raw['apps'] ?? [], fn($a) => ($a['status'] ?? '') === 'available');
+    foreach ($raw['apps'] ?? [] as $a) {
+        $st = $a['status'] ?? '';
+        if ($st === 'available')  { $__apps[]      = $a; }
+        if ($st === 'template')   { $__templates[] = $a; }
+    }
 }
 ?>
 <!DOCTYPE html>
@@ -167,5 +172,36 @@ if (file_exists($catalogPath)) {
         </div>
         <?php endforeach; endif; ?>
     </div>
+
+    <?php if (!empty($__templates)): ?>
+    <!-- Sección plantillas — visibles pero no instalables directamente -->
+    <div style="max-width:1200px;margin:0 auto;padding:0 4rem 2rem;">
+        <h2 style="font-size:1.4rem;font-weight:700;color:var(--text);margin-bottom:0.5rem;">
+            Próximamente en el Marketplace
+        </h2>
+        <p style="color:var(--text-dim);font-size:0.92rem;margin-bottom:2rem;">
+            Estas plantillas están en desarrollo. Un Builder puede tomarlas como punto de partida
+            y publicarlas una vez implementadas.
+        </p>
+    </div>
+    <div class="grid" style="padding-top:0;">
+        <?php foreach ($__templates as $__tpl):
+            $__tid   = htmlspecialchars($__tpl['id'],          ENT_QUOTES, 'UTF-8');
+            $__tname = htmlspecialchars($__tpl['name'],        ENT_QUOTES, 'UTF-8');
+            $__tcat  = htmlspecialchars($__tpl['category'],    ENT_QUOTES, 'UTF-8');
+            $__tdesc = htmlspecialchars($__tpl['description'], ENT_QUOTES, 'UTF-8');
+        ?>
+        <div class="card" style="opacity:0.72;border-style:dashed;">
+            <div class="badge" style="background:rgba(100,116,139,0.08);color:var(--text-dim);border-color:rgba(100,116,139,0.2);"><?= $__tcat ?></div>
+            <h3 style="color:var(--text-dim);"><?= $__tname ?></h3>
+            <p><?= $__tdesc ?></p>
+            <a href="<?= $__base ?>/builder-login" style="display:inline-block;background:transparent;color:var(--text-dim);border:1.5px solid #CBD5E1;padding:0.65rem 1.2rem;border-radius:8px;font-weight:600;font-size:0.88rem;text-decoration:none;">
+                Construir esta app →
+            </a>
+        </div>
+        <?php endforeach; ?>
+    </div>
+    <?php endif; ?>
+
 </body>
 </html>

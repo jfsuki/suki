@@ -36,10 +36,32 @@ final class AppCatalogManager
         return $this->catalog;
     }
 
-    public function listApps(): array
+    /**
+     * Retorna apps del catálogo filtradas por status.
+     *
+     * @param string|null $status  'available'|'draft'|'template'|null (null = todas)
+     * @return list<array<string, mixed>>
+     */
+    public function listApps(?string $status = null): array
     {
         $catalog = $this->loadCatalog();
-        return is_array($catalog['apps'] ?? null) ? (array) $catalog['apps'] : [];
+        $apps    = is_array($catalog['apps'] ?? null) ? (array) $catalog['apps'] : [];
+        if ($status === null) {
+            return $apps;
+        }
+        return array_values(array_filter($apps, static fn($a) => ($a['status'] ?? '') === $status));
+    }
+
+    /** Alias explícito: solo apps publicadas en el Marketplace. */
+    public function listAvailable(): array
+    {
+        return $this->listApps('available');
+    }
+
+    /** Alias explícito: solo plantillas base (para Builders). */
+    public function listTemplates(): array
+    {
+        return $this->listApps('template');
     }
 
     public function findApp(string $appId): ?array

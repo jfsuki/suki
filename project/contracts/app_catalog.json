@@ -1,480 +1,1255 @@
 {
-  "schema_version": "2.0",
-  "mixins": {
-    "accounting": {
-      "name": "Módulo Contable",
-      "description": "PUC colombiano, libro diario, estados financieros, declaraciones DIAN",
-      "additional_agents": ["ACCOUNTING", "FISCAL"],
-      "additional_modules": ["puc", "libro_diario", "balance", "pyg", "declaraciones_dian"],
-      "additional_config_fields": ["nit", "regimen_tributario", "actividad_economica", "contador_responsable"]
+    "schema_version": "2.0",
+    "mixins": {
+        "accounting": {
+            "name": "Módulo Contable",
+            "description": "PUC colombiano, libro diario, estados financieros, declaraciones DIAN",
+            "additional_agents": [
+                "ACCOUNTING",
+                "FISCAL"
+            ],
+            "additional_modules": [
+                "puc",
+                "libro_diario",
+                "balance",
+                "pyg",
+                "declaraciones_dian"
+            ],
+            "additional_config_fields": [
+                "nit",
+                "regimen_tributario",
+                "actividad_economica",
+                "contador_responsable"
+            ]
+        },
+        "pos": {
+            "name": "Punto de Venta",
+            "description": "Caja registradora, turnos, descuentos, medios de pago",
+            "additional_agents": [
+                "SALES"
+            ],
+            "additional_modules": [
+                "pos",
+                "caja",
+                "descuentos",
+                "medios_pago"
+            ],
+            "additional_config_fields": [
+                "numero_cajas",
+                "medios_pago_aceptados"
+            ]
+        },
+        "billing_dian": {
+            "name": "Facturación Electrónica DIAN",
+            "description": "Facturas electrónicas, notas crédito\/débito, resolución DIAN",
+            "additional_agents": [
+                "BILLING",
+                "FISCAL"
+            ],
+            "additional_modules": [
+                "facturacion_electronica",
+                "notas_credito",
+                "resolucion_dian"
+            ],
+            "additional_config_fields": [
+                "resolucion_dian",
+                "prefijo_factura",
+                "rango_inicial",
+                "rango_final"
+            ]
+        },
+        "inventory": {
+            "name": "Control de Inventario",
+            "description": "Stock, alertas de mínimos, entradas y salidas, bodegas",
+            "additional_agents": [
+                "INVENTORY"
+            ],
+            "additional_modules": [
+                "inventario",
+                "bodegas",
+                "alertas_stock"
+            ],
+            "additional_config_fields": [
+                "numero_bodegas",
+                "unidades_medida"
+            ]
+        },
+        "crm": {
+            "name": "CRM & Clientes",
+            "description": "Gestión de clientes, historial, seguimiento, fidelización",
+            "additional_agents": [
+                "CRM"
+            ],
+            "additional_modules": [
+                "crm",
+                "historial_clientes",
+                "fidelizacion"
+            ],
+            "additional_config_fields": [
+                "programa_fidelidad",
+                "canales_contacto"
+            ]
+        }
     },
-    "pos": {
-      "name": "Punto de Venta",
-      "description": "Caja registradora, turnos, descuentos, medios de pago",
-      "additional_agents": ["SALES"],
-      "additional_modules": ["pos", "caja", "descuentos", "medios_pago"],
-      "additional_config_fields": ["numero_cajas", "medios_pago_aceptados"]
-    },
-    "billing_dian": {
-      "name": "Facturación Electrónica DIAN",
-      "description": "Facturas electrónicas, notas crédito/débito, resolución DIAN",
-      "additional_agents": ["BILLING", "FISCAL"],
-      "additional_modules": ["facturacion_electronica", "notas_credito", "resolucion_dian"],
-      "additional_config_fields": ["resolucion_dian", "prefijo_factura", "rango_inicial", "rango_final"]
-    },
-    "inventory": {
-      "name": "Control de Inventario",
-      "description": "Stock, alertas de mínimos, entradas y salidas, bodegas",
-      "additional_agents": ["INVENTORY"],
-      "additional_modules": ["inventario", "bodegas", "alertas_stock"],
-      "additional_config_fields": ["numero_bodegas", "unidades_medida"]
-    },
-    "crm": {
-      "name": "CRM & Clientes",
-      "description": "Gestión de clientes, historial, seguimiento, fidelización",
-      "additional_agents": ["CRM"],
-      "additional_modules": ["crm", "historial_clientes", "fidelizacion"],
-      "additional_config_fields": ["programa_fidelidad", "canales_contacto"]
+    "apps": [
+        {
+            "id": "suki_erp",
+            "name": "SUKI ERP Core",
+            "category": "Administrativo",
+            "sector": "comercio",
+            "description": "Control total de inventarios, compras y ventas con inteligencia fiscal integrada.",
+            "status": "available",
+            "enabled_agents": [
+                "ACCOUNTING",
+                "INVENTORY",
+                "PURCHASES",
+                "SALES",
+                "FINANCES"
+            ],
+            "default_workflows": [
+                "PURCHASE",
+                "QUOTATION",
+                "FISCAL_CLOSE",
+                "INVENTORY_REORDER"
+            ],
+            "modules": [
+                "pos",
+                "compras",
+                "inventario",
+                "contabilidad",
+                "fiscal"
+            ],
+            "config_fields": [
+                "nit",
+                "razon_social",
+                "municipio",
+                "regimen_tributario",
+                "actividad_economica"
+            ],
+            "compatible_mixins": [
+                "billing_dian",
+                "crm"
+            ],
+            "interview_questions": [
+                "¿Cuántos puntos de venta o sucursales tienes?",
+                "¿Manejas bodega propia o trabajas con proveedores directos?",
+                "¿Necesitas facturación electrónica DIAN?",
+                "¿Tienes equipo de ventas al que deba asignar comisiones?",
+                "¿Qué tipo de productos vendes: físicos, servicios o ambos?"
+            ]
+        },
+        {
+            "id": "store_hub",
+            "name": "Store Hub",
+            "category": "Ecommerce",
+            "sector": "ecommerce",
+            "description": "Conecta tu tienda física con el mundo digital. WooCommerce, Tienda Nube, catálogo y pedidos desde chat.",
+            "status": "template",
+            "enabled_agents": [
+                "SALES",
+                "INVENTORY"
+            ],
+            "default_workflows": [
+                "QUOTATION",
+                "ORDER_FULFILLMENT"
+            ],
+            "modules": [
+                "catalogo",
+                "pedidos",
+                "integraciones_ecommerce",
+                "inventario"
+            ],
+            "config_fields": [
+                "nombre_tienda",
+                "url_tienda",
+                "plataforma",
+                "moneda"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian",
+                "pos"
+            ],
+            "interview_questions": [
+                "¿Ya tienes tienda en línea (WooCommerce, Tienda Nube, Shopify)?",
+                "¿Vendes también de forma presencial o solo en línea?",
+                "¿Necesitas sincronizar inventario físico con la tienda virtual?",
+                "¿Cuántos SKUs (productos) tienes aproximadamente?",
+                "¿Haces despachos nacionales o también internacionales?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "agent_support",
+            "name": "Agent Support",
+            "category": "Soporte",
+            "sector": "servicios",
+            "description": "Atención al cliente automatizada con memoria semántica y resolución de dudas.",
+            "status": "template",
+            "enabled_agents": [
+                "SALES"
+            ],
+            "default_workflows": [],
+            "modules": [
+                "chat_soporte",
+                "faq",
+                "escalamiento"
+            ],
+            "config_fields": [
+                "nombre_empresa",
+                "horario_atencion",
+                "temas_soporte"
+            ],
+            "compatible_mixins": [
+                "crm"
+            ],
+            "interview_questions": [
+                "¿Cuáles son los temas más frecuentes que preguntan tus clientes?",
+                "¿Tienes un horario de atención específico?",
+                "¿Necesitas escalar tickets a agentes humanos?",
+                "¿Quieres integrarlo con WhatsApp o solo web chat?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "health_clinic",
+            "name": "Clínica & Consultorio",
+            "category": "Salud",
+            "sector": "salud_medica",
+            "description": "Gestión de pacientes, historia clínica, citas, tratamientos y facturación médica. Odontología, medicina general, especialistas.",
+            "status": "template",
+            "enabled_agents": [
+                "HEALTH_RECORDS",
+                "APPOINTMENTS",
+                "BILLING",
+                "INVENTORY"
+            ],
+            "default_workflows": [
+                "PATIENT_INTAKE",
+                "APPOINTMENT_BOOKING",
+                "TREATMENT_PLAN",
+                "BILLING_CLOSE"
+            ],
+            "modules": [
+                "pacientes",
+                "historia_clinica",
+                "citas",
+                "tratamientos",
+                "inventario_medico",
+                "facturacion"
+            ],
+            "config_fields": [
+                "nombre_clinica",
+                "especialidad",
+                "nit",
+                "registro_medico",
+                "municipio"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian",
+                "inventory"
+            ],
+            "interview_questions": [
+                "¿Cuál es la especialidad médica principal (medicina general, especialista, odontología)?",
+                "¿Cuántos médicos o profesionales de salud trabajan en el consultorio?",
+                "¿Manejas farmacia o venta de medicamentos propia?",
+                "¿Necesitas historia clínica con campos específicos de tu especialidad?",
+                "¿Aceptas seguros médicos o EPS?",
+                "¿Cuántas salas de atención o consultorios físicos tienes?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "dental_clinic",
+            "name": "Consultorio Dental",
+            "category": "Salud",
+            "sector": "salud_dental",
+            "description": "Historia clínica odontológica, odontograma, citas, tratamientos y facturación DIAN para consultorios dentales.",
+            "status": "template",
+            "enabled_agents": [
+                "DENTAL_RECORDS",
+                "APPOINTMENTS",
+                "BILLING",
+                "INVENTORY"
+            ],
+            "default_workflows": [
+                "PATIENT_INTAKE",
+                "DENTAL_EXAM",
+                "TREATMENT_PLAN",
+                "BILLING_CLOSE"
+            ],
+            "modules": [
+                "pacientes",
+                "odontograma",
+                "historia_dental",
+                "citas",
+                "tratamientos",
+                "inventario_dental",
+                "facturacion"
+            ],
+            "config_fields": [
+                "nombre_consultorio",
+                "nit",
+                "registro_odontologico",
+                "municipio"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian",
+                "inventory"
+            ],
+            "interview_questions": [
+                "¿Qué especialidades odontológicas manejas (ortodoncia, endodoncia, implantes, estética)?",
+                "¿Cuántos sillones dentales tiene el consultorio?",
+                "¿Necesitas odontograma digital con seguimiento por pieza?",
+                "¿Manejas plan de tratamiento con presupuestos por etapas?",
+                "¿Tienes laboratorio dental propio o trabajas con externos?",
+                "¿Necesitas control de materiales dentales (inventario)?",
+                "¿Manejas ortodoncia? (requiere seguimiento de brackets, arcos, elásticos)"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "vet_clinic",
+            "name": "Clínica Veterinaria",
+            "category": "Salud",
+            "sector": "veterinaria",
+            "description": "Historia clínica de mascotas, vacunas, citas, cirugías, farmacia veterinaria y facturación.",
+            "status": "template",
+            "enabled_agents": [
+                "VET_RECORDS",
+                "APPOINTMENTS",
+                "BILLING",
+                "INVENTORY"
+            ],
+            "default_workflows": [
+                "PET_INTAKE",
+                "VET_EXAM",
+                "VACCINATION_SCHEDULE",
+                "BILLING_CLOSE"
+            ],
+            "modules": [
+                "mascotas",
+                "propietarios",
+                "historia_veterinaria",
+                "vacunas",
+                "citas",
+                "farmacia",
+                "facturacion"
+            ],
+            "config_fields": [
+                "nombre_veterinaria",
+                "nit",
+                "registro_veterinario",
+                "municipio"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian",
+                "inventory"
+            ],
+            "interview_questions": [
+                "¿Qué especies atienden (caninos, felinos, exóticos, grandes animales)?",
+                "¿Cuántos veterinarios o médicos veterinarios trabajan?",
+                "¿Tienen farmacia veterinaria propia con venta de medicamentos?",
+                "¿Realizan cirugías? (requiere quirófano y anestesia)",
+                "¿Tienen servicio de peluquería canina o grooming?",
+                "¿Manejan hotel o guardería de mascotas?",
+                "¿Necesitan control de vacunas con recordatorios automáticos?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "education_center",
+            "name": "Colegio & Centro Educativo",
+            "category": "Educación",
+            "sector": "educacion",
+            "description": "Matrícula, estudiantes, notas, asistencia, pagos de pensión y comunicación con padres.",
+            "status": "template",
+            "enabled_agents": [
+                "ACADEMIC",
+                "BILLING",
+                "COMMUNICATIONS"
+            ],
+            "default_workflows": [
+                "ENROLLMENT",
+                "GRADE_REPORT",
+                "ATTENDANCE",
+                "TUITION_BILLING"
+            ],
+            "modules": [
+                "estudiantes",
+                "matricula",
+                "notas",
+                "asistencia",
+                "pensiones",
+                "comunicados"
+            ],
+            "config_fields": [
+                "nombre_colegio",
+                "nit",
+                "niveles_educativos",
+                "jornada",
+                "municipio"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian"
+            ],
+            "interview_questions": [
+                "¿Qué niveles educativos manejan (preescolar, primaria, secundaria, universitario)?",
+                "¿Cuántos estudiantes tiene actualmente?",
+                "¿Tienen jornada única, mañana\/tarde o ambas?",
+                "¿Cómo cobran las pensiones (mensual, bimensual)?",
+                "¿Necesitan comunicados a padres vía WhatsApp o email?",
+                "¿Manejan calificaciones numéricas, conceptuales o ambas?",
+                "¿Requieren control de rutas escolares o transporte?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "church_org",
+            "name": "Iglesia & Organización Religiosa",
+            "category": "Organizaciones",
+            "sector": "iglesia",
+            "description": "Gestión de miembros, grupos, eventos, diezmos, ofrendas y comunicación congregacional.",
+            "status": "template",
+            "enabled_agents": [
+                "MEMBER_MANAGEMENT",
+                "FINANCES",
+                "COMMUNICATIONS"
+            ],
+            "default_workflows": [
+                "MEMBER_REGISTRATION",
+                "EVENT_PLANNING",
+                "OFFERING_RECORD"
+            ],
+            "modules": [
+                "miembros",
+                "grupos",
+                "eventos",
+                "diezmos_ofrendas",
+                "comunicaciones"
+            ],
+            "config_fields": [
+                "nombre_iglesia",
+                "nit",
+                "denominacion",
+                "municipio",
+                "pastor_lider"
+            ],
+            "compatible_mixins": [
+                "accounting"
+            ],
+            "interview_questions": [
+                "¿Cuántos miembros activos tiene la congregación?",
+                "¿Tienen grupos celulares, ministerios o departamentos?",
+                "¿Necesitan registrar diezmos y ofrendas individuales?",
+                "¿Tienen múltiples sedes o congregaciones?",
+                "¿Cómo desean comunicarse con los miembros (WhatsApp, email, SMS)?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "accounting_firm",
+            "name": "Firma Contable",
+            "category": "Contabilidad",
+            "sector": "contabilidad",
+            "description": "PUC colombiano completo, libro diario, estados financieros, declaraciones DIAN, múltiples clientes.",
+            "status": "template",
+            "enabled_agents": [
+                "ACCOUNTING",
+                "FISCAL",
+                "REPORTS"
+            ],
+            "default_workflows": [
+                "JOURNAL_ENTRY",
+                "BANK_RECONCILIATION",
+                "TAX_DECLARATION",
+                "FINANCIAL_CLOSE"
+            ],
+            "modules": [
+                "puc",
+                "libro_diario",
+                "balance",
+                "pyg",
+                "flujo_caja",
+                "declaraciones_dian"
+            ],
+            "config_fields": [
+                "nombre_firma",
+                "nit",
+                "tarjeta_profesional",
+                "municipio"
+            ],
+            "compatible_mixins": [
+                "billing_dian",
+                "crm"
+            ],
+            "interview_questions": [
+                "¿Cuántos clientes\/empresas maneja la firma actualmente?",
+                "¿Qué tipos de declaraciones tramitan (renta, IVA, retención, industria)?",
+                "¿Trabajan con pymes, personas naturales o grandes empresas?",
+                "¿Necesitan acceso diferenciado por cliente?",
+                "¿Llevan contabilidad en tiempo real o al cierre del mes?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "sales_agent",
+            "name": "Agente de Ventas",
+            "category": "Ventas",
+            "sector": "ventas",
+            "description": "CRM, pipeline de ventas, cotizaciones, seguimiento de clientes y comisiones para equipos comerciales.",
+            "status": "template",
+            "enabled_agents": [
+                "SALES",
+                "CRM",
+                "REPORTS"
+            ],
+            "default_workflows": [
+                "LEAD_CAPTURE",
+                "QUOTATION",
+                "DEAL_CLOSE",
+                "COMMISSION_CALC"
+            ],
+            "modules": [
+                "crm",
+                "leads",
+                "cotizaciones",
+                "pipeline",
+                "comisiones",
+                "reportes_ventas"
+            ],
+            "config_fields": [
+                "nombre_empresa",
+                "productos_servicios",
+                "metas_ventas",
+                "territorios"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian",
+                "inventory"
+            ],
+            "interview_questions": [
+                "¿Cuántos vendedores o agentes comerciales tiene el equipo?",
+                "¿Venden por territorios, productos o cuentas asignadas?",
+                "¿Cómo calculan las comisiones (porcentaje, escalas, por producto)?",
+                "¿Tienen proceso de aprobación para descuentos o condiciones especiales?",
+                "¿Necesitan cotizaciones con firma digital o aprobación del cliente?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "restaurant",
+            "name": "Restaurante & Bar",
+            "category": "Alimentos",
+            "sector": "restaurante",
+            "description": "Comandas, mesas, carta digital, cocina en tiempo real, delivery, facturación y control de costos de recetas.",
+            "status": "template",
+            "enabled_agents": [
+                "SALES",
+                "INVENTORY",
+                "BILLING",
+                "OPERATIONS"
+            ],
+            "default_workflows": [
+                "TABLE_ORDER",
+                "KITCHEN_DISPATCH",
+                "DELIVERY_ORDER",
+                "DAILY_CLOSE"
+            ],
+            "modules": [
+                "mesas",
+                "comandas",
+                "cocina",
+                "carta_digital",
+                "delivery",
+                "inventario_cocina",
+                "recetas",
+                "facturacion"
+            ],
+            "config_fields": [
+                "nombre_restaurante",
+                "nit",
+                "tipo_establecimiento",
+                "numero_mesas",
+                "municipio"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian",
+                "pos",
+                "inventory"
+            ],
+            "interview_questions": [
+                "¿Qué tipo de establecimiento es (restaurante, bar, cafetería, comida rápida, dark kitchen)?",
+                "¿Cuántas mesas o puestos de atención tiene?",
+                "¿Maneja servicio a domicilio o delivery propio?",
+                "¿Tiene cocina diferenciada de barra o múltiples estaciones?",
+                "¿Necesita control de recetas con costo por plato?",
+                "¿Tiene carta de licores o bebidas alcohólicas?",
+                "¿Maneja meseros con comandas desde celular o tablet?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "beauty_salon",
+            "name": "Salón de Belleza & Spa",
+            "category": "Bienestar",
+            "sector": "belleza",
+            "description": "Citas, servicios, comisiones a estilistas, productos, facturación y fidelización de clientes.",
+            "status": "template",
+            "enabled_agents": [
+                "APPOINTMENTS",
+                "SALES",
+                "BILLING",
+                "INVENTORY"
+            ],
+            "default_workflows": [
+                "APPOINTMENT_BOOKING",
+                "SERVICE_EXECUTION",
+                "STYLIST_COMMISSION",
+                "BILLING_CLOSE"
+            ],
+            "modules": [
+                "citas",
+                "servicios",
+                "estilistas",
+                "productos",
+                "comisiones",
+                "facturacion",
+                "fidelizacion"
+            ],
+            "config_fields": [
+                "nombre_salon",
+                "nit",
+                "tipo_servicios",
+                "numero_sillas",
+                "municipio"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian",
+                "inventory",
+                "crm"
+            ],
+            "interview_questions": [
+                "¿Qué servicios ofrece (corte, color, manicure, spa, barbería, cejas)?",
+                "¿Cuántos estilistas o técnicos trabajan?",
+                "¿Las comisiones son por servicio, por porcentaje o mixtas?",
+                "¿Vende productos de belleza al por menor?",
+                "¿Maneja reservas en línea o solo presenciales?",
+                "¿Tiene programa de fidelización o puntos para clientes?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "gym_fitness",
+            "name": "Gimnasio & Centro Deportivo",
+            "category": "Bienestar",
+            "sector": "gimnasio",
+            "description": "Membresías, asistencia, entrenadores, rutinas, pagos recurrentes y control de acceso.",
+            "status": "template",
+            "enabled_agents": [
+                "MEMBER_MANAGEMENT",
+                "BILLING",
+                "SCHEDULING",
+                "SALES"
+            ],
+            "default_workflows": [
+                "MEMBERSHIP_SIGNUP",
+                "ATTENDANCE_CHECK",
+                "RENEWAL_BILLING",
+                "TRAINER_SCHEDULE"
+            ],
+            "modules": [
+                "membresias",
+                "asistencia",
+                "entrenadores",
+                "rutinas",
+                "pagos_recurrentes",
+                "acceso"
+            ],
+            "config_fields": [
+                "nombre_gimnasio",
+                "nit",
+                "tipos_membresia",
+                "horario_atencion",
+                "municipio"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian",
+                "pos"
+            ],
+            "interview_questions": [
+                "¿Qué tipos de membresía ofrecen (mensual, trimestral, anual, clases)?",
+                "¿Cuántos entrenadores o instructores trabajan?",
+                "¿Tienen clases grupales programadas (spinning, yoga, crossfit)?",
+                "¿Necesitan control de acceso (torniquete, QR)?",
+                "¿Venden suplementos u otros productos?",
+                "¿Manejan entrenamiento personalizado con seguimiento de rutinas?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "pharmacy",
+            "name": "Farmacia & Droguería",
+            "category": "Salud",
+            "sector": "farmacia",
+            "description": "Inventario de medicamentos, control de vencimientos, recetas, ventas y facturación.",
+            "status": "template",
+            "enabled_agents": [
+                "INVENTORY",
+                "SALES",
+                "BILLING",
+                "HEALTH_RECORDS"
+            ],
+            "default_workflows": [
+                "PRESCRIPTION_FILL",
+                "STOCK_REPLENISHMENT",
+                "EXPIRY_ALERT",
+                "BILLING_CLOSE"
+            ],
+            "modules": [
+                "medicamentos",
+                "recetas",
+                "vencimientos",
+                "inventario",
+                "proveedores",
+                "facturacion"
+            ],
+            "config_fields": [
+                "nombre_farmacia",
+                "nit",
+                "numero_invima",
+                "director_tecnico",
+                "municipio"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian",
+                "pos"
+            ],
+            "interview_questions": [
+                "¿Es droguería, farmacia magistral o depósito de medicamentos?",
+                "¿Manejan medicamentos de control especial?",
+                "¿Tienen servicio de preparación de fórmulas magistrales?",
+                "¿Cuántos SKUs de medicamentos manejan aproximadamente?",
+                "¿Necesitan alertas automáticas de vencimiento?",
+                "¿Trabajan con EPS o solo venta directa al público?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "logistics_transport",
+            "name": "Logística & Transporte",
+            "category": "Logística",
+            "sector": "logistica",
+            "description": "Flota vehicular, conductores, rutas, guías de envío, tracking y facturación de flete.",
+            "status": "template",
+            "enabled_agents": [
+                "OPERATIONS",
+                "BILLING",
+                "INVENTORY",
+                "CRM"
+            ],
+            "default_workflows": [
+                "SHIPMENT_ORDER",
+                "ROUTE_DISPATCH",
+                "DELIVERY_CONFIRM",
+                "BILLING_CLOSE"
+            ],
+            "modules": [
+                "flota",
+                "conductores",
+                "rutas",
+                "guias_envio",
+                "tracking",
+                "clientes",
+                "facturacion"
+            ],
+            "config_fields": [
+                "nombre_empresa",
+                "nit",
+                "numero_vehiculos",
+                "tipo_carga",
+                "municipio"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian",
+                "crm"
+            ],
+            "interview_questions": [
+                "¿Qué tipo de carga transportan (mensajería, carga pesada, refrigerada, pasajeros)?",
+                "¿Cuántos vehículos tiene la flota?",
+                "¿Los conductores son propios o contratistas?",
+                "¿Necesitan tracking GPS en tiempo real?",
+                "¿Facturan por kilo, por viaje o por contrato?",
+                "¿Hacen envíos nacionales, locales o ambos?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "construction",
+            "name": "Constructora & Contratista",
+            "category": "Construcción",
+            "sector": "construccion",
+            "description": "Proyectos de obra, APU, presupuestos, contratistas, materiales, avance físico y facturación por hitos.",
+            "status": "template",
+            "enabled_agents": [
+                "OPERATIONS",
+                "ACCOUNTING",
+                "INVENTORY",
+                "BILLING"
+            ],
+            "default_workflows": [
+                "PROJECT_CREATION",
+                "BUDGET_APU",
+                "PROGRESS_BILLING",
+                "MATERIAL_ORDER"
+            ],
+            "modules": [
+                "proyectos",
+                "apu",
+                "presupuestos",
+                "contratistas",
+                "materiales",
+                "avance_obra",
+                "facturacion_hitos"
+            ],
+            "config_fields": [
+                "nombre_empresa",
+                "nit",
+                "rut_constructor",
+                "especialidad_obra",
+                "municipio"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian",
+                "inventory"
+            ],
+            "interview_questions": [
+                "¿Qué tipo de proyectos construyen (vivienda, comercial, industrial, infraestructura)?",
+                "¿Trabajan con presupuesto APU o precio alzado?",
+                "¿Necesitan control de avance físico por actividad o capítulo?",
+                "¿Tienen subcontratistas a quienes pagar por avance?",
+                "¿Manejan control de materiales en bodega de obra?",
+                "¿Facturan por hitos o entregas parciales?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "fashion_clothing",
+            "name": "Moda, Confección & Calzado",
+            "category": "Manufactura",
+            "sector": "moda",
+            "description": "Producción de prendas o calzado, tallas, colores, temporadas, órdenes de producción y ventas.",
+            "status": "template",
+            "enabled_agents": [
+                "INVENTORY",
+                "SALES",
+                "OPERATIONS",
+                "BILLING"
+            ],
+            "default_workflows": [
+                "PRODUCTION_ORDER",
+                "FABRIC_CUT",
+                "QUALITY_CHECK",
+                "SALES_ORDER"
+            ],
+            "modules": [
+                "materiales_tela",
+                "produccion",
+                "tallas_colores",
+                "temporadas",
+                "ordenes_produccion",
+                "ventas",
+                "facturacion"
+            ],
+            "config_fields": [
+                "nombre_marca",
+                "nit",
+                "tipo_producto",
+                "temporadas_anuales",
+                "municipio"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian",
+                "inventory",
+                "pos"
+            ],
+            "interview_questions": [
+                "¿Fabrican ropa, calzado, accesorios o combinado?",
+                "¿Producen para marca propia, maquila o ambas?",
+                "¿Manejan temporadas o colecciones definidas?",
+                "¿Necesitan control de telas y materiales con rendimiento por prenda?",
+                "¿Tienen punto de venta propio o solo venden por mayor?",
+                "¿Exportan o solo mercado nacional?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        },
+        {
+            "id": "services_consulting",
+            "name": "Empresa de Servicios & Consultoría",
+            "category": "Servicios",
+            "sector": "servicios_profesionales",
+            "description": "Gestión de proyectos, horas trabajadas, honorarios, contratos, facturación por entregables.",
+            "status": "template",
+            "enabled_agents": [
+                "CRM",
+                "BILLING",
+                "OPERATIONS",
+                "ACCOUNTING"
+            ],
+            "default_workflows": [
+                "CONTRACT_CREATION",
+                "PROJECT_TRACKING",
+                "HOURS_LOG",
+                "INVOICE_GENERATION"
+            ],
+            "modules": [
+                "contratos",
+                "proyectos",
+                "horas_trabajadas",
+                "facturacion_honorarios",
+                "clientes",
+                "reportes"
+            ],
+            "config_fields": [
+                "nombre_empresa",
+                "nit",
+                "tipo_servicios",
+                "modalidad_cobro",
+                "municipio"
+            ],
+            "compatible_mixins": [
+                "accounting",
+                "billing_dian",
+                "crm"
+            ],
+            "interview_questions": [
+                "¿Qué tipo de servicio ofrecen (IT, consultoría, marketing, legal, ingeniería)?",
+                "¿Cobran por hora, por proyecto o por retainer mensual?",
+                "¿Cuántos consultores o profesionales trabajan?",
+                "¿Necesitan registro de horas por cliente y proyecto?",
+                "¿Manejan contratos con alcance y entregables definidos?",
+                "¿Sus clientes son empresas (B2B) o personas naturales (B2C)?"
+            ],
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+        }
+    ],
+    "field_definitions": {
+        "nit": {
+            "type": "text",
+            "description": "NIT o cédula del negocio (Colombia). Necesario para facturación y documentos.",
+            "llm_hint": "Pregunta por el NIT o número de identificación tributaria del negocio. Si es persona natural puede ser la cédula."
+        },
+        "razon_social": {
+            "type": "text",
+            "description": "Nombre legal completo del negocio o empresa.",
+            "llm_hint": "Pregunta cuál es el nombre oficial o razón social con que está registrado el negocio."
+        },
+        "municipio": {
+            "type": "text",
+            "description": "Ciudad o municipio donde opera el negocio (Colombia).",
+            "llm_hint": "Pregunta en qué ciudad o municipio está ubicado el negocio."
+        },
+        "telefono": {
+            "type": "text",
+            "description": "Número de contacto del negocio.",
+            "llm_hint": "Pregunta el teléfono o celular de contacto del negocio."
+        },
+        "nombre_empresa": {
+            "type": "text",
+            "description": "Nombre comercial de la empresa o negocio.",
+            "llm_hint": "Pregunta cómo se llama el negocio o empresa."
+        },
+        "nombre_clinica": {
+            "type": "text",
+            "description": "Nombre del consultorio o clínica médica.",
+            "llm_hint": "Pregunta cómo se llama la clínica o consultorio."
+        },
+        "nombre_consultorio": {
+            "type": "text",
+            "description": "Nombre del consultorio dental.",
+            "llm_hint": "Pregunta cómo se llama el consultorio odontológico."
+        },
+        "nombre_veterinaria": {
+            "type": "text",
+            "description": "Nombre de la clínica veterinaria.",
+            "llm_hint": "Pregunta cómo se llama la clínica veterinaria."
+        },
+        "nombre_salon": {
+            "type": "text",
+            "description": "Nombre del salón de belleza o spa.",
+            "llm_hint": "Pregunta cómo se llama el salón o spa."
+        },
+        "nombre_gimnasio": {
+            "type": "text",
+            "description": "Nombre del gimnasio o centro deportivo.",
+            "llm_hint": "Pregunta cómo se llama el gimnasio."
+        },
+        "nombre_farmacia": {
+            "type": "text",
+            "description": "Nombre de la farmacia o droguería.",
+            "llm_hint": "Pregunta cómo se llama la farmacia o droguería."
+        },
+        "nombre_restaurante": {
+            "type": "text",
+            "description": "Nombre del restaurante o establecimiento de alimentos.",
+            "llm_hint": "Pregunta cómo se llama el restaurante."
+        },
+        "nombre_colegio": {
+            "type": "text",
+            "description": "Nombre del colegio o institución educativa.",
+            "llm_hint": "Pregunta cómo se llama el colegio o institución educativa."
+        },
+        "nombre_iglesia": {
+            "type": "text",
+            "description": "Nombre de la iglesia u organización religiosa.",
+            "llm_hint": "Pregunta cómo se llama la iglesia o congregación."
+        },
+        "nombre_firma": {
+            "type": "text",
+            "description": "Nombre de la firma contable o empresa de contabilidad.",
+            "llm_hint": "Pregunta cómo se llama la firma contable."
+        },
+        "nombre_marca": {
+            "type": "text",
+            "description": "Nombre de la marca de moda o confección.",
+            "llm_hint": "Pregunta cuál es el nombre de la marca o empresa de confección."
+        },
+        "especialidad": {
+            "type": "text",
+            "description": "Especialidad médica principal (medicina general, especialista, pediatría, etc.).",
+            "llm_hint": "Pregunta cuál es la especialidad médica principal del consultorio."
+        },
+        "registro_medico": {
+            "type": "text",
+            "description": "Número de registro médico ante la Secretaría de Salud o RETHUS.",
+            "llm_hint": "Pregunta cuál es el número de registro médico o tarjeta profesional del médico principal."
+        },
+        "registro_odontologico": {
+            "type": "text",
+            "description": "Número de tarjeta profesional del odontólogo principal ante el COPNIA o Tribunal de Ética.",
+            "llm_hint": "Pregunta cuál es el número de tarjeta profesional odontológica."
+        },
+        "registro_veterinario": {
+            "type": "text",
+            "description": "Número de registro del médico veterinario ante el ICA (Instituto Colombiano Agropecuario).",
+            "llm_hint": "Pregunta cuál es el número de registro ICA de los médicos veterinarios."
+        },
+        "numero_invima": {
+            "type": "text",
+            "description": "Número INVIMA de la farmacia o droguería (Colombia).",
+            "llm_hint": "Pregunta cuál es el número de registro INVIMA del establecimiento."
+        },
+        "director_tecnico": {
+            "type": "text",
+            "description": "Nombre del director técnico o químico farmacéutico responsable.",
+            "llm_hint": "Pregunta cuál es el nombre del director técnico o químico farmacéutico a cargo."
+        },
+        "regimen_tributario": {
+            "type": "text",
+            "description": "Régimen tributario del negocio (ordinario, simple, gran contribuyente).",
+            "llm_hint": "Pregunta si el negocio está en régimen ordinario, régimen simple o es gran contribuyente."
+        },
+        "actividad_economica": {
+            "type": "text",
+            "description": "Código CIIU o descripción de la actividad económica principal.",
+            "llm_hint": "Pregunta cuál es la actividad económica principal del negocio (o código CIIU si lo conoce)."
+        },
+        "resolucion_dian": {
+            "type": "text",
+            "description": "Número de resolución DIAN para facturación electrónica.",
+            "llm_hint": "Pregunta cuál es el número de resolución de facturación electrónica otorgado por la DIAN."
+        },
+        "prefijo_factura": {
+            "type": "text",
+            "description": "Prefijo de las facturas electrónicas (ej: FE, FAC, INV).",
+            "llm_hint": "Pregunta cuál es el prefijo que usan en las facturas electrónicas."
+        },
+        "rango_inicial": {
+            "type": "text",
+            "description": "Número inicial del rango de facturas autorizado por la DIAN.",
+            "llm_hint": "Pregunta cuál es el número inicial del rango de facturas autorizado."
+        },
+        "rango_final": {
+            "type": "text",
+            "description": "Número final del rango de facturas autorizado por la DIAN.",
+            "llm_hint": "Pregunta cuál es el número final del rango de facturas autorizado."
+        },
+        "numero_cajas": {
+            "type": "text",
+            "description": "Cantidad de cajas registradoras o puntos de venta.",
+            "llm_hint": "Pregunta cuántas cajas registradoras o puntos de venta tiene el establecimiento."
+        },
+        "medios_pago_aceptados": {
+            "type": "text",
+            "description": "Medios de pago que acepta (efectivo, tarjeta, Nequi, PSE, etc.).",
+            "llm_hint": "Pregunta qué medios de pago acepta el negocio."
+        },
+        "numero_bodegas": {
+            "type": "text",
+            "description": "Número de bodegas o almacenes de inventario.",
+            "llm_hint": "Pregunta cuántas bodegas o almacenes de inventario tiene el negocio."
+        },
+        "unidades_medida": {
+            "type": "text",
+            "description": "Unidades de medida principales que usa (unidades, cajas, kilos, litros, metros).",
+            "llm_hint": "Pregunta qué unidades de medida usa principalmente para su inventario."
+        },
+        "programa_fidelidad": {
+            "type": "text",
+            "description": "Si tiene programa de puntos o fidelización de clientes.",
+            "llm_hint": "Pregunta si el negocio tiene o quiere implementar un programa de puntos o fidelización de clientes."
+        },
+        "canales_contacto": {
+            "type": "text",
+            "description": "Canales por donde los clientes contactan al negocio (WhatsApp, teléfono, email, web).",
+            "llm_hint": "Pregunta por qué canales contactan normalmente los clientes al negocio."
+        },
+        "tarjeta_profesional": {
+            "type": "text",
+            "description": "Número de tarjeta profesional del contador o revisor fiscal.",
+            "llm_hint": "Pregunta cuál es el número de tarjeta profesional del contador responsable."
+        },
+        "contador_responsable": {
+            "type": "text",
+            "description": "Nombre del contador o revisor fiscal responsable.",
+            "llm_hint": "Pregunta cuál es el nombre del contador o revisor fiscal del negocio."
+        },
+        "tipo_establecimiento": {
+            "type": "text",
+            "description": "Tipo de establecimiento de alimentos (restaurante, bar, cafetería, comida rápida, dark kitchen).",
+            "llm_hint": "Pregunta qué tipo de establecimiento es: restaurante, bar, cafetería, comida rápida u otro."
+        },
+        "numero_mesas": {
+            "type": "text",
+            "description": "Número de mesas o puestos de atención.",
+            "llm_hint": "Pregunta cuántas mesas o puestos de atención tiene el establecimiento."
+        },
+        "tipo_servicios": {
+            "type": "text",
+            "description": "Tipo de servicios que ofrece la empresa.",
+            "llm_hint": "Pregunta qué tipo de servicios ofrece la empresa de forma natural."
+        },
+        "denominacion": {
+            "type": "text",
+            "description": "Denominación o corriente religiosa de la iglesia (cristiana, católica, adventista, etc.).",
+            "llm_hint": "Pregunta cuál es la denominación o corriente religiosa de la congregación."
+        },
+        "pastor_lider": {
+            "type": "text",
+            "description": "Nombre del pastor o líder principal de la congregación.",
+            "llm_hint": "Pregunta cuál es el nombre del pastor o líder principal."
+        },
+        "niveles_educativos": {
+            "type": "text",
+            "description": "Niveles educativos que maneja la institución (preescolar, primaria, secundaria, etc.).",
+            "llm_hint": "Pregunta qué niveles educativos maneja la institución."
+        },
+        "jornada": {
+            "type": "text",
+            "description": "Jornada escolar (mañana, tarde, noche, única).",
+            "llm_hint": "Pregunta en qué jornada o jornadas opera la institución educativa."
+        },
+        "tipos_membresia": {
+            "type": "text",
+            "description": "Tipos de membresía que ofrece el gimnasio (mensual, trimestral, anual, clases).",
+            "llm_hint": "Pregunta qué tipos de membresía o planes maneja el gimnasio."
+        },
+        "horario_atencion": {
+            "type": "text",
+            "description": "Horario de atención al público del negocio.",
+            "llm_hint": "Pregunta en qué horario atienden al público."
+        },
+        "numero_sillas": {
+            "type": "text",
+            "description": "Número de sillas o puestos de trabajo del salón.",
+            "llm_hint": "Pregunta cuántas sillas o puestos de trabajo tiene el salón."
+        },
+        "tipo_carga": {
+            "type": "text",
+            "description": "Tipo de carga o mercancía que transportan.",
+            "llm_hint": "Pregunta qué tipo de carga o mercancía transportan normalmente."
+        },
+        "numero_vehiculos": {
+            "type": "text",
+            "description": "Número de vehículos en la flota de transporte.",
+            "llm_hint": "Pregunta cuántos vehículos tiene la flota de transporte."
+        },
+        "rut_constructor": {
+            "type": "text",
+            "description": "Número RUT o matrícula profesional del constructor.",
+            "llm_hint": "Pregunta cuál es el número RUT o matrícula de la constructora o contratista."
+        },
+        "especialidad_obra": {
+            "type": "text",
+            "description": "Especialidad de construcción u obra (vivienda, comercial, industrial, infraestructura).",
+            "llm_hint": "Pregunta en qué tipo de obras o proyectos de construcción se especializa."
+        },
+        "tipo_producto": {
+            "type": "text",
+            "description": "Tipo de producto que fabrican (ropa, calzado, accesorios).",
+            "llm_hint": "Pregunta qué tipo de producto fabrican o comercializan."
+        },
+        "temporadas_anuales": {
+            "type": "text",
+            "description": "Número de temporadas o colecciones de moda por año.",
+            "llm_hint": "Pregunta cuántas temporadas o colecciones de moda manejan por año."
+        },
+        "modalidad_cobro": {
+            "type": "text",
+            "description": "Modalidad de cobro (por hora, por proyecto, mensual, retainer).",
+            "llm_hint": "Pregunta cómo cobran sus servicios: por hora, por proyecto, mensualidad u otra modalidad."
+        },
+        "productos_servicios": {
+            "type": "text",
+            "description": "Descripción de los productos o servicios que vende el equipo comercial.",
+            "llm_hint": "Pregunta qué productos o servicios vende el equipo."
+        },
+        "metas_ventas": {
+            "type": "text",
+            "description": "Metas o cuotas de ventas del equipo comercial.",
+            "llm_hint": "Pregunta si tienen metas o cuotas de ventas definidas por período."
+        },
+        "territorios": {
+            "type": "text",
+            "description": "Territorios o zonas de ventas del equipo comercial.",
+            "llm_hint": "Pregunta si el equipo de ventas trabaja por territorios o zonas geográficas."
+        },
+        "temas_soporte": {
+            "type": "text",
+            "description": "Temas más frecuentes de soporte al cliente.",
+            "llm_hint": "Pregunta cuáles son los temas o preguntas más frecuentes de los clientes."
+        },
+        "nombre_tienda": {
+            "type": "text",
+            "description": "Nombre de la tienda en línea o e-commerce.",
+            "llm_hint": "Pregunta cómo se llama la tienda en línea."
+        },
+        "url_tienda": {
+            "type": "text",
+            "description": "URL o dirección web de la tienda en línea.",
+            "llm_hint": "Pregunta cuál es la dirección web de la tienda (si ya la tiene)."
+        },
+        "plataforma": {
+            "type": "text",
+            "description": "Plataforma de e-commerce que usa (WooCommerce, Shopify, Tienda Nube, etc.).",
+            "llm_hint": "Pregunta en qué plataforma tiene su tienda en línea."
+        },
+        "moneda": {
+            "type": "text",
+            "description": "Moneda principal de la tienda (COP, USD, etc.).",
+            "llm_hint": "Pregunta en qué moneda opera principalmente la tienda."
+        }
     }
-  },
-  "apps": [
-    {
-      "id": "suki_erp",
-      "name": "SUKI ERP Core",
-      "category": "Administrativo",
-      "sector": "comercio",
-      "description": "Control total de inventarios, compras y ventas con inteligencia fiscal integrada.",
-      "status": "available",
-      "enabled_agents": ["ACCOUNTING", "INVENTORY", "PURCHASES", "SALES", "FINANCES"],
-      "default_workflows": ["PURCHASE", "QUOTATION", "FISCAL_CLOSE", "INVENTORY_REORDER"],
-      "modules": ["pos", "compras", "inventario", "contabilidad", "fiscal"],
-      "config_fields": ["nit", "razon_social", "municipio", "regimen_tributario", "actividad_economica"],
-      "compatible_mixins": ["billing_dian", "crm"],
-      "interview_questions": [
-        "¿Cuántos puntos de venta o sucursales tienes?",
-        "¿Manejas bodega propia o trabajas con proveedores directos?",
-        "¿Necesitas facturación electrónica DIAN?",
-        "¿Tienes equipo de ventas al que deba asignar comisiones?",
-        "¿Qué tipo de productos vendes: físicos, servicios o ambos?"
-      ]
-    },
-    {
-      "id": "store_hub",
-      "name": "Store Hub",
-      "category": "Ecommerce",
-      "sector": "ecommerce",
-      "description": "Conecta tu tienda física con el mundo digital. WooCommerce, Tienda Nube, catálogo y pedidos desde chat.",
-      "status": "available",
-      "enabled_agents": ["SALES", "INVENTORY"],
-      "default_workflows": ["QUOTATION", "ORDER_FULFILLMENT"],
-      "modules": ["catalogo", "pedidos", "integraciones_ecommerce", "inventario"],
-      "config_fields": ["nombre_tienda", "url_tienda", "plataforma", "moneda"],
-      "compatible_mixins": ["accounting", "billing_dian", "pos"],
-      "interview_questions": [
-        "¿Ya tienes tienda en línea (WooCommerce, Tienda Nube, Shopify)?",
-        "¿Vendes también de forma presencial o solo en línea?",
-        "¿Necesitas sincronizar inventario físico con la tienda virtual?",
-        "¿Cuántos SKUs (productos) tienes aproximadamente?",
-        "¿Haces despachos nacionales o también internacionales?"
-      ]
-    },
-    {
-      "id": "agent_support",
-      "name": "Agent Support",
-      "category": "Soporte",
-      "sector": "servicios",
-      "description": "Atención al cliente automatizada con memoria semántica y resolución de dudas.",
-      "status": "available",
-      "enabled_agents": ["SALES"],
-      "default_workflows": [],
-      "modules": ["chat_soporte", "faq", "escalamiento"],
-      "config_fields": ["nombre_empresa", "horario_atencion", "temas_soporte"],
-      "compatible_mixins": ["crm"],
-      "interview_questions": [
-        "¿Cuáles son los temas más frecuentes que preguntan tus clientes?",
-        "¿Tienes un horario de atención específico?",
-        "¿Necesitas escalar tickets a agentes humanos?",
-        "¿Quieres integrarlo con WhatsApp o solo web chat?"
-      ]
-    },
-    {
-      "id": "health_clinic",
-      "name": "Clínica & Consultorio",
-      "category": "Salud",
-      "sector": "salud_medica",
-      "description": "Gestión de pacientes, historia clínica, citas, tratamientos y facturación médica. Odontología, medicina general, especialistas.",
-      "status": "available",
-      "enabled_agents": ["HEALTH_RECORDS", "APPOINTMENTS", "BILLING", "INVENTORY"],
-      "default_workflows": ["PATIENT_INTAKE", "APPOINTMENT_BOOKING", "TREATMENT_PLAN", "BILLING_CLOSE"],
-      "modules": ["pacientes", "historia_clinica", "citas", "tratamientos", "inventario_medico", "facturacion"],
-      "config_fields": ["nombre_clinica", "especialidad", "nit", "registro_medico", "municipio"],
-      "compatible_mixins": ["accounting", "billing_dian", "inventory"],
-      "interview_questions": [
-        "¿Cuál es la especialidad médica principal (medicina general, especialista, odontología)?",
-        "¿Cuántos médicos o profesionales de salud trabajan en el consultorio?",
-        "¿Manejas farmacia o venta de medicamentos propia?",
-        "¿Necesitas historia clínica con campos específicos de tu especialidad?",
-        "¿Aceptas seguros médicos o EPS?",
-        "¿Cuántas salas de atención o consultorios físicos tienes?"
-      ]
-    },
-    {
-      "id": "dental_clinic",
-      "name": "Consultorio Dental",
-      "category": "Salud",
-      "sector": "salud_dental",
-      "description": "Historia clínica odontológica, odontograma, citas, tratamientos y facturación DIAN para consultorios dentales.",
-      "status": "available",
-      "enabled_agents": ["DENTAL_RECORDS", "APPOINTMENTS", "BILLING", "INVENTORY"],
-      "default_workflows": ["PATIENT_INTAKE", "DENTAL_EXAM", "TREATMENT_PLAN", "BILLING_CLOSE"],
-      "modules": ["pacientes", "odontograma", "historia_dental", "citas", "tratamientos", "inventario_dental", "facturacion"],
-      "config_fields": ["nombre_consultorio", "nit", "registro_odontologico", "municipio"],
-      "compatible_mixins": ["accounting", "billing_dian", "inventory"],
-      "interview_questions": [
-        "¿Qué especialidades odontológicas manejas (ortodoncia, endodoncia, implantes, estética)?",
-        "¿Cuántos sillones dentales tiene el consultorio?",
-        "¿Necesitas odontograma digital con seguimiento por pieza?",
-        "¿Manejas plan de tratamiento con presupuestos por etapas?",
-        "¿Tienes laboratorio dental propio o trabajas con externos?",
-        "¿Necesitas control de materiales dentales (inventario)?",
-        "¿Manejas ortodoncia? (requiere seguimiento de brackets, arcos, elásticos)"
-      ]
-    },
-    {
-      "id": "vet_clinic",
-      "name": "Clínica Veterinaria",
-      "category": "Salud",
-      "sector": "veterinaria",
-      "description": "Historia clínica de mascotas, vacunas, citas, cirugías, farmacia veterinaria y facturación.",
-      "status": "available",
-      "enabled_agents": ["VET_RECORDS", "APPOINTMENTS", "BILLING", "INVENTORY"],
-      "default_workflows": ["PET_INTAKE", "VET_EXAM", "VACCINATION_SCHEDULE", "BILLING_CLOSE"],
-      "modules": ["mascotas", "propietarios", "historia_veterinaria", "vacunas", "citas", "farmacia", "facturacion"],
-      "config_fields": ["nombre_veterinaria", "nit", "registro_veterinario", "municipio"],
-      "compatible_mixins": ["accounting", "billing_dian", "inventory"],
-      "interview_questions": [
-        "¿Qué especies atienden (caninos, felinos, exóticos, grandes animales)?",
-        "¿Cuántos veterinarios o médicos veterinarios trabajan?",
-        "¿Tienen farmacia veterinaria propia con venta de medicamentos?",
-        "¿Realizan cirugías? (requiere quirófano y anestesia)",
-        "¿Tienen servicio de peluquería canina o grooming?",
-        "¿Manejan hotel o guardería de mascotas?",
-        "¿Necesitan control de vacunas con recordatorios automáticos?"
-      ]
-    },
-    {
-      "id": "education_center",
-      "name": "Colegio & Centro Educativo",
-      "category": "Educación",
-      "sector": "educacion",
-      "description": "Matrícula, estudiantes, notas, asistencia, pagos de pensión y comunicación con padres.",
-      "status": "available",
-      "enabled_agents": ["ACADEMIC", "BILLING", "COMMUNICATIONS"],
-      "default_workflows": ["ENROLLMENT", "GRADE_REPORT", "ATTENDANCE", "TUITION_BILLING"],
-      "modules": ["estudiantes", "matricula", "notas", "asistencia", "pensiones", "comunicados"],
-      "config_fields": ["nombre_colegio", "nit", "niveles_educativos", "jornada", "municipio"],
-      "compatible_mixins": ["accounting", "billing_dian"],
-      "interview_questions": [
-        "¿Qué niveles educativos manejan (preescolar, primaria, secundaria, universitario)?",
-        "¿Cuántos estudiantes tiene actualmente?",
-        "¿Tienen jornada única, mañana/tarde o ambas?",
-        "¿Cómo cobran las pensiones (mensual, bimensual)?",
-        "¿Necesitan comunicados a padres vía WhatsApp o email?",
-        "¿Manejan calificaciones numéricas, conceptuales o ambas?",
-        "¿Requieren control de rutas escolares o transporte?"
-      ]
-    },
-    {
-      "id": "church_org",
-      "name": "Iglesia & Organización Religiosa",
-      "category": "Organizaciones",
-      "sector": "iglesia",
-      "description": "Gestión de miembros, grupos, eventos, diezmos, ofrendas y comunicación congregacional.",
-      "status": "available",
-      "enabled_agents": ["MEMBER_MANAGEMENT", "FINANCES", "COMMUNICATIONS"],
-      "default_workflows": ["MEMBER_REGISTRATION", "EVENT_PLANNING", "OFFERING_RECORD"],
-      "modules": ["miembros", "grupos", "eventos", "diezmos_ofrendas", "comunicaciones"],
-      "config_fields": ["nombre_iglesia", "nit", "denominacion", "municipio", "pastor_lider"],
-      "compatible_mixins": ["accounting"],
-      "interview_questions": [
-        "¿Cuántos miembros activos tiene la congregación?",
-        "¿Tienen grupos celulares, ministerios o departamentos?",
-        "¿Necesitan registrar diezmos y ofrendas individuales?",
-        "¿Tienen múltiples sedes o congregaciones?",
-        "¿Cómo desean comunicarse con los miembros (WhatsApp, email, SMS)?"
-      ]
-    },
-    {
-      "id": "accounting_firm",
-      "name": "Firma Contable",
-      "category": "Contabilidad",
-      "sector": "contabilidad",
-      "description": "PUC colombiano completo, libro diario, estados financieros, declaraciones DIAN, múltiples clientes.",
-      "status": "available",
-      "enabled_agents": ["ACCOUNTING", "FISCAL", "REPORTS"],
-      "default_workflows": ["JOURNAL_ENTRY", "BANK_RECONCILIATION", "TAX_DECLARATION", "FINANCIAL_CLOSE"],
-      "modules": ["puc", "libro_diario", "balance", "pyg", "flujo_caja", "declaraciones_dian"],
-      "config_fields": ["nombre_firma", "nit", "tarjeta_profesional", "municipio"],
-      "compatible_mixins": ["billing_dian", "crm"],
-      "interview_questions": [
-        "¿Cuántos clientes/empresas maneja la firma actualmente?",
-        "¿Qué tipos de declaraciones tramitan (renta, IVA, retención, industria)?",
-        "¿Trabajan con pymes, personas naturales o grandes empresas?",
-        "¿Necesitan acceso diferenciado por cliente?",
-        "¿Llevan contabilidad en tiempo real o al cierre del mes?"
-      ]
-    },
-    {
-      "id": "sales_agent",
-      "name": "Agente de Ventas",
-      "category": "Ventas",
-      "sector": "ventas",
-      "description": "CRM, pipeline de ventas, cotizaciones, seguimiento de clientes y comisiones para equipos comerciales.",
-      "status": "available",
-      "enabled_agents": ["SALES", "CRM", "REPORTS"],
-      "default_workflows": ["LEAD_CAPTURE", "QUOTATION", "DEAL_CLOSE", "COMMISSION_CALC"],
-      "modules": ["crm", "leads", "cotizaciones", "pipeline", "comisiones", "reportes_ventas"],
-      "config_fields": ["nombre_empresa", "productos_servicios", "metas_ventas", "territorios"],
-      "compatible_mixins": ["accounting", "billing_dian", "inventory"],
-      "interview_questions": [
-        "¿Cuántos vendedores o agentes comerciales tiene el equipo?",
-        "¿Venden por territorios, productos o cuentas asignadas?",
-        "¿Cómo calculan las comisiones (porcentaje, escalas, por producto)?",
-        "¿Tienen proceso de aprobación para descuentos o condiciones especiales?",
-        "¿Necesitan cotizaciones con firma digital o aprobación del cliente?"
-      ]
-    },
-    {
-      "id": "restaurant",
-      "name": "Restaurante & Bar",
-      "category": "Alimentos",
-      "sector": "restaurante",
-      "description": "Comandas, mesas, carta digital, cocina en tiempo real, delivery, facturación y control de costos de recetas.",
-      "status": "available",
-      "enabled_agents": ["SALES", "INVENTORY", "BILLING", "OPERATIONS"],
-      "default_workflows": ["TABLE_ORDER", "KITCHEN_DISPATCH", "DELIVERY_ORDER", "DAILY_CLOSE"],
-      "modules": ["mesas", "comandas", "cocina", "carta_digital", "delivery", "inventario_cocina", "recetas", "facturacion"],
-      "config_fields": ["nombre_restaurante", "nit", "tipo_establecimiento", "numero_mesas", "municipio"],
-      "compatible_mixins": ["accounting", "billing_dian", "pos", "inventory"],
-      "interview_questions": [
-        "¿Qué tipo de establecimiento es (restaurante, bar, cafetería, comida rápida, dark kitchen)?",
-        "¿Cuántas mesas o puestos de atención tiene?",
-        "¿Maneja servicio a domicilio o delivery propio?",
-        "¿Tiene cocina diferenciada de barra o múltiples estaciones?",
-        "¿Necesita control de recetas con costo por plato?",
-        "¿Tiene carta de licores o bebidas alcohólicas?",
-        "¿Maneja meseros con comandas desde celular o tablet?"
-      ]
-    },
-    {
-      "id": "beauty_salon",
-      "name": "Salón de Belleza & Spa",
-      "category": "Bienestar",
-      "sector": "belleza",
-      "description": "Citas, servicios, comisiones a estilistas, productos, facturación y fidelización de clientes.",
-      "status": "available",
-      "enabled_agents": ["APPOINTMENTS", "SALES", "BILLING", "INVENTORY"],
-      "default_workflows": ["APPOINTMENT_BOOKING", "SERVICE_EXECUTION", "STYLIST_COMMISSION", "BILLING_CLOSE"],
-      "modules": ["citas", "servicios", "estilistas", "productos", "comisiones", "facturacion", "fidelizacion"],
-      "config_fields": ["nombre_salon", "nit", "tipo_servicios", "numero_sillas", "municipio"],
-      "compatible_mixins": ["accounting", "billing_dian", "inventory", "crm"],
-      "interview_questions": [
-        "¿Qué servicios ofrece (corte, color, manicure, spa, barbería, cejas)?",
-        "¿Cuántos estilistas o técnicos trabajan?",
-        "¿Las comisiones son por servicio, por porcentaje o mixtas?",
-        "¿Vende productos de belleza al por menor?",
-        "¿Maneja reservas en línea o solo presenciales?",
-        "¿Tiene programa de fidelización o puntos para clientes?"
-      ]
-    },
-    {
-      "id": "gym_fitness",
-      "name": "Gimnasio & Centro Deportivo",
-      "category": "Bienestar",
-      "sector": "gimnasio",
-      "description": "Membresías, asistencia, entrenadores, rutinas, pagos recurrentes y control de acceso.",
-      "status": "available",
-      "enabled_agents": ["MEMBER_MANAGEMENT", "BILLING", "SCHEDULING", "SALES"],
-      "default_workflows": ["MEMBERSHIP_SIGNUP", "ATTENDANCE_CHECK", "RENEWAL_BILLING", "TRAINER_SCHEDULE"],
-      "modules": ["membresias", "asistencia", "entrenadores", "rutinas", "pagos_recurrentes", "acceso"],
-      "config_fields": ["nombre_gimnasio", "nit", "tipos_membresia", "horario_atencion", "municipio"],
-      "compatible_mixins": ["accounting", "billing_dian", "pos"],
-      "interview_questions": [
-        "¿Qué tipos de membresía ofrecen (mensual, trimestral, anual, clases)?",
-        "¿Cuántos entrenadores o instructores trabajan?",
-        "¿Tienen clases grupales programadas (spinning, yoga, crossfit)?",
-        "¿Necesitan control de acceso (torniquete, QR)?",
-        "¿Venden suplementos u otros productos?",
-        "¿Manejan entrenamiento personalizado con seguimiento de rutinas?"
-      ]
-    },
-    {
-      "id": "pharmacy",
-      "name": "Farmacia & Droguería",
-      "category": "Salud",
-      "sector": "farmacia",
-      "description": "Inventario de medicamentos, control de vencimientos, recetas, ventas y facturación.",
-      "status": "available",
-      "enabled_agents": ["INVENTORY", "SALES", "BILLING", "HEALTH_RECORDS"],
-      "default_workflows": ["PRESCRIPTION_FILL", "STOCK_REPLENISHMENT", "EXPIRY_ALERT", "BILLING_CLOSE"],
-      "modules": ["medicamentos", "recetas", "vencimientos", "inventario", "proveedores", "facturacion"],
-      "config_fields": ["nombre_farmacia", "nit", "numero_invima", "director_tecnico", "municipio"],
-      "compatible_mixins": ["accounting", "billing_dian", "pos"],
-      "interview_questions": [
-        "¿Es droguería, farmacia magistral o depósito de medicamentos?",
-        "¿Manejan medicamentos de control especial?",
-        "¿Tienen servicio de preparación de fórmulas magistrales?",
-        "¿Cuántos SKUs de medicamentos manejan aproximadamente?",
-        "¿Necesitan alertas automáticas de vencimiento?",
-        "¿Trabajan con EPS o solo venta directa al público?"
-      ]
-    },
-    {
-      "id": "logistics_transport",
-      "name": "Logística & Transporte",
-      "category": "Logística",
-      "sector": "logistica",
-      "description": "Flota vehicular, conductores, rutas, guías de envío, tracking y facturación de flete.",
-      "status": "available",
-      "enabled_agents": ["OPERATIONS", "BILLING", "INVENTORY", "CRM"],
-      "default_workflows": ["SHIPMENT_ORDER", "ROUTE_DISPATCH", "DELIVERY_CONFIRM", "BILLING_CLOSE"],
-      "modules": ["flota", "conductores", "rutas", "guias_envio", "tracking", "clientes", "facturacion"],
-      "config_fields": ["nombre_empresa", "nit", "numero_vehiculos", "tipo_carga", "municipio"],
-      "compatible_mixins": ["accounting", "billing_dian", "crm"],
-      "interview_questions": [
-        "¿Qué tipo de carga transportan (mensajería, carga pesada, refrigerada, pasajeros)?",
-        "¿Cuántos vehículos tiene la flota?",
-        "¿Los conductores son propios o contratistas?",
-        "¿Necesitan tracking GPS en tiempo real?",
-        "¿Facturan por kilo, por viaje o por contrato?",
-        "¿Hacen envíos nacionales, locales o ambos?"
-      ]
-    },
-    {
-      "id": "construction",
-      "name": "Constructora & Contratista",
-      "category": "Construcción",
-      "sector": "construccion",
-      "description": "Proyectos de obra, APU, presupuestos, contratistas, materiales, avance físico y facturación por hitos.",
-      "status": "available",
-      "enabled_agents": ["OPERATIONS", "ACCOUNTING", "INVENTORY", "BILLING"],
-      "default_workflows": ["PROJECT_CREATION", "BUDGET_APU", "PROGRESS_BILLING", "MATERIAL_ORDER"],
-      "modules": ["proyectos", "apu", "presupuestos", "contratistas", "materiales", "avance_obra", "facturacion_hitos"],
-      "config_fields": ["nombre_empresa", "nit", "rut_constructor", "especialidad_obra", "municipio"],
-      "compatible_mixins": ["accounting", "billing_dian", "inventory"],
-      "interview_questions": [
-        "¿Qué tipo de proyectos construyen (vivienda, comercial, industrial, infraestructura)?",
-        "¿Trabajan con presupuesto APU o precio alzado?",
-        "¿Necesitan control de avance físico por actividad o capítulo?",
-        "¿Tienen subcontratistas a quienes pagar por avance?",
-        "¿Manejan control de materiales en bodega de obra?",
-        "¿Facturan por hitos o entregas parciales?"
-      ]
-    },
-    {
-      "id": "fashion_clothing",
-      "name": "Moda, Confección & Calzado",
-      "category": "Manufactura",
-      "sector": "moda",
-      "description": "Producción de prendas o calzado, tallas, colores, temporadas, órdenes de producción y ventas.",
-      "status": "available",
-      "enabled_agents": ["INVENTORY", "SALES", "OPERATIONS", "BILLING"],
-      "default_workflows": ["PRODUCTION_ORDER", "FABRIC_CUT", "QUALITY_CHECK", "SALES_ORDER"],
-      "modules": ["materiales_tela", "produccion", "tallas_colores", "temporadas", "ordenes_produccion", "ventas", "facturacion"],
-      "config_fields": ["nombre_marca", "nit", "tipo_producto", "temporadas_anuales", "municipio"],
-      "compatible_mixins": ["accounting", "billing_dian", "inventory", "pos"],
-      "interview_questions": [
-        "¿Fabrican ropa, calzado, accesorios o combinado?",
-        "¿Producen para marca propia, maquila o ambas?",
-        "¿Manejan temporadas o colecciones definidas?",
-        "¿Necesitan control de telas y materiales con rendimiento por prenda?",
-        "¿Tienen punto de venta propio o solo venden por mayor?",
-        "¿Exportan o solo mercado nacional?"
-      ]
-    },
-    {
-      "id": "services_consulting",
-      "name": "Empresa de Servicios & Consultoría",
-      "category": "Servicios",
-      "sector": "servicios_profesionales",
-      "description": "Gestión de proyectos, horas trabajadas, honorarios, contratos, facturación por entregables.",
-      "status": "available",
-      "enabled_agents": ["CRM", "BILLING", "OPERATIONS", "ACCOUNTING"],
-      "default_workflows": ["CONTRACT_CREATION", "PROJECT_TRACKING", "HOURS_LOG", "INVOICE_GENERATION"],
-      "modules": ["contratos", "proyectos", "horas_trabajadas", "facturacion_honorarios", "clientes", "reportes"],
-      "config_fields": ["nombre_empresa", "nit", "tipo_servicios", "modalidad_cobro", "municipio"],
-      "compatible_mixins": ["accounting", "billing_dian", "crm"],
-      "interview_questions": [
-        "¿Qué tipo de servicio ofrecen (IT, consultoría, marketing, legal, ingeniería)?",
-        "¿Cobran por hora, por proyecto o por retainer mensual?",
-        "¿Cuántos consultores o profesionales trabajan?",
-        "¿Necesitan registro de horas por cliente y proyecto?",
-        "¿Manejan contratos con alcance y entregables definidos?",
-        "¿Sus clientes son empresas (B2B) o personas naturales (B2C)?"
-      ]
-    }
-  ],
-  "field_definitions": {
-    "nit":                   {"type":"text","description":"NIT o cédula del negocio (Colombia). Necesario para facturación y documentos.","llm_hint":"Pregunta por el NIT o número de identificación tributaria del negocio. Si es persona natural puede ser la cédula."},
-    "razon_social":          {"type":"text","description":"Nombre legal completo del negocio o empresa.","llm_hint":"Pregunta cuál es el nombre oficial o razón social con que está registrado el negocio."},
-    "municipio":             {"type":"text","description":"Ciudad o municipio donde opera el negocio (Colombia).","llm_hint":"Pregunta en qué ciudad o municipio está ubicado el negocio."},
-    "telefono":              {"type":"text","description":"Número de contacto del negocio.","llm_hint":"Pregunta el teléfono o celular de contacto del negocio."},
-    "nombre_empresa":        {"type":"text","description":"Nombre comercial de la empresa o negocio.","llm_hint":"Pregunta cómo se llama el negocio o empresa."},
-    "nombre_clinica":        {"type":"text","description":"Nombre del consultorio o clínica médica.","llm_hint":"Pregunta cómo se llama la clínica o consultorio."},
-    "nombre_consultorio":    {"type":"text","description":"Nombre del consultorio dental.","llm_hint":"Pregunta cómo se llama el consultorio odontológico."},
-    "nombre_veterinaria":    {"type":"text","description":"Nombre de la clínica veterinaria.","llm_hint":"Pregunta cómo se llama la clínica veterinaria."},
-    "nombre_salon":          {"type":"text","description":"Nombre del salón de belleza o spa.","llm_hint":"Pregunta cómo se llama el salón o spa."},
-    "nombre_gimnasio":       {"type":"text","description":"Nombre del gimnasio o centro deportivo.","llm_hint":"Pregunta cómo se llama el gimnasio."},
-    "nombre_farmacia":       {"type":"text","description":"Nombre de la farmacia o droguería.","llm_hint":"Pregunta cómo se llama la farmacia o droguería."},
-    "nombre_restaurante":    {"type":"text","description":"Nombre del restaurante o establecimiento de alimentos.","llm_hint":"Pregunta cómo se llama el restaurante."},
-    "nombre_colegio":        {"type":"text","description":"Nombre del colegio o institución educativa.","llm_hint":"Pregunta cómo se llama el colegio o institución educativa."},
-    "nombre_iglesia":        {"type":"text","description":"Nombre de la iglesia u organización religiosa.","llm_hint":"Pregunta cómo se llama la iglesia o congregación."},
-    "nombre_firma":          {"type":"text","description":"Nombre de la firma contable o empresa de contabilidad.","llm_hint":"Pregunta cómo se llama la firma contable."},
-    "nombre_marca":          {"type":"text","description":"Nombre de la marca de moda o confección.","llm_hint":"Pregunta cuál es el nombre de la marca o empresa de confección."},
-    "especialidad":          {"type":"text","description":"Especialidad médica principal (medicina general, especialista, pediatría, etc.).","llm_hint":"Pregunta cuál es la especialidad médica principal del consultorio."},
-    "registro_medico":       {"type":"text","description":"Número de registro médico ante la Secretaría de Salud o RETHUS.","llm_hint":"Pregunta cuál es el número de registro médico o tarjeta profesional del médico principal."},
-    "registro_odontologico": {"type":"text","description":"Número de tarjeta profesional del odontólogo principal ante el COPNIA o Tribunal de Ética.","llm_hint":"Pregunta cuál es el número de tarjeta profesional odontológica."},
-    "registro_veterinario":  {"type":"text","description":"Número de registro del médico veterinario ante el ICA (Instituto Colombiano Agropecuario).","llm_hint":"Pregunta cuál es el número de registro ICA de los médicos veterinarios."},
-    "numero_invima":         {"type":"text","description":"Número INVIMA de la farmacia o droguería (Colombia).","llm_hint":"Pregunta cuál es el número de registro INVIMA del establecimiento."},
-    "director_tecnico":      {"type":"text","description":"Nombre del director técnico o químico farmacéutico responsable.","llm_hint":"Pregunta cuál es el nombre del director técnico o químico farmacéutico a cargo."},
-    "regimen_tributario":    {"type":"text","description":"Régimen tributario del negocio (ordinario, simple, gran contribuyente).","llm_hint":"Pregunta si el negocio está en régimen ordinario, régimen simple o es gran contribuyente."},
-    "actividad_economica":   {"type":"text","description":"Código CIIU o descripción de la actividad económica principal.","llm_hint":"Pregunta cuál es la actividad económica principal del negocio (o código CIIU si lo conoce)."},
-    "resolucion_dian":       {"type":"text","description":"Número de resolución DIAN para facturación electrónica.","llm_hint":"Pregunta cuál es el número de resolución de facturación electrónica otorgado por la DIAN."},
-    "prefijo_factura":       {"type":"text","description":"Prefijo de las facturas electrónicas (ej: FE, FAC, INV).","llm_hint":"Pregunta cuál es el prefijo que usan en las facturas electrónicas."},
-    "rango_inicial":         {"type":"text","description":"Número inicial del rango de facturas autorizado por la DIAN.","llm_hint":"Pregunta cuál es el número inicial del rango de facturas autorizado."},
-    "rango_final":           {"type":"text","description":"Número final del rango de facturas autorizado por la DIAN.","llm_hint":"Pregunta cuál es el número final del rango de facturas autorizado."},
-    "numero_cajas":          {"type":"text","description":"Cantidad de cajas registradoras o puntos de venta.","llm_hint":"Pregunta cuántas cajas registradoras o puntos de venta tiene el establecimiento."},
-    "medios_pago_aceptados": {"type":"text","description":"Medios de pago que acepta (efectivo, tarjeta, Nequi, PSE, etc.).","llm_hint":"Pregunta qué medios de pago acepta el negocio."},
-    "numero_bodegas":        {"type":"text","description":"Número de bodegas o almacenes de inventario.","llm_hint":"Pregunta cuántas bodegas o almacenes de inventario tiene el negocio."},
-    "unidades_medida":       {"type":"text","description":"Unidades de medida principales que usa (unidades, cajas, kilos, litros, metros).","llm_hint":"Pregunta qué unidades de medida usa principalmente para su inventario."},
-    "programa_fidelidad":    {"type":"text","description":"Si tiene programa de puntos o fidelización de clientes.","llm_hint":"Pregunta si el negocio tiene o quiere implementar un programa de puntos o fidelización de clientes."},
-    "canales_contacto":      {"type":"text","description":"Canales por donde los clientes contactan al negocio (WhatsApp, teléfono, email, web).","llm_hint":"Pregunta por qué canales contactan normalmente los clientes al negocio."},
-    "tarjeta_profesional":   {"type":"text","description":"Número de tarjeta profesional del contador o revisor fiscal.","llm_hint":"Pregunta cuál es el número de tarjeta profesional del contador responsable."},
-    "contador_responsable":  {"type":"text","description":"Nombre del contador o revisor fiscal responsable.","llm_hint":"Pregunta cuál es el nombre del contador o revisor fiscal del negocio."},
-    "tipo_establecimiento":  {"type":"text","description":"Tipo de establecimiento de alimentos (restaurante, bar, cafetería, comida rápida, dark kitchen).","llm_hint":"Pregunta qué tipo de establecimiento es: restaurante, bar, cafetería, comida rápida u otro."},
-    "numero_mesas":          {"type":"text","description":"Número de mesas o puestos de atención.","llm_hint":"Pregunta cuántas mesas o puestos de atención tiene el establecimiento."},
-    "tipo_servicios":        {"type":"text","description":"Tipo de servicios que ofrece la empresa.","llm_hint":"Pregunta qué tipo de servicios ofrece la empresa de forma natural."},
-    "denominacion":          {"type":"text","description":"Denominación o corriente religiosa de la iglesia (cristiana, católica, adventista, etc.).","llm_hint":"Pregunta cuál es la denominación o corriente religiosa de la congregación."},
-    "pastor_lider":          {"type":"text","description":"Nombre del pastor o líder principal de la congregación.","llm_hint":"Pregunta cuál es el nombre del pastor o líder principal."},
-    "niveles_educativos":    {"type":"text","description":"Niveles educativos que maneja la institución (preescolar, primaria, secundaria, etc.).","llm_hint":"Pregunta qué niveles educativos maneja la institución."},
-    "jornada":               {"type":"text","description":"Jornada escolar (mañana, tarde, noche, única).","llm_hint":"Pregunta en qué jornada o jornadas opera la institución educativa."},
-    "tipos_membresia":       {"type":"text","description":"Tipos de membresía que ofrece el gimnasio (mensual, trimestral, anual, clases).","llm_hint":"Pregunta qué tipos de membresía o planes maneja el gimnasio."},
-    "horario_atencion":      {"type":"text","description":"Horario de atención al público del negocio.","llm_hint":"Pregunta en qué horario atienden al público."},
-    "numero_sillas":         {"type":"text","description":"Número de sillas o puestos de trabajo del salón.","llm_hint":"Pregunta cuántas sillas o puestos de trabajo tiene el salón."},
-    "tipo_carga":            {"type":"text","description":"Tipo de carga o mercancía que transportan.","llm_hint":"Pregunta qué tipo de carga o mercancía transportan normalmente."},
-    "numero_vehiculos":      {"type":"text","description":"Número de vehículos en la flota de transporte.","llm_hint":"Pregunta cuántos vehículos tiene la flota de transporte."},
-    "rut_constructor":       {"type":"text","description":"Número RUT o matrícula profesional del constructor.","llm_hint":"Pregunta cuál es el número RUT o matrícula de la constructora o contratista."},
-    "especialidad_obra":     {"type":"text","description":"Especialidad de construcción u obra (vivienda, comercial, industrial, infraestructura).","llm_hint":"Pregunta en qué tipo de obras o proyectos de construcción se especializa."},
-    "tipo_producto":         {"type":"text","description":"Tipo de producto que fabrican (ropa, calzado, accesorios).","llm_hint":"Pregunta qué tipo de producto fabrican o comercializan."},
-    "temporadas_anuales":    {"type":"text","description":"Número de temporadas o colecciones de moda por año.","llm_hint":"Pregunta cuántas temporadas o colecciones de moda manejan por año."},
-    "modalidad_cobro":       {"type":"text","description":"Modalidad de cobro (por hora, por proyecto, mensual, retainer).","llm_hint":"Pregunta cómo cobran sus servicios: por hora, por proyecto, mensualidad u otra modalidad."},
-    "productos_servicios":   {"type":"text","description":"Descripción de los productos o servicios que vende el equipo comercial.","llm_hint":"Pregunta qué productos o servicios vende el equipo."},
-    "metas_ventas":          {"type":"text","description":"Metas o cuotas de ventas del equipo comercial.","llm_hint":"Pregunta si tienen metas o cuotas de ventas definidas por período."},
-    "territorios":           {"type":"text","description":"Territorios o zonas de ventas del equipo comercial.","llm_hint":"Pregunta si el equipo de ventas trabaja por territorios o zonas geográficas."},
-    "temas_soporte":         {"type":"text","description":"Temas más frecuentes de soporte al cliente.","llm_hint":"Pregunta cuáles son los temas o preguntas más frecuentes de los clientes."},
-    "nombre_tienda":         {"type":"text","description":"Nombre de la tienda en línea o e-commerce.","llm_hint":"Pregunta cómo se llama la tienda en línea."},
-    "url_tienda":            {"type":"text","description":"URL o dirección web de la tienda en línea.","llm_hint":"Pregunta cuál es la dirección web de la tienda (si ya la tiene)."},
-    "plataforma":            {"type":"text","description":"Plataforma de e-commerce que usa (WooCommerce, Shopify, Tienda Nube, etc.).","llm_hint":"Pregunta en qué plataforma tiene su tienda en línea."},
-    "moneda":                {"type":"text","description":"Moneda principal de la tienda (COP, USD, etc.).","llm_hint":"Pregunta en qué moneda opera principalmente la tienda."}
-  }
 }
