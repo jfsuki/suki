@@ -98,7 +98,7 @@
             "category": "Administrativo",
             "sector": "comercio",
             "description": "Control total de inventarios, compras y ventas con inteligencia fiscal integrada.",
-            "status": "beta",
+            "status": "template",
             "enabled_agents": [
                 "ACCOUNTING",
                 "INVENTORY",
@@ -137,12 +137,11 @@
                 "¿Tienes equipo de ventas al que deba asignar comisiones?",
                 "¿Qué tipo de productos vendes: físicos, servicios o ambos?"
             ],
-            "_beta_blockers": [
-                "OTP self-service por tenant (P0) — auth\/register.php falta flujo completo",
-                "Factura electrónica DIAN — AlanubeIntegrationAdapter payload no conectado end-to-end",
-                "Tablas operativas POS\/inventario no se aprovisionan automáticamente al instalar"
-            ],
-            "_beta_note": "Funcional para demos y piloto asistido. No disponible para self-service hasta cerrar P0s."
+            "_template_note": "App con más implementación PHP real. Requiere P0: OTP self-service + DIAN FE para publicarse como available.",
+            "_p0_blockers": [
+                "OTP self-service por tenant — auth\/register flujo incompleto",
+                "Factura electrónica DIAN — AlanubeIntegrationAdapter sin CUFE\/firma end-to-end"
+            ]
         },
         {
             "id": "store_hub",
@@ -183,7 +182,7 @@
                 "¿Cuántos SKUs (productos) tienes aproximadamente?",
                 "¿Haces despachos nacionales o también internacionales?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "agent_support",
@@ -215,7 +214,7 @@
                 "¿Necesitas escalar tickets a agentes humanos?",
                 "¿Quieres integrarlo con WhatsApp o solo web chat?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "health_clinic",
@@ -264,7 +263,7 @@
                 "¿Aceptas seguros médicos o EPS?",
                 "¿Cuántas salas de atención o consultorios físicos tienes?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "dental_clinic",
@@ -314,7 +313,7 @@
                 "¿Necesitas control de materiales dentales (inventario)?",
                 "¿Manejas ortodoncia? (requiere seguimiento de brackets, arcos, elásticos)"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "vet_clinic",
@@ -364,7 +363,7 @@
                 "¿Manejan hotel o guardería de mascotas?",
                 "¿Necesitan control de vacunas con recordatorios automáticos?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "education_center",
@@ -412,7 +411,7 @@
                 "¿Manejan calificaciones numéricas, conceptuales o ambas?",
                 "¿Requieren control de rutas escolares o transporte?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "church_org",
@@ -455,7 +454,7 @@
                 "¿Tienen múltiples sedes o congregaciones?",
                 "¿Cómo desean comunicarse con los miembros (WhatsApp, email, SMS)?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "accounting_firm",
@@ -500,7 +499,7 @@
                 "¿Necesitan acceso diferenciado por cliente?",
                 "¿Llevan contabilidad en tiempo real o al cierre del mes?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "sales_agent",
@@ -546,7 +545,7 @@
                 "¿Tienen proceso de aprobación para descuentos o condiciones especiales?",
                 "¿Necesitan cotizaciones con firma digital o aprobación del cliente?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "restaurant",
@@ -599,7 +598,7 @@
                 "¿Tiene carta de licores o bebidas alcohólicas?",
                 "¿Maneja meseros con comandas desde celular o tablet?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "beauty_salon",
@@ -650,7 +649,7 @@
                 "¿Maneja reservas en línea o solo presenciales?",
                 "¿Tiene programa de fidelización o puntos para clientes?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "gym_fitness",
@@ -699,7 +698,7 @@
                 "¿Venden suplementos u otros productos?",
                 "¿Manejan entrenamiento personalizado con seguimiento de rutinas?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "pharmacy",
@@ -748,7 +747,7 @@
                 "¿Necesitan alertas automáticas de vencimiento?",
                 "¿Trabajan con EPS o solo venta directa al público?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "logistics_transport",
@@ -798,7 +797,7 @@
                 "¿Facturan por kilo, por viaje o por contrato?",
                 "¿Hacen envíos nacionales, locales o ambos?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "construction",
@@ -848,7 +847,7 @@
                 "¿Manejan control de materiales en bodega de obra?",
                 "¿Facturan por hitos o entregas parciales?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "fashion_clothing",
@@ -899,7 +898,7 @@
                 "¿Tienen punto de venta propio o solo venden por mayor?",
                 "¿Exportan o solo mercado nacional?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         },
         {
             "id": "services_consulting",
@@ -948,7 +947,7 @@
                 "¿Manejan contratos con alcance y entregables definidos?",
                 "¿Sus clientes son empresas (B2B) o personas naturales (B2C)?"
             ],
-            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para activarse en el Marketplace."
+            "_template_note": "Plantilla base de SUKI. Requiere implementación PHP para publicarse en Marketplace."
         }
     ],
     "field_definitions": {

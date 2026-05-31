@@ -1,16 +1,14 @@
 <?php
 $__base = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '';
 $catalogPath = dirname(__DIR__, 2) . '/project/contracts/app_catalog.json';
-$__apps      = [];   // status:available  — listas para instalar
-$__beta      = [];   // status:beta       — funcionales con P0s pendientes
-$__templates = [];   // status:template   — plantillas para Builders
+$__apps      = [];  // status:available — listas para instalar (hoy: ninguna)
+$__templates = [];  // status:template  — plantillas para Builders
 if (file_exists($catalogPath)) {
     $raw = json_decode(file_get_contents($catalogPath), true);
     foreach ($raw['apps'] ?? [] as $a) {
         $st = $a['status'] ?? '';
         if ($st === 'available') { $__apps[]      = $a; }
-        if ($st === 'beta')      { $__beta[]       = $a; }
-        if ($st === 'template')  { $__templates[]  = $a; }
+        if ($st === 'template')  { $__templates[] = $a; }
     }
 }
 ?>
@@ -174,41 +172,6 @@ if (file_exists($catalogPath)) {
         </div>
         <?php endforeach; endif; ?>
     </div>
-
-    <?php if (!empty($__beta)): ?>
-    <!-- Beta: funcionales con P0s pendientes — no instalables en self-service -->
-    <div style="max-width:1200px;margin:0 auto;padding:0 4rem 1.5rem;">
-        <div style="background:#FFF7ED;border:1.5px solid #FED7AA;border-radius:12px;padding:1rem 1.5rem;display:flex;align-items:flex-start;gap:1rem;margin-bottom:2rem;">
-            <span style="font-size:1.4rem;line-height:1;">🚧</span>
-            <div>
-                <strong style="color:#9A3412;font-size:0.95rem;">Apps en fase Beta</strong>
-                <p style="color:#C2410C;font-size:0.88rem;margin:0.25rem 0 0;line-height:1.5;">
-                    Estas apps tienen implementación PHP real pero tienen funcionalidades P0 pendientes
-                    (autenticación OTP por tenant, factura electrónica DIAN). No disponibles para
-                    self-service todavía. Disponibles para <strong>demos asistidas y pilotos</strong>.
-                </p>
-            </div>
-        </div>
-        <h2 style="font-size:1.4rem;font-weight:700;color:var(--text);margin-bottom:1.5rem;">En desarrollo activo</h2>
-    </div>
-    <div class="grid" style="padding-top:0;">
-        <?php foreach ($__beta as $__b):
-            $__bid   = htmlspecialchars($__b['id'],          ENT_QUOTES, 'UTF-8');
-            $__bname = htmlspecialchars($__b['name'],        ENT_QUOTES, 'UTF-8');
-            $__bcat  = htmlspecialchars($__b['category'],    ENT_QUOTES, 'UTF-8');
-            $__bdesc = htmlspecialchars($__b['description'], ENT_QUOTES, 'UTF-8');
-        ?>
-        <div class="card" style="border-color:#FED7AA;">
-            <div class="badge" style="background:#FFF7ED;color:#C2410C;border-color:#FED7AA;"><?= $__bcat ?> · Beta</div>
-            <h3><?= $__bname ?></h3>
-            <p><?= $__bdesc ?></p>
-            <span style="display:inline-block;color:#9A3412;background:#FFF7ED;border:1.5px solid #FED7AA;padding:0.6rem 1.1rem;border-radius:8px;font-weight:600;font-size:0.88rem;">
-                Disponible pronto
-            </span>
-        </div>
-        <?php endforeach; ?>
-    </div>
-    <?php endif; ?>
 
     <?php if (!empty($__templates)): ?>
     <!-- Sección plantillas — visibles pero no instalables directamente -->

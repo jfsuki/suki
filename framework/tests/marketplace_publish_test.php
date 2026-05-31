@@ -44,7 +44,7 @@ $baseCatalog = [
         [
             'id'     => 'suki_erp',
             'name'   => 'SUKI ERP Core',
-            'status' => 'beta',   // P0s pendientes: OTP + DIAN — no es 'available' todavía
+            'status' => 'template',  // Marketplace vacío hasta cerrar P0s (OTP + DIAN)
         ],
     ],
 ];
@@ -56,8 +56,9 @@ $manager = new AppCatalogManager($tmpCatalog);
 
 $apps = $manager->listApps();
 ok('M01 catálogo base tiene apps existentes', count($apps) === 1);
-// suki_erp está en 'beta' (P0s pendientes: OTP + DIAN). No hay apps 'available' todavía.
-ok('M02 suki_erp está en beta (P0s pendientes: OTP + DIAN)', ($apps[0]['status'] ?? '') === 'beta');
+// suki_erp está en 'template' igual que el resto (P0s pendientes: OTP + DIAN).
+// El marketplace arranca vacío — ninguna app lista para producción todavía.
+ok('M02 suki_erp está en template (marketplace arranca vacío)', ($apps[0]['status'] ?? '') === 'template');
 
 // ─── M04-M08: proposeApp() crea con status:draft ─────────────────────────────
 
