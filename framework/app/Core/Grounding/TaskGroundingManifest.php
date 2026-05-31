@@ -24,12 +24,17 @@ final class TaskGroundingManifest
 
     private string $catalogPath;
     private float $confidenceThreshold;
+    private ?ExecutionRegistry $executionRegistry;
 
-    public function __construct(?string $catalogPath = null, float $confidenceThreshold = 0.60)
-    {
-        $this->catalogPath = $catalogPath
+    public function __construct(
+        ?string $catalogPath = null,
+        float $confidenceThreshold = 0.60,
+        ?ExecutionRegistry $executionRegistry = null
+    ) {
+        $this->catalogPath       = $catalogPath
             ?? dirname(__DIR__, 4) . '/docs/contracts/skills_catalog.json';
         $this->confidenceThreshold = $confidenceThreshold;
+        $this->executionRegistry   = $executionRegistry;
     }
 
     /**
@@ -136,9 +141,23 @@ final class TaskGroundingManifest
         $handlerClass = $this->shortClassName($entry['handler']);
         $peers = $this->getClusterPeers($cluster, $classifiedIntent, 3);
 
-        // Paso 3: construir bloque
+        // Paso 3: construir bloque (enriquecido con firmas reales si ExecutionRegistry disponible)
+        $signatureHint = '';
+        if ($this->executionRegistry !== null) {
+            try {
+                $signatureHint = $this->executionRegistry->renderSignatureHint($classifiedIntent);
+            } catch (\Throwable) {
+                // degradación graciosa
+            }
+        }
+
+        $handlerLine = "Intent: {$classifiedIntent} | Handler: {$handlerClass}";
+        if ($signatureHint !== '') {
+            $handlerLine .= " | {$signatureHint}";
+        }
+
         $block = "=== TAREA EJECUTABLE: {$cluster} ===\n";
-        $block .= "Intent: {$classifiedIntent} | Handler: {$handlerClass}\n";
+        $block .= $handlerLine . "\n";
         $block .= "Descripcion: {$entry['description']}\n";
         $block .= "INSTRUCCION: Emite JSON {\"skill\":\"{$classifiedIntent}\",\"data\":{...}} — NO calcules tu.\n";
 

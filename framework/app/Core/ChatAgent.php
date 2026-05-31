@@ -1053,7 +1053,11 @@ final class ChatAgent
 
                 // --- Capa 2I: Task Grounding Manifest — topic-scoped, previene alucinaciones en tareas ejecutables ---
                 try {
-                    $grounding = new \App\Core\Grounding\TaskGroundingManifest();
+                    $grounding = new \App\Core\Grounding\TaskGroundingManifest(
+                        null,
+                        0.60,
+                        new \App\Core\Grounding\ExecutionRegistry()
+                    );
                     $classifiedIntent = (string) (
                         $telemetry['classification'] ??
                         $telemetry['semantic_intent_skill'] ??
