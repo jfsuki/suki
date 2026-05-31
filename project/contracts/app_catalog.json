@@ -98,7 +98,7 @@
             "category": "Administrativo",
             "sector": "comercio",
             "description": "Control total de inventarios, compras y ventas con inteligencia fiscal integrada.",
-            "status": "available",
+            "status": "beta",
             "enabled_agents": [
                 "ACCOUNTING",
                 "INVENTORY",
@@ -136,7 +136,13 @@
                 "¿Necesitas facturación electrónica DIAN?",
                 "¿Tienes equipo de ventas al que deba asignar comisiones?",
                 "¿Qué tipo de productos vendes: físicos, servicios o ambos?"
-            ]
+            ],
+            "_beta_blockers": [
+                "OTP self-service por tenant (P0) — auth\/register.php falta flujo completo",
+                "Factura electrónica DIAN — AlanubeIntegrationAdapter payload no conectado end-to-end",
+                "Tablas operativas POS\/inventario no se aprovisionan automáticamente al instalar"
+            ],
+            "_beta_note": "Funcional para demos y piloto asistido. No disponible para self-service hasta cerrar P0s."
         },
         {
             "id": "store_hub",

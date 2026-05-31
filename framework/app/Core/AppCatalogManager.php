@@ -52,13 +52,19 @@ final class AppCatalogManager
         return array_values(array_filter($apps, static fn($a) => ($a['status'] ?? '') === $status));
     }
 
-    /** Alias explícito: solo apps publicadas en el Marketplace. */
+    /** Solo apps publicadas y listas para instalar. */
     public function listAvailable(): array
     {
         return $this->listApps('available');
     }
 
-    /** Alias explícito: solo plantillas base (para Builders). */
+    /** Apps funcionales con P0s pendientes — demos/pilotos asistidos. */
+    public function listBeta(): array
+    {
+        return $this->listApps('beta');
+    }
+
+    /** Plantillas base — esqueletos JSON sin PHP, punto de partida para Builders. */
     public function listTemplates(): array
     {
         return $this->listApps('template');
