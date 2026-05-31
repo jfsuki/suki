@@ -83,14 +83,29 @@ final class OutputValidator
         }
 
         // 3. Validar keys de data contra skill_params
-        $knownKeys = $entry['input_keys'];
+        $knownKeys      = $entry['input_keys'];
+        $paramsDeclared = $entry['params_declared'] ?? false;
+        $strict         = (bool) $this->cfg('output_validator_strict', true);
+
+        // Caso A: skill declaró skill_params:{} (sin params) pero LLM envió data
+        if ($paramsDeclared && empty($knownKeys) && !empty($data)) {
+            if ($strict) {
+                return [
+                    'valid'                 => false,
+                    'error'                 => 'no_params_expected',
+                    'skill'                 => $skill,
+                    'clarification_message' => "La acción '{$skill}' no requiere parámetros adicionales.",
+                ];
+            }
+            $data = []; // Non-strict: descartar silenciosamente
+        }
+
+        // Caso B: hay params conocidos → verificar que los del LLM sean subset
         if (!empty($knownKeys)) {
             $dataKeys    = array_keys($data);
             $unknownKeys = array_values(array_diff($dataKeys, $knownKeys));
 
             if (!empty($unknownKeys)) {
-                $strict = (bool) $this->cfg('output_validator_strict', true);
-
                 if ($strict) {
                     return [
                         'valid'                 => false,
@@ -100,7 +115,7 @@ final class OutputValidator
                         'clarification_message' => $this->unknownParamsMessage($skill, $entry, $unknownKeys),
                     ];
                 }
-                // En modo no-strict: descartar keys desconocidas silenciosamente
+                // Non-strict: descartar keys desconocidas
                 $data = array_intersect_key($data, array_flip($knownKeys));
             }
         }

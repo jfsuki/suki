@@ -88,11 +88,13 @@ final class ExecutionRegistry
             $resolvedAction = $catalogAction !== '' ? $catalogAction : ($reflectionAction ?? null);
 
             // Prioridad 1: skill_params desde catalog JSON
-            $catalogParams = is_array($skill['skill_params'] ?? null)
+            // null = no declarado; [] = declarado vacío (skill sin params); [keys] = params explícitos
+            $catalogParamsDeclared = array_key_exists('skill_params', $skill) && is_array($skill['skill_params']);
+            $catalogParams = $catalogParamsDeclared
                 ? array_keys($skill['skill_params'])
                 : null;
 
-            // Prioridad 2: input_keys extraídas por análisis estático
+            // Prioridad 2: input_keys extraídas por análisis estático (fallback si no hay catalog)
             $resolvedParams = $catalogParams ?? $info['input_keys'];
 
             $this->registry[$intent] = [
@@ -103,11 +105,12 @@ final class ExecutionRegistry
                 'class_exists'    => $info['exists'],
                 'method_exists'   => $declaredExists || $handleExists,
                 'method_is_alias' => !$declaredExists && $handleExists,
-                'action'          => $resolvedAction !== '' ? $resolvedAction : null,
-                'input_keys'      => $resolvedParams,
-                'deps'            => $info['deps'],
-                'topic_cluster'   => $this->sanitizeIdentifier((string) ($skill['topic_cluster'] ?? 'general')),
-                'source'          => $catalogAction !== '' ? 'catalog' : ($reflectionAction !== null ? 'reflection' : 'static'),
+                'action'           => $resolvedAction !== '' ? $resolvedAction : null,
+                'input_keys'       => $resolvedParams,
+                'params_declared'  => $catalogParamsDeclared,  // true = skill_params explícito en catalog
+                'deps'             => $info['deps'],
+                'topic_cluster'    => $this->sanitizeIdentifier((string) ($skill['topic_cluster'] ?? 'general')),
+                'source'           => $catalogAction !== '' ? 'catalog' : ($reflectionAction !== null ? 'reflection' : 'static'),
             ];
         }
 

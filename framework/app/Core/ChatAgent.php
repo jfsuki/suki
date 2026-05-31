@@ -1032,6 +1032,8 @@ final class ChatAgent
                 'route_path' => (string) ($telemetry['route_path'] ?? ''),
                 'gate_decision' => (string) ($telemetry['gate_decision'] ?? 'unknown'),
             ]);
+            // P4-Fix: única instancia por request, reutilizada en Capa 2I y 2J
+            $scmlRegistry = new \App\Core\Grounding\ExecutionRegistry();
             try {
                 // --- MEMORY FLOW STEP 3, 5, 6: Load and Build Context ---
                 $history = $memory->load($threadId);
@@ -1056,8 +1058,10 @@ final class ChatAgent
                     $grounding = new \App\Core\Grounding\TaskGroundingManifest(
                         null,
                         0.60,
-                        new \App\Core\Grounding\ExecutionRegistry()
+                        $scmlRegistry  // P4-Fix: reusar instancia ya creada
                     );
+                    // P1-Fix: cargar cluster anterior persistido cross-request
+                    $previousCluster = $this->loadTopicCluster($threadId, $tenantId);
                     $classifiedIntent = (string) (
                         $telemetry['classification'] ??
                         $telemetry['semantic_intent_skill'] ??
@@ -1076,18 +1080,19 @@ final class ChatAgent
                         $telemetry['confidence'] ??
                         $defaultConfidence
                     );
-                    // Topic cluster anterior para detectar cambio de tema
-                    $previousCluster = (string) ($telemetry['previous_topic_cluster'] ?? '');
+                    // P1-Fix: inyectar en telemetry para que quede registrado
+                    $telemetry['previous_topic_cluster'] = $previousCluster;
                     $groundingResult = $grounding->renderForSystemPrompt($classifiedIntent, $confidence, $previousCluster);
                     if ($groundingResult['needs_clarification']) {
                         $systemPrompt .= "\n\n[SISTEMA: No identifico la tarea especifica. Pregunta al usuario que quiere hacer antes de ejecutar cualquier accion.]";
                     } elseif ($groundingResult['block'] !== '') {
                         $systemPrompt .= "\n\n" . $groundingResult['block'];
                     }
-                    // Fix Gap-SCML-4: registrar cluster actual en telemetry para el siguiente turn
+                    // P1-Fix: persistir cluster actual a DB para cross-request
                     if (($groundingResult['cluster'] ?? '') !== '') {
-                        $telemetry['previous_topic_cluster'] = $telemetry['current_topic_cluster'] ?? '';
+                        $telemetry['previous_topic_cluster'] = $telemetry['current_topic_cluster'] ?? $previousCluster;
                         $telemetry['current_topic_cluster']  = $groundingResult['cluster'];
+                        $this->saveTopicCluster($threadId, $tenantId, $groundingResult['cluster']);
                     }
                     // Si block==='' y needs_clarification===false: intent conversacional, no se anade nada
                 } catch (\Throwable $groundingErr) {
@@ -1305,7 +1310,7 @@ final class ChatAgent
             if (is_array($json)) {
                 // --- Capa 2J: SCML OutputValidator — valida {"skill":..,"data":..} antes del dispatch ---
                 $validator = new \App\Core\Grounding\OutputValidator(
-                    new \App\Core\Grounding\ExecutionRegistry()
+                    $scmlRegistry ?? new \App\Core\Grounding\ExecutionRegistry()  // P4-Fix: reusar instancia
                 );
                 if ($validator->isSkillCall($json)) {
                     $validation = $validator->validate($json);
@@ -1322,9 +1327,20 @@ final class ChatAgent
                                 'project_id' => $projectId,
                             ]
                         );
-                        $skillReply  = (string) ($skillDispatchResult['reply'] ?? $skillDispatchResult['message'] ?? 'Acción ejecutada.');
+                        // P3-Fix: null = clase no existe o no registrada; skill_failed = ejecución fallida
+                        if ($skillDispatchResult === null) {
+                            error_log('[SCML] DynamicSkillRegistry::dispatch() null — skill no registrado: ' . $validation['skill']);
+                            $skillReply   = \App\Core\PolicyLoader::get('routing_policies', 'app_execution_fallback_reply', 'No pude ejecutar esa acción. Por favor intenta de nuevo.');
+                            $responseKind = 'respond_local';
+                        } elseif ($skillDispatchResult['skill_failed'] ?? false) {
+                            error_log('[SCML] Skill execution failed: reason=' . ($skillDispatchResult['skill_fallback_reason'] ?? 'unknown') . ' skill=' . $validation['skill']);
+                            $skillReply   = (string) ($skillDispatchResult['reply'] ?? 'Hubo un error ejecutando la acción. Por favor intenta de nuevo.');
+                            $responseKind = 'respond_local';
+                        } else {
+                            $skillReply   = (string) ($skillDispatchResult['reply'] ?? $skillDispatchResult['message'] ?? 'Acción ejecutada.');
+                            $responseKind = 'execute_command';
+                        }
                         $reply       = $this->reply($skillReply, $channel, $sessionId, $userId);
-                        $responseKind = 'execute_command';
                         $responseText = $skillReply;
                     } else {
                         // Skill inválido o params desconocidos → clarificación al usuario
@@ -4867,6 +4883,84 @@ final class ChatAgent
         return new \App\Core\WorkflowExecutor([
             'calculator' => fn(array $in, array $ctx) => $calculator->handle($in, $ctx)
         ]);
+    }
+
+    // -------------------------------------------------------------------------
+    // SCML Fase 4 — Topic Cluster Persistence (P1-Fix)
+    // -------------------------------------------------------------------------
+
+    /**
+     * Carga el último topic_cluster persistido para este thread.
+     * Retorna '' si no existe o la tabla aún no está creada.
+     */
+    private function loadTopicCluster(string $threadId, string $tenantId): string
+    {
+        try {
+            $db = (new \App\Core\ProjectRegistry())->db();
+            $this->ensureTopicClusterTable($db);
+            $stmt = $db->prepare(
+                'SELECT cluster FROM conversation_topic_cluster WHERE thread_id = :t AND tenant_id = :n LIMIT 1'
+            );
+            $stmt->execute([':t' => $threadId, ':n' => $tenantId]);
+            return (string) ($stmt->fetchColumn() ?: '');
+        } catch (\Throwable) {
+            return '';
+        }
+    }
+
+    /**
+     * Persiste el topic_cluster actual para que el siguiente request lo lea como "previous".
+     */
+    private function saveTopicCluster(string $threadId, string $tenantId, string $cluster): void
+    {
+        if ($cluster === '') {
+            return;
+        }
+        try {
+            $db     = (new \App\Core\ProjectRegistry())->db();
+            $this->ensureTopicClusterTable($db);
+            $driver = $db->getAttribute(\PDO::ATTR_DRIVER_NAME);
+            $now    = date('Y-m-d H:i:s');
+            if ($driver === 'sqlite') {
+                $sql = 'INSERT OR REPLACE INTO conversation_topic_cluster
+                        (thread_id, tenant_id, cluster, updated_at)
+                        VALUES (:t, :n, :c, :u)';
+            } else {
+                $sql = 'INSERT INTO conversation_topic_cluster
+                        (thread_id, tenant_id, cluster, updated_at)
+                        VALUES (:t, :n, :c, :u)
+                        ON DUPLICATE KEY UPDATE cluster = VALUES(cluster), updated_at = VALUES(updated_at)';
+            }
+            $db->prepare($sql)->execute([':t' => $threadId, ':n' => $tenantId, ':c' => $cluster, ':u' => $now]);
+        } catch (\Throwable $e) {
+            error_log('[SCML] saveTopicCluster failed: ' . $e->getMessage());
+        }
+    }
+
+    /**
+     * Crea la tabla conversation_topic_cluster si no existe (SQLite + MySQL).
+     * ADD COLUMN sólo se usa en ConversationMemory; aquí usamos CREATE TABLE IF NOT EXISTS.
+     */
+    private function ensureTopicClusterTable(\PDO $db): void
+    {
+        $driver = $db->getAttribute(\PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'sqlite') {
+            $db->exec("CREATE TABLE IF NOT EXISTS conversation_topic_cluster (
+                thread_id TEXT NOT NULL,
+                tenant_id TEXT NOT NULL DEFAULT '',
+                cluster   TEXT NOT NULL DEFAULT '',
+                updated_at TEXT NOT NULL DEFAULT '',
+                PRIMARY KEY (thread_id, tenant_id)
+            )");
+        } else {
+            $db->exec("CREATE TABLE IF NOT EXISTS conversation_topic_cluster (
+                thread_id  VARCHAR(255) NOT NULL,
+                tenant_id  VARCHAR(100) NOT NULL DEFAULT '',
+                cluster    VARCHAR(64)  NOT NULL DEFAULT '',
+                updated_at VARCHAR(20)  NOT NULL DEFAULT '',
+                PRIMARY KEY (thread_id, tenant_id)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+        }
     }
 }
 
