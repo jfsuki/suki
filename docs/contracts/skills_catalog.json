@@ -137,6 +137,8 @@
                 "accounting_poster"
             ],
             "handler": "App\\Core\\Skills\\AccountingSkill@execute",
+            "action": "record_entry",
+            "skill_params": {"data": "object", "amount": "number", "description": "string"},
             "topic_cluster": "accounting",
             "priority": 135,
             "memory_type": null,
@@ -171,6 +173,8 @@
                 "inventory_query"
             ],
             "handler": "App\\Core\\Skills\\InventorySkill@execute",
+            "action": "check_stock",
+            "skill_params": {"id_or_sku": "string"},
             "topic_cluster": "inventory",
             "priority": 130,
             "memory_type": null,
@@ -4375,6 +4379,7 @@
                 "internal_memory_updater"
             ],
             "handler": "App\\Core\\Agents\\Tools\\UpdateInternalMemorySkill@execute",
+            "skill_params": {"content": "string", "memory_type": "string", "update_mode": "string"},
             "topic_cluster": "memory",
             "priority": 200,
             "input_schema": {
@@ -4438,6 +4443,8 @@
                 "CommandBus"
             ],
             "handler": "App\\Core\\Skills\\InventorySkill@execute",
+            "action": "adjust_stock",
+            "skill_params": {"product_id": "string", "qty": "number", "reason": "string"},
             "topic_cluster": "inventory",
             "priority": 100,
             "memory_type": "transactional",
@@ -4467,6 +4474,8 @@
                 "CommandBus"
             ],
             "handler": "App\\Core\\Skills\\InventorySkill@execute",
+            "action": "add_product",
+            "skill_params": {"data": "object"},
             "topic_cluster": "inventory",
             "priority": 100,
             "memory_type": "transactional",
@@ -4497,6 +4506,8 @@
                 "CommandBus"
             ],
             "handler": "App\\Core\\Skills\\InventorySkill@execute",
+            "action": "check_stock",
+            "skill_params": {"id_or_sku": "string"},
             "topic_cluster": "inventory",
             "priority": 100,
             "memory_type": "informative",
@@ -4522,6 +4533,8 @@
                 "CommandBus"
             ],
             "handler": "App\\Core\\Skills\\InventorySkill@execute",
+            "action": "list_products",
+            "skill_params": {},
             "topic_cluster": "inventory",
             "priority": 90,
             "memory_type": "informative",
@@ -4549,6 +4562,8 @@
                 "CommandBus"
             ],
             "handler": "App\\Core\\Skills\\CRMSkill@execute",
+            "action": "register_lead",
+            "skill_params": {"data": "object"},
             "topic_cluster": "crm",
             "priority": 100,
             "memory_type": "transactional",
@@ -4579,6 +4594,8 @@
                 "CommandBus"
             ],
             "handler": "App\\Core\\Skills\\CRMSkill@execute",
+            "action": "update_customer",
+            "skill_params": {"customer_id": "string", "updates": "object"},
             "topic_cluster": "crm",
             "priority": 100,
             "memory_type": "transactional",
@@ -4610,6 +4627,8 @@
                 "CommandBus"
             ],
             "handler": "App\\Core\\Skills\\CRMSkill@execute",
+            "action": "search_customers",
+            "skill_params": {"filters": "object"},
             "topic_cluster": "crm",
             "priority": 90,
             "memory_type": "informative",
@@ -4637,6 +4656,8 @@
                 "CommandBus"
             ],
             "handler": "App\\Core\\Skills\\CRMSkill@execute",
+            "action": "crm_stats",
+            "skill_params": {},
             "topic_cluster": "crm",
             "priority": 80,
             "memory_type": "informative",
@@ -4659,6 +4680,8 @@
                 "CommandBus"
             ],
             "handler": "App\\Core\\Skills\\AccountingSkill@execute",
+            "action": "record_entry",
+            "skill_params": {"data": "object", "amount": "number", "description": "string"},
             "topic_cluster": "accounting",
             "priority": 100,
             "memory_type": "transactional",
@@ -4691,6 +4714,8 @@
                 "CommandBus"
             ],
             "handler": "App\\Core\\Skills\\AccountingSkill@execute",
+            "action": "balance_sheet",
+            "skill_params": {"as_of_date": "string"},
             "topic_cluster": "accounting",
             "priority": 80,
             "memory_type": "informative",
@@ -4711,6 +4736,8 @@
                 "CommandBus"
             ],
             "handler": "App\\Core\\Skills\\AccountingSkill@execute",
+            "action": "record_sale_accounting",
+            "skill_params": {"ref": "string", "total": "number"},
             "topic_cluster": "accounting",
             "priority": 100,
             "memory_type": "transactional",

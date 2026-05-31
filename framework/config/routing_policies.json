@@ -1,0 +1,108 @@
+{
+    "_comment": "Runtime routing policies — editable without PHP deploys. Loaded by PolicyLoader.",
+    "_version": "1.1.0",
+
+    "create_triggers": [
+        "crear",
+        "hacer",
+        "construir",
+        "armar",
+        "quiero un sistema",
+        "quiero una app",
+        "necesito un sistema",
+        "montar",
+        "configurar",
+        "nueva app",
+        "nueva aplicación"
+    ],
+
+    "research_active_tasks": [
+        "unknown_business_discovery",
+        "business_research_confirmation"
+    ],
+
+    "fallback_min_score": 0.55,
+    "_note_classifier_threshold": "El threshold de clasificación Qdrant está en intent_policies.json → qdrant_confidence_threshold (0.65). Ese es el valor canónico.",
+
+    "semantic_intent_strong_threshold": 0.75,
+    "semantic_intent_candidate_threshold": 0.60,
+    "evidence_override_threshold": 0.75,
+
+    "app_execution_fallback_reply": "No encontré una acción disponible para esa solicitud. Intenta describir la operación de forma diferente (por ejemplo, 'crear factura', 'registrar venta').",
+
+    "frustration_signals": [
+        "no sirve",
+        "estafa",
+        "basura",
+        "no funciona",
+        "odio",
+        "horrible",
+        "asco",
+        "malo",
+        "pesimo",
+        "perder tiempo",
+        "quiero mi dinero",
+        "no me ayuda"
+    ],
+
+    "business_sectors": [
+        "inventory",
+        "billing",
+        "sales",
+        "accounting",
+        "tax",
+        "crm",
+        "pos",
+        "purchases",
+        "ecommerce"
+    ],
+
+    "sector_category_map": {
+        "inventory": "inventory",
+        "FERRETERIA_MINORISTA": "inventory",
+        "pos": "inventory",
+        "billing": "billing",
+        "sales": "billing",
+        "crm": "billing",
+        "accounting": "accounting",
+        "purchases": "accounting",
+        "tax": "tax",
+        "fiscal": "tax",
+        "ecommerce": "billing"
+    },
+
+    "grounding": {
+        "_comment": "SCML grounding config — editable sin deploy PHP",
+        "confidence_threshold": 0.60,
+        "default_confidence_when_no_score": 0.65,
+        "max_params_in_hint": 7,
+        "max_cluster_peers": 3,
+        "max_description_length": 200,
+        "allowed_intent_pattern": "^[a-zA-Z0-9_]{1,64}$",
+        "context_keys": ["tenant_id", "agent_id", "user_id", "session_id"],
+        "callable_methods": ["execute", "handle", "calculate"]
+    },
+
+    "request_mode_budgets": {
+        "operation": {
+            "max_router_steps": 5,
+            "max_tool_calls": 10,
+            "max_retries": 0,
+            "max_llm_fallbacks": 1,
+            "max_semantic_queries": 1,
+            "max_context_chunks": 2,
+            "max_execution_ms": 15000,
+            "max_same_route_repeats": 2
+        },
+        "research": {
+            "max_router_steps": 6,
+            "max_tool_calls": 2,
+            "max_retries": 1,
+            "max_llm_fallbacks": 1,
+            "max_semantic_queries": 2,
+            "max_context_chunks": 4,
+            "max_execution_ms": 30000,
+            "max_same_route_repeats": 3
+        }
+    }
+}

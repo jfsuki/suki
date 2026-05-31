@@ -111,6 +111,18 @@ final class TaskGroundingManifest
     ): array {
         $empty = ['needs_clarification' => false, 'block' => '', 'cluster' => ''];
 
+        // Seguridad: validar intent name contra allowlist antes de cualquier uso
+        if ($classifiedIntent !== '' && $this->executionRegistry !== null) {
+            $safe = $this->executionRegistry->sanitizeIdentifier($classifiedIntent);
+            if ($safe === '') {
+                error_log('[SCML] Intent name rechazado por allowlist: ' . substr($classifiedIntent, 0, 50));
+                return ['needs_clarification' => true, 'block' => '', 'cluster' => ''];
+            }
+        } elseif ($classifiedIntent !== '' && !preg_match('/^[a-zA-Z0-9_]{1,64}$/', $classifiedIntent)) {
+            error_log('[SCML] Intent name inválido rechazado: ' . substr($classifiedIntent, 0, 50));
+            return ['needs_clarification' => true, 'block' => '', 'cluster' => ''];
+        }
+
         // Paso 1: intent desconocido o confianza insuficiente
         if ($classifiedIntent === '' || $confidence < $this->confidenceThreshold) {
             return ['needs_clarification' => true, 'block' => '', 'cluster' => ''];
@@ -137,9 +149,10 @@ final class TaskGroundingManifest
             return $empty;
         }
 
-        $cluster = $entry['topic_cluster'];
+        $cluster      = $this->safeIdentifier($entry['topic_cluster']);
         $handlerClass = $this->shortClassName($entry['handler']);
-        $peers = $this->getClusterPeers($cluster, $classifiedIntent, 3);
+        $maxPeers     = (int) \App\Core\PolicyLoader::get('routing_policies', 'grounding.max_cluster_peers', 3);
+        $peers        = $this->getClusterPeers($cluster, $classifiedIntent, $maxPeers);
 
         // Paso 3: construir bloque (enriquecido con firmas reales si ExecutionRegistry disponible)
         $signatureHint = '';
@@ -156,15 +169,24 @@ final class TaskGroundingManifest
             $handlerLine .= " | {$signatureHint}";
         }
 
-        $block = "=== TAREA EJECUTABLE: {$cluster} ===\n";
+        // Sanitizar todos los valores antes de inyectar al system prompt (anti-injection)
+        $safeCluster     = $this->safeIdentifier($cluster);
+        $safeIntent      = $this->safeIdentifier($classifiedIntent);
+        $safeDescription = $this->sanitizeDescription((string) ($entry['description'] ?? ''));
+
+        $block = "=== TAREA EJECUTABLE: {$safeCluster} ===\n";
         $block .= $handlerLine . "\n";
-        $block .= "Descripcion: {$entry['description']}\n";
-        $block .= "INSTRUCCION: Emite JSON {\"skill\":\"{$classifiedIntent}\",\"data\":{...}} — NO calcules tu.\n";
+        $block .= "Descripcion: {$safeDescription}\n";
+        $block .= "INSTRUCCION: Emite JSON {\"skill\":\"{$safeIntent}\",\"data\":{...}} — NO calcules tu.\n";
 
         if (!empty($peers)) {
             $block .= "Skills relacionadas en este contexto:\n";
             foreach ($peers as $peer) {
-                $block .= '• ' . $peer['name'] . ': ' . $peer['description'] . "\n";
+                $peerName = $this->safeIdentifier((string) ($peer['name'] ?? ''));
+                $peerDesc = $this->sanitizeDescription((string) ($peer['description'] ?? ''));
+                if ($peerName !== '') {
+                    $block .= '• ' . $peerName . ': ' . $peerDesc . "\n";
+                }
             }
         }
 
@@ -246,10 +268,36 @@ final class TaskGroundingManifest
      */
     private function shortClassName(string $handler): string
     {
-        // Quitar @metodo si existe
         $classRef = explode('@', $handler)[0];
-        // Quitar namespace
-        $parts = explode('\\', $classRef);
+        $parts    = explode('\\', $classRef);
         return end($parts) ?: $classRef;
+    }
+
+    /**
+     * Valida que un identificador sea seguro: solo [a-zA-Z0-9_]{1,64}.
+     * Si no pasa, retorna 'unknown' para no dejar vacío el bloque.
+     */
+    private function safeIdentifier(string $value): string
+    {
+        return preg_match('/^[a-zA-Z0-9_]{1,64}$/', $value) ? $value : 'unknown';
+    }
+
+    /**
+     * Sanitiza texto libre que va al system prompt: elimina injection patterns.
+     */
+    private function sanitizeDescription(string $text): string
+    {
+        $maxLen = (int) \App\Core\PolicyLoader::get('routing_policies', 'grounding.max_description_length', 200);
+
+        $text = mb_substr($text, 0, $maxLen * 3);
+        $text = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $text) ?? $text;
+        $text = preg_replace('/={3,}/', '---', $text) ?? $text;
+        $text = preg_replace('/\[(SISTEMA|SYSTEM)\s*:/i', '[INFO:', $text) ?? $text;
+        $text = preg_replace('/(INSTRUCCION|INSTRUCTION)\s*:/i', 'INFO:', $text) ?? $text;
+        $text = preg_replace('/ignore\s+previous\s+instructions/i', '[INFO]', $text) ?? $text;
+        $text = preg_replace('/olvida\s+(las\s+)?instrucciones/i', '[INFO]', $text) ?? $text;
+        $text = preg_replace('/[\r\n]{2,}/', "\n", $text) ?? $text;
+
+        return mb_substr(trim($text), 0, $maxLen);
     }
 }

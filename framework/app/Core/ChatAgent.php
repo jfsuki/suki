@@ -1063,11 +1063,18 @@ final class ChatAgent
                         $telemetry['semantic_intent_skill'] ??
                         $telemetry['intent'] ?? ''
                     );
+                    // Fallback dinámico cuando Qdrant está off: leer de routing_policies.json
+                    $defaultConfidence = (float) \App\Core\PolicyLoader::get(
+                        'routing_policies',
+                        'grounding.default_confidence_when_no_score',
+                        0.65
+                    );
                     $confidence = (float) (
                         $telemetry['semantic_intent_similarity_score'] ??
                         $telemetry['classification_score'] ??
                         $telemetry['score'] ??
-                        $telemetry['confidence'] ?? 0.0
+                        $telemetry['confidence'] ??
+                        $defaultConfidence
                     );
                     // Topic cluster anterior para detectar cambio de tema
                     $previousCluster = (string) ($telemetry['previous_topic_cluster'] ?? '');
