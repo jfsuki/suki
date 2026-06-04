@@ -30,16 +30,50 @@ final class DeepSeekProvider
         if (!empty($params['strict_json'])) {
             $payload['response_format'] = ['type' => 'json_object'];
         }
+        // Tool calling: DeepSeek is OpenAI-compatible
+        $rawTools = $params['tools'] ?? null;
+        if (!empty($rawTools) && is_array($rawTools)) {
+            $openAiTools = [];
+            foreach ($rawTools as $tool) {
+                $name   = (string) ($tool['name'] ?? '');
+                $desc   = (string) ($tool['description'] ?? '');
+                $schema = is_array($tool['input_schema'] ?? null) ? (array) $tool['input_schema'] : ['type' => 'object', 'properties' => []];
+                if ($name === '') continue;
+                $openAiTools[] = ['type' => 'function', 'function' => ['name' => $name, 'description' => $desc, 'parameters' => $schema]];
+            }
+            if ($openAiTools !== []) {
+                $payload['tools'] = $openAiTools;
+            }
+        }
 
         $response = $this->request($baseUrl, $payload, [
             'Authorization: Bearer ' . $apiKey,
         ]);
 
-        $content = $response['data']['choices'][0]['message']['content'] ?? '';
+        $message = $response['data']['choices'][0]['message'] ?? [];
+        $content = (string) ($message['content'] ?? '');
+
+        $toolCalls = [];
+        if (!empty($message['tool_calls']) && is_array($message['tool_calls'])) {
+            foreach ($message['tool_calls'] as $tc) {
+                $fn   = is_array($tc['function'] ?? null) ? (array) $tc['function'] : [];
+                $name = (string) ($fn['name'] ?? '');
+                $args = [];
+                if (!empty($fn['arguments'])) {
+                    $decoded = json_decode((string) $fn['arguments'], true);
+                    if (is_array($decoded)) { $args = $decoded; }
+                }
+                if ($name !== '') {
+                    $toolCalls[] = ['id' => (string) ($tc['id'] ?? ''), 'name' => $name, 'input' => $args];
+                }
+            }
+        }
+
         return [
-            'text' => $content,
-            'usage' => $response['data']['usage'] ?? [],
-            'raw' => $response,
+            'text'       => $content,
+            'tool_calls' => $toolCalls,
+            'usage'      => $response['data']['usage'] ?? [],
+            'raw'        => $response,
         ];
     }
 

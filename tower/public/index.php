@@ -36,7 +36,7 @@ $__baseTower = (str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki'
 
 // Procesar Login si se envía el formulario
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['master_key'])) {
-    if ($_POST['master_key'] === $masterKey) {
+    if (hash_equals($masterKey, (string) $_POST['master_key'])) {
         $_SESSION['suki_tower_auth'] = true;
         unset($_SESSION['tower_tenant_scope']); // reset scope on re-login — Tower shows all tenants by default
         header("Location: {$__baseTower}/torre");

@@ -138,7 +138,7 @@ final class EmailService
     {
         $fromEmail = $this->fromEmail($company);
         $fromName  = $this->fromName($company);
-        $boundary  = md5(uniqid((string) rand(), true));
+        $boundary  = bin2hex(random_bytes(16));
 
         $headers  = "MIME-Version: 1.0\r\n";
         $headers .= "Content-Type: text/html; charset=UTF-8\r\n";
@@ -175,7 +175,14 @@ final class EmailService
         $from     = $this->fromEmail($company);
         $fromName = $this->fromName($company);
 
-        $context = stream_context_create(['ssl' => ['verify_peer' => false, 'verify_peer_name' => false]]);
+        $isLocal = strtolower((string) (getenv('APP_ENV') ?: 'production')) === 'local';
+        $sslOpts = ['verify_peer' => !$isLocal, 'verify_peer_name' => !$isLocal];
+        if ($isLocal) {
+            $sslOpts['allow_self_signed'] = true;
+        } elseif ($cafile = (string) (getenv('SSL_CAFILE') ?: '')) {
+            $sslOpts['cafile'] = $cafile;
+        }
+        $context = stream_context_create(['ssl' => $sslOpts]);
         $prefix  = $secure === 'ssl' ? 'ssl://' : '';
 
         $socket = @stream_socket_client(
@@ -192,8 +199,10 @@ final class EmailService
 
         $read(); // banner
 
+        $ehlo = gethostname() ?: 'localhost';
+
         if ($secure === 'tls') {
-            $write('EHLO suki-erp');
+            $write('EHLO ' . $ehlo);
             $read();
             $write('STARTTLS');
             $read();
@@ -203,7 +212,7 @@ final class EmailService
             }
         }
 
-        $write('EHLO suki-erp'); $read();
+        $write('EHLO ' . $ehlo); $read();
 
         if ($user !== '' && $pass !== '') {
             $write('AUTH LOGIN'); $read();
@@ -220,7 +229,7 @@ final class EmailService
         $write("RCPT TO:<{$to}>"); $read();
         $write('DATA'); $read();
 
-        $msgId  = '<' . time() . '.' . rand(1000, 9999) . '@suki-erp>';
+        $msgId  = '<' . time() . '.' . rand(1000, 9999) . '@' . (gethostname() ?: 'localhost') . '>';
         $body   = "From: {$fromName} <{$from}>\r\n"
             . "To: {$to}\r\n"
             . "Subject: =?UTF-8?B?" . base64_encode($subject) . "?=\r\n"
@@ -362,7 +371,7 @@ HTML;
     {
         if (($company['email'] ?? '') !== '') return $company['email'];
         $env = trim((string) (getenv('SMTP_FROM') ?: ''));
-        return $env !== '' ? $env : ('noreply@' . ($_SERVER['HTTP_HOST'] ?? 'suki-erp.app'));
+        return $env !== '' ? $env : ('noreply@' . ($_SERVER['HTTP_HOST'] ?? 'localhost'));
     }
 
     private function fromName(array $company = []): string

@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace App\Core\Agents;
 
 use App\Core\LLM\LLMRouter;
+use App\Core\PolicyLoader;
 
 /**
  * LLM-first profile extractor for builder onboarding.
@@ -15,7 +16,17 @@ final class BuilderProfileExtractor
     private LLMRouter $llm;
     private array $cache = [];
 
-    private const REQUIRED_FIELDS = ['business_type', 'operation_model', 'needs_scope', 'documents_scope'];
+    /**
+     * Required builder profile fields — from framework/config/builder_policies.json.
+     * Add new fields there without touching PHP.
+     * @return string[]
+     */
+    private function requiredFields(): array
+    {
+        return PolicyLoader::get('builder_policies', 'required_profile_fields', [
+            'business_type', 'operation_model', 'needs_scope', 'documents_scope',
+        ]);
+    }
 
     public function __construct(?LLMRouter $llm = null)
     {
@@ -32,7 +43,7 @@ final class BuilderProfileExtractor
      */
     public function extractAndGuide(string $userMessage, array $currentProfile, array $history = []): array
     {
-        $cacheKey = md5($userMessage . json_encode(array_intersect_key($currentProfile, array_flip(self::REQUIRED_FIELDS))));
+        $cacheKey = md5($userMessage . json_encode(array_intersect_key($currentProfile, array_flip($this->requiredFields()))));
         if (isset($this->cache[$cacheKey])) {
             return $this->cache[$cacheKey];
         }
@@ -136,7 +147,7 @@ final class BuilderProfileExtractor
      */
     public function generateQuestion(string $step, array $currentProfile): string
     {
-        $cacheKey = 'q_' . md5($step . json_encode(array_intersect_key($currentProfile, array_flip(self::REQUIRED_FIELDS))));
+        $cacheKey = 'q_' . md5($step . json_encode(array_intersect_key($currentProfile, array_flip($this->requiredFields()))));
         if (isset($this->cache[$cacheKey])) {
             return $this->cache[$cacheKey];
         }

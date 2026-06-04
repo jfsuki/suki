@@ -8,10 +8,8 @@ final class IntentRouter
     private const REQUEST_MODE_OPERATION = 'operation';
     private const REQUEST_MODE_RESEARCH = 'research';
     private const TRACE_HISTORY_LIMIT = 8;
-    private const SEMANTIC_INTENT_STRONG_THRESHOLD = 0.75;
-    private const SEMANTIC_INTENT_CANDIDATE_THRESHOLD = 0.60;
-    private const EVIDENCE_OVERRIDE_THRESHOLD = 0.75;
-    private const REQUEST_MODE_BUDGETS = [
+
+    private const DEFAULT_REQUEST_MODE_BUDGETS = [
         'operation' => [
             'max_router_steps' => 5,
             'max_tool_calls' => 10,
@@ -33,11 +31,23 @@ final class IntentRouter
             'max_same_route_repeats' => 3,
         ],
     ];
-    /** @var array<int,string> */
-    private const RESEARCH_ACTIVE_TASKS = [
-        'unknown_business_discovery',
-        'business_research_confirmation',
-    ];
+
+    private float $semanticIntentStrongThreshold;
+    private float $semanticIntentCandidateThreshold;
+    private float $evidenceOverrideThreshold;
+    private array $requestModeBudgets;
+    /**
+     * Active tasks that force RESEARCH mode routing.
+     * Source of truth: framework/config/routing_policies.json — no code change needed to extend.
+     * @return string[]
+     */
+    private function researchActiveTasks(): array
+    {
+        return \App\Core\PolicyLoader::get('routing_policies', 'research_active_tasks', [
+            'unknown_business_discovery',
+            'business_research_confirmation',
+        ]);
+    }
 
     private ContractRegistry $contracts;
     private RouterPolicyEvaluator $policyEvaluator;
@@ -78,6 +88,12 @@ final class IntentRouter
         $this->enforcementMode = (string) ($resolved['mode'] ?? 'warn');
         $this->enforcementModeSource = (string) ($resolved['source'] ?? 'app_env_default');
         $this->effectiveAppEnv = (string) ($resolved['app_env'] ?? 'dev');
+
+        $this->semanticIntentStrongThreshold    = (float) PolicyLoader::get('routing_policies', 'semantic_intent_strong_threshold', 0.75);
+        $this->semanticIntentCandidateThreshold = (float) PolicyLoader::get('routing_policies', 'semantic_intent_candidate_threshold', 0.60);
+        $this->evidenceOverrideThreshold        = (float) PolicyLoader::get('routing_policies', 'evidence_override_threshold', 0.75);
+        $rawBudgets = PolicyLoader::get('routing_policies', 'request_mode_budgets', null);
+        $this->requestModeBudgets = is_array($rawBudgets) ? $rawBudgets : self::DEFAULT_REQUEST_MODE_BUDGETS;
     }
 
     public function executeSkill(string $name, array $args, array $context = []): array
@@ -622,7 +638,7 @@ final class IntentRouter
         }
 
         $activeTask = strtolower(trim((string) ($state['active_task'] ?? $gatewayResult['active_task'] ?? '')));
-        if ((bool) ($state['unknown_business_force_research'] ?? false) || in_array($activeTask, self::RESEARCH_ACTIVE_TASKS, true)) {
+        if ((bool) ($state['unknown_business_force_research'] ?? false) || in_array($activeTask, $this->researchActiveTasks(), true)) {
             return self::REQUEST_MODE_RESEARCH;
         }
 
@@ -649,7 +665,8 @@ final class IntentRouter
             $normalizedMode = self::REQUEST_MODE_OPERATION;
         }
 
-        return self::REQUEST_MODE_BUDGETS[$normalizedMode];
+        $budgets = $this->requestModeBudgets;
+        return $budgets[$normalizedMode] ?? $budgets[self::REQUEST_MODE_OPERATION] ?? self::DEFAULT_REQUEST_MODE_BUDGETS[self::REQUEST_MODE_OPERATION];
     }
 
     private function hashQueryForTrace(string $query): string
@@ -1278,7 +1295,7 @@ final class IntentRouter
             ];
         }
 
-        if ($score < self::SEMANTIC_INTENT_CANDIDATE_THRESHOLD) {
+        if ($score < $this->semanticIntentCandidateThreshold) {
             return [
                 'telemetry' => $semanticTelemetry + [
                     'semantic_intent_status' => 'below_threshold',
@@ -1286,7 +1303,7 @@ final class IntentRouter
             ];
         }
 
-        if ($forceCandidateIntent || $score < self::SEMANTIC_INTENT_STRONG_THRESHOLD) {
+        if ($forceCandidateIntent || $score < $this->semanticIntentStrongThreshold) {
             $llmRequest = is_array($gatewayResult['llm_request'] ?? null) ? (array) $gatewayResult['llm_request'] : [];
             if ($llmRequest === []) {
                 $llmRequest = [
@@ -1318,7 +1335,7 @@ final class IntentRouter
         }
 
         // --- SPECIAL CASE: LOCAL INTENTS ---
-        if ($skillName === 'project_status_summary' && $score >= self::SEMANTIC_INTENT_STRONG_THRESHOLD) {
+        if ($skillName === 'project_status_summary' && $score >= $this->semanticIntentStrongThreshold) {
             $statusReport = $this->buildLocalProjectStatusReport();
             return [
                 'action' => 'respond_local',
@@ -1352,7 +1369,7 @@ final class IntentRouter
                 [
                     'semantic_intent_status' => 'matched',
                     'semantic_intent_match' => true,
-                    'evidence_override' => $score >= self::EVIDENCE_OVERRIDE_THRESHOLD,
+                    'evidence_override' => $score >= $this->evidenceOverrideThreshold,
                     'decision_path' => $routingHintSteps,
                     'decision_path_string' => implode('>', $routingHintSteps),
                 ]
@@ -1589,7 +1606,7 @@ final class IntentRouter
             $topScore = $this->resolveTopRetrievalScore(is_array($retrieval['hits'] ?? null) ? (array) $retrieval['hits'] : []);
             $passed = $preparedContext['used_count'] >= $runtimeConfig['min_evidence_chunks'];
             $retrievalLatencyMs = $this->latencyMs($retrievalStartedAt);
-            $evidenceOverride = $passed && $topScore >= self::EVIDENCE_OVERRIDE_THRESHOLD;
+            $evidenceOverride = $passed && $topScore >= $this->evidenceOverrideThreshold;
 
             return [
                 'ok' => true,

@@ -120,6 +120,10 @@
         "delete": { "type": "array", "items": { "type": "string" } }
       }
     },
+    "visibility_scope": {
+      "type": "string",
+      "description": "Row-level security scope: all_tenant | created_by | role:X,Y"
+    },
     "extensions": {
       "type": "object",
       "additionalProperties": true

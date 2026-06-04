@@ -1,0 +1,27 @@
+{
+    "_comment": "Intent classification policies — editable without PHP deploys. Loaded by PolicyLoader.",
+    "_version": "1.0.0",
+
+    "llm_allowed_intents": [
+        "greeting",
+        "farewell",
+        "affirmation",
+        "negation",
+        "frustration",
+        "create_request",
+        "business_description",
+        "scope_question",
+        "pricing_question",
+        "crud",
+        "status",
+        "out_of_scope",
+        "faq",
+        "question",
+        "solve_unit_conversion",
+        "builder_install_playbook"
+    ],
+
+    "qdrant_confidence_threshold": 0.65,
+
+    "_note_llm_intents": "Estos son los intents genéricos para la capa LLM fast-path (fallback cuando Qdrant no alcanza threshold). Los intents específicos de ERP (erp_accounting_*) son resueltos por Qdrant (Layer 1) y no necesitan estar aquí. Agregar intents genéricos nuevos aquí sin deploy PHP."
+}

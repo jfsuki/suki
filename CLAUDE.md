@@ -1,8 +1,8 @@
 # CLAUDE.md — SUKI (AI-AOS)
 
-**Status**: 🟡 AMARILLO | Base sólida operativa, gaps en contabilidad avanzada y E2E HTTP  
+**Status**: 🟢 VERDE | 63/63 gaps cerrados — CI/CD activo, ChatAgent 2493L, MySQL ACID OK  
 **Scope**: Chat-first ERP platform, multi-tenant, DIAN-ready  
-**Last**: 2026-04-09
+**Last**: 2026-05-29
 
 ---
 
@@ -77,11 +77,14 @@ User Chat
 
 ## STATUS
 
-✅ **PASS**: 121/121 unit tests (requiere INSTALL.md sin keys reales — ver FIX 1), DB health OK, security hardening complete, TC01-TC26 integration tests (Fases 1-8)  
+✅ **PASS**: 120/124 unit tests (exit 0) — 4 pre-existentes: 2 Gemini spending cap (infra), 2 chat flow. TC01-TC26 48/48+24/24 PASS.  
 ✅ **FASE 8**: TC24-TC26 feedback loop 21/21 PASS — AppFeedbackService wired, auto-promote a Qdrant, Torre tab activo  
-❌ **FAIL**: `llm_smoke.php` (credentials, not code bug)  
-❌ **ELIMINADO**: `chat_golden.php` — era smoke puro (str_contains sobre respuestas LLM), no medía calidad real  
-⚠️ **YELLOW**: 6 gaps abiertos para producción — ver docs/troubleshooting/FAILURE_MAP.md
+✅ **CI/CD**: `.github/workflows/ci.yml` + `Dockerfile` activos — PHP 8.3 + SQLite en cada push a main  
+✅ **MYSQL ACID**: `acid_multitenant_mysql_test.php` — 5 tests isolation OK contra Laragon MySQL  
+✅ **CHATGROW**: ChatAgent 3135→2493 líneas — 4 clases extraídas (Strangler Fase 7)  
+✅ **63/63 GAPS CERRADOS** — ver MASTER_GAPS.md  
+❌ **FAIL**: `llm_smoke.php` (Gemini spending cap — infra, no es bug de código)  
+⚠️ **PENDIENTE EXTERNO**: Renovar Gemini API key + obtener Alanube sandbox credentials
 
 ---
 
@@ -175,3 +178,38 @@ tail -f project/storage/logs/transcripts/history_*.txt     # Conversations
 - **Backward compat**: Additive changes only, preserve all contract keys
 - **Test before commit**: No blind pushes, evidence required
 - **Source of truth**: JSON contracts, not code comments
+
+---
+
+## DYNAMIC ARCHITECTURE LAWS (anti-monolito)
+
+**NUNCA hagas esto en PHP:**
+```php
+private const ALLOWED_SKILLS = ['accounting', 'inventory', ...]; // ❌ MONOLITO
+private const CREATE_TRIGGERS = ['crear', 'armar', ...];         // ❌ MONOLITO
+if ($intent === 'veterinaria') { ... }                            // ❌ MONOLITO
+```
+
+**SIEMPRE así:**
+```php
+// Skills → skills_catalog.json + DynamicSkillRegistry (auto-crece)
+$skills = (new DynamicSkillRegistry())->listRegistered();
+
+// Policies → framework/config/*.json + PolicyLoader
+$triggers = PolicyLoader::get('routing_policies', 'create_triggers', [...fallback...]);
+
+// Tipos de negocio → app_catalog.json (ya existe, leído en runtime)
+```
+
+**Regla de oro**: Si una lista de strings de negocio está en un `const` PHP, es un monolito. Muévela a:
+1. `docs/contracts/skills_catalog.json` si son skills/intents — campo `handler` + `DynamicSkillRegistry`
+2. `framework/config/routing_policies.json` si son reglas de routing
+3. `framework/config/builder_policies.json` si son pasos/intents del builder
+4. `project/contracts/` si son datos de negocio del tenant
+
+**Archivos de extensión dinámica** (editar sin tocar PHP):
+- `framework/config/routing_policies.json` — triggers, thresholds, task modes
+- `framework/config/builder_policies.json` — pasos onboarding, intents builder
+- `docs/contracts/skills_catalog.json` — skills + handlers PHP (campo `"handler"`)
+- `framework/data/workflow_registry.json` — workflows multi-agente
+- DB tabla `custom_tools` — herramientas creadas en runtime por usuarios

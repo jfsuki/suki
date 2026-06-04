@@ -1,5 +1,5 @@
 {
-  "_comment": "Registro de workflows multi-agente. Agrega nuevos workflows aquí sin tocar PHP. sequence = áreas de specialist_personas.json a invocar en orden.",
+  "_comment": "Registro de workflows multi-agente. Agrega nuevos workflows aquí sin tocar PHP. sequence = áreas de specialist_personas.json a invocar en orden. parallel siempre false — ejecución paralela no implementada en AgentWorkflowDispatcher (todos los nodos corren secuencialmente).",
   "workflows": {
     "PURCHASE": {
       "triggers": ["erp_purchase_finalize"],
@@ -25,7 +25,7 @@
     },
     "FISCAL_CLOSE": {
       "triggers": ["erp_accounting_post", "erp_report_generate", "erp_invoice_create", "erp_tax_credit_note"],
-      "parallel": true,
+      "parallel": false,
       "sequence": ["ACCOUNTING", "FINANCES"],
       "description": "Cierre contable -> Validación fiscal y tributaria"
     },

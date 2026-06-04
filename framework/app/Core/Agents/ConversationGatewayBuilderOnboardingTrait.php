@@ -1782,18 +1782,15 @@ trait ConversationGatewayBuilderOnboardingTrait
         $entities = is_array($p['suggested_entities'] ?? null) ? $p['suggested_entities'] : [];
         $documents = is_array($p['suggested_documents'] ?? null) ? $p['suggested_documents'] : [];
         
-        $tools = [];
-        $intents = [];
-        if ($businessType === 'ferreteria') {
-            $tools = ['InventoryQueryTool', 'InvoiceExecute'];
-            $intents = ['crear factura', 'inventario'];
-        } elseif ($businessType === 'veterinaria') {
-            $tools = ['PatientManagerTool', 'AppointmentScheduler'];
-            $intents = ['crear cita', 'historia clinica'];
-        } else {
-            $tools = ['RecordCreateTool', 'ReportSummaryTool'];
-            $intents = ['crear registro', 'ver resumen'];
-        }
+        // Derive tools and intents from domain playbook profile — dynamic, not hardcoded per sector
+        $profileForms    = array_slice(is_array($p['forms']    ?? null) ? $p['forms']    : [], 0, 2);
+        $profileEntities = array_slice(is_array($p['entities'] ?? null) ? $p['entities'] : [], 0, 2);
+        $tools   = !empty($profileForms)
+            ? array_map(fn($f) => str_replace('.form', 'Tool', $f), $profileForms)
+            : ['RecordCreateTool', 'ReportSummaryTool'];
+        $intents = !empty($profileEntities)
+            ? array_map(fn($e) => "gestionar $e", $profileEntities)
+            : ['crear registro', 'ver resumen'];
         
         return [
             'entities' => $entities,
@@ -2290,10 +2287,12 @@ trait ConversationGatewayBuilderOnboardingTrait
         }
 
         // 2. Intent Classifier (Qdrant/Semantic)
+        // Valid types derived from domain_playbooks.json — auto-grows when profiles are added
+        $validTypes = array_column($profiles, 'key');
         $result = $this->intentClassifier()->classify($text);
         if ($result['score'] >= 0.72) {
             $intent = $result['intent'];
-            if (in_array($intent, ['veterinaria', 'ferreteria', 'retail_tienda', 'servicios_mantenimiento', 'restaurante'], true)) {
+            if (in_array($intent, $validTypes, true)) {
                 return $intent;
             }
         }
@@ -2321,13 +2320,16 @@ trait ConversationGatewayBuilderOnboardingTrait
     {
         try {
             $router = new \App\Core\LLM\LLMRouter();
+            // Build valid types from domain playbook — dynamic, grows with new profiles
+            $playbookForPrompt = $this->loadDomainPlaybook();
+            $validTypesForLlm  = implode(', ', array_column($playbookForPrompt['profiles'] ?? [], 'key')) ?: 'ferreteria, restaurante, servicios_mantenimiento';
             $capsule = [
                 'policy' => ['requires_strict_json' => true, 'max_output_tokens' => 300],
                 'prompt_contract' => [
                     'TASK' => 'Analiza el historial y el mensaje actual para extraer el perfil técnico y fiscal del negocio.',
                     'RULES' => [
                         'Devuelve ESTRICTAMENTE un JSON puro.',
-                        'business_type: ferreteria, veterinaria, restaurante, retail, servicios_mantenimiento o unknown_business.',
+                        "business_type: uno de [{$validTypesForLlm}] o unknown_business.",
                         'CRITICO: Extrae regimen_tributario si menciona "SIMPLE", "RESPONSABLE IVA", "ORDINARIO", etc.',
                         'CRITICO: Extrae codigo_actividad_ciiu si menciona números de 4 cifras (ej: 4791).',
                         'CRITICO: Extrae municipio_ica si menciona una ciudad vinculada a impuestos (ej: "Soledad", "Bogota").',

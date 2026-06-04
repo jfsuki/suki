@@ -5,6 +5,8 @@ namespace App\Core\Skills;
 
 use App\Core\AppDataService;
 use App\Core\AppMemoryService;
+use App\Core\BusinessConfigRepository;
+use App\Core\DataQualityGuard;
 
 /**
  * AppCrudSkill
@@ -24,13 +26,16 @@ final class AppCrudSkill
 {
     private AppDataService   $data;
     private AppMemoryService $memory;
+    private ?DataQualityGuard $guard; // lazy: resolved per-tenant in execute()
 
     public function __construct(
         ?AppDataService   $data   = null,
-        ?AppMemoryService $memory = null
+        ?AppMemoryService $memory = null,
+        ?DataQualityGuard $guard  = null
     ) {
         $this->data   = $data   ?? new AppDataService();
         $this->memory = $memory ?? new AppMemoryService();
+        $this->guard  = $guard; // null means: resolve from tenant in execute()
     }
 
     public function execute(array $params, string $tenantId): array
@@ -39,6 +44,11 @@ final class AppCrudSkill
         $entityName = trim((string) ($params['entity']  ?? ''));
         $action     = strtolower(trim((string) ($params['action'] ?? 'insert')));
         $id         = isset($params['id']) ? (int) $params['id'] : null;
+
+        // Resolve country for this tenant and build a country-aware guard
+        if ($this->guard === null) {
+            $this->guard = new DataQualityGuard($this->resolveCountry($tenantId));
+        }
         $data       = is_array($params['data'] ?? null) ? (array) $params['data'] : [];
 
         if ($appId === '') {
@@ -69,6 +79,11 @@ final class AppCrudSkill
             return $this->error('Se requieren datos para insertar. Incluye el campo "data" con los valores del registro.');
         }
 
+        $violations = $this->guard->validateFields($data);
+        if (!empty($violations['reject'])) {
+            return $this->validationError($violations['reject']);
+        }
+
         $newId = $this->data->insertRecord($tenantId, $appId, $entityName, $data);
         $row   = $this->data->findRecord($tenantId, $appId, $entityName, $newId);
 
@@ -96,6 +111,11 @@ final class AppCrudSkill
         }
         if (empty($data)) {
             return $this->error('Se requieren datos para actualizar. Incluye el campo "data" con los nuevos valores.');
+        }
+
+        $violations = $this->guard->validateFields($data);
+        if (!empty($violations['reject'])) {
+            return $this->validationError($violations['reject']);
         }
 
         $affected = $this->data->updateRecord($tenantId, $appId, $entityName, $id, $data);
@@ -211,6 +231,25 @@ final class AppCrudSkill
         return implode("\n", $lines);
     }
 
+    private function resolveCountry(string $tenantId): string
+    {
+        if ($tenantId === '') {
+            return 'CO';
+        }
+        try {
+            $config = (new BusinessConfigRepository())->findByTenant($tenantId);
+            return strtoupper((string) ($config['country'] ?? 'CO')) ?: 'CO';
+        } catch (\Throwable) {
+            return 'CO';
+        }
+    }
+
+    /** DynamicSkillRegistry adapter — maps handle() contract to execute() */
+    public function handle(array $input, array $context = []): array
+    {
+        return $this->execute($input, (string) ($context['tenant_id'] ?? 'default'));
+    }
+
     private function error(string $msg): array
     {
         return [
@@ -218,6 +257,17 @@ final class AppCrudSkill
             'reply'  => "No pude completar la operación: {$msg}",
             'status' => 'error',
             'error'  => $msg,
+        ];
+    }
+
+    private function validationError(array $violations): array
+    {
+        $msg = $this->guard->formatRejectionMessage($violations);
+        return [
+            'action'     => 'respond_local',
+            'reply'      => $msg,
+            'status'     => 'validation_error',
+            'violations' => $violations,
         ];
     }
 }

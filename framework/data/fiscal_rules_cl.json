@@ -1,0 +1,50 @@
+{
+  "_meta": {
+    "description": "Reglas fiscales Chile — IVA / IR 2025. Stub básico — expandir con reglas específicas.",
+    "legal_base": "DL 825 (IVA), DL 824 (Renta), SII 2025.",
+    "version": "2025.1-stub",
+    "country": "CL",
+    "currency": "CLP",
+    "uvt": 1
+  },
+
+  "rules": [
+
+    {
+      "id": "iva",
+      "name": "Impuesto al Valor Agregado",
+      "legal_ref": "Art. 14 DL 825",
+      "type": "percentage_line",
+      "applies_at": "line",
+      "applies_to_document_types": ["sales_invoice", "credit_note"],
+      "enabled": true,
+      "rates": [
+        { "key": "general", "rate": 0.19, "label": "IVA General (Art. 14 DL 825)" },
+        { "key": "exento",  "rate": 0.00, "label": "Exento" }
+      ],
+      "default_rate_key": "general"
+    },
+
+    {
+      "id": "retencion_boleta_honorario",
+      "name": "Retención — Boleta de Honorarios",
+      "legal_ref": "Art. 74 N°2 DL 824",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["honorarios", "servicios"],
+      "enabled": true,
+      "threshold_uvt": 0,
+      "rate": 0.1225,
+      "overrides": []
+    }
+
+  ],
+
+  "concept_aliases": {
+    "compras": "compras",
+    "honorarios": "honorarios",
+    "servicios": "honorarios"
+  }
+}

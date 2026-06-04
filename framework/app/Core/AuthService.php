@@ -136,4 +136,56 @@ class AuthService
     {
         $this->registry->touchSession($sessionId, $userId, $projectId, $tenantId, $channel);
     }
+
+    /**
+     * Solicita un OTP para el identifier (phone/email). Envía el código por email.
+     * Retorna ['ok'=>true] o ['ok'=>false, 'error'=>string].
+     * NUNCA expone el código en la respuesta.
+     */
+    public function requestOtp(string $projectId, string $identifier, string $email): array
+    {
+        $ip = $_SERVER['HTTP_X_FORWARDED_FOR'] ?? $_SERVER['REMOTE_ADDR'] ?? '0.0.0.0';
+        if ($this->isRateLimited($identifier, $ip)) {
+            return ['ok' => false, 'error' => 'Demasiados intentos. Espera 15 minutos.'];
+        }
+
+        $otp = new OtpService($this->db);
+        return $otp->send($projectId, $identifier, $email);
+    }
+
+    /**
+     * Verifica el OTP y, si es válido, marca el usuario como email_verified.
+     * NO activa la cuenta (is_active sigue siendo responsabilidad del admin).
+     */
+    public function verifyOtp(string $projectId, string $identifier, string $code): array
+    {
+        $otp    = new OtpService($this->db);
+        $result = $otp->verify($projectId, $identifier, $code);
+
+        if (!$result['ok']) {
+            return $result;
+        }
+
+        // Marcar email verificado — no activa la cuenta
+        $this->markEmailVerified($projectId, $identifier);
+
+        return ['ok' => true, 'message' => 'Identidad verificada. Tu cuenta será activada pronto.'];
+    }
+
+    private function markEmailVerified(string $projectId, string $identifier): void
+    {
+        // Añade columna si no existe (idempotente)
+        try {
+            $this->db->exec("ALTER TABLE auth_users ADD COLUMN email_verified INTEGER DEFAULT 0");
+        } catch (\Throwable $e) {
+            // columna ya existe — ok
+        }
+
+        $stmt = $this->db->prepare(
+            'UPDATE auth_users SET email_verified = 1
+             WHERE (id = :id OR alt_email = :id OR phone_number = :id)
+               AND project_id = :project'
+        );
+        $stmt->execute([':id' => $identifier, ':project' => $projectId]);
+    }
 }

@@ -115,10 +115,11 @@ final class ApiSecurityGuard
 
     private function requiresAuth(string $route, string $method): bool
     {
-        if (!in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+        if ($route === '' || str_starts_with($route, 'channels/')) {
             return false;
         }
-        if ($route === '' || str_starts_with($route, 'chat/') || str_starts_with($route, 'channels/')) {
+        // chat/* no requiere auth (tenant viene del payload verificado internamente)
+        if (str_starts_with($route, 'chat/')) {
             return false;
         }
         $public = [
@@ -126,6 +127,8 @@ final class ApiSecurityGuard
             'auth/register',
             'auth/request_code',
             'auth/verify_code',
+            'auth/tenant-register',
+            'auth/tenant-verify-otp',
             'auth/me',
             'auth/logout',
             'health',
@@ -136,18 +139,30 @@ final class ApiSecurityGuard
         if (in_array($route, $public, true)) {
             return false;
         }
-        $protectedPrefixes = [
+        // Prefijos que requieren auth en CUALQUIER método HTTP (incluido GET)
+        $protectedAllMethods = [
+            'registry/',
+            'command',
+            'auth/users',
+        ];
+        foreach ($protectedAllMethods as $prefix) {
+            if (str_starts_with($route, $prefix) || $route === rtrim($prefix, '/')) {
+                return true;
+            }
+        }
+        // El resto solo protege mutaciones
+        if (!in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+            return false;
+        }
+        $protectedMutation = [
             'entity/',
             'import/',
             'integrations/',
             'workflow/',
-            'registry/',
             'records/',
-            'command',
-            'auth/users',
         ];
-        foreach ($protectedPrefixes as $prefix) {
-            if (str_starts_with($route, $prefix) || $route === $prefix) {
+        foreach ($protectedMutation as $prefix) {
+            if (str_starts_with($route, $prefix)) {
                 return true;
             }
         }
@@ -156,15 +171,15 @@ final class ApiSecurityGuard
 
     private function requiresCsrf(string $route): bool
     {
-        $enforce = trim((string) (getenv('API_CSRF_ENFORCE') ?: ''));
-        $strict = (string) (getenv('API_SECURITY_STRICT') ?: '0');
-        $mustEnforce = ($enforce === '1') || ($strict === '1' && $enforce !== '0');
-        if (!$mustEnforce) {
+        // CSRF activo por defecto — opt-out solo con API_CSRF_ENFORCE=0 explícito
+        $enforce = trim((string) (getenv('API_CSRF_ENFORCE') ?: '1'));
+        if ($enforce === '0') {
             return false;
         }
-        if (str_starts_with($route, 'chat/')) {
+        if (str_starts_with($route, 'chat/') || str_starts_with($route, 'channels/')) {
             return false;
         }
+        // Webhooks y auth inicial no necesitan CSRF
         $csrfSkip = [
             'channels/telegram/webhook',
             'channels/whatsapp/webhook',
@@ -173,6 +188,8 @@ final class ApiSecurityGuard
             'auth/register',
             'auth/request_code',
             'auth/verify_code',
+            'auth/tenant-register',
+            'auth/tenant-verify-otp',
         ];
         return !in_array($route, $csrfSkip, true);
     }

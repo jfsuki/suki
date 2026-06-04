@@ -1,0 +1,65 @@
+{
+  "_meta": {
+    "description": "Reglas fiscales México — LISR / LIVA 2025. Stub básico — expandir con reglas específicas.",
+    "legal_base": "Ley del IVA, Ley del ISR, SAT 2025.",
+    "version": "2025.1-stub",
+    "country": "MX",
+    "currency": "MXN",
+    "uvt": 108.57
+  },
+
+  "rules": [
+
+    {
+      "id": "iva",
+      "name": "Impuesto al Valor Agregado",
+      "legal_ref": "Art. 1 LIVA",
+      "type": "percentage_line",
+      "applies_at": "line",
+      "applies_to_document_types": ["sales_invoice", "credit_note"],
+      "enabled": true,
+      "rates": [
+        { "key": "general",  "rate": 0.16, "label": "IVA General (Art. 1 LIVA)" },
+        { "key": "frontera", "rate": 0.08, "label": "IVA Zona fronteriza (Art. 2 LIVA)" },
+        { "key": "exento",   "rate": 0.00, "label": "Tasa 0% (Art. 2-A LIVA)" }
+      ],
+      "default_rate_key": "general"
+    },
+
+    {
+      "id": "isr_honorarios",
+      "name": "Retención ISR — Honorarios",
+      "legal_ref": "Art. 106 LISR",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["honorarios", "servicios"],
+      "enabled": true,
+      "threshold_uvt": 0,
+      "rate": 0.10,
+      "overrides": []
+    },
+
+    {
+      "id": "iva_retenido",
+      "name": "Retención IVA — 2/3 partes",
+      "legal_ref": "Art. 1-A LIVA",
+      "type": "withholding_on_tax",
+      "applies_at": "document",
+      "applies_to_document_types": ["support_document"],
+      "enabled": true,
+      "rate": 0.6667,
+      "applies_when_agent": ["moral_obligada"],
+      "overrides": []
+    }
+
+  ],
+
+  "concept_aliases": {
+    "compras": "compras",
+    "honorarios": "honorarios",
+    "servicios": "honorarios",
+    "arrendamiento": "arrendamiento"
+  }
+}

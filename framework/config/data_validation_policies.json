@@ -1,0 +1,263 @@
+{
+    "_version": "2.0.0",
+    "_description": "Reglas de validación y extracción por país. Editar aquí sin tocar PHP. País se resuelve desde tenant_business_config.country.",
+
+    "common": {
+        "field_types": {
+            "email": {
+                "field_names": ["email", "correo", "correo_electronico", "mail", "email_contacto", "email_empresa", "correo_cliente"],
+                "validate_email": true,
+                "suspicious_domains": ["test.com", "example.com", "dummy.com", "fake.com", "nomail.com",
+                    "prueba.com", "correo.com", "mailtest.com", "noemail.com", "email.com", "mail.com",
+                    "test.co", "example.co", "no-email.com", "noreply.com"],
+                "ask_if_missing": "¿Cuál es el correo electrónico real? Ejemplo: nombre@empresa.com",
+                "reject_message": "El correo «{value}» no parece válido. Por favor verifica que sea una dirección real."
+            },
+            "nombre": {
+                "field_names": ["nombre", "nombre_completo", "nombre_empresa", "nombre_cliente", "nombre_proveedor",
+                    "apellido", "primer_nombre", "segundo_nombre", "nombre_contacto", "razon_social",
+                    "company_name", "full_name", "trade_name"],
+                "min_length": 2,
+                "max_length": 200,
+                "check_garbage_text": true,
+                "ask_if_missing": "¿Cuál es el nombre completo o razón social?",
+                "reject_message": "El nombre «{value}» no parece válido. Por favor ingresa un nombre real."
+            },
+            "direccion": {
+                "field_names": ["direccion", "direccion_empresa", "direccion_cliente", "domicilio", "ubicacion", "address"],
+                "min_length": 5,
+                "max_length": 300,
+                "check_garbage_text": true,
+                "ask_if_missing": "¿Cuál es la dirección completa?",
+                "reject_message": "La dirección «{value}» parece incompleta. Por favor ingresa una dirección real."
+            },
+            "ciudad": {
+                "field_names": ["municipio", "ciudad", "ciudad_residencia", "municipio_empresa", "ciudad_empresa",
+                    "ciudad_cliente", "city"],
+                "min_length": 2,
+                "max_length": 100,
+                "check_garbage_text": true,
+                "ask_if_missing": "¿En qué ciudad está ubicado?",
+                "reject_message": "«{value}» no parece un nombre de ciudad válido."
+            }
+        },
+
+        "garbage_detection": {
+            "sequential_run_min_length": 6,
+            "sequential_run_min_ratio":  0.90,
+            "repeated_min_run": 5,
+            "keyboard_mash": ["asdf", "qwer", "zxcv", "poiu", "mnbv", "hjkl", "yuio", "dfgh", "vbnm",
+                "ghjk", "bnmv", "lkjh", "iuyt", "ñlkj", "ñoiu"],
+            "test_words": ["test", "prueba", "ejemplo", "example", "dummy", "fake", "demo",
+                "xxxx", "yyyy", "zzzz", "aaaa", "nnnn", "ssss", "tttt",
+                "nada", "nulo", "null", "undefined", "na", "n/a", "no aplica",
+                "hola", "asd", "qwe"]
+        },
+
+        "extraction_keywords": {
+            "email":  ["email", "correo", "mail", "e-mail"],
+            "nombre": ["nombre", "llamo", "soy", "empresa", "razón social", "razon social"]
+        }
+    },
+
+    "countries": {
+        "CO": {
+            "_name": "Colombia",
+            "field_types": {
+                "tax_id": {
+                    "local_name": "NIT",
+                    "field_names": ["nit", "nit_empresa", "nit_proveedor", "numero_nit", "nit_cliente",
+                        "rut", "nit_comprador", "nit_vendedor", "nit_receptor"],
+                    "normalized_regex": "^[0-9]{8,10}$",
+                    "check_digit_algorithm": "colombia_nit",
+                    "ask_if_missing": "¿Cuál es el NIT de la empresa? Ejemplo: 900.123.456-1",
+                    "reject_message": "El NIT «{value}» no parece válido para Colombia. Verifica el número."
+                },
+                "person_id": {
+                    "local_name": "Cédula",
+                    "field_names": ["cedula", "numero_documento", "cedula_ciudadania", "documento_identidad",
+                        "cc", "id_persona", "numero_cedula", "doc_identidad", "cedula_cliente"],
+                    "normalized_regex": "^[0-9]{6,10}$",
+                    "ask_if_missing": "¿Cuál es el número de cédula de ciudadanía?",
+                    "reject_message": "El número «{value}» no parece una cédula válida (debe tener 6 a 10 dígitos)."
+                },
+                "phone": {
+                    "local_name": "Celular",
+                    "field_names": ["celular", "telefono", "tel", "phone", "movil", "numero_celular",
+                        "numero_telefono", "whatsapp", "contacto_tel"],
+                    "normalized_regex": "^3[0-9]{9}$",
+                    "ask_if_missing": "¿Cuál es el número de celular? Debe tener 10 dígitos y empezar con 3. Ejemplo: 3101234567",
+                    "reject_message": "El número «{value}» no es un celular colombiano válido. Debe tener 10 dígitos y empezar con 3."
+                }
+            },
+            "extraction_keywords": {
+                "tax_id":    ["nit", "n.i.t", "rut"],
+                "person_id": ["cédula", "cedula", "cc", "c.c", "documento", "doc"],
+                "phone":     ["celular", "teléfono", "telefono", "cel", "movil", "móvil", "whatsapp"]
+            }
+        },
+
+        "MX": {
+            "_name": "México",
+            "field_types": {
+                "tax_id": {
+                    "local_name": "RFC",
+                    "field_names": ["rfc", "registro_federal_contribuyentes", "tax_id", "rfc_empresa"],
+                    "normalized_regex": "^[A-Z&Ñ]{3,4}[0-9]{6}[A-Z0-9]{3}$",
+                    "ask_if_missing": "¿Cuál es el RFC? Ejemplo: ABC010101ABC",
+                    "reject_message": "El RFC «{value}» no parece válido para México."
+                },
+                "person_id": {
+                    "local_name": "CURP",
+                    "field_names": ["curp", "clave_unica_registro", "curp_persona", "documento", "ine"],
+                    "normalized_regex": "^[A-Z]{4}[0-9]{6}[HM][A-Z]{5}[A-Z0-9][0-9]$",
+                    "ask_if_missing": "¿Cuál es el CURP?",
+                    "reject_message": "El CURP «{value}» no parece válido para México."
+                },
+                "phone": {
+                    "local_name": "Teléfono",
+                    "field_names": ["telefono", "celular", "tel", "movil", "phone", "numero_telefono", "whatsapp"],
+                    "normalized_regex": "^[0-9]{10}$",
+                    "ask_if_missing": "¿Cuál es el número de teléfono? Debe tener 10 dígitos.",
+                    "reject_message": "El número «{value}» no es un teléfono mexicano válido. Debe tener 10 dígitos."
+                }
+            },
+            "extraction_keywords": {
+                "tax_id":    ["rfc", "r.f.c"],
+                "person_id": ["curp", "ine", "documento"],
+                "phone":     ["teléfono", "telefono", "celular", "cel", "movil", "móvil", "whatsapp"]
+            }
+        },
+
+        "PE": {
+            "_name": "Perú",
+            "field_types": {
+                "tax_id": {
+                    "local_name": "RUC",
+                    "field_names": ["ruc", "registro_unico_contribuyentes", "tax_id", "ruc_empresa"],
+                    "normalized_regex": "^(10|15|17|20)[0-9]{9}$",
+                    "ask_if_missing": "¿Cuál es el RUC? Debe tener 11 dígitos.",
+                    "reject_message": "El RUC «{value}» no parece válido para Perú (11 dígitos, empieza con 10, 15, 17 o 20)."
+                },
+                "person_id": {
+                    "local_name": "DNI",
+                    "field_names": ["dni", "documento_identidad", "documento", "cedula", "numero_dni"],
+                    "normalized_regex": "^[0-9]{8}$",
+                    "ask_if_missing": "¿Cuál es el número de DNI? Debe tener 8 dígitos.",
+                    "reject_message": "El DNI «{value}» no parece válido para Perú (debe tener 8 dígitos)."
+                },
+                "phone": {
+                    "local_name": "Celular",
+                    "field_names": ["celular", "telefono", "tel", "movil", "phone", "numero_telefono", "whatsapp"],
+                    "normalized_regex": "^9[0-9]{8}$",
+                    "ask_if_missing": "¿Cuál es el número de celular? Debe tener 9 dígitos y empezar con 9.",
+                    "reject_message": "El número «{value}» no es un celular peruano válido. Debe tener 9 dígitos y empezar con 9."
+                }
+            },
+            "extraction_keywords": {
+                "tax_id":    ["ruc", "r.u.c"],
+                "person_id": ["dni", "d.n.i", "documento"],
+                "phone":     ["celular", "teléfono", "telefono", "cel", "movil", "whatsapp"]
+            }
+        },
+
+        "AR": {
+            "_name": "Argentina",
+            "field_types": {
+                "tax_id": {
+                    "local_name": "CUIT/CUIL",
+                    "field_names": ["cuit", "cuil", "tax_id", "cuit_empresa", "cuil_persona"],
+                    "normalized_regex": "^(20|23|24|25|26|27|30|33|34)[0-9]{9}$",
+                    "check_digit_algorithm": "argentina_cuit",
+                    "ask_if_missing": "¿Cuál es el CUIT/CUIL? Ejemplo: 20-12345678-9",
+                    "reject_message": "El CUIT/CUIL «{value}» no parece válido para Argentina."
+                },
+                "person_id": {
+                    "local_name": "DNI",
+                    "field_names": ["dni", "documento", "documento_identidad", "numero_dni"],
+                    "normalized_regex": "^[0-9]{7,8}$",
+                    "ask_if_missing": "¿Cuál es el número de DNI?",
+                    "reject_message": "El DNI «{value}» no parece válido para Argentina (7 u 8 dígitos)."
+                },
+                "phone": {
+                    "local_name": "Celular",
+                    "field_names": ["celular", "telefono", "tel", "movil", "phone", "numero_telefono", "whatsapp"],
+                    "normalized_regex": "^(11|15|[2-9][0-9])[0-9]{8}$",
+                    "ask_if_missing": "¿Cuál es el número de celular? Debe tener 10 dígitos.",
+                    "reject_message": "El número «{value}» no parece un celular argentino válido."
+                }
+            },
+            "extraction_keywords": {
+                "tax_id":    ["cuit", "cuil", "c.u.i.t", "c.u.i.l"],
+                "person_id": ["dni", "d.n.i", "documento"],
+                "phone":     ["celular", "teléfono", "telefono", "cel", "movil", "móvil", "whatsapp"]
+            }
+        },
+
+        "CL": {
+            "_name": "Chile",
+            "field_types": {
+                "tax_id": {
+                    "local_name": "RUT",
+                    "field_names": ["rut", "run", "tax_id", "rut_empresa"],
+                    "normalized_regex": "^[0-9]{7,8}[0-9Kk]$",
+                    "check_digit_algorithm": "chile_rut",
+                    "ask_if_missing": "¿Cuál es el RUT? Ejemplo: 12.345.678-9",
+                    "reject_message": "El RUT «{value}» no parece válido para Chile."
+                },
+                "person_id": {
+                    "local_name": "RUT (persona)",
+                    "field_names": ["rut_persona", "cedula", "documento", "run"],
+                    "normalized_regex": "^[0-9]{7,8}[0-9Kk]$",
+                    "check_digit_algorithm": "chile_rut",
+                    "ask_if_missing": "¿Cuál es el RUT?",
+                    "reject_message": "El RUT «{value}» no parece válido para Chile."
+                },
+                "phone": {
+                    "local_name": "Celular",
+                    "field_names": ["celular", "telefono", "tel", "movil", "phone", "numero_telefono"],
+                    "normalized_regex": "^9[0-9]{8}$",
+                    "ask_if_missing": "¿Cuál es el número de celular? Debe tener 9 dígitos y empezar con 9.",
+                    "reject_message": "El número «{value}» no parece un celular chileno válido."
+                }
+            },
+            "extraction_keywords": {
+                "tax_id":    ["rut", "r.u.t", "run"],
+                "person_id": ["rut", "r.u.t", "cédula", "cedula", "run"],
+                "phone":     ["celular", "teléfono", "telefono", "cel", "movil"]
+            }
+        },
+
+        "EC": {
+            "_name": "Ecuador",
+            "field_types": {
+                "tax_id": {
+                    "local_name": "RUC",
+                    "field_names": ["ruc", "tax_id", "ruc_empresa"],
+                    "normalized_regex": "^[0-9]{13}$",
+                    "ask_if_missing": "¿Cuál es el RUC? Debe tener 13 dígitos.",
+                    "reject_message": "El RUC «{value}» no parece válido para Ecuador (13 dígitos)."
+                },
+                "person_id": {
+                    "local_name": "Cédula",
+                    "field_names": ["cedula", "ci", "documento", "numero_cedula"],
+                    "normalized_regex": "^[0-9]{10}$",
+                    "ask_if_missing": "¿Cuál es el número de cédula? Debe tener 10 dígitos.",
+                    "reject_message": "La cédula «{value}» no parece válida para Ecuador (10 dígitos)."
+                },
+                "phone": {
+                    "local_name": "Celular",
+                    "field_names": ["celular", "telefono", "tel", "movil", "phone"],
+                    "normalized_regex": "^09[0-9]{8}$",
+                    "ask_if_missing": "¿Cuál es el número de celular? Debe tener 10 dígitos y empezar con 09.",
+                    "reject_message": "El número «{value}» no parece un celular ecuatoriano válido (empieza con 09)."
+                }
+            },
+            "extraction_keywords": {
+                "tax_id":    ["ruc", "r.u.c"],
+                "person_id": ["cédula", "cedula", "ci", "documento"],
+                "phone":     ["celular", "teléfono", "telefono", "cel", "movil"]
+            }
+        }
+    }
+}

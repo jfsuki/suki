@@ -1,0 +1,65 @@
+{
+  "_meta": {
+    "description": "Reglas fiscales Perú — IGV / IR 2025. Stub básico — expandir con reglas específicas.",
+    "legal_base": "TUO de la Ley del IGV, Ley del IR, SUNAT 2025.",
+    "version": "2025.1-stub",
+    "country": "PE",
+    "currency": "PEN",
+    "uvt": 5150
+  },
+
+  "rules": [
+
+    {
+      "id": "igv",
+      "name": "Impuesto General a las Ventas",
+      "legal_ref": "Art. 1 TUO IGV",
+      "type": "percentage_line",
+      "applies_at": "line",
+      "applies_to_document_types": ["sales_invoice", "credit_note"],
+      "enabled": true,
+      "rates": [
+        { "key": "general", "rate": 0.18, "label": "IGV General (16%) + IPM (2%)" },
+        { "key": "exonerado", "rate": 0.00, "label": "Exonerado (Apéndice I y II TUO IGV)" }
+      ],
+      "default_rate_key": "general"
+    },
+
+    {
+      "id": "renta_cuarta",
+      "name": "Retención IR — 4ta Categoría",
+      "legal_ref": "Art. 74 TUO LIR",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["honorarios", "servicios"],
+      "enabled": true,
+      "threshold_uvt": 1,
+      "rate": 0.08,
+      "overrides": []
+    },
+
+    {
+      "id": "renta_segunda",
+      "name": "Retención IR — 2da Categoría",
+      "legal_ref": "Art. 72 TUO LIR",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["dividendos", "regalias"],
+      "enabled": true,
+      "threshold_uvt": 0,
+      "rate": 0.05,
+      "overrides": []
+    }
+
+  ],
+
+  "concept_aliases": {
+    "compras": "compras",
+    "honorarios": "honorarios",
+    "servicios": "honorarios"
+  }
+}

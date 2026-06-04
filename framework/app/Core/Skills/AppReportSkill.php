@@ -133,6 +133,12 @@ final class AppReportSkill
         return 'http://' . $host . '/suki';
     }
 
+    /** DynamicSkillRegistry adapter — maps handle() contract to execute() */
+    public function handle(array $input, array $context = []): array
+    {
+        return $this->execute($input, (string) ($context['tenant_id'] ?? 'default'));
+    }
+
     private function error(string $msg): array
     {
         return [

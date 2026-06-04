@@ -929,6 +929,9 @@ function safeStr($s): string {
     </div>
 
     <script>
+        const SUKI_BASE = <?= json_encode((str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '') ?>;
+    </script>
+    <script>
         function toggleDetails(id) {
             const content = document.getElementById(id);
             const icon = document.getElementById('icon_' + id);
@@ -1162,7 +1165,7 @@ function safeStr($s): string {
             const countEl = document.getElementById('feedback-count');
             tbody.innerHTML = '<tr><td colspan="6" style="padding:20px; text-align:center; color:var(--text-dim);">Cargando...</td></tr>';
             try {
-                const res = await fetch('api/chat/feedback');
+                const res = await fetch(SUKI_BASE + '/api/chat/feedback');
                 const json = await res.json();
                 const items = json.data?.items || [];
                 const pending = items.filter(i => i.status === 'pending').length;
@@ -1216,7 +1219,7 @@ function safeStr($s): string {
             if (!intent) { resultEl.textContent = 'Escribe el intent correcto.'; return; }
             resultEl.textContent = 'Vectorizando...';
             try {
-                const res = await fetch('api/chat/feedback/promote', {
+                const res = await fetch(SUKI_BASE + '/api/chat/feedback/promote', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ feedback_id: fbId, utterance, intent })

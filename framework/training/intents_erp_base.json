@@ -522,6 +522,32 @@
       "skill": "generate_report",
       "confidence": "medium",
       "domain": "erp"
+    },
+    {
+      "intent": "erp_accounting_financial_statements",
+      "utterances": [
+        "muéstrame el balance general",
+        "necesito el estado de resultados",
+        "dame el P&G del mes",
+        "cuánto ganamos este trimestre",
+        "flujo de caja del mes pasado",
+        "balance a hoy",
+        "pérdidas y ganancias de este año",
+        "informe financiero del período",
+        "ver el balance de situación",
+        "mostrar estado de pérdidas y ganancias",
+        "cómo quedó el flujo de efectivo",
+        "dame el resultado del período",
+        "cuál es la utilidad del mes",
+        "ver los estados financieros",
+        "balance general a hoy",
+        "qué pasó con el flujo de caja",
+        "ingresos versus gastos este mes",
+        "reporte financiero completo"
+      ],
+      "skill": "accounting_financial_statements",
+      "confidence": "high",
+      "domain": "erp"
     }
   ]
 }

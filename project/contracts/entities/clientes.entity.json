@@ -65,6 +65,7 @@
     "grids": [],
     "relations": [],
     "rules": [],
+    "visibility_scope": "all_tenant",
     "permissions": {
         "read": ["admin", "seller", "support"],
         "create": ["admin", "seller"],

@@ -1,0 +1,67 @@
+{
+  "_meta": {
+    "description": "Reglas fiscales Argentina — IVA / Ganancias 2025. Stub básico — expandir con reglas específicas.",
+    "legal_base": "Ley 23.349 (IVA), Ley 20.628 (Ganancias), RG AFIP 2025.",
+    "version": "2025.1-stub",
+    "country": "AR",
+    "currency": "ARS",
+    "uvt": 1
+  },
+
+  "rules": [
+
+    {
+      "id": "iva",
+      "name": "Impuesto al Valor Agregado",
+      "legal_ref": "Art. 28 Ley 23.349",
+      "type": "percentage_line",
+      "applies_at": "line",
+      "applies_to_document_types": ["sales_invoice", "credit_note"],
+      "enabled": true,
+      "rates": [
+        { "key": "general",   "rate": 0.21, "label": "IVA Alícuota General" },
+        { "key": "reducido",  "rate": 0.105, "label": "IVA Reducido (Art. 28 inc. e)" },
+        { "key": "minimo",    "rate": 0.027, "label": "IVA Mínimo (servicios básicos)" },
+        { "key": "exento",    "rate": 0.00,  "label": "Exento" }
+      ],
+      "default_rate_key": "general"
+    },
+
+    {
+      "id": "ganancias_honorarios",
+      "name": "Retención Ganancias — Honorarios",
+      "legal_ref": "RG 830 AFIP",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["honorarios", "servicios"],
+      "enabled": true,
+      "threshold_uvt": 0,
+      "rate": 0.06,
+      "overrides": []
+    },
+
+    {
+      "id": "ganancias_compras",
+      "name": "Retención Ganancias — Compras",
+      "legal_ref": "RG 830 AFIP",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["compras"],
+      "enabled": true,
+      "threshold_uvt": 0,
+      "rate": 0.02,
+      "overrides": []
+    }
+
+  ],
+
+  "concept_aliases": {
+    "compras": "compras",
+    "honorarios": "honorarios",
+    "servicios": "honorarios"
+  }
+}

@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    name: PHP 8.3 Unit Tests (SQLite)
+
+    env:
+      DB_DRIVER: sqlite
+      GEMINI_ENABLED: "0"
+      OPENROUTER_ENABLED: "0"
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up PHP 8.3
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: "8.3"
+          extensions: pdo, pdo_sqlite, pdo_mysql, mbstring, json, openssl, curl
+          coverage: none
+
+      - name: Validate composer.json (if present)
+        run: |
+          if [ -f framework/composer.json ]; then
+            composer validate --no-check-all --working-dir=framework
+          fi
+
+      - name: Install Composer dependencies (if present)
+        run: |
+          if [ -f framework/composer.json ]; then
+            composer install --no-interaction --prefer-dist --working-dir=framework
+          fi
+
+      - name: Copy .env for CI
+        run: |
+          if [ -f project/.env.example ]; then
+            cp project/.env.example project/.env
+          fi
+
+      - name: Run unit tests
+        run: php framework/tests/run.php
+
+      - name: Run DB health check
+        run: php framework/tests/db_health.php
+
+      - name: Run QA gate (pre)
+        run: php framework/scripts/qa_gate.php pre

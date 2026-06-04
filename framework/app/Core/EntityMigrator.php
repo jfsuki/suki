@@ -318,7 +318,11 @@ class EntityMigrator
 
         $primaryKey = $this->sanitizeIdentifier($primaryKey);
         if (!$primaryDefined) {
-            $columns[] = "{$primaryKey} INT AUTO_INCREMENT PRIMARY KEY";
+            $driver = $this->db->getAttribute(\PDO::ATTR_DRIVER_NAME);
+            $pkSql  = $driver === 'sqlite'
+                ? "{$primaryKey} INTEGER PRIMARY KEY AUTOINCREMENT"
+                : "{$primaryKey} INT AUTO_INCREMENT PRIMARY KEY";
+            $columns[] = $pkSql;
             $used[$primaryKey] = true;
         }
 

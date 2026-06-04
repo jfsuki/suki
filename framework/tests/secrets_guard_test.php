@@ -12,7 +12,16 @@ if (!is_string($initialCwd) || $initialCwd === '') {
 chdir($repoRoot);
 $tracked = [];
 $gitExit = 0;
-exec('git ls-files', $tracked, $gitExit);
+$gitBin = 'git';
+if (PHP_OS_FAMILY === 'Windows' && trim((string) shell_exec('where git 2>NUL')) === '') {
+    foreach (['C:\\Program Files\\Git\\bin\\git.exe', 'C:\\Program Files (x86)\\Git\\bin\\git.exe'] as $candidate) {
+        if (file_exists($candidate)) {
+            $gitBin = '"' . $candidate . '"';
+            break;
+        }
+    }
+}
+exec($gitBin . ' ls-files', $tracked, $gitExit);
 chdir($initialCwd);
 
 $failures = [];

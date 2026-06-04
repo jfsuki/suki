@@ -14,12 +14,18 @@ declare(strict_types=1);
 
 namespace App\Core\Agents;
 
+use App\Core\DynamicSkillRegistry;
 use App\Core\LLM\LLMRouter;
 use RuntimeException;
 
 final class AppFastPathParser
 {
-    private const ALLOWED_INTENTS = [
+    /**
+     * Base intents always available (core operational actions).
+     * Extended at runtime with all registered skills from DynamicSkillRegistry.
+     * Do NOT add business-specific intents here — register them in skills_catalog.json.
+     */
+    private const BASE_INTENTS = [
         'pos.create_sale',
         'pos.add_item',
         'pos.finalize',
@@ -33,6 +39,25 @@ final class AppFastPathParser
         'clarify',
         'unknown',
     ];
+
+    /** @var string[]|null Cached merged list */
+    private ?array $allowedIntentsCache = null;
+
+    /**
+     * Returns allowed intents: base set + all skills registered in DynamicSkillRegistry.
+     * Auto-grows when new skills are added to skills_catalog.json — no code change needed.
+     *
+     * @return string[]
+     */
+    private function getAllowedIntents(): array
+    {
+        if ($this->allowedIntentsCache !== null) {
+            return $this->allowedIntentsCache;
+        }
+        $fromRegistry = (new DynamicSkillRegistry())->listRegistered();
+        $this->allowedIntentsCache = array_unique(array_merge(self::BASE_INTENTS, $fromRegistry));
+        return $this->allowedIntentsCache;
+    }
 
     private const SYSTEM_PROMPT_AGENT = "Act as Suki, an elite AI Agent for business operations. 
 Your goal is to parse user intents for business actions and provide a natural, human-like response in Spanish.
@@ -105,10 +130,10 @@ Available tables: " . implode(', ', $entities),
                     'output_language' => 'es-CO',
                     'agentic_tone' => true,
                     'short_replies' => true,
-                    'allowed_intents' => self::ALLOWED_INTENTS,
+                    'allowed_intents' => $this->getAllowedIntents(),
                 ],
                 'OUTPUT_FORMAT' => [
-                    'intent' => ['type' => 'string', 'enum' => self::ALLOWED_INTENTS],
+                    'intent' => ['type' => 'string', 'enum' => $this->getAllowedIntents()],
                     'mapped_fields' => ['type' => 'object'],
                     'reply' => ['type' => 'string', 'description' => 'A natural, warm, and professional Spanish response.'],
                     'confidence' => ['type' => 'number'],
@@ -132,7 +157,7 @@ Available tables: " . implode(', ', $entities),
     private function validate(array $json): array
     {
         $intent = (string)($json['intent'] ?? 'unknown');
-        if (!in_array($intent, self::ALLOWED_INTENTS, true)) {
+        if (!in_array($intent, $this->getAllowedIntents(), true)) {
             $intent = 'unknown';
         }
 

@@ -7,6 +7,13 @@ use RuntimeException;
 
 final class OpenRouterProvider
 {
+    private array $config;
+
+    public function __construct(array $config = [])
+    {
+        $this->config = $config;
+    }
+
     public function sendChat(array $messages, array $params = []): array
     {
         $apiKey = getenv('OPENROUTER_API_KEY') ?: '';

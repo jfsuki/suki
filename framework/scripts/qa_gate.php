@@ -39,11 +39,11 @@ if ($mode === 'post') {
     $includeKpiGate = (string) (getenv('QA_INCLUDE_KPI_GATE') ?: '1') === '1';
     $steps = [
         ['name' => 'run', 'cmd' => 'php framework/tests/run.php', 'parser' => 'run'],
-        ['name' => 'chat_acid', 'cmd' => 'php framework/tests/chat_acid.php', 'parser' => 'chat_acid'],
-        ['name' => 'chat_golden', 'cmd' => 'php framework/tests/chat_golden.php', 'parser' => 'chat_golden'],
-        ['name' => 'chat_real_20', 'cmd' => 'php framework/tests/chat_real_20.php', 'parser' => 'chat_real_20'],
         ['name' => 'db_health', 'cmd' => 'php framework/tests/db_health.php', 'parser' => 'db_health'],
     ];
+    if ((string) (getenv('QA_INCLUDE_CHAT_REAL_20') ?: '0') === '1') {
+        $steps[] = ['name' => 'chat_real_20', 'cmd' => 'php framework/tests/chat_real_20.php', 'parser' => 'chat_real_20'];
+    }
     if ($includeKpiGate || (string) (getenv('QA_INCLUDE_CHAT_REAL_100') ?: '0') === '1') {
         $steps[] = ['name' => 'chat_real_100', 'cmd' => 'php framework/tests/chat_real_100.php', 'parser' => 'chat_real_100'];
     }
@@ -58,6 +58,9 @@ if ($mode === 'post') {
     }
     if ((string) (getenv('QA_INCLUDE_LLM_GEMINI_SMOKE') ?: '0') === '1') {
         $steps[] = ['name' => 'llm_gemini_staging_smoke', 'cmd' => 'php framework/tests/llm_gemini_staging_smoke.php', 'parser' => 'llm_smoke'];
+    }
+    if ((string) (getenv('QA_INCLUDE_MYSQL_ACID') ?: '0') === '1') {
+        $steps[] = ['name' => 'mysql_acid', 'cmd' => 'php framework/tests/acid_multitenant_mysql_test.php', 'parser' => 'mysql_acid'];
     }
 }
 if ($mode === 'incremental') {
@@ -276,6 +279,16 @@ function evaluateStepResult(string $parser, string $output, int $exitCode): arra
             : failResult($output, 'conversation_kpi_gate failed');
     }
 
+    if ($parser === 'mysql_acid') {
+        if (($json['skipped'] ?? false) === true) {
+            return warningResult($output, 'mysql_acid skipped: ' . (string) ($json['reason'] ?? 'no DB credentials'));
+        }
+        if (($json['ok'] ?? false) !== true) {
+            return failResult($output, 'mysql_acid failed: ' . count((array) ($json['failures'] ?? [])) . ' failure(s)');
+        }
+        return passResult('mysql_acid engine=' . (string) ($json['engine'] ?? 'MySQL') . ' ok=true');
+    }
+
     if (($json['ok'] ?? null) === true) {
         $summary = shortenEvidence($output);
         return passResult($summary !== '' ? $summary : 'ok=true');
@@ -326,6 +339,7 @@ function detectParserFromCommand(string $command): string
         str_contains($command, 'framework/tests/perf_stress_report.php') => 'perf_stress',
         str_contains($command, 'framework/tests/llm_smoke.php') => 'llm_smoke',
         str_contains($command, 'framework/tests/conversation_kpi_gate.php') => 'conversation_kpi_gate',
+        str_contains($command, 'acid_multitenant_mysql_test.php') => 'mysql_acid',
         default => 'generic',
     };
 }

@@ -239,6 +239,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 
         <div class="footer-links">
             ¿Aún no tienes cuenta? <a href="register">Registrarse ahora</a>
+            &nbsp;·&nbsp;
+            <a href="otp-request">Verificar con código</a>
         </div>
 
         <div style="text-align: center;">

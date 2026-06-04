@@ -16,48 +16,52 @@ declare(strict_types=1);
 namespace App\Core\Agents;
 
 use App\Core\LLM\LLMRouter;
+use App\Core\PolicyLoader;
 use RuntimeException;
 
 final class BuilderFastPathParser
 {
-    // Builder-scoped allowed intents (Tool Contextualization).
-    // The LLM CANNOT produce any ERP operational action.
-    private const ALLOWED_INTENTS = [
-        'ask_user',
-        'set_business_type',
-        'set_operation_model',
-        'set_scope',
-        'set_documents',
-        'confirm',
-        'adjust',
-        'frustration_help',
-        'create_table',
-        'create_form',
-        'unknown',
-    ];
+    /**
+     * All builder policies loaded from framework/config/builder_policies.json.
+     * Edit that file to add steps, intents, or fallback texts — no PHP redeploy needed.
+     */
+    private function allowedIntents(): array
+    {
+        return PolicyLoader::get('builder_policies', 'allowed_intents', [
+            'ask_user', 'set_business_type', 'set_operation_model', 'set_scope',
+            'set_documents', 'confirm', 'adjust', 'frustration_help',
+            'create_table', 'create_form', 'unknown',
+        ]);
+    }
 
-    // Deterministic fallbacks per step — guaranateed no-null for any failure.
-    private const STEP_FALLBACK = [
-        'business_type'   => 'Cuéntame en una frase: ¿qué vendes o a qué se dedica tu negocio?',
-        'operation_model' => 'Solo dime cómo cobras: ¿al contado, a crédito o los dos?',
-        'needs_scope'     => '¿Qué quieres controlar primero? Por ejemplo: clientes, pedidos, inventario.',
-        'documents_scope' => '¿Qué documentos usas? Por ejemplo: factura, cotización, orden de trabajo.',
-        'confirm_scope'   => 'Revisa el resumen y dime si está bien o qué quieres ajustar.',
-        'plan_ready'      => '¿Creamos la primera tabla o ajustas algo del alcance?',
-    ];
+    private function stepFallback(): array
+    {
+        return PolicyLoader::get('builder_policies', 'step_fallback', [
+            'business_type'   => 'Cuéntame en una frase: ¿qué vendes o a qué se dedica tu negocio?',
+            'operation_model' => 'Solo dime cómo cobras: ¿al contado, a crédito o los dos?',
+            'needs_scope'     => '¿Qué quieres controlar primero? Por ejemplo: clientes, pedidos, inventario.',
+            'documents_scope' => '¿Qué documentos usas? Por ejemplo: factura, cotización, orden de trabajo.',
+            'confirm_scope'   => 'Revisa el resumen y dime si está bien o qué quieres ajustar.',
+            'plan_ready'      => '¿Creamos la primera tabla o ajustas algo del alcance?',
+        ]);
+    }
 
-    private const DEFAULT_FALLBACK = 'Ayúdame con un dato más para continuar.';
+    private function defaultFallback(): string
+    {
+        return (string) PolicyLoader::get('builder_policies', 'default_fallback', 'Ayúdame con un dato más para continuar.');
+    }
 
-    // Whitelist of fields the LLM is allowed to map per step.
-    // Prevents the LLM from hallucinating fields from future steps and jumping the flow.
-    private const STEP_ALLOWED_FIELDS = [
-        'business_type'   => ['business_type', 'proposed_profile'],
-        'operation_model' => ['operation_model'],
-        'needs_scope'     => ['needs_scope', 'needs_scope_items'],
-        'documents_scope' => ['documents_scope', 'documents_scope_items'],
-        'confirm_scope'   => ['confirmed'],
-        'plan_ready'      => [],
-    ];
+    private function stepAllowedFields(): array
+    {
+        return PolicyLoader::get('builder_policies', 'step_allowed_fields', [
+            'business_type'   => ['business_type', 'proposed_profile'],
+            'operation_model' => ['operation_model'],
+            'needs_scope'     => ['needs_scope', 'needs_scope_items'],
+            'documents_scope' => ['documents_scope', 'documents_scope_items'],
+            'confirm_scope'   => ['confirmed'],
+            'plan_ready'      => [],
+        ]);
+    }
 
     /**
      * Parse a raw user message for the builder fast path.
@@ -176,12 +180,12 @@ final class BuilderFastPathParser
                     'do_not_invent_fields'                 => true,
                     'if_not_sure_use_intent_unknown'       => true,
                     'if_user_frustrated_use_frustration_help' => true,
-                    'allowed_intents'                      => self::ALLOWED_INTENTS,
+                    'allowed_intents'                      => $this->allowedIntents(),
                     'no_chat_history_available'            => true,
                     'no_rag_available'                     => true,
                 ],
                 'OUTPUT_FORMAT' => [
-                    'intent'             => ['type' => 'string', 'enum' => self::ALLOWED_INTENTS],
+                    'intent'             => ['type' => 'string', 'enum' => $this->allowedIntents()],
                     'mapped_fields'      => ['type' => 'object', 'additionalProperties' => false],
                     'reply'              => ['type' => 'string'],
                     'confidence'         => ['type' => 'number', 'minimum' => 0, 'maximum' => 1],
@@ -204,7 +208,7 @@ final class BuilderFastPathParser
     private function validate(array $json, string $step): array
     {
         $intent = trim((string) ($json['intent'] ?? 'unknown'));
-        if (!in_array($intent, self::ALLOWED_INTENTS, true)) {
+        if (!in_array($intent, $this->allowedIntents(), true)) {
             $intent = 'unknown';
         }
 
@@ -219,12 +223,12 @@ final class BuilderFastPathParser
         }
         // Step isolation: discard any field the LLM mapped outside the current step's scope.
         // This prevents the LLM from hallucinating future-step fields and jumping the flow.
-        $allowedForStep = self::STEP_ALLOWED_FIELDS[$step] ?? [];
+        $allowedForStep = $this->stepAllowedFields()[$step] ?? [];
         $safeFields = array_intersect_key($safeFields, array_flip($allowedForStep));
 
         $reply = trim((string) ($json['reply'] ?? ''));
         if ($reply === '') {
-            $reply = self::STEP_FALLBACK[$step] ?? self::DEFAULT_FALLBACK;
+            $reply = $this->stepFallback()[$step] ?? $this->defaultFallback();
         }
         // Cap reply length.
         if (mb_strlen($reply) > 300) {
@@ -255,7 +259,7 @@ final class BuilderFastPathParser
         return [
             'intent'              => 'ask_user',
             'mapped_fields'       => [],
-            'reply'               => self::STEP_FALLBACK[$step] ?? self::DEFAULT_FALLBACK,
+            'reply'               => $this->stepFallback()[$step] ?? $this->defaultFallback(),
             'confidence'          => 0.0,
             'needs_clarification' => true,
             'via'                 => 'fast_path_fallback:' . $reason,

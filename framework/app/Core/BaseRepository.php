@@ -152,7 +152,7 @@ class BaseRepository
             ->setAllowedColumns($this->allowedColumns);
     }
 
-    protected function applyTenantScope(QueryBuilder $qb): void
+    protected function applyTenantScope(QueryBuilder $qb, array $userContext = []): void
     {
         if ($this->tenantScoped && $this->tenantId !== null) {
             if (in_array('tenant_id', $this->allowedColumns, true)) {
@@ -161,6 +161,60 @@ class BaseRepository
         }
         if ($this->canonicalScoped && in_array('app_id', $this->allowedColumns, true)) {
             $qb->where('app_id', '=', $this->appId);
+        }
+        // Additive visibility scope — reads entity schema to decide extra filters.
+        // Empty context = no additional filter (full backward compat).
+        if (!empty($userContext)) {
+            $this->applyVisibilityScope($qb, $userContext);
+        }
+    }
+
+    /**
+     * Read the entity schema's visibility_scope field and apply extra WHERE clauses.
+     *
+     * Possible values:
+     *   "all_tenant"       → no extra filter (default)
+     *   "created_by"       → AND created_by = user_id
+     *   "role:X,Y"         → AND (created_by = user_id OR role matches)
+     *
+     * @param array<string, mixed> $userContext  Keys: user_id (string), role (string)
+     */
+    private function applyVisibilityScope(QueryBuilder $qb, array $userContext): void
+    {
+        $visibilityScope = $this->entity['visibility_scope'] ?? 'all_tenant';
+
+        if ($visibilityScope === 'all_tenant' || $visibilityScope === '') {
+            return;
+        }
+
+        $userId = (string) ($userContext['user_id'] ?? '');
+
+        if ($visibilityScope === 'created_by') {
+            if ($userId !== '' && in_array('created_by', $this->allowedColumns, true)) {
+                $qb->where('created_by', '=', $userId);
+            }
+            return;
+        }
+
+        if (str_starts_with((string) $visibilityScope, 'role:')) {
+            $allowedRoles = array_map('trim', explode(',', substr((string) $visibilityScope, 5)));
+            $userRole     = (string) ($userContext['role'] ?? '');
+
+            // Admins always bypass row-level filter; listed roles see own records + records they created.
+            if (in_array($userRole, ['admin', 'super_admin'], true)) {
+                return;
+            }
+
+            if (in_array($userRole, $allowedRoles, true)) {
+                // Role is allowed → can see all tenant records for their role.
+                return;
+            }
+
+            // Role not in list → restrict to records created by this user.
+            if ($userId !== '' && in_array('created_by', $this->allowedColumns, true)) {
+                $qb->where('created_by', '=', $userId);
+            }
+            return;
         }
     }
 

@@ -9,6 +9,7 @@ use App\Core\Agents\Memory\MemoryWindow;
 use App\Core\Agents\Memory\TokenBudgeter;
 use App\Core\IntentRouter;
 use App\Core\LLM\LLMRouter;
+use App\Core\PolicyLoader;
 
 /**
  * Agente Especialista: Operación Pura de Apps (SUKI Business)
@@ -121,9 +122,14 @@ class AppExecutionProcess
             }
         }
 
+        $fallbackReply = (string) PolicyLoader::get(
+            'routing_policies',
+            'app_execution_fallback_reply',
+            'No encontré una acción disponible para esa solicitud. Intenta describir la operación de forma diferente.'
+        );
         return [
             'action'    => 'ask_user',
-            'reply'     => 'Aún estoy aprendiendo a usar las herramientas de tu ERP. ¿Qué transacción deseas hacer? (Prueba decir "crear factura")',
+            'reply'     => $fallbackReply,
             'telemetry' => ['agent' => 'AppExecutionProcess', 'fallback' => true],
         ];
     }

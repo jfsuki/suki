@@ -8,6 +8,7 @@ namespace App\Core\Agents;
 use App\Core\GeminiEmbeddingService;
 use App\Core\QdrantVectorStore;
 use App\Core\LLM\LLMRouter;
+use App\Core\PolicyLoader;
 use RuntimeException;
 
 /**
@@ -18,16 +19,12 @@ use RuntimeException;
  * Layer 3: PHP keyword fallback (hardcoded last resort).
  *
  * NEVER use preg_match or in_array for business intent classification.
+ * Thresholds and allowed intents live in framework/config/intent_policies.json.
  */
 final class IntentClassifier
 {
-    private const QDRANT_CONFIDENCE_THRESHOLD = 0.65;
-    private const LLM_ALLOWED_INTENTS = [
-        'greeting', 'farewell', 'affirmation', 'negation', 'frustration',
-        'create_request', 'business_description', 'scope_question',
-        'pricing_question', 'crud', 'status', 'out_of_scope', 'faq', 'question',
-        'solve_unit_conversion', 'builder_install_playbook',
-    ];
+    private float $qdrantConfidenceThreshold;
+    private array $llmAllowedIntents;
 
     private ?GeminiEmbeddingService $embedder;
     private ?QdrantVectorStore $vectorStore;
@@ -45,6 +42,16 @@ final class IntentClassifier
         $this->vectorStore = $vectorStore;
         $this->llmRouter = $llmRouter;
         $this->tenantId = $tenantId !== '' ? $tenantId : 'system';
+
+        $this->qdrantConfidenceThreshold = (float) PolicyLoader::get(
+            'intent_policies', 'qdrant_confidence_threshold', 0.65
+        );
+        $this->llmAllowedIntents = (array) PolicyLoader::get('intent_policies', 'llm_allowed_intents', [
+            'greeting', 'farewell', 'affirmation', 'negation', 'frustration',
+            'create_request', 'business_description', 'scope_question',
+            'pricing_question', 'crud', 'status', 'out_of_scope', 'faq', 'question',
+            'solve_unit_conversion', 'builder_install_playbook',
+        ]);
     }
 
     /**
@@ -77,7 +84,7 @@ final class IntentClassifier
 
         // Layer 1: Qdrant semantic search
         $qdrant = $this->queryQdrant($text, true); // explicitly request full hit
-        if ($qdrant !== null && $qdrant['score'] >= self::QDRANT_CONFIDENCE_THRESHOLD) {
+        if ($qdrant !== null && $qdrant['score'] >= $this->qdrantConfidenceThreshold) {
             $this->logTraining($text, $qdrant['intent'], $qdrant['score'], 'skip');
             return [
                 'intent' => $qdrant['intent'], 
@@ -161,12 +168,12 @@ final class IntentClassifier
             return null;
         }
         try {
-            $allowedStr = implode(', ', self::LLM_ALLOWED_INTENTS);
+            $allowedStr = implode(', ', $this->llmAllowedIntents);
             $capsule = [
                 'policy' => ['requires_strict_json' => true, 'max_output_tokens' => 60],
                 'prompt_contract' => [
                     'TASK' => 'Classify the user message into one intent.',
-                    'ALLOWED_INTENTS' => self::LLM_ALLOWED_INTENTS,
+                    'ALLOWED_INTENTS' => $this->llmAllowedIntents,
                     'USER_MESSAGE' => $text,
                     'OUTPUT_FORMAT' => ['intent' => 'string', 'confidence' => 'float 0-1'],
                     'RULES' => [
@@ -189,7 +196,7 @@ final class IntentClassifier
             $confidence = isset($json['confidence']) && is_numeric($json['confidence'])
                 ? (float) $json['confidence']
                 : 0.6;
-            if (!in_array($intent, self::LLM_ALLOWED_INTENTS, true)) {
+            if (!in_array($intent, $this->llmAllowedIntents, true)) {
                 return null;
             }
             return ['intent' => $intent, 'score' => $confidence];

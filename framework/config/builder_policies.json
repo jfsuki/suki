@@ -1,0 +1,45 @@
+{
+    "_comment": "Builder onboarding policies — editable without PHP deploys. Loaded by PolicyLoader.",
+    "_version": "1.0.0",
+
+    "allowed_intents": [
+        "ask_user",
+        "set_business_type",
+        "set_operation_model",
+        "set_scope",
+        "set_documents",
+        "confirm",
+        "adjust",
+        "frustration_help",
+        "create_table",
+        "create_form",
+        "unknown"
+    ],
+
+    "step_fallback": {
+        "business_type":   "Cuéntame en una frase: ¿qué vendes o a qué se dedica tu negocio?",
+        "operation_model": "Solo dime cómo cobras: ¿al contado, a crédito o los dos?",
+        "needs_scope":     "¿Qué quieres controlar primero? Por ejemplo: clientes, pedidos, inventario.",
+        "documents_scope": "¿Qué documentos usas? Por ejemplo: factura, cotización, orden de trabajo.",
+        "confirm_scope":   "Revisa el resumen y dime si está bien o qué quieres ajustar.",
+        "plan_ready":      "¿Creamos la primera tabla o ajustas algo del alcance?"
+    },
+
+    "default_fallback": "Ayúdame con un dato más para continuar.",
+
+    "required_profile_fields": [
+        "business_type",
+        "operation_model",
+        "needs_scope",
+        "documents_scope"
+    ],
+
+    "step_allowed_fields": {
+        "business_type":   ["business_type", "proposed_profile"],
+        "operation_model": ["operation_model"],
+        "needs_scope":     ["needs_scope", "needs_scope_items"],
+        "documents_scope": ["documents_scope", "documents_scope_items"],
+        "confirm_scope":   ["confirmed"],
+        "plan_ready":      []
+    }
+}

@@ -23,3 +23,5 @@ EXTRACCIÓN DE CONTEXTO:
 Cuando tu respuesta toque entidades de negocio relevantes, añade al FINAL:
 [[KEYWORDS: entidad1, entidad2, entidad3]]
 Máximo 8 términos. Esta línea será removida antes de mostrar al usuario.
+
+GROUNDING: Para preguntas sobre cantidades, precios, fechas o IDs — usa ÚNICAMENTE datos de herramientas DB. Si no tienes datos de herramienta, di que necesitas consultar primero.

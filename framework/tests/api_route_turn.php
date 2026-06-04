@@ -52,6 +52,15 @@ foreach ($sessionData as $key => $value) {
     $_SESSION[$key] = $value;
 }
 
+// When a test provides an authenticated session but no CSRF token, auto-inject a
+// matching pair (session + header) — mirrors what the browser does after login.
+$isMutation = in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true);
+if ($isMutation && !empty($_SESSION['auth_user']) && empty($_SESSION['csrf_token'])) {
+    $autoToken = bin2hex(random_bytes(16));
+    $_SESSION['csrf_token'] = $autoToken;
+    $_SERVER['HTTP_X_CSRF_TOKEN'] = $autoToken;
+}
+
 $_GET = array_merge(['route' => $route], $query);
 $_POST = $payload;
 $_SERVER['REQUEST_METHOD'] = $method;

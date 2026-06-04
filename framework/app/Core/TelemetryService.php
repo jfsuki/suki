@@ -40,13 +40,11 @@ final class TelemetryService
     public function detectSignals(string $text, array $context): ?array
     {
         $text = strtolower(trim($text));
-        $frustrationKeywords = [
-            'no sirve', 'estafa', 'basura', 'no funciona', 'odio', 'horrible', 'asco', 
-            'malo', 'pesimo', 'perder tiempo', 'quiero mi dinero', 'no me ayuda'
-        ];
+        /** @var string[] $frustrationKeywords */
+        $frustrationKeywords = PolicyLoader::get('routing_policies', 'frustration_signals', []);
 
         foreach ($frustrationKeywords as $keyword) {
-            if (str_contains($text, $keyword)) {
+            if (str_contains($text, (string) $keyword)) {
                 return [
                     'signal' => 'frustration',
                     'message' => 'El usuario muestra frustración: ' . $keyword,

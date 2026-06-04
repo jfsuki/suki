@@ -58,258 +58,101 @@ final class SkillExecutor
 
         switch ($executionMode) {
             case 'tool':
+                // Dynamic registry — resolves any skill with "handler" in skills_catalog.json
+                // or custom tools from DB (ToolFactory). Falls through to legacy chain if not found.
+                $dynamicResult = (new \App\Core\DynamicSkillRegistry())->dispatch(
+                    $name,
+                    is_array($context['explicit_args'] ?? null) ? (array) $context['explicit_args'] : [],
+                    $context
+                );
+                if ($dynamicResult !== null) {
+                    $action              = (string) ($dynamicResult['action']               ?? 'respond_local');
+                    $reply               = (string) ($dynamicResult['reply']                ?? '');
+                    $command             = is_array($dynamicResult['command'] ?? null) ? (array) $dynamicResult['command'] : [];
+                    $skillResultStatus   = (string) ($dynamicResult['skill_result_status']  ?? 'ok');
+                    $skillFallbackReason = (string) ($dynamicResult['skill_fallback_reason'] ?? 'none');
+                    $skillFailed         = (bool)   ($dynamicResult['skill_failed']          ?? false);
+                    $routingHintSteps    = ['cache', 'rules', 'skills'];
+                    $telemetryOverrides  = is_array($dynamicResult['telemetry'] ?? null) ? (array) $dynamicResult['telemetry'] : [];
+                    break;
+                }
+                // Legacy fallback for skills not yet registered in skills_catalog.json with "handler":
                 if ($this->isAlertsCenterSkill($name)) {
-                    $toolOutcome = $this->executeAlertsCenterSkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
-                        ? (array) $toolOutcome['routing_hint_steps']
-                        : ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $this->applyToolOutcome($this->executeAlertsCenterSkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 if ($this->isMediaSkill($name)) {
-                    $toolOutcome = $this->executeMediaSkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
-                        ? (array) $toolOutcome['routing_hint_steps']
-                        : ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $this->applyToolOutcome($this->executeMediaSkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 if ($this->isEntitySearchSkill($name)) {
-                    $toolOutcome = $this->executeEntitySearchSkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
-                        ? (array) $toolOutcome['routing_hint_steps']
-                        : ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $this->applyToolOutcome($this->executeEntitySearchSkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 if ($this->isPosSkill($name)) {
-                    $toolOutcome = $this->executePosSkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
-                        ? (array) $toolOutcome['routing_hint_steps']
-                        : ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $this->applyToolOutcome($this->executePosSkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 if ($this->isPurchasesSkill($name)) {
-                    $toolOutcome = $this->executePurchasesSkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
-                        ? (array) $toolOutcome['routing_hint_steps']
-                        : ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $this->applyToolOutcome($this->executePurchasesSkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 if ($this->isFiscalSkill($name)) {
-                    $toolOutcome = $this->executeFiscalSkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
-                        ? (array) $toolOutcome['routing_hint_steps']
-                        : ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $this->applyToolOutcome($this->executeFiscalSkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 if ($this->isEcommerceSkill($name)) {
-                    $toolOutcome = $this->executeEcommerceSkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
-                        ? (array) $toolOutcome['routing_hint_steps']
-                        : ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $this->applyToolOutcome($this->executeEcommerceSkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 if ($this->isTenantAccessControlSkill($name)) {
-                    $toolOutcome = $this->executeTenantAccessControlSkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
-                        ? (array) $toolOutcome['routing_hint_steps']
-                        : ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $this->applyToolOutcome($this->executeTenantAccessControlSkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 if ($this->isTenantPlanSkill($name)) {
-                    $toolOutcome = $this->executeTenantPlanSkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
-                        ? (array) $toolOutcome['routing_hint_steps']
-                        : ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $this->applyToolOutcome($this->executeTenantPlanSkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 if ($this->isUsageMeteringSkill($name)) {
-                    $toolOutcome = $this->executeUsageMeteringSkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
-                        ? (array) $toolOutcome['routing_hint_steps']
-                        : ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $this->applyToolOutcome($this->executeUsageMeteringSkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 if ($this->isAgentToolsIntegrationSkill($name)) {
-                    $toolOutcome = $this->executeAgentToolsIntegrationSkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
-                        ? (array) $toolOutcome['routing_hint_steps']
-                        : ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $this->applyToolOutcome($this->executeAgentToolsIntegrationSkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 if ($this->isAgentOpsObservabilitySkill($name)) {
-                    $toolOutcome = $this->executeAgentOpsObservabilitySkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
-                        ? (array) $toolOutcome['routing_hint_steps']
-                        : ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $this->applyToolOutcome($this->executeAgentOpsObservabilitySkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 if ($this->isInternalMemorySkill($name)) {
-                    $toolOutcome = $this->executeInternalMemorySkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = is_array($toolOutcome['routing_hint_steps'] ?? null)
-                        ? (array) $toolOutcome['routing_hint_steps']
-                        : ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $this->applyToolOutcome($this->executeInternalMemorySkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 if ($name === 'create_app' || $name === 'propose_app_type') {
                     $toolOutcome = $this->executeCreateAppSkill($context, $name);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
+                    $this->applyToolOutcome($toolOutcome, $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     $skillResultStatus = $toolOutcome['ok'] ?? false ? 'success' : 'safe_fallback';
-                    $skillFallbackReason = 'none';
-                    $skillFailed = !($toolOutcome['ok'] ?? false);
-                    $routingHintSteps = ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                    $skillFailed       = !($toolOutcome['ok'] ?? false);
                     break;
                 }
                 if ($name === 'query_app_data' || $name === 'app_report' || $name === 'view_app_data') {
                     $toolOutcome = $this->executeAppReportSkill($context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
+                    $this->applyToolOutcome($toolOutcome, $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     $skillResultStatus = ($toolOutcome['status'] ?? '') === 'success' ? 'success' : 'safe_fallback';
-                    $skillFallbackReason = 'none';
-                    $skillFailed = ($toolOutcome['status'] ?? '') === 'error';
-                    $routingHintSteps = ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = [];
+                    $skillFailed       = ($toolOutcome['status'] ?? '') === 'error';
                     break;
                 }
                 if ($name === 'insert_app_data' || $name === 'update_app_data' || $name === 'delete_app_data' || $name === 'find_app_data') {
                     $toolOutcome = $this->executeAppCrudSkill($context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = [];
+                    $this->applyToolOutcome($toolOutcome, $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
+                    $command           = [];
                     $skillResultStatus = ($toolOutcome['status'] ?? '') === 'success' ? 'success' : 'safe_fallback';
-                    $skillFallbackReason = 'none';
-                    $skillFailed = ($toolOutcome['status'] ?? '') === 'error';
-                    $routingHintSteps = ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = [];
+                    $skillFailed       = ($toolOutcome['status'] ?? '') === 'error';
                     break;
                 }
-                if ($this->isAccountingSkill($name)) {
-                    $toolOutcome = $this->executeAccountingSkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
-                    break;
-                }
-                if ($this->isInventorySkill($name)) {
-                    $toolOutcome = $this->executeInventorySkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
-                    break;
-                }
-                if ($this->isCrmSkill($name)) {
-                    $toolOutcome = $this->executeCrmSkill($name, $context);
-                    $action = (string) ($toolOutcome['action'] ?? 'respond_local');
-                    $reply = (string) ($toolOutcome['reply'] ?? '');
-                    $command = is_array($toolOutcome['command'] ?? null) ? (array) $toolOutcome['command'] : [];
-                    $skillResultStatus = (string) ($toolOutcome['skill_result_status'] ?? 'safe_fallback');
-                    $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
-                    $skillFailed = (bool) ($toolOutcome['skill_failed'] ?? false);
-                    $routingHintSteps = ['cache', 'rules', 'skills'];
-                    $telemetryOverrides = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
+                if ($this->isBusinessAutomationSkill($name)) {
+                    $this->applyToolOutcome($this->executeBusinessAutomationSkill($name, $context), $action, $reply, $command, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps, $telemetryOverrides);
                     break;
                 }
                 [$action, $reply, $skillResultStatus, $skillFallbackReason, $skillFailed, $routingHintSteps] = $this->executeToolSkill($skill, $context);
@@ -1184,112 +1027,6 @@ final class SkillExecutor
         }
     }
 
-    private function isAccountingSkill(string $name): bool
-    {
-        return in_array($name, [
-            'accounting_post',
-            'accounting_record_entry',
-            'accounting_balance_sheet',
-            'accounting_record_sale',
-        ], true);
-    }
-
-    private function executeAccountingSkill(string $name, array $context): array
-    {
-        $actionMap = [
-            'accounting_post'          => 'record_entry',
-            'accounting_record_entry'  => 'record_entry',
-            'accounting_balance_sheet' => 'balance_sheet',
-            'accounting_record_sale'   => 'record_sale_accounting',
-        ];
-        try {
-            $skill = new \App\Core\Skills\AccountingSkill();
-            $input = array_merge(
-                is_array($context['explicit_args'] ?? null) ? (array)$context['explicit_args'] : [],
-                ['action' => $actionMap[$name] ?? 'balance_sheet']
-            );
-            $result = $skill->handle($input, $context);
-            $reply = is_array($result)
-                ? ($result['reply'] ?? $result['message'] ?? json_encode($result, JSON_UNESCAPED_UNICODE))
-                : (string)$result;
-            return ['action' => 'respond_local', 'reply' => (string)$reply, 'command' => [], 'skill_result_status' => 'ok', 'skill_fallback_reason' => 'none', 'skill_failed' => false, 'telemetry' => []];
-        } catch (\Throwable $e) {
-            return ['action' => 'respond_local', 'reply' => 'No pude ejecutar la operacion contable: ' . $e->getMessage(), 'command' => [], 'skill_result_status' => 'error', 'skill_fallback_reason' => 'exception', 'skill_failed' => true, 'telemetry' => []];
-        }
-    }
-
-    private function isInventorySkill(string $name): bool
-    {
-        return in_array($name, [
-            'inventory_check',
-            'inventory_check_stock',
-            'inventory_adjust_stock',
-            'inventory_create_product',
-            'inventory_list_products',
-        ], true);
-    }
-
-    private function executeInventorySkill(string $name, array $context): array
-    {
-        $actionMap = [
-            'inventory_check'          => 'check_stock',
-            'inventory_check_stock'    => 'check_stock',
-            'inventory_adjust_stock'   => 'adjust_stock',
-            'inventory_create_product' => 'add_product',
-            'inventory_list_products'  => 'list_products',
-        ];
-        try {
-            $skill = new \App\Core\Skills\InventorySkill();
-            $input = array_merge(
-                is_array($context['explicit_args'] ?? null) ? (array)$context['explicit_args'] : [],
-                ['action' => $actionMap[$name] ?? 'check_stock']
-            );
-            $result = $skill->handle($input, $context);
-            $reply = is_array($result)
-                ? ($result['reply'] ?? $result['message'] ?? json_encode($result, JSON_UNESCAPED_UNICODE))
-                : (string)$result;
-            return ['action' => 'respond_local', 'reply' => (string)$reply, 'command' => [], 'skill_result_status' => 'ok', 'skill_fallback_reason' => 'none', 'skill_failed' => false, 'telemetry' => []];
-        } catch (\Throwable $e) {
-            return ['action' => 'respond_local', 'reply' => 'No pude consultar el inventario: ' . $e->getMessage(), 'command' => [], 'skill_result_status' => 'error', 'skill_fallback_reason' => 'exception', 'skill_failed' => true, 'telemetry' => []];
-        }
-    }
-
-    private function isCrmSkill(string $name): bool
-    {
-        return in_array($name, [
-            'customer_lookup',
-            'crm_register_lead',
-            'crm_update_customer',
-            'crm_search_customers',
-            'crm_stats',
-        ], true);
-    }
-
-    private function executeCrmSkill(string $name, array $context): array
-    {
-        $actionMap = [
-            'customer_lookup'      => 'search_customers',
-            'crm_register_lead'    => 'register_lead',
-            'crm_update_customer'  => 'update_customer',
-            'crm_search_customers' => 'search_customers',
-            'crm_stats'            => 'crm_stats',
-        ];
-        try {
-            $skill = new \App\Core\Skills\CRMSkill();
-            $input = array_merge(
-                is_array($context['explicit_args'] ?? null) ? (array)$context['explicit_args'] : [],
-                ['action' => $actionMap[$name] ?? 'search_customers']
-            );
-            $result = $skill->handle($input, $context);
-            $reply = is_array($result)
-                ? ($result['reply'] ?? $result['message'] ?? json_encode($result, JSON_UNESCAPED_UNICODE))
-                : (string)$result;
-            return ['action' => 'respond_local', 'reply' => (string)$reply, 'command' => [], 'skill_result_status' => 'ok', 'skill_fallback_reason' => 'none', 'skill_failed' => false, 'telemetry' => []];
-        } catch (\Throwable $e) {
-            return ['action' => 'respond_local', 'reply' => 'No pude consultar CRM: ' . $e->getMessage(), 'command' => [], 'skill_result_status' => 'error', 'skill_fallback_reason' => 'exception', 'skill_failed' => true, 'telemetry' => []];
-        }
-    }
-
     private function executeCreateAppSkill(array $context, string $skillName = 'create_app'): array
     {
         try {
@@ -1328,5 +1065,78 @@ final class SkillExecutor
         } catch (\Throwable $e) {
             return ['action' => 'respond_local', 'reply' => 'No pude completar la operación: ' . $e->getMessage(), 'status' => 'error'];
         }
+    }
+
+    private function isBusinessAutomationSkill(string $name): bool
+    {
+        return in_array($name, [
+            'automation_web_search',
+            'automation_download_file',
+            'automation_validate_payment',
+            'automation_business_automation',
+            'automation_create_tool',
+            'web_search',
+            'download_file',
+            'validate_payment',
+            'business_automation',
+            'create_tool',
+        ], true);
+    }
+
+    private function executeBusinessAutomationSkill(string $name, array $context): array
+    {
+        $actionMap = [
+            'automation_web_search'          => 'web_search',
+            'automation_download_file'       => 'download_file',
+            'automation_validate_payment'    => 'validate_payment',
+            'automation_business_automation' => 'business_automation',
+            'automation_create_tool'         => 'create_tool',
+            'web_search'                     => 'web_search',
+            'download_file'                  => 'download_file',
+            'validate_payment'               => 'validate_payment',
+            'business_automation'            => 'business_automation',
+            'create_tool'                    => 'create_tool',
+        ];
+        try {
+            $args     = is_array($context['explicit_args'] ?? null) ? (array) $context['explicit_args'] : [];
+            $tenantId = (string) ($context['tenant_id'] ?? '');
+            $skill    = new \App\Core\Skills\BusinessAutomationSkill();
+            $action   = $actionMap[$name] ?? $name;
+            $input    = array_merge($args, ['action' => $action]);
+            $result   = $skill->execute($action, $input, array_merge($context, ['tenant_id' => $tenantId]));
+            $reply    = is_array($result)
+                ? ($result['reply'] ?? $result['message'] ?? json_encode($result, JSON_UNESCAPED_UNICODE))
+                : (string) $result;
+            return ['action' => 'respond_local', 'reply' => (string) $reply, 'command' => [], 'skill_result_status' => 'ok', 'skill_fallback_reason' => 'none', 'skill_failed' => false, 'telemetry' => []];
+        } catch (\Throwable $e) {
+            return ['action' => 'respond_local', 'reply' => 'No pude ejecutar la automatización: ' . $e->getMessage(), 'command' => [], 'skill_result_status' => 'error', 'skill_fallback_reason' => 'exception', 'skill_failed' => true, 'telemetry' => []];
+        }
+    }
+
+    /**
+     * Extracts standard fields from a tool outcome array into dispatch variables.
+     * Eliminates the 8-line boilerplate that was repeated 16 times in the if-chain.
+     */
+    private function applyToolOutcome(
+        array $toolOutcome,
+        string &$action,
+        string &$reply,
+        array &$command,
+        string &$skillResultStatus,
+        string &$skillFallbackReason,
+        bool &$skillFailed,
+        array &$routingHintSteps,
+        array &$telemetryOverrides
+    ): void {
+        $action              = (string) ($toolOutcome['action']               ?? 'respond_local');
+        $reply               = (string) ($toolOutcome['reply']                ?? '');
+        $command             = is_array($toolOutcome['command']      ?? null) ? (array) $toolOutcome['command'] : [];
+        $skillResultStatus   = (string) ($toolOutcome['skill_result_status']  ?? 'safe_fallback');
+        $skillFallbackReason = (string) ($toolOutcome['skill_fallback_reason'] ?? 'none');
+        $skillFailed         = (bool)   ($toolOutcome['skill_failed']          ?? false);
+        $routingHintSteps    = is_array($toolOutcome['routing_hint_steps'] ?? null)
+            ? (array) $toolOutcome['routing_hint_steps']
+            : ['cache', 'rules', 'skills'];
+        $telemetryOverrides  = is_array($toolOutcome['telemetry'] ?? null) ? (array) $toolOutcome['telemetry'] : [];
     }
 }

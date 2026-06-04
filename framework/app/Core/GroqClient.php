@@ -33,6 +33,24 @@ final class GroqClient
         if (!empty($options['strict_json'])) {
             $payload['response_format'] = ['type' => 'json_object'];
         }
+        // Tool calling: convert Claude format (input_schema) → OpenAI format (parameters)
+        $rawTools = $options['tools'] ?? null;
+        if (!empty($rawTools) && is_array($rawTools)) {
+            $openAiTools = [];
+            foreach ($rawTools as $tool) {
+                $name   = (string) ($tool['name'] ?? '');
+                $desc   = (string) ($tool['description'] ?? '');
+                $schema = is_array($tool['input_schema'] ?? null) ? (array) $tool['input_schema'] : ['type' => 'object', 'properties' => []];
+                if ($name === '') continue;
+                $openAiTools[] = ['type' => 'function', 'function' => ['name' => $name, 'description' => $desc, 'parameters' => $schema]];
+            }
+            if ($openAiTools !== []) {
+                $payload['tools'] = $openAiTools;
+                if (!empty($options['tool_choice'])) {
+                    $payload['tool_choice'] = $options['tool_choice'];
+                }
+            }
+        }
 
         $response = $this->request('POST', $this->baseUrl, $payload);
         $content = $response['data']['choices'][0]['message']['content'] ?? '';

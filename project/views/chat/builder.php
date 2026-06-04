@@ -627,7 +627,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
   window.loadSessions = async () => {
     const sList = document.getElementById('sessionList');
     try {
-        const res = await fetch('api/chat/sessions/list');
+        const res = await fetch((window.SUKI_BASE || '') + '/api/chat/sessions/list');
         if (!res.ok) throw new Error('Network error: ' + res.status);
         
         const json = await res.json();
@@ -685,7 +685,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
     chatMsgs.innerHTML = '<div class="empty-hint">Cargando historial...</div>';
 
     try {
-        const res = await fetch(`api/chat/history?session_id=${sid}`);
+        const res = await fetch((window.SUKI_BASE || '') + `/api/chat/history?session_id=${sid}`);
         const json = await res.json();
         chatMsgs.innerHTML = '';
         if (json.data.history && json.data.history.length > 0) {
@@ -708,7 +708,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
 
   window.createNewSession = async () => {
     try {
-        const res = await fetch('api/chat/sessions/create');
+        const res = await fetch((window.SUKI_BASE || '') + '/api/chat/sessions/create');
         const json = await res.json();
         if (json.status === 'success') {
             const newSid = json.data.session_id;
@@ -772,7 +772,7 @@ include $frameworkRoot . '/views/builder/includes/navbar.php';
     if (!journalId) return;
 
     try {
-        const res = await fetch(`api/chat/journal/get?role=architect&session_id=${journalId}`);
+        const res = await fetch((window.SUKI_BASE || '') + `/api/chat/journal/get?role=architect&session_id=${journalId}`);
         const json = await res.json();
         if (json.status !== 'success') return;
 

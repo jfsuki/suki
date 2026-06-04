@@ -12,8 +12,13 @@ trait ConversationGatewayStubsTrait
     private const CLASSIFIER_MIN_SCORE = 0.60; // Clasificador local: confianza media
     private const FALLBACK_MIN_SCORE   = 0.55; // Fallback keyword: confianza baja, solo si no hay mejor opción
 
-    // ─── Triggers de creación: TODO mover a training data cuando se genere conjunto suficiente ───
-    private const CREATE_TRIGGERS = ['crear', 'hacer', 'construir', 'armar', 'quiero un sistema', 'quiero una app'];
+    // Create triggers loaded from framework/config/routing_policies.json — editable without deploys
+    private function getCreateTriggers(): array
+    {
+        return \App\Core\PolicyLoader::get('routing_policies', 'create_triggers', [
+            'crear', 'hacer', 'construir', 'armar', 'quiero un sistema', 'quiero una app',
+        ]);
+    }
 
     public function sessionKey(string $tenantId, string $projectId, string $mode, string $userId): string
     {
@@ -243,7 +248,7 @@ trait ConversationGatewayStubsTrait
         }
 
         // Low-confidence fallback: only explicit creation vocabulary
-        foreach (self::CREATE_TRIGGERS as $t) {
+        foreach ($this->getCreateTriggers() as $t) {
             if (str_contains($n, $t)) {
                 return true;
             }

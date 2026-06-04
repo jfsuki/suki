@@ -1,0 +1,65 @@
+{
+  "_meta": {
+    "description": "Reglas fiscales Ecuador — IVA / IR 2025. Stub básico — expandir con reglas específicas.",
+    "legal_base": "Ley de Régimen Tributario Interno, SRI 2025.",
+    "version": "2025.1-stub",
+    "country": "EC",
+    "currency": "USD",
+    "uvt": 1
+  },
+
+  "rules": [
+
+    {
+      "id": "iva",
+      "name": "Impuesto al Valor Agregado",
+      "legal_ref": "Art. 52 LRTI",
+      "type": "percentage_line",
+      "applies_at": "line",
+      "applies_to_document_types": ["sales_invoice", "credit_note"],
+      "enabled": true,
+      "rates": [
+        { "key": "general", "rate": 0.12, "label": "IVA General (Art. 65 LRTI)" },
+        { "key": "cero",    "rate": 0.00, "label": "Tarifa 0% (Art. 55 LRTI)" }
+      ],
+      "default_rate_key": "general"
+    },
+
+    {
+      "id": "retencion_ir_servicios",
+      "name": "Retención IR — Servicios",
+      "legal_ref": "Art. 45 LRTI, Res. NAC-DGERCGC",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["honorarios", "servicios"],
+      "enabled": true,
+      "threshold_uvt": 0,
+      "rate": 0.0175,
+      "overrides": []
+    },
+
+    {
+      "id": "retencion_ir_compras",
+      "name": "Retención IR — Compras de bienes",
+      "legal_ref": "Art. 45 LRTI, Res. NAC-DGERCGC",
+      "type": "withholding",
+      "applies_at": "document",
+      "base_field": "subtotal",
+      "applies_to_document_types": ["support_document"],
+      "applies_to_concepts": ["compras"],
+      "enabled": true,
+      "threshold_uvt": 0,
+      "rate": 0.0175,
+      "overrides": []
+    }
+
+  ],
+
+  "concept_aliases": {
+    "compras": "compras",
+    "honorarios": "honorarios",
+    "servicios": "honorarios"
+  }
+}
