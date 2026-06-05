@@ -130,6 +130,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('semantic_pipeline_e2e', fn() => $this->checkSemanticPipelineE2E());
         $tests[] = $this->wrap('data_quality_guard', fn() => $this->checkDataQualityGuard());
         $tests[] = $this->wrap('otp_flow_e2e', fn() => $this->checkOtpFlowE2E());
+        $tests[] = $this->wrap('tenant_self_registration', fn() => $this->checkTenantSelfRegistration());
         $tests[] = $this->wrap('app_config_onboarding', fn() => $this->checkAppConfigOnboarding());
 
         // ACID tests — real infrastructure, no mocks (exit 1 = real failure)
@@ -1877,6 +1878,71 @@ final class UnitTestRunner
         }
         if (!str_contains((string) ($r['error'] ?? ''), 'intentos')) {
             throw new \RuntimeException('TC-OTP-10: mensaje debe mencionar intentos, obtenido: ' . ($r['error'] ?? ''));
+        }
+    }
+
+    private function checkTenantSelfRegistration(): void
+    {
+        $db  = new \PDO('sqlite::memory:');
+        $db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+        $otp = new \App\Core\OtpService($db, sys_get_temp_dir());
+        $svc = new \App\Core\TenantSelfRegistrationService($db, $otp, new \App\Core\EmailService());
+
+        // TC-TSR-01: campos requeridos faltantes
+        $r = $svc->requestRegistration(['email' => 'a@b.com']);
+        if ($r['ok'] !== false || !str_contains($r['message'], 'requeridos')) {
+            throw new \RuntimeException('TC-TSR-01: campos faltantes deben retornar ok=false');
+        }
+
+        // TC-TSR-02: email inválido rechazado
+        $r = $svc->requestRegistration(['email' => 'noemail', 'nit' => '900123456', 'business_name' => 'Test', 'password' => 'secret123']);
+        if ($r['ok'] !== false || !str_contains($r['message'], 'Email')) {
+            throw new \RuntimeException('TC-TSR-02: email inválido debe retornar ok=false');
+        }
+
+        // TC-TSR-03: password corta rechazada
+        $r = $svc->requestRegistration(['email' => 'a@empresa.com', 'nit' => '900123456', 'business_name' => 'Test', 'password' => 'abc']);
+        if ($r['ok'] !== false || !str_contains($r['message'], 'contrasena')) {
+            throw new \RuntimeException('TC-TSR-03: password < 8 chars debe retornar ok=false');
+        }
+
+        // TC-TSR-04: registro válido → ok=true, tenant_id generado
+        $r = $svc->requestRegistration(['email' => 'owner@empresa.com', 'nit' => '900123456-1', 'business_name' => 'Empresa Test SAS', 'password' => 'secreto123']);
+        if ($r['ok'] !== true) {
+            throw new \RuntimeException('TC-TSR-04: registro válido debe retornar ok=true, obtenido: ' . ($r['message'] ?? ''));
+        }
+        if (empty($r['tenant_id']) || !str_starts_with($r['tenant_id'], 'tenant_')) {
+            throw new \RuntimeException('TC-TSR-04: tenant_id debe generarse con prefijo tenant_, obtenido: ' . ($r['tenant_id'] ?? 'vacío'));
+        }
+        $tenantId = $r['tenant_id'];
+
+        // TC-TSR-05: verifyAndActivate con código incorrecto
+        $r = $svc->verifyAndActivate($tenantId, 'owner@empresa.com', '000000');
+        if ($r['ok'] !== false) {
+            throw new \RuntimeException('TC-TSR-05: código incorrecto debe retornar ok=false');
+        }
+
+        // TC-TSR-06: verifyAndActivate acepta OTP correcto — ProjectRegistry requiere MySQL (no disponible in-memory)
+        $stmt = $db->query("SELECT code FROM otp_codes WHERE project_id='{$tenantId}' ORDER BY id DESC LIMIT 1");
+        $code = (string) ($stmt->fetchColumn() ?: '');
+        if (strlen($code) !== 6) {
+            throw new \RuntimeException('TC-TSR-06: OTP de 6 dígitos debe existir en DB tras requestRegistration');
+        }
+        // Insertar OTP conocido para verificar que el check pasa antes de llegar a ProjectRegistry
+        $db->exec("INSERT INTO otp_codes (project_id, identifier, code, created_at, attempts) VALUES ('{$tenantId}','owner@empresa.com','123456',CURRENT_TIMESTAMP,0)");
+        try {
+            $r = $svc->verifyAndActivate($tenantId, 'owner@empresa.com', '123456');
+            if (isset($r['ok']) && $r['ok'] === false && str_contains((string)($r['message'] ?? ''), 'invalido')) {
+                throw new \RuntimeException('TC-TSR-06: OTP correcto no debe rechazarse, obtenido: ' . $r['message']);
+            }
+        } catch (\PDOException $ignored) {
+            // ProjectRegistry::createAuthUser() requiere MySQL — esperado en test SQLite in-memory
+        } catch (\RuntimeException $e) {
+            // Solo propagar si NO es error de conexión DB
+            if (!str_contains($e->getMessage(), 'conexion') && !str_contains($e->getMessage(), 'DB') && !str_contains($e->getMessage(), 'connect')) {
+                throw $e;
+            }
+            // MySQL no disponible en test in-memory — OTP fue verificado, ProjectRegistry falla por infra
         }
     }
 

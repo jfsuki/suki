@@ -115,43 +115,84 @@ final class BusinessConfigRepository
 
     private function ensureSchema(): void
     {
-        $this->db->getPdo()->exec('
-            CREATE TABLE IF NOT EXISTS tenant_business_config (
-                id              INTEGER PRIMARY KEY AUTOINCREMENT,
-                tenant_id       TEXT NOT NULL UNIQUE,
-                company_name    TEXT NOT NULL DEFAULT \'\',
-                trade_name      TEXT NOT NULL DEFAULT \'\',
-                nit             TEXT NOT NULL DEFAULT \'\',
-                address         TEXT NOT NULL DEFAULT \'\',
-                city            TEXT NOT NULL DEFAULT \'\',
-                department      TEXT NOT NULL DEFAULT \'\',
-                country         TEXT NOT NULL DEFAULT \'CO\',
-                phone           TEXT NOT NULL DEFAULT \'\',
-                email           TEXT NOT NULL DEFAULT \'\',
-                website         TEXT NOT NULL DEFAULT \'\',
-                tax_regime      TEXT NOT NULL DEFAULT \'\',
-                dian_resolution TEXT NOT NULL DEFAULT \'\',
-                dian_prefix     TEXT NOT NULL DEFAULT \'\',
-                dian_from_number INTEGER NOT NULL DEFAULT 0,
-                dian_to_number   INTEGER NOT NULL DEFAULT 0,
-                dian_valid_from  TEXT NOT NULL DEFAULT \'\',
-                dian_valid_until TEXT NOT NULL DEFAULT \'\',
-                document_footer  TEXT NOT NULL DEFAULT \'\',
-                primary_color    TEXT NOT NULL DEFAULT \'#1a56db\',
-                logo_path        TEXT NOT NULL DEFAULT \'\',
-                logo_base64      TEXT NOT NULL DEFAULT \'\',
-                currency         TEXT NOT NULL DEFAULT \'COP\',
-                smtp_host        TEXT NOT NULL DEFAULT \'\',
-                smtp_port        INTEGER NOT NULL DEFAULT 587,
-                smtp_user        TEXT NOT NULL DEFAULT \'\',
-                smtp_pass        TEXT NOT NULL DEFAULT \'\',
-                created_at       TEXT NOT NULL,
-                updated_at       TEXT NOT NULL
-            )
-        ');
-        $this->db->getPdo()->exec(
-            'CREATE INDEX IF NOT EXISTS idx_tbc_tenant ON tenant_business_config(tenant_id)'
-        );
+        $driver = $this->db->getPdo()->getAttribute(\PDO::ATTR_DRIVER_NAME);
+
+        if ($driver === 'mysql') {
+            $this->db->getPdo()->exec('
+                CREATE TABLE IF NOT EXISTS tenant_business_config (
+                    id              INT NOT NULL AUTO_INCREMENT,
+                    tenant_id       VARCHAR(64) NOT NULL,
+                    company_name    VARCHAR(200) NOT NULL DEFAULT \'\',
+                    trade_name      VARCHAR(200) NOT NULL DEFAULT \'\',
+                    nit             VARCHAR(20) NOT NULL DEFAULT \'\',
+                    address         VARCHAR(300) NOT NULL DEFAULT \'\',
+                    city            VARCHAR(100) NOT NULL DEFAULT \'\',
+                    department      VARCHAR(100) NOT NULL DEFAULT \'\',
+                    country         VARCHAR(10) NOT NULL DEFAULT \'CO\',
+                    phone           VARCHAR(30) NOT NULL DEFAULT \'\',
+                    email           VARCHAR(200) NOT NULL DEFAULT \'\',
+                    website         VARCHAR(200) NOT NULL DEFAULT \'\',
+                    tax_regime      VARCHAR(50) NOT NULL DEFAULT \'\',
+                    dian_resolution VARCHAR(100) NOT NULL DEFAULT \'\',
+                    dian_prefix     VARCHAR(10) NOT NULL DEFAULT \'\',
+                    dian_from_number INT NOT NULL DEFAULT 0,
+                    dian_to_number   INT NOT NULL DEFAULT 0,
+                    dian_valid_from  VARCHAR(20) NOT NULL DEFAULT \'\',
+                    dian_valid_until VARCHAR(20) NOT NULL DEFAULT \'\',
+                    document_footer  TEXT NOT NULL,
+                    primary_color    VARCHAR(20) NOT NULL DEFAULT \'#1a56db\',
+                    logo_path        VARCHAR(500) NOT NULL DEFAULT \'\',
+                    logo_base64      MEDIUMTEXT NOT NULL,
+                    currency         VARCHAR(10) NOT NULL DEFAULT \'COP\',
+                    smtp_host        VARCHAR(200) NOT NULL DEFAULT \'\',
+                    smtp_port        INT NOT NULL DEFAULT 587,
+                    smtp_user        VARCHAR(200) NOT NULL DEFAULT \'\',
+                    smtp_pass        VARCHAR(200) NOT NULL DEFAULT \'\',
+                    created_at       VARCHAR(30) NOT NULL DEFAULT \'\',
+                    updated_at       VARCHAR(30) NOT NULL DEFAULT \'\',
+                    PRIMARY KEY (id),
+                    UNIQUE KEY uk_tbc_tenant (tenant_id)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+            ');
+        } else {
+            $this->db->getPdo()->exec('
+                CREATE TABLE IF NOT EXISTS tenant_business_config (
+                    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id       TEXT NOT NULL UNIQUE,
+                    company_name    TEXT NOT NULL DEFAULT \'\',
+                    trade_name      TEXT NOT NULL DEFAULT \'\',
+                    nit             TEXT NOT NULL DEFAULT \'\',
+                    address         TEXT NOT NULL DEFAULT \'\',
+                    city            TEXT NOT NULL DEFAULT \'\',
+                    department      TEXT NOT NULL DEFAULT \'\',
+                    country         TEXT NOT NULL DEFAULT \'CO\',
+                    phone           TEXT NOT NULL DEFAULT \'\',
+                    email           TEXT NOT NULL DEFAULT \'\',
+                    website         TEXT NOT NULL DEFAULT \'\',
+                    tax_regime      TEXT NOT NULL DEFAULT \'\',
+                    dian_resolution TEXT NOT NULL DEFAULT \'\',
+                    dian_prefix     TEXT NOT NULL DEFAULT \'\',
+                    dian_from_number INTEGER NOT NULL DEFAULT 0,
+                    dian_to_number   INTEGER NOT NULL DEFAULT 0,
+                    dian_valid_from  TEXT NOT NULL DEFAULT \'\',
+                    dian_valid_until TEXT NOT NULL DEFAULT \'\',
+                    document_footer  TEXT NOT NULL DEFAULT \'\',
+                    primary_color    TEXT NOT NULL DEFAULT \'#1a56db\',
+                    logo_path        TEXT NOT NULL DEFAULT \'\',
+                    logo_base64      TEXT NOT NULL DEFAULT \'\',
+                    currency         TEXT NOT NULL DEFAULT \'COP\',
+                    smtp_host        TEXT NOT NULL DEFAULT \'\',
+                    smtp_port        INTEGER NOT NULL DEFAULT 587,
+                    smtp_user        TEXT NOT NULL DEFAULT \'\',
+                    smtp_pass        TEXT NOT NULL DEFAULT \'\',
+                    created_at       TEXT NOT NULL DEFAULT \'\',
+                    updated_at       TEXT NOT NULL DEFAULT \'\'
+                )
+            ');
+            $this->db->getPdo()->exec(
+                'CREATE INDEX IF NOT EXISTS idx_tbc_tenant ON tenant_business_config(tenant_id)'
+            );
+        }
     }
 
     // ─── Helpers ──────────────────────────────────────────────────────────────

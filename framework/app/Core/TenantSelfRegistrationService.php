@@ -37,20 +37,21 @@ final class TenantSelfRegistrationService
             return ['ok' => false, 'message' => 'La contrasena debe tener al menos 8 caracteres'];
         }
 
+        $this->ensureSchema();
+
         // Generar tenant_id único — nunca del payload
         $tenantId = 'tenant_' . bin2hex(random_bytes(8));
 
         // Guardar datos temporales mientras el OTP no sea verificado
         $this->storePendingTenant($tenantId, $data);
 
-        $code = $this->otpService->generate($data['email'], 'register');
-
-        $this->emailService->sendNotification($tenantId, [
-            'type'    => 'otp_registration',
-            'to'      => $data['email'],
-            'subject' => 'Codigo de verificacion SUKI — ' . $code,
-            'body'    => "Tu codigo de verificacion es: <strong>{$code}</strong>\n\nVigente por 15 minutos.\nSi no solicitaste este registro, ignora este email.",
-        ]);
+        // OtpService::send() genera el código, lo almacena y envía el email internamente.
+        // Firma: send(string $projectId, string $identifier, string $email): array
+        $sent = $this->otpService->send($tenantId, $data['email'], $data['email']);
+        if (!$sent['ok']) {
+            $this->deletePendingTenant($tenantId);
+            return ['ok' => false, 'message' => $sent['error'] ?? 'Error enviando codigo. Intentalo de nuevo.'];
+        }
 
         return [
             'ok'        => true,
@@ -64,8 +65,10 @@ final class TenantSelfRegistrationService
      */
     public function verifyAndActivate(string $tenantId, string $email, string $code): array
     {
-        if (!$this->otpService->verify($email, $code, 'register')) {
-            return ['ok' => false, 'message' => 'Codigo invalido o expirado'];
+        // OtpService::verify() firma: verify(string $projectId, string $identifier, string $code): array
+        $result = $this->otpService->verify($tenantId, $email, $code);
+        if (!$result['ok']) {
+            return ['ok' => false, 'message' => $result['error'] ?? 'Codigo invalido o expirado'];
         }
 
         $pending = $this->getPendingTenant($tenantId);
@@ -96,27 +99,36 @@ final class TenantSelfRegistrationService
         // La columna se llama password_hash pero almacena la contraseña sin hashear.
         // createAuthUser() aplica bcrypt — hacerlo aquí causaría doble hash.
         // La fila es eliminada inmediatamente tras la activación (ventana máx. 30 min).
-        $stmt = $this->db->prepare(
-            'INSERT INTO otp_pending_registrations
-             (tenant_id, email, phone, nit, business_name, password_hash, app_id, created_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
-             ON DUPLICATE KEY UPDATE email=VALUES(email), updated_at=NOW()'
-        );
-        $stmt->execute([
+        $driver = $this->db->getAttribute(\PDO::ATTR_DRIVER_NAME);
+        if ($driver === 'mysql') {
+            $sql = 'INSERT INTO otp_pending_registrations
+                    (tenant_id, email, phone, nit, business_name, password_hash, app_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, NOW())
+                    ON DUPLICATE KEY UPDATE email=VALUES(email), updated_at=NOW()';
+        } else {
+            $sql = 'INSERT OR REPLACE INTO otp_pending_registrations
+                    (tenant_id, email, phone, nit, business_name, password_hash, app_id, created_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)';
+        }
+        $this->db->prepare($sql)->execute([
             $tenantId,
             $data['email'],
             $data['phone'] ?? '',
             $data['nit'],
             $data['business_name'],
-            $data['password'],          // plain — createAuthUser() aplica bcrypt
+            $data['password'],
             $data['app_id'] ?? 'suki_erp',
         ]);
     }
 
     private function getPendingTenant(string $tenantId): ?array
     {
+        $driver   = $this->db->getAttribute(\PDO::ATTR_DRIVER_NAME);
+        $timeExpr = $driver === 'mysql'
+            ? 'NOW() - INTERVAL 30 MINUTE'
+            : "DATETIME('now', '-30 minutes')";
         $stmt = $this->db->prepare(
-            'SELECT * FROM otp_pending_registrations WHERE tenant_id = ? AND created_at > NOW() - INTERVAL 30 MINUTE'
+            'SELECT * FROM otp_pending_registrations WHERE tenant_id = ? AND created_at > ' . $timeExpr
         );
         $stmt->execute([$tenantId]);
         $row = $stmt->fetch(\PDO::FETCH_ASSOC);
@@ -125,7 +137,26 @@ final class TenantSelfRegistrationService
 
     private function deletePendingTenant(string $tenantId): void
     {
-        $stmt = $this->db->prepare('DELETE FROM otp_pending_registrations WHERE tenant_id = ?');
-        $stmt->execute([$tenantId]);
+        $this->db->prepare('DELETE FROM otp_pending_registrations WHERE tenant_id = ?')
+                 ->execute([$tenantId]);
+    }
+
+    private function ensureSchema(): void
+    {
+        $driver = $this->db->getAttribute(\PDO::ATTR_DRIVER_NAME);
+        if ($driver !== 'sqlite') {
+            return; // MySQL: la migración 028_tenant_auth.sql crea la tabla
+        }
+        $this->db->exec("CREATE TABLE IF NOT EXISTS otp_pending_registrations (
+            tenant_id     TEXT NOT NULL PRIMARY KEY,
+            email         TEXT NOT NULL,
+            phone         TEXT,
+            nit           TEXT NOT NULL,
+            business_name TEXT NOT NULL,
+            password_hash TEXT NOT NULL,
+            app_id        TEXT NOT NULL DEFAULT 'suki_erp',
+            created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
+            updated_at    DATETIME
+        )");
     }
 }

@@ -61,7 +61,13 @@ final class SkillRegistry
     {
         $memoryType = trim((string) ($skill['memory_type'] ?? ''));
         if ($memoryType !== '') {
-            $memoryType = QdrantVectorStore::assertMemoryType($memoryType);
+            try {
+                $memoryType = QdrantVectorStore::assertMemoryType($memoryType);
+            } catch (\RuntimeException $e) {
+                // Catalog may use non-Qdrant labels (e.g. "transactional", "informative").
+                // Those are not RAG memory types — silently treat as null for catalog loading.
+                $memoryType = '';
+            }
         }
 
         return [
