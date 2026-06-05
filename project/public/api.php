@@ -3473,6 +3473,46 @@ if ($route === 'auth/tenant-verify-otp') {
     return;
 }
 
+// GET /api/admin/users/pending — Lista usuarios con is_active=0 (requiere Torre auth)
+if ($route === 'admin/users/pending' && $method === 'GET') {
+    $isTowerAuth = ($_SESSION['suki_tower_auth'] ?? false) === true;
+    $masterKey   = (string) (getenv('SUKI_MASTER_KEY') ?: '');
+    $headerKey   = (string) ($_SERVER['HTTP_X_MASTER_KEY'] ?? '');
+    if (!$isTowerAuth && ($masterKey === '' || !hash_equals($masterKey, $headerKey))) {
+        respondJson($response, 'error', 'No autorizado', [], 401);
+        return;
+    }
+    $registry = new ProjectRegistry();
+    $users    = $registry->getUsersByStatus(0);
+    $safe     = array_map(function (array $u): array {
+        unset($u['password_hash'], $u['active_session_hash']);
+        return $u;
+    }, $users);
+    respondJson($response, 'success', count($safe) . ' usuarios pendientes', ['users' => $safe]);
+    return;
+}
+
+// POST /api/admin/users/{id}/activate — Activa usuario (is_active=0 → 1)
+if (preg_match('#^admin/users/([^/]+)/activate$#', $route, $_m) && $method === 'POST') {
+    $isTowerAuth = ($_SESSION['suki_tower_auth'] ?? false) === true;
+    $masterKey   = (string) (getenv('SUKI_MASTER_KEY') ?: '');
+    $headerKey   = (string) ($_SERVER['HTTP_X_MASTER_KEY'] ?? '');
+    if (!$isTowerAuth && ($masterKey === '' || !hash_equals($masterKey, $headerKey))) {
+        respondJson($response, 'error', 'No autorizado', [], 401);
+        return;
+    }
+    $userId   = rawurldecode((string) $_m[1]);
+    $registry = new ProjectRegistry();
+    $user     = $registry->getAuthUserById($userId);
+    if (!$user) {
+        respondJson($response, 'error', 'Usuario no encontrado', [], 404);
+        return;
+    }
+    $registry->updateAuthUserStatus($userId, 1);
+    respondJson($response, 'success', 'Usuario activado', ['user_id' => $userId]);
+    return;
+}
+
 if ($route === 'auth/me') {
     $user = $_SESSION['auth_user'] ?? null;
     if (!$user) {

@@ -29,13 +29,19 @@ if ($url === 'logout' || $url === 'builder/logout') {
 
 // 2. Definición de Rutas y Permisos
 // 'view' => path relativo a framework/views/
+$_projectViewsRoot = dirname(__DIR__, 2) . '/project/views';
+
 $routes = [
-    'login'         => ['view' => 'auth/login.php',         'public' => true],
-    'builder-login' => ['view' => 'auth/builder_login.php', 'public' => true],
-    'register'      => ['view' => 'auth/register.php',      'public' => true],
-    'marketplace' => ['view' => 'marketplace.php',      'public' => true],
-    'builder'     => ['view' => 'builder/chat_builder.php', 'role' => 'creator'],
-    'editor'      => ['view' => 'builder/formjson.php',     'role' => 'creator'],
+    'login'           => ['view' => 'auth/login.php',                         'public' => true],
+    'builder-login'   => ['view' => 'auth/builder_login.php',                  'public' => true],
+    'register'        => ['view' => 'auth/register.php',                       'public' => true],
+    'marketplace'     => ['view' => 'marketplace.php',                         'public' => true],
+    'otp-request'     => ['view' => 'auth/otp-request.php',                    'public' => true],
+    'otp-verify'      => ['view' => 'auth/otp-verify.php',                     'public' => true],
+    'register-tenant' => ['view_abs' => $_projectViewsRoot . '/auth/register_tenant.php', 'public' => true],
+    'verify-otp'      => ['view_abs' => $_projectViewsRoot . '/auth/verify_otp.php',      'public' => true],
+    'builder'         => ['view' => 'builder/chat_builder.php',                'role' => 'creator'],
+    'editor'          => ['view' => 'builder/formjson.php',                    'role' => 'creator'],
 ];
 
 // 3. Lógica de Enrutado y Seguridad
@@ -55,10 +61,11 @@ if (array_key_exists($url, $routes)) {
         }
     }
 
-    $viewFile = __DIR__ . '/../views/' . $route['view'];
-    
+    $viewFile = isset($route['view_abs'])
+        ? $route['view_abs']
+        : __DIR__ . '/../views/' . $route['view'];
+
     if (file_exists($viewFile)) {
-        // Cargar la vista desde la capa oculta
         require_once $viewFile;
     } else {
         http_response_code(500);

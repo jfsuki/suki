@@ -42,13 +42,14 @@
   <div class="login-link">Ya tienes cuenta? <a href="/login">Iniciar sesion</a></div>
 </div>
 <script>
+const SUKI_BASE = window.location.pathname.includes('/suki/') ? '/suki' : '';
 document.getElementById('regForm').addEventListener('submit', async (e) => {
   e.preventDefault();
   const fd = new FormData(e.target);
   const body = Object.fromEntries(fd.entries());
   const msg = document.getElementById('msg');
   try {
-    const r = await fetch('/api/auth/tenant-register', {
+    const r = await fetch(SUKI_BASE + '/api/auth/tenant-register', {
       method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify(body)
     });
     const data = await r.json();
@@ -58,7 +59,7 @@ document.getElementById('regForm').addEventListener('submit', async (e) => {
       msg.textContent = data.message;
       sessionStorage.setItem('reg_tenant_id', data.tenant_id);
       sessionStorage.setItem('reg_email', body.email);
-      setTimeout(() => window.location.href = '/auth/verify-otp', 1500);
+      setTimeout(() => window.location.href = SUKI_BASE + '/marketplace/verify-otp', 1500);
     } else {
       msg.className = 'msg err';
       msg.textContent = data.message || 'Error al registrar';

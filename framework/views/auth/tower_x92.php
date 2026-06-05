@@ -90,7 +90,8 @@ try {
     $userMemory = $knowledgeRepo->getUserMemoryNodes(1); 
     
     $catalog = $metricsRepo->getAppCatalogStats();
-    $creators = $registry->getMasterUsersByType('creator');
+    $creators        = $registry->getMasterUsersByType('creator');
+    $pendingUsers    = $registry->getUsersByStatus(0);
 
     // 2.1 Training Portal Action
     if ($action === 'ingest_knowledge' && $_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -303,6 +304,12 @@ function safeStr($s): string {
             <a href="?tab=library" class="<?= $tab==='library'?'active':'' ?>">Biblioteca Conocimiento</a>
             <a href="?tab=catalog" class="<?= $tab==='catalog'?'active':'' ?>">Catálogo Apps</a>
             <a href="?tab=creators" class="<?= $tab==='creators'?'active':'' ?>">Creators Hub</a>
+            <a href="?tab=usuarios" class="<?= $tab==='usuarios'?'active':'' ?>">
+                👤 Usuarios
+                <?php if (!empty($pendingUsers)): ?>
+                    <span style="background:#EF4444;color:#fff;border-radius:10px;padding:1px 7px;font-size:10px;margin-left:6px;font-weight:800;"><?= count($pendingUsers) ?></span>
+                <?php endif; ?>
+            </a>
             <a href="?tab=training" class="<?= $tab==='training'?'active':'' ?>">🧠 Entrenamiento AI</a>
             <a href="?tab=feedback" class="<?= $tab==='feedback'?'active':'' ?>">Feedback</a>
         </nav>
@@ -679,6 +686,46 @@ function safeStr($s): string {
              </div>
         </div>
 
+        <!-- TAB: USUARIOS PENDIENTES -->
+        <div id="usuarios" class="tab-pane <?= $tab==='usuarios'?'active':'' ?>">
+            <div class="section-title">👤 Gestión de Usuarios</div>
+            <div class="card">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+                    <p style="font-size:14px; color:var(--text-dim);">Usuarios registrados vía formulario pendientes de aprobación (<code style="font-size:11px;">is_active=0</code>).</p>
+                    <button onclick="loadPendingUsers()" style="background:var(--surface-light);color:var(--accent);border:1px solid var(--border);padding:8px 16px;border-radius:10px;cursor:pointer;font-size:12px;font-weight:700;">↻ Refrescar</button>
+                </div>
+                <table style="width:100%; border-collapse:collapse; font-size:13px;">
+                    <thead>
+                        <tr style="text-align:left; color:var(--text-dim); border-bottom:1px solid var(--border);">
+                            <th style="padding:12px;">ID / Email</th>
+                            <th style="padding:12px;">Empresa</th>
+                            <th style="padding:12px;">NIT</th>
+                            <th style="padding:12px;">Registrado</th>
+                            <th style="padding:12px;">Acción</th>
+                        </tr>
+                    </thead>
+                    <tbody id="pending-users-body">
+                        <?php if (empty($pendingUsers)): ?>
+                        <tr><td colspan="5" style="padding:30px; text-align:center; color:var(--text-dim);">No hay usuarios pendientes de activación.</td></tr>
+                        <?php else: foreach ($pendingUsers as $pu): ?>
+                        <tr style="border-bottom:1px solid rgba(255,255,255,0.05);" id="pu-row-<?= htmlspecialchars($pu['id']) ?>">
+                            <td style="padding:12px; font-family:'JetBrains Mono'; color:var(--accent); font-size:11px;"><?= htmlspecialchars($pu['id']) ?></td>
+                            <td style="padding:12px; font-weight:600;"><?= htmlspecialchars((string)($pu['full_name'] ?? $pu['label'] ?? '—')) ?></td>
+                            <td style="padding:12px; color:var(--text-dim);"><?= htmlspecialchars((string)($pu['nit'] ?? '—')) ?></td>
+                            <td style="padding:12px; color:var(--text-dim); font-size:11px;"><?= htmlspecialchars((string)($pu['created_at'] ?? '—')) ?></td>
+                            <td style="padding:12px;">
+                                <button onclick="activateUser('<?= htmlspecialchars($pu['id']) ?>')"
+                                    style="background:#059669;color:#fff;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:11px;font-weight:800;">
+                                    ✓ Activar
+                                </button>
+                            </td>
+                        </tr>
+                        <?php endforeach; endif; ?>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
         <!-- TAB: AI TRAINING CENTER v1.0 [KTC ENGINE] -->
         <div id="training" class="tab-pane <?= $tab==='training'?'active':'' ?>">
              <div class="section-title">🧠 Centro de Entrenamiento AI (KTC Engine)</div>
@@ -930,6 +977,53 @@ function safeStr($s): string {
 
     <script>
         const SUKI_BASE = <?= json_encode((str_contains($_SERVER['REQUEST_URI'] ?? '', '/suki/')) ? '/suki' : '') ?>;
+
+        async function activateUser(userId) {
+            if (!confirm('Activar usuario: ' + userId + '?')) return;
+            try {
+                const r = await fetch(SUKI_BASE + '/api/admin/users/' + encodeURIComponent(userId) + '/activate', {
+                    method: 'POST', headers: {'Content-Type': 'application/json'}
+                });
+                const data = await r.json();
+                if (data.ok || data.status === 'success') {
+                    const row = document.getElementById('pu-row-' + userId);
+                    if (row) row.style.opacity = '0.3';
+                    alert('Usuario activado. Ya puede iniciar sesion.');
+                } else {
+                    alert('Error: ' + (data.message || 'No se pudo activar'));
+                }
+            } catch (e) {
+                alert('Error de conexion');
+            }
+        }
+
+        async function loadPendingUsers() {
+            try {
+                const r = await fetch(SUKI_BASE + '/api/admin/users/pending');
+                const data = await r.json();
+                const tbody = document.getElementById('pending-users-body');
+                if (!tbody) return;
+                if (!data.users || data.users.length === 0) {
+                    tbody.innerHTML = '<tr><td colspan="5" style="padding:30px;text-align:center;color:var(--text-dim);">No hay usuarios pendientes.</td></tr>';
+                    return;
+                }
+                tbody.innerHTML = data.users.map(u => `
+                    <tr style="border-bottom:1px solid rgba(255,255,255,0.05);" id="pu-row-${u.id}">
+                        <td style="padding:12px;font-family:'JetBrains Mono';color:var(--accent);font-size:11px;">${u.id}</td>
+                        <td style="padding:12px;font-weight:600;">${u.full_name || u.label || '—'}</td>
+                        <td style="padding:12px;color:var(--text-dim);">${u.nit || '—'}</td>
+                        <td style="padding:12px;color:var(--text-dim);font-size:11px;">${u.created_at || '—'}</td>
+                        <td style="padding:12px;">
+                            <button onclick="activateUser('${u.id}')"
+                                style="background:#059669;color:#fff;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:11px;font-weight:800;">
+                                ✓ Activar
+                            </button>
+                        </td>
+                    </tr>`).join('');
+            } catch (e) {
+                console.error('loadPendingUsers error', e);
+            }
+        }
     </script>
     <script>
         function toggleDetails(id) {

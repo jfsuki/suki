@@ -41,6 +41,7 @@
   <div class="back"><a href="/auth/register">Volver al registro</a></div>
 </div>
 <script>
+const SUKI_BASE = window.location.pathname.includes('/suki/') ? '/suki' : '';
 const tenantId = sessionStorage.getItem('reg_tenant_id') || '';
 const email    = sessionStorage.getItem('reg_email') || '';
 if (email) document.getElementById('subText').textContent = 'Ingresa el codigo enviado a ' + email;
@@ -50,7 +51,7 @@ document.getElementById('verifyForm').addEventListener('submit', async (e) => {
   const code = e.target.code.value.trim();
   const msg  = document.getElementById('msg');
   try {
-    const r = await fetch('/api/auth/tenant-verify-otp', {
+    const r = await fetch(SUKI_BASE + '/api/auth/tenant-verify-otp', {
       method: 'POST', headers: {'Content-Type': 'application/json'},
       body: JSON.stringify({ tenant_id: tenantId, email, code })
     });
@@ -61,7 +62,7 @@ document.getElementById('verifyForm').addEventListener('submit', async (e) => {
       msg.textContent = 'Cuenta activada! Redirigiendo al login...';
       sessionStorage.removeItem('reg_tenant_id');
       sessionStorage.removeItem('reg_email');
-      setTimeout(() => window.location.href = '/login', 2000);
+      setTimeout(() => window.location.href = SUKI_BASE + '/marketplace/login', 2000);
     } else {
       msg.className = 'msg err';
       msg.textContent = data.message || 'Codigo incorrecto';
