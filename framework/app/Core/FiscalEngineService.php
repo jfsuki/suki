@@ -221,6 +221,15 @@ final class FiscalEngineService
         ?AlanubePayloadBuilderCO $builder = null
     ): array {
         $startedAt = microtime(true);
+
+        // Verificar modo fiscal: si Alanube no está configurado → ticket no electrónico.
+        // También si el tenant configuró explícitamente fiscal_mode=ticket.
+        $fiscalMode = $this->resolveFiscalMode($tenantId, $appId);
+        if ($fiscalMode === 'ticket') {
+            $receipt = new NonElectronicReceiptService();
+            return $receipt->generateFromDocument($tenantId, $documentId, $appId);
+        }
+
         $document = $this->getDocument($tenantId, $documentId, $appId);
         $currentStatus = (string) ($document['status'] ?? '');
         if (!in_array($currentStatus, ['prepared', 'pending'], true)) {
@@ -247,6 +256,11 @@ final class FiscalEngineService
         );
 
         $status = (int) ($result['status'] ?? 0);
+        // Alanube no configurado (no_token) → fallback gracioso a ticket
+        if (($result['mode'] ?? '') === 'no_token') {
+            $receipt = new NonElectronicReceiptService();
+            return $receipt->generateFromDocument($tenantId, $documentId, $appId);
+        }
         if ($status < 200 || $status >= 300) {
             throw new RuntimeException('FISCAL_SUBMIT_PROVIDER_ERROR');
         }
@@ -1689,5 +1703,41 @@ final class FiscalEngineService
         ];
         $this->auditLogger->log('fiscal_' . $actionName, 'fiscal_document', (string) ($document['id'] ?? ''), $payload);
         $this->eventLogger->log($actionName, $tenantId, $payload);
+    }
+
+    /**
+     * Resuelve el modo fiscal del tenant:
+     *  - 'ticket'     → ticket no electrónico (sin DIAN)
+     *  - 'electronic' → factura electrónica vía Alanube
+     *
+     * Prioridad: env FISCAL_MODE → config de tenant → auto-detectar por token Alanube.
+     */
+    private function resolveFiscalMode(string $tenantId, ?string $appId): string
+    {
+        // 1. Variable de entorno global (override de instalación)
+        $envMode = strtolower(trim((string) (getenv('FISCAL_MODE') ?: '')));
+        if (in_array($envMode, ['ticket', 'electronic'], true)) {
+            return $envMode;
+        }
+
+        // 2. Configuración por tenant en app_tenant_config
+        try {
+            $db   = Database::connection();
+            $stmt = $db->prepare(
+                'SELECT field_value FROM app_tenant_config
+                 WHERE tenant_id = :tid AND field_key = :fk
+                 ORDER BY updated_at DESC LIMIT 1'
+            );
+            $stmt->execute([':tid' => $tenantId, ':fk' => 'fiscal_mode']);
+            $tenantMode = strtolower(trim((string) ($stmt->fetchColumn() ?: '')));
+            if (in_array($tenantMode, ['ticket', 'electronic'], true)) {
+                return $tenantMode;
+            }
+        } catch (\Throwable $e) {
+            // Si la tabla no existe aún, ignorar y continuar
+        }
+
+        // 3. Auto-detectar: si Alanube está configurado → electronic, si no → ticket
+        return AlanubeClient::isConfigured() ? 'electronic' : 'ticket';
     }
 }

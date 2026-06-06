@@ -9,6 +9,17 @@ final class AlanubeIntegrationAdapter implements IntegrationAdapterInterface
 {
     public function execute(string $action, array $integration, array $payload, array $context = []): array
     {
+        // Si no hay token, retornar modo no-configurado en lugar de exception fatal.
+        // FiscalEngineService detecta esto y enruta a NonElectronicReceiptService.
+        if (!AlanubeClient::isConfigured()) {
+            return [
+                'ok'     => false,
+                'mode'   => 'no_token',
+                'status' => 0,
+                'error'  => 'ALANUBE_NOT_CONFIGURED',
+                'message' => 'Alanube no configurado. Usando modo ticket no electrónico.',
+            ];
+        }
         $token = $this->resolveToken($integration, $payload);
         $baseUrl = $this->resolveBaseUrl($integration);
         $client = new AlanubeClient($baseUrl, $token);

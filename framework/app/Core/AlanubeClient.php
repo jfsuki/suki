@@ -23,6 +23,15 @@ final class AlanubeClient
         }
     }
 
+    /**
+     * Verifica si el token Alanube está configurado sin lanzar excepción.
+     * Usar para decidir el modo fiscal (ticket vs electrónico) antes de intentar conectar.
+     */
+    public static function isConfigured(string $envKey = 'ALANUBE_TOKEN'): bool
+    {
+        return trim((string) (getenv($envKey) ?: '')) !== '';
+    }
+
     public function testConnection(): array
     {
         return $this->request('GET', '/company', [], true);

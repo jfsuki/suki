@@ -131,6 +131,7 @@ final class UnitTestRunner
         $tests[] = $this->wrap('data_quality_guard', fn() => $this->checkDataQualityGuard());
         $tests[] = $this->wrap('otp_flow_e2e', fn() => $this->checkOtpFlowE2E());
         $tests[] = $this->wrap('tenant_self_registration', fn() => $this->checkTenantSelfRegistration());
+        $tests[] = $this->wrap('non_electronic_receipt', fn() => $this->checkNonElectronicReceipt());
         $tests[] = $this->wrap('app_config_onboarding', fn() => $this->checkAppConfigOnboarding());
 
         // ACID tests — real infrastructure, no mocks (exit 1 = real failure)
@@ -1944,6 +1945,82 @@ final class UnitTestRunner
             }
             // MySQL no disponible en test in-memory — OTP fue verificado, ProjectRegistry falla por infra
         }
+    }
+
+    private function checkNonElectronicReceipt(): void
+    {
+        $db = new \PDO('sqlite::memory:');
+        $db->setAttribute(\PDO::ATTR_ERRMODE, \PDO::ERRMODE_EXCEPTION);
+
+        // TC-NER-01: AlanubeClient::isConfigured() retorna false cuando ALANUBE_TOKEN vacío
+        $orig = getenv('ALANUBE_TOKEN');
+        putenv('ALANUBE_TOKEN=');
+        if (\App\Core\AlanubeClient::isConfigured()) {
+            throw new \RuntimeException('TC-NER-01: isConfigured() debe retornar false cuando token vacío');
+        }
+
+        // TC-NER-02: AlanubeClient::isConfigured() retorna true con token presente
+        putenv('ALANUBE_TOKEN=test_token_123');
+        if (!\App\Core\AlanubeClient::isConfigured()) {
+            throw new \RuntimeException('TC-NER-02: isConfigured() debe retornar true con token presente');
+        }
+        putenv('ALANUBE_TOKEN=' . ($orig ?: ''));
+
+        // TC-NER-03: generateDirect() genera ticket con número secuencial
+        $svc = new \App\Core\NonElectronicReceiptService($db);
+        $payload = [
+            'customer_name' => 'Empresa Test SAS',
+            'lines' => [
+                ['description' => 'Arroz 3kg', 'quantity' => 2, 'unit_price' => 5000, 'amount' => 10000],
+                ['description' => 'Aceite 1L',  'quantity' => 1, 'unit_price' => 8500, 'amount' => 8500],
+            ],
+            'subtotal' => 18500,
+            'tax'      => 1480,
+            'total'    => 19980,
+            'currency' => 'COP',
+        ];
+        $r = $svc->generateDirect('tenant_test', $payload, 'suki_erp');
+        if ($r['ok'] !== true) {
+            throw new \RuntimeException('TC-NER-03: generateDirect() debe retornar ok=true');
+        }
+        if (!str_starts_with($r['ticket_number'], 'TKT-')) {
+            throw new \RuntimeException('TC-NER-03: ticket_number debe iniciar con TKT-, obtenido: ' . $r['ticket_number']);
+        }
+        if (!str_contains($r['html'], 'NO EQUIVALE A FACTURA')) {
+            throw new \RuntimeException('TC-NER-03: HTML debe incluir disclaimer DIAN');
+        }
+        if (!str_contains($r['html'], 'Empresa Test SAS')) {
+            throw new \RuntimeException('TC-NER-03: HTML debe incluir nombre del cliente');
+        }
+        if (!str_contains($r['html'], 'Arroz 3kg')) {
+            throw new \RuntimeException('TC-NER-03: HTML debe incluir los items de la venta');
+        }
+
+        // TC-NER-04: números de secuencia incrementan
+        $r2 = $svc->generateDirect('tenant_test', $payload, 'suki_erp');
+        $r3 = $svc->generateDirect('tenant_test', $payload, 'suki_erp');
+        $seq1 = (int) substr($r['ticket_number'],  -4);
+        $seq2 = (int) substr($r2['ticket_number'], -4);
+        $seq3 = (int) substr($r3['ticket_number'], -4);
+        if ($seq2 !== $seq1 + 1 || $seq3 !== $seq1 + 2) {
+            throw new \RuntimeException("TC-NER-04: secuencia debe incrementar: {$seq1},{$seq2},{$seq3}");
+        }
+
+        // TC-NER-05: diferentes tenants tienen secuencias independientes
+        $r4 = $svc->generateDirect('tenant_otro', $payload, 'suki_erp');
+        $seq4 = (int) substr($r4['ticket_number'], -4);
+        if ($seq4 !== 1) {
+            throw new \RuntimeException('TC-NER-05: nuevo tenant debe iniciar en secuencia 1, obtenido: ' . $seq4);
+        }
+
+        // TC-NER-06: AlanubeIntegrationAdapter retorna no_token cuando ALANUBE_TOKEN vacío
+        putenv('ALANUBE_TOKEN=');
+        $adapter = new \App\Core\AlanubeIntegrationAdapter();
+        $result  = $adapter->execute('emit_document', [], ['endpoint' => '/documents', 'body' => []], []);
+        if (($result['mode'] ?? '') !== 'no_token') {
+            throw new \RuntimeException('TC-NER-06: adapter debe retornar mode=no_token cuando token vacío');
+        }
+        putenv('ALANUBE_TOKEN=' . ($orig ?: ''));
     }
 
     private function checkAppConfigOnboarding(): void
