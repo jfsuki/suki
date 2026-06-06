@@ -1,111 +1,3842 @@
 [
-  {"codigo":"1",      "nombre":"ACTIVOS",                                     "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"clase",     "parent":null},
-  {"codigo":"11",     "nombre":"Disponible",                                   "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"grupo",     "parent":"1"},
-  {"codigo":"1105",   "nombre":"Caja",                                         "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"11"},
-  {"codigo":"110505", "nombre":"Caja general",                                 "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"1105"},
-  {"codigo":"110510", "nombre":"Cajas menores",                                "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"1105"},
-  {"codigo":"1110",   "nombre":"Bancos",                                       "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"11"},
-  {"codigo":"111005", "nombre":"Moneda nacional",                              "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"1110"},
-  {"codigo":"111010", "nombre":"Moneda extranjera",                            "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"1110"},
-  {"codigo":"1115",   "nombre":"Remesas en tránsito",                          "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"11"},
-  {"codigo":"111505", "nombre":"En moneda nacional",                           "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"1115"},
-  {"codigo":"12",     "nombre":"Inversiones",                                  "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"grupo",     "parent":"1"},
-  {"codigo":"13",     "nombre":"Deudores",                                     "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"grupo",     "parent":"1"},
-  {"codigo":"1305",   "nombre":"Clientes",                                     "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"13"},
-  {"codigo":"130505", "nombre":"Clientes nacionales",                          "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"1305"},
-  {"codigo":"130510", "nombre":"Clientes del exterior",                        "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"1305"},
-  {"codigo":"1330",   "nombre":"Anticipos y avances",                          "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"13"},
-  {"codigo":"1355",   "nombre":"Anticipo de impuestos y contribuciones",       "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"13"},
-  {"codigo":"135515", "nombre":"Anticipo impuesto de renta",                   "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"1355"},
-  {"codigo":"135520", "nombre":"IVA retenido (IVA descontable)",               "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"1355"},
-  {"codigo":"1360",   "nombre":"Reclamaciones",                                "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"13"},
-  {"codigo":"1365",   "nombre":"Cuentas por cobrar a trabajadores",            "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"13"},
-  {"codigo":"14",     "nombre":"Inventarios",                                  "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"grupo",     "parent":"1"},
-  {"codigo":"1405",   "nombre":"Materias primas",                              "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"14"},
-  {"codigo":"1430",   "nombre":"Productos terminados",                         "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"14"},
-  {"codigo":"1435",   "nombre":"Mercancías no fabricadas por la empresa",      "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"14"},
-  {"codigo":"143505", "nombre":"En almacén propio",                            "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"1435"},
-  {"codigo":"1455",   "nombre":"Materiales, repuestos y accesorios",           "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"14"},
-  {"codigo":"15",     "nombre":"Propiedad, planta y equipo",                   "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"grupo",     "parent":"1"},
-  {"codigo":"1504",   "nombre":"Terrenos",                                     "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"15"},
-  {"codigo":"1516",   "nombre":"Construcciones y edificaciones",               "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"15"},
-  {"codigo":"1524",   "nombre":"Equipo de oficina",                            "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"15"},
-  {"codigo":"1528",   "nombre":"Equipo de computación y comunicación",         "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"15"},
-  {"codigo":"1592",   "nombre":"Depreciación acumulada",                       "tipo":"ACTIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"15"},
-  {"codigo":"2",      "nombre":"PASIVOS",                                      "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"clase",     "parent":null},
-  {"codigo":"21",     "nombre":"Obligaciones financieras",                     "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"grupo",     "parent":"2"},
-  {"codigo":"2105",   "nombre":"Bancos nacionales",                            "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"21"},
-  {"codigo":"210505", "nombre":"Crédito ordinario",                            "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"subcuenta", "parent":"2105"},
-  {"codigo":"22",     "nombre":"Proveedores",                                  "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"grupo",     "parent":"2"},
-  {"codigo":"2205",   "nombre":"Proveedores nacionales",                       "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"22"},
-  {"codigo":"220505", "nombre":"Proveedores nacionales — bienes",              "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"subcuenta", "parent":"2205"},
-  {"codigo":"2210",   "nombre":"Proveedores del exterior",                     "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"22"},
-  {"codigo":"23",     "nombre":"Cuentas por pagar",                            "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"grupo",     "parent":"2"},
-  {"codigo":"2335",   "nombre":"Costos y gastos por pagar",                    "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"23"},
-  {"codigo":"2365",   "nombre":"Retención en la fuente",                       "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"23"},
-  {"codigo":"236505", "nombre":"Salarios y pagos laborales",                   "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"subcuenta", "parent":"2365"},
-  {"codigo":"236515", "nombre":"Honorarios",                                   "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"subcuenta", "parent":"2365"},
-  {"codigo":"236520", "nombre":"Servicios",                                    "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"subcuenta", "parent":"2365"},
-  {"codigo":"2367",   "nombre":"Impuesto de industria y comercio retenido",   "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"23"},
-  {"codigo":"2368",   "nombre":"Impuesto de timbre",                           "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"23"},
-  {"codigo":"24",     "nombre":"Impuestos, gravámenes y tasas",                "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"grupo",     "parent":"2"},
-  {"codigo":"2404",   "nombre":"De renta y complementarios",                   "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"24"},
-  {"codigo":"2408",   "nombre":"Impuesto sobre las ventas por pagar",          "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"24"},
-  {"codigo":"240805", "nombre":"IVA generado (ventas)",                        "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"subcuenta", "parent":"2408"},
-  {"codigo":"240810", "nombre":"IVA descontable (compras)",                    "tipo":"ACTIVO",     "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"2408"},
-  {"codigo":"2412",   "nombre":"Impuesto de industria y comercio",             "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"24"},
-  {"codigo":"25",     "nombre":"Obligaciones laborales",                       "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"grupo",     "parent":"2"},
-  {"codigo":"2505",   "nombre":"Salarios por pagar",                           "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"25"},
-  {"codigo":"2510",   "nombre":"Cesantías consolidadas",                       "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"25"},
-  {"codigo":"2515",   "nombre":"Intereses sobre cesantías",                    "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"25"},
-  {"codigo":"2520",   "nombre":"Prima de servicios",                           "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"25"},
-  {"codigo":"2525",   "nombre":"Vacaciones consolidadas",                      "tipo":"PASIVO",     "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"25"},
-  {"codigo":"3",      "nombre":"PATRIMONIO",                                   "tipo":"PATRIMONIO", "naturaleza":"CREDITO", "nivel":"clase",     "parent":null},
-  {"codigo":"31",     "nombre":"Capital social",                               "tipo":"PATRIMONIO", "naturaleza":"CREDITO", "nivel":"grupo",     "parent":"3"},
-  {"codigo":"3105",   "nombre":"Capital suscrito y pagado",                    "tipo":"PATRIMONIO", "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"31"},
-  {"codigo":"33",     "nombre":"Reservas",                                     "tipo":"PATRIMONIO", "naturaleza":"CREDITO", "nivel":"grupo",     "parent":"3"},
-  {"codigo":"3305",   "nombre":"Reserva legal",                                "tipo":"PATRIMONIO", "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"33"},
-  {"codigo":"3310",   "nombre":"Reserva estatutaria",                          "tipo":"PATRIMONIO", "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"33"},
-  {"codigo":"36",     "nombre":"Resultados del ejercicio",                     "tipo":"PATRIMONIO", "naturaleza":"CREDITO", "nivel":"grupo",     "parent":"3"},
-  {"codigo":"3605",   "nombre":"Utilidad del ejercicio",                       "tipo":"PATRIMONIO", "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"36"},
-  {"codigo":"3610",   "nombre":"Pérdida del ejercicio",                        "tipo":"PATRIMONIO", "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"36"},
-  {"codigo":"4",      "nombre":"INGRESOS",                                     "tipo":"INGRESO",    "naturaleza":"CREDITO", "nivel":"clase",     "parent":null},
-  {"codigo":"41",     "nombre":"Ingresos operacionales",                       "tipo":"INGRESO",    "naturaleza":"CREDITO", "nivel":"grupo",     "parent":"4"},
-  {"codigo":"4135",   "nombre":"Comercio al por mayor y al por menor",         "tipo":"INGRESO",    "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"41"},
-  {"codigo":"413505", "nombre":"Ventas de mercancías",                         "tipo":"INGRESO",    "naturaleza":"CREDITO", "nivel":"subcuenta", "parent":"4135"},
-  {"codigo":"4145",   "nombre":"Servicios",                                    "tipo":"INGRESO",    "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"41"},
-  {"codigo":"414505", "nombre":"Servicios técnicos",                           "tipo":"INGRESO",    "naturaleza":"CREDITO", "nivel":"subcuenta", "parent":"4145"},
-  {"codigo":"414510", "nombre":"Servicios de consultoría",                     "tipo":"INGRESO",    "naturaleza":"CREDITO", "nivel":"subcuenta", "parent":"4145"},
-  {"codigo":"42",     "nombre":"Ingresos no operacionales",                    "tipo":"INGRESO",    "naturaleza":"CREDITO", "nivel":"grupo",     "parent":"4"},
-  {"codigo":"4210",   "nombre":"Financieros",                                  "tipo":"INGRESO",    "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"42"},
-  {"codigo":"4220",   "nombre":"Arrendamientos",                               "tipo":"INGRESO",    "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"42"},
-  {"codigo":"4245",   "nombre":"Utilidad en venta de propiedades",             "tipo":"INGRESO",    "naturaleza":"CREDITO", "nivel":"cuenta",    "parent":"42"},
-  {"codigo":"5",      "nombre":"GASTOS",                                       "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"clase",     "parent":null},
-  {"codigo":"51",     "nombre":"Gastos operacionales de administración",       "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"grupo",     "parent":"5"},
-  {"codigo":"5105",   "nombre":"Gastos de personal",                           "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"51"},
-  {"codigo":"510506", "nombre":"Sueldos",                                      "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"5105"},
-  {"codigo":"510527", "nombre":"Dotación y suministro a trabajadores",         "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"5105"},
-  {"codigo":"5110",   "nombre":"Honorarios",                                   "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"51"},
-  {"codigo":"5115",   "nombre":"Impuestos",                                    "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"51"},
-  {"codigo":"5120",   "nombre":"Arrendamientos",                               "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"51"},
-  {"codigo":"5135",   "nombre":"Servicios",                                    "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"51"},
-  {"codigo":"5145",   "nombre":"Mantenimiento y reparaciones",                 "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"51"},
-  {"codigo":"5160",   "nombre":"Depreciaciones",                               "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"51"},
-  {"codigo":"5195",   "nombre":"Diversos",                                     "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"51"},
-  {"codigo":"52",     "nombre":"Gastos operacionales de ventas",               "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"grupo",     "parent":"5"},
-  {"codigo":"5205",   "nombre":"Gastos de personal (ventas)",                  "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"52"},
-  {"codigo":"5225",   "nombre":"Publicidad, propaganda y promoción",           "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"52"},
-  {"codigo":"53",     "nombre":"Gastos no operacionales",                      "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"grupo",     "parent":"5"},
-  {"codigo":"5305",   "nombre":"Financieros",                                  "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"53"},
-  {"codigo":"5310",   "nombre":"Pérdida en venta y retiro de bienes",          "tipo":"GASTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"53"},
-  {"codigo":"6",      "nombre":"COSTOS DE VENTAS",                             "tipo":"COSTO",      "naturaleza":"DEBITO",  "nivel":"clase",     "parent":null},
-  {"codigo":"61",     "nombre":"Costo de ventas y de prestación de servicios", "tipo":"COSTO",      "naturaleza":"DEBITO",  "nivel":"grupo",     "parent":"6"},
-  {"codigo":"6135",   "nombre":"Comercio al por mayor y al por menor",         "tipo":"COSTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"61"},
-  {"codigo":"613505", "nombre":"Costo de mercancías vendidas",                 "tipo":"COSTO",      "naturaleza":"DEBITO",  "nivel":"subcuenta", "parent":"6135"},
-  {"codigo":"6145",   "nombre":"Servicios",                                    "tipo":"COSTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"61"},
-  {"codigo":"7",      "nombre":"COSTOS DE PRODUCCIÓN O DE OPERACIÓN",          "tipo":"COSTO",      "naturaleza":"DEBITO",  "nivel":"clase",     "parent":null},
-  {"codigo":"71",     "nombre":"Materia prima y materiales",                   "tipo":"COSTO",      "naturaleza":"DEBITO",  "nivel":"grupo",     "parent":"7"},
-  {"codigo":"7105",   "nombre":"Materias primas",                              "tipo":"COSTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"71"},
-  {"codigo":"72",     "nombre":"Mano de obra directa",                         "tipo":"COSTO",      "naturaleza":"DEBITO",  "nivel":"grupo",     "parent":"7"},
-  {"codigo":"7205",   "nombre":"Salarios",                                     "tipo":"COSTO",      "naturaleza":"DEBITO",  "nivel":"cuenta",    "parent":"72"}
+    {
+        "codigo": "1",
+        "nombre": "ACTIVO",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "clase",
+        "parent": null
+    },
+    {
+        "codigo": "11",
+        "nombre": "DISPONIBLE",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "1"
+    },
+    {
+        "codigo": "1105",
+        "nombre": "CAJA",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "11"
+    },
+    {
+        "codigo": "110505",
+        "nombre": "Caja general",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1105"
+    },
+    {
+        "codigo": "110510",
+        "nombre": "Cajas menores",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1105"
+    },
+    {
+        "codigo": "1110",
+        "nombre": "BANCOS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "11"
+    },
+    {
+        "codigo": "111005",
+        "nombre": "Banco cuenta corriente",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1110"
+    },
+    {
+        "codigo": "111010",
+        "nombre": "Banco cuenta de ahorros",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1110"
+    },
+    {
+        "codigo": "1115",
+        "nombre": "REMESAS EN TRÁNSITO",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "11"
+    },
+    {
+        "codigo": "111505",
+        "nombre": "Nacionales",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1115"
+    },
+    {
+        "codigo": "12",
+        "nombre": "INVERSIONES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "1"
+    },
+    {
+        "codigo": "1205",
+        "nombre": "ACCIONES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "12"
+    },
+    {
+        "codigo": "120505",
+        "nombre": "Ordinarias",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1205"
+    },
+    {
+        "codigo": "1210",
+        "nombre": "CUOTAS O PARTES DE INTERÉS SOCIAL",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "12"
+    },
+    {
+        "codigo": "121005",
+        "nombre": "En sociedades de responsabilidad limitada",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1210"
+    },
+    {
+        "codigo": "1225",
+        "nombre": "CDT",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "12"
+    },
+    {
+        "codigo": "122505",
+        "nombre": "Certificados de depósito a término",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1225"
+    },
+    {
+        "codigo": "1255",
+        "nombre": "DERECHOS FIDUCIARIOS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "12"
+    },
+    {
+        "codigo": "1260",
+        "nombre": "TÍTULOS VALORES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "12"
+    },
+    {
+        "codigo": "126005",
+        "nombre": "Bonos",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1260"
+    },
+    {
+        "codigo": "13",
+        "nombre": "DEUDORES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "1"
+    },
+    {
+        "codigo": "1305",
+        "nombre": "CLIENTES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "13"
+    },
+    {
+        "codigo": "130505",
+        "nombre": "Nacionales",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1305"
+    },
+    {
+        "codigo": "130510",
+        "nombre": "Del exterior",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1305"
+    },
+    {
+        "codigo": "1310",
+        "nombre": "CUENTAS CORRIENTES COMERCIALES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "13"
+    },
+    {
+        "codigo": "131005",
+        "nombre": "Nacionales",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1310"
+    },
+    {
+        "codigo": "1320",
+        "nombre": "CUENTAS POR COBRAR A SOCIOS Y ACCIONISTAS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "13"
+    },
+    {
+        "codigo": "132005",
+        "nombre": "A socios",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1320"
+    },
+    {
+        "codigo": "1330",
+        "nombre": "ANTICIPOS Y AVANCES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "13"
+    },
+    {
+        "codigo": "133005",
+        "nombre": "A proveedores",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1330"
+    },
+    {
+        "codigo": "133010",
+        "nombre": "A empleados",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1330"
+    },
+    {
+        "codigo": "1335",
+        "nombre": "DEPÓSITOS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "13"
+    },
+    {
+        "codigo": "133505",
+        "nombre": "En garantía",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1335"
+    },
+    {
+        "codigo": "1345",
+        "nombre": "PROMESAS DE COMPRAVENTA",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "13"
+    },
+    {
+        "codigo": "1355",
+        "nombre": "ANTICIPO DE IMPUESTOS Y CONTRIBUCIONES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "13"
+    },
+    {
+        "codigo": "135505",
+        "nombre": "Anticipo renta y complementarios",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1355"
+    },
+    {
+        "codigo": "135510",
+        "nombre": "Sobretasa del impuesto",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1355"
+    },
+    {
+        "codigo": "135515",
+        "nombre": "IVA - Saldo a favor",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1355"
+    },
+    {
+        "codigo": "135520",
+        "nombre": "Retefuente a favor",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1355"
+    },
+    {
+        "codigo": "1360",
+        "nombre": "RECLAMACIONES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "13"
+    },
+    {
+        "codigo": "136005",
+        "nombre": "A compañías aseguradoras",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1360"
+    },
+    {
+        "codigo": "1365",
+        "nombre": "CUENTAS POR COBRAR A EMPLEADOS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "13"
+    },
+    {
+        "codigo": "136505",
+        "nombre": "Préstamos de vivienda",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1365"
+    },
+    {
+        "codigo": "136510",
+        "nombre": "Otros préstamos",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1365"
+    },
+    {
+        "codigo": "1380",
+        "nombre": "DEUDORES VARIOS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "13"
+    },
+    {
+        "codigo": "138005",
+        "nombre": "Depósitos",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1380"
+    },
+    {
+        "codigo": "138010",
+        "nombre": "Derechos por arrendamiento",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1380"
+    },
+    {
+        "codigo": "1399",
+        "nombre": "PROVISIÓN DEUDORES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "13"
+    },
+    {
+        "codigo": "139905",
+        "nombre": "Clientes",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1399"
+    },
+    {
+        "codigo": "14",
+        "nombre": "INVENTARIOS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "1"
+    },
+    {
+        "codigo": "1405",
+        "nombre": "MATERIAS PRIMAS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "14"
+    },
+    {
+        "codigo": "140505",
+        "nombre": "Materias primas",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1405"
+    },
+    {
+        "codigo": "1410",
+        "nombre": "PRODUCTOS EN PROCESO",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "14"
+    },
+    {
+        "codigo": "141005",
+        "nombre": "Costo de los productos en proceso",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1410"
+    },
+    {
+        "codigo": "1415",
+        "nombre": "OBRAS DE CONSTRUCCIÓN EN CURSO",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "14"
+    },
+    {
+        "codigo": "1430",
+        "nombre": "PRODUCTOS TERMINADOS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "14"
+    },
+    {
+        "codigo": "143005",
+        "nombre": "Productos terminados",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1430"
+    },
+    {
+        "codigo": "1435",
+        "nombre": "MERCANCÍAS NO FABRICADAS POR LA EMPRESA",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "14"
+    },
+    {
+        "codigo": "143505",
+        "nombre": "Mercancías",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1435"
+    },
+    {
+        "codigo": "1440",
+        "nombre": "MATERIALES, REPUESTOS Y ACCESORIOS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "14"
+    },
+    {
+        "codigo": "144005",
+        "nombre": "Materiales y repuestos",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1440"
+    },
+    {
+        "codigo": "1445",
+        "nombre": "ENVASES Y EMPAQUES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "14"
+    },
+    {
+        "codigo": "1450",
+        "nombre": "INVENTARIOS EN TRÁNSITO",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "14"
+    },
+    {
+        "codigo": "145005",
+        "nombre": "Nacionales",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1450"
+    },
+    {
+        "codigo": "1499",
+        "nombre": "PROVISIÓN PARA PROTECCIÓN DE INVENTARIOS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "14"
+    },
+    {
+        "codigo": "15",
+        "nombre": "PROPIEDADES, PLANTA Y EQUIPO",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "1"
+    },
+    {
+        "codigo": "1504",
+        "nombre": "TERRENOS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "15"
+    },
+    {
+        "codigo": "150405",
+        "nombre": "Urbanos",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1504"
+    },
+    {
+        "codigo": "150410",
+        "nombre": "Rurales",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1504"
+    },
+    {
+        "codigo": "1508",
+        "nombre": "CONSTRUCCIONES EN CURSO",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "15"
+    },
+    {
+        "codigo": "1512",
+        "nombre": "EDIFICACIONES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "15"
+    },
+    {
+        "codigo": "151205",
+        "nombre": "Edificios",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1512"
+    },
+    {
+        "codigo": "151210",
+        "nombre": "Locales",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1512"
+    },
+    {
+        "codigo": "1516",
+        "nombre": "MAQUINARIA Y EQUIPO",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "15"
+    },
+    {
+        "codigo": "151605",
+        "nombre": "Maquinaria y equipo de producción",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1516"
+    },
+    {
+        "codigo": "1520",
+        "nombre": "EQUIPO DE OFICINA",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "15"
+    },
+    {
+        "codigo": "152005",
+        "nombre": "Muebles y enseres",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1520"
+    },
+    {
+        "codigo": "152010",
+        "nombre": "Equipo de oficina",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1520"
+    },
+    {
+        "codigo": "1524",
+        "nombre": "EQUIPO DE COMPUTACIÓN Y COMUNICACIÓN",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "15"
+    },
+    {
+        "codigo": "152405",
+        "nombre": "Equipo de procesamiento de datos",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1524"
+    },
+    {
+        "codigo": "152410",
+        "nombre": "Equipo de comunicación",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1524"
+    },
+    {
+        "codigo": "1528",
+        "nombre": "EQUIPO DE TRANSPORTE",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "15"
+    },
+    {
+        "codigo": "152805",
+        "nombre": "Flota y equipo de transporte",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1528"
+    },
+    {
+        "codigo": "1548",
+        "nombre": "DEPRECIACIÓN ACUMULADA (CR)",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "15"
+    },
+    {
+        "codigo": "154815",
+        "nombre": "Edificaciones",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1548"
+    },
+    {
+        "codigo": "154820",
+        "nombre": "Maquinaria y equipo",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1548"
+    },
+    {
+        "codigo": "154825",
+        "nombre": "Equipo de oficina",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1548"
+    },
+    {
+        "codigo": "154828",
+        "nombre": "Equipo de computación",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1548"
+    },
+    {
+        "codigo": "154830",
+        "nombre": "Equipo de transporte",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1548"
+    },
+    {
+        "codigo": "1592",
+        "nombre": "DEPRECIACIÓN DIFERIDA",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "15"
+    },
+    {
+        "codigo": "16",
+        "nombre": "INTANGIBLES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "1"
+    },
+    {
+        "codigo": "1605",
+        "nombre": "CRÉDITO MERCANTIL",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "16"
+    },
+    {
+        "codigo": "160505",
+        "nombre": "Adquirido",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1605"
+    },
+    {
+        "codigo": "1610",
+        "nombre": "MARCAS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "16"
+    },
+    {
+        "codigo": "1615",
+        "nombre": "PATENTES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "16"
+    },
+    {
+        "codigo": "1625",
+        "nombre": "LICENCIAS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "16"
+    },
+    {
+        "codigo": "162505",
+        "nombre": "Licencias y software",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1625"
+    },
+    {
+        "codigo": "1630",
+        "nombre": "KNOW HOW",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "16"
+    },
+    {
+        "codigo": "1698",
+        "nombre": "AMORTIZACIÓN ACUMULADA (CR)",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "16"
+    },
+    {
+        "codigo": "17",
+        "nombre": "DIFERIDOS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "1"
+    },
+    {
+        "codigo": "1705",
+        "nombre": "GASTOS PAGADOS POR ANTICIPADO",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "17"
+    },
+    {
+        "codigo": "170505",
+        "nombre": "Seguros",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1705"
+    },
+    {
+        "codigo": "170510",
+        "nombre": "Arrendamientos",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1705"
+    },
+    {
+        "codigo": "170515",
+        "nombre": "Publicidad y propaganda",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1705"
+    },
+    {
+        "codigo": "1710",
+        "nombre": "CARGOS DIFERIDOS",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "17"
+    },
+    {
+        "codigo": "171005",
+        "nombre": "Estudios, diseños y proyectos",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "1710"
+    },
+    {
+        "codigo": "19",
+        "nombre": "VALORIZACIONES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "1"
+    },
+    {
+        "codigo": "1905",
+        "nombre": "DE INVERSIONES",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "19"
+    },
+    {
+        "codigo": "1910",
+        "nombre": "DE PROPIEDADES PLANTA Y EQUIPO",
+        "tipo": "ACTIVO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "19"
+    },
+    {
+        "codigo": "2",
+        "nombre": "PASIVO",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "clase",
+        "parent": null
+    },
+    {
+        "codigo": "21",
+        "nombre": "OBLIGACIONES FINANCIERAS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "2"
+    },
+    {
+        "codigo": "2105",
+        "nombre": "BANCOS NACIONALES",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "21"
+    },
+    {
+        "codigo": "210505",
+        "nombre": "Banco - crédito de libre inversión",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2105"
+    },
+    {
+        "codigo": "210510",
+        "nombre": "Banco - crédito de tesorería",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2105"
+    },
+    {
+        "codigo": "210515",
+        "nombre": "Sobregiro bancario",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2105"
+    },
+    {
+        "codigo": "2110",
+        "nombre": "BANCOS DEL EXTERIOR",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "21"
+    },
+    {
+        "codigo": "2115",
+        "nombre": "CORPORACIONES FINANCIERAS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "21"
+    },
+    {
+        "codigo": "2120",
+        "nombre": "COMPAÑÍAS DE FINANCIAMIENTO",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "21"
+    },
+    {
+        "codigo": "2125",
+        "nombre": "LEASING",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "21"
+    },
+    {
+        "codigo": "212505",
+        "nombre": "Leasing operativo",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2125"
+    },
+    {
+        "codigo": "212510",
+        "nombre": "Leasing financiero",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2125"
+    },
+    {
+        "codigo": "2145",
+        "nombre": "DEUDAS CON SOCIOS Y ACCIONISTAS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "21"
+    },
+    {
+        "codigo": "22",
+        "nombre": "PROVEEDORES",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "2"
+    },
+    {
+        "codigo": "2205",
+        "nombre": "NACIONALES",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "22"
+    },
+    {
+        "codigo": "220505",
+        "nombre": "Grandes proveedores",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2205"
+    },
+    {
+        "codigo": "220510",
+        "nombre": "Proveedores varios",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2205"
+    },
+    {
+        "codigo": "2210",
+        "nombre": "DEL EXTERIOR",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "22"
+    },
+    {
+        "codigo": "23",
+        "nombre": "CUENTAS POR PAGAR",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "2"
+    },
+    {
+        "codigo": "2305",
+        "nombre": "CUENTAS CORRIENTES COMERCIALES",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "230505",
+        "nombre": "Nacionales",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2305"
+    },
+    {
+        "codigo": "2315",
+        "nombre": "A COMPAÑÍAS VINCULADAS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "2320",
+        "nombre": "A CONTRATISTAS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "2325",
+        "nombre": "ÓRDENES DE COMPRA POR PAGAR",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "2330",
+        "nombre": "COSTOS Y GASTOS POR PAGAR",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "233005",
+        "nombre": "Honorarios",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2330"
+    },
+    {
+        "codigo": "233010",
+        "nombre": "Servicios",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2330"
+    },
+    {
+        "codigo": "233015",
+        "nombre": "Arrendamientos",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2330"
+    },
+    {
+        "codigo": "2335",
+        "nombre": "DEUDAS CON ACCIONISTAS O SOCIOS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "2340",
+        "nombre": "PROMESAS DE COMPRAVENTA",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "2345",
+        "nombre": "RETENCIÓN EN LA FUENTE",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "234505",
+        "nombre": "Salarios y pagos laborales",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2345"
+    },
+    {
+        "codigo": "234510",
+        "nombre": "Honorarios",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2345"
+    },
+    {
+        "codigo": "234515",
+        "nombre": "Servicios",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2345"
+    },
+    {
+        "codigo": "234520",
+        "nombre": "Compras",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2345"
+    },
+    {
+        "codigo": "234525",
+        "nombre": "Arrendamientos",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2345"
+    },
+    {
+        "codigo": "234530",
+        "nombre": "Otros conceptos",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2345"
+    },
+    {
+        "codigo": "2350",
+        "nombre": "RETENCIONES Y APORTES DE NÓMINA",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "235005",
+        "nombre": "Aportes a fondos de cesantías",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2350"
+    },
+    {
+        "codigo": "235010",
+        "nombre": "Fondos de pensiones y jubilación",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2350"
+    },
+    {
+        "codigo": "235015",
+        "nombre": "Seguridad social",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2350"
+    },
+    {
+        "codigo": "235020",
+        "nombre": "Sindical",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2350"
+    },
+    {
+        "codigo": "2355",
+        "nombre": "CUOTAS POR DEVOLVER",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "2360",
+        "nombre": "DIVIDENDOS O PARTICIPACIONES POR PAGAR",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "2365",
+        "nombre": "RETENCION EN LA FUENTE",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "236505",
+        "nombre": "Honorarios",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2365"
+    },
+    {
+        "codigo": "236510",
+        "nombre": "Servicios",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2365"
+    },
+    {
+        "codigo": "236515",
+        "nombre": "Arrendamientos",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2365"
+    },
+    {
+        "codigo": "236520",
+        "nombre": "Compras",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2365"
+    },
+    {
+        "codigo": "2370",
+        "nombre": "RETENCIONES Y APORTES LABORALES",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "237005",
+        "nombre": "Aportes SENA",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2370"
+    },
+    {
+        "codigo": "237010",
+        "nombre": "Aportes ICBF",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2370"
+    },
+    {
+        "codigo": "237015",
+        "nombre": "Aportes cajas de compensación",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2370"
+    },
+    {
+        "codigo": "2375",
+        "nombre": "IMPUESTO A LAS VENTAS RETENIDO",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "237505",
+        "nombre": "IVA retenido",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2375"
+    },
+    {
+        "codigo": "2380",
+        "nombre": "ACREEDORES VARIOS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "23"
+    },
+    {
+        "codigo": "238005",
+        "nombre": "Acreedores varios",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2380"
+    },
+    {
+        "codigo": "24",
+        "nombre": "IMPUESTOS, GRAVÁMENES Y TASAS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "2"
+    },
+    {
+        "codigo": "2404",
+        "nombre": "IMPUESTO DE RENTA Y COMPLEMENTARIOS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "24"
+    },
+    {
+        "codigo": "240405",
+        "nombre": "Vigencia fiscal corriente",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2404"
+    },
+    {
+        "codigo": "2408",
+        "nombre": "IMPUESTO SOBRE LAS VENTAS - IVA",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "24"
+    },
+    {
+        "codigo": "240805",
+        "nombre": "IVA generado",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2408"
+    },
+    {
+        "codigo": "240810",
+        "nombre": "IVA por pagar",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2408"
+    },
+    {
+        "codigo": "2412",
+        "nombre": "IMPUESTO DE TIMBRE NACIONAL",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "24"
+    },
+    {
+        "codigo": "2416",
+        "nombre": "IMPUESTO DE INDUSTRIA Y COMERCIO - ICA",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "24"
+    },
+    {
+        "codigo": "241605",
+        "nombre": "ICA por pagar",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2416"
+    },
+    {
+        "codigo": "2420",
+        "nombre": "IMPUESTO PREDIAL UNIFICADO",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "24"
+    },
+    {
+        "codigo": "2424",
+        "nombre": "IMPUESTO SOBRE VEHÍCULOS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "24"
+    },
+    {
+        "codigo": "2436",
+        "nombre": "IMPUESTO DE REGISTRO",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "24"
+    },
+    {
+        "codigo": "25",
+        "nombre": "OBLIGACIONES LABORALES",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "2"
+    },
+    {
+        "codigo": "2505",
+        "nombre": "SALARIOS POR PAGAR",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "25"
+    },
+    {
+        "codigo": "250505",
+        "nombre": "Salarios",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2505"
+    },
+    {
+        "codigo": "250510",
+        "nombre": "Horas extras",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2505"
+    },
+    {
+        "codigo": "250515",
+        "nombre": "Comisiones",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2505"
+    },
+    {
+        "codigo": "2510",
+        "nombre": "CESANTÍAS CONSOLIDADAS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "25"
+    },
+    {
+        "codigo": "251005",
+        "nombre": "Cesantías",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2510"
+    },
+    {
+        "codigo": "2515",
+        "nombre": "INTERESES SOBRE CESANTÍAS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "25"
+    },
+    {
+        "codigo": "251505",
+        "nombre": "Intereses cesantías",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2515"
+    },
+    {
+        "codigo": "2520",
+        "nombre": "PRIMA DE SERVICIOS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "25"
+    },
+    {
+        "codigo": "252005",
+        "nombre": "Prima de servicios",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2520"
+    },
+    {
+        "codigo": "2525",
+        "nombre": "VACACIONES CONSOLIDADAS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "25"
+    },
+    {
+        "codigo": "252505",
+        "nombre": "Vacaciones",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2525"
+    },
+    {
+        "codigo": "2530",
+        "nombre": "PRESTACIONES EXTRALEGALES",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "25"
+    },
+    {
+        "codigo": "2535",
+        "nombre": "PENSIONES POR PAGAR",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "25"
+    },
+    {
+        "codigo": "26",
+        "nombre": "PASIVOS ESTIMADOS Y PROVISIONES",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "2"
+    },
+    {
+        "codigo": "2605",
+        "nombre": "PARA COSTOS Y GASTOS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "26"
+    },
+    {
+        "codigo": "260505",
+        "nombre": "Provisión para garantías",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2605"
+    },
+    {
+        "codigo": "260510",
+        "nombre": "Provisión para contingencias",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2605"
+    },
+    {
+        "codigo": "2610",
+        "nombre": "PARA OBLIGACIONES FISCALES",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "26"
+    },
+    {
+        "codigo": "261005",
+        "nombre": "Para impuesto de renta",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2610"
+    },
+    {
+        "codigo": "2615",
+        "nombre": "PARA OBLIGACIONES LABORALES",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "26"
+    },
+    {
+        "codigo": "261505",
+        "nombre": "Para prestaciones sociales",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2615"
+    },
+    {
+        "codigo": "2620",
+        "nombre": "PARA OBLIGACIONES PRESUNTAS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "26"
+    },
+    {
+        "codigo": "27",
+        "nombre": "DIFERIDOS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "2"
+    },
+    {
+        "codigo": "2705",
+        "nombre": "INGRESOS RECIBIDOS POR ANTICIPADO",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "27"
+    },
+    {
+        "codigo": "270505",
+        "nombre": "Arrendamientos",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2705"
+    },
+    {
+        "codigo": "270510",
+        "nombre": "Intereses",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2705"
+    },
+    {
+        "codigo": "270515",
+        "nombre": "Comisiones",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2705"
+    },
+    {
+        "codigo": "2710",
+        "nombre": "INGRESOS DIFERIDOS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "27"
+    },
+    {
+        "codigo": "271005",
+        "nombre": "Utilidad diferida en ventas a plazos",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2710"
+    },
+    {
+        "codigo": "28",
+        "nombre": "OTROS PASIVOS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "2"
+    },
+    {
+        "codigo": "2805",
+        "nombre": "ANTICIPOS Y AVANCES RECIBIDOS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "28"
+    },
+    {
+        "codigo": "280505",
+        "nombre": "De clientes",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2805"
+    },
+    {
+        "codigo": "2815",
+        "nombre": "DEPÓSITOS RECIBIDOS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "28"
+    },
+    {
+        "codigo": "2820",
+        "nombre": "INGRESOS RECIBIDOS PARA TERCEROS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "28"
+    },
+    {
+        "codigo": "2825",
+        "nombre": "RETENCIONES A TERCEROS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "28"
+    },
+    {
+        "codigo": "282505",
+        "nombre": "Retenciones sobre ventas",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "2825"
+    },
+    {
+        "codigo": "2830",
+        "nombre": "CUENTAS EN PARTICIPACIÓN",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "28"
+    },
+    {
+        "codigo": "2895",
+        "nombre": "OTROS",
+        "tipo": "PASIVO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "28"
+    },
+    {
+        "codigo": "3",
+        "nombre": "PATRIMONIO",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "clase",
+        "parent": null
+    },
+    {
+        "codigo": "31",
+        "nombre": "CAPITAL SOCIAL",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "3"
+    },
+    {
+        "codigo": "3105",
+        "nombre": "CAPITAL AUTORIZADO",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "31"
+    },
+    {
+        "codigo": "3110",
+        "nombre": "CAPITAL POR SUSCRIBIR (DB)",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "31"
+    },
+    {
+        "codigo": "3115",
+        "nombre": "CAPITAL SUSCRITO Y PAGADO",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "31"
+    },
+    {
+        "codigo": "311505",
+        "nombre": "Capital suscrito y pagado",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "3115"
+    },
+    {
+        "codigo": "32",
+        "nombre": "SUPERÁVIT DE CAPITAL",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "3"
+    },
+    {
+        "codigo": "3205",
+        "nombre": "PRIMA EN COLOCACIÓN DE ACCIONES",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "32"
+    },
+    {
+        "codigo": "3210",
+        "nombre": "CRÉDITO MERCANTIL",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "32"
+    },
+    {
+        "codigo": "3225",
+        "nombre": "KNOW HOW",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "32"
+    },
+    {
+        "codigo": "33",
+        "nombre": "RESERVAS",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "3"
+    },
+    {
+        "codigo": "3305",
+        "nombre": "RESERVA LEGAL",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "33"
+    },
+    {
+        "codigo": "330505",
+        "nombre": "Reserva legal",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "3305"
+    },
+    {
+        "codigo": "3310",
+        "nombre": "RESERVAS ESTATUTARIAS",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "33"
+    },
+    {
+        "codigo": "3315",
+        "nombre": "RESERVAS OCASIONALES",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "33"
+    },
+    {
+        "codigo": "331505",
+        "nombre": "Para futuros ensanches",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "3315"
+    },
+    {
+        "codigo": "331510",
+        "nombre": "Para reposición de activos",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "3315"
+    },
+    {
+        "codigo": "34",
+        "nombre": "REVALORIZACIÓN DEL PATRIMONIO",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "3"
+    },
+    {
+        "codigo": "3405",
+        "nombre": "DE CAPITAL",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "34"
+    },
+    {
+        "codigo": "35",
+        "nombre": "DIVIDENDOS O PARTICIPACIONES DECRETADAS",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "3"
+    },
+    {
+        "codigo": "3505",
+        "nombre": "EN ACCIONES",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "35"
+    },
+    {
+        "codigo": "3510",
+        "nombre": "EN CUOTAS O PARTES DE INTERÉS",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "35"
+    },
+    {
+        "codigo": "36",
+        "nombre": "RESULTADOS DEL EJERCICIO",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "3"
+    },
+    {
+        "codigo": "3605",
+        "nombre": "UTILIDAD DEL EJERCICIO",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "36"
+    },
+    {
+        "codigo": "360505",
+        "nombre": "Utilidad del ejercicio",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "3605"
+    },
+    {
+        "codigo": "3610",
+        "nombre": "PÉRDIDA DEL EJERCICIO (DB)",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "36"
+    },
+    {
+        "codigo": "37",
+        "nombre": "RESULTADOS DE EJERCICIOS ANTERIORES",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "3"
+    },
+    {
+        "codigo": "3705",
+        "nombre": "UTILIDADES ACUMULADAS",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "37"
+    },
+    {
+        "codigo": "3710",
+        "nombre": "PÉRDIDAS ACUMULADAS (DB)",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "37"
+    },
+    {
+        "codigo": "38",
+        "nombre": "SUPERÁVIT POR VALORIZACIONES",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "3"
+    },
+    {
+        "codigo": "3805",
+        "nombre": "DE INVERSIONES",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "38"
+    },
+    {
+        "codigo": "3810",
+        "nombre": "DE PROPIEDADES PLANTA Y EQUIPO",
+        "tipo": "PATRIMONIO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "38"
+    },
+    {
+        "codigo": "4",
+        "nombre": "INGRESOS",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "clase",
+        "parent": null
+    },
+    {
+        "codigo": "41",
+        "nombre": "OPERACIONALES",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "4"
+    },
+    {
+        "codigo": "4105",
+        "nombre": "AGRICULTURA, GANADERÍA, CAZA Y SILVICULTURA",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "4110",
+        "nombre": "PESCA",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "4115",
+        "nombre": "EXPLOTACIÓN DE MINAS Y CANTERAS",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "4120",
+        "nombre": "INDUSTRIAS MANUFACTURERAS",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "412005",
+        "nombre": "Venta de productos fabricados",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4120"
+    },
+    {
+        "codigo": "4125",
+        "nombre": "SUMINISTRO DE ENERGÍA",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "4130",
+        "nombre": "CONSTRUCCIÓN",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "4135",
+        "nombre": "COMERCIO AL POR MAYOR Y AL POR MENOR",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "413505",
+        "nombre": "Venta de mercancías",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4135"
+    },
+    {
+        "codigo": "413510",
+        "nombre": "Ingresos por ventas",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4135"
+    },
+    {
+        "codigo": "4140",
+        "nombre": "HOTELES Y RESTAURANTES",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "414005",
+        "nombre": "Alojamiento",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4140"
+    },
+    {
+        "codigo": "414010",
+        "nombre": "Restaurante y bar",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4140"
+    },
+    {
+        "codigo": "4145",
+        "nombre": "TRANSPORTE",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "4148",
+        "nombre": "CORREOS Y TELECOMUNICACIONES",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "4150",
+        "nombre": "INTERMEDIACIÓN FINANCIERA",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "4155",
+        "nombre": "ACTIVIDADES INMOBILIARIAS",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "415505",
+        "nombre": "Arrendamiento de bienes inmuebles",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4155"
+    },
+    {
+        "codigo": "4160",
+        "nombre": "SERVICIOS SOCIALES Y DE SALUD",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "416005",
+        "nombre": "Consultas médicas",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4160"
+    },
+    {
+        "codigo": "416010",
+        "nombre": "Procedimientos médicos",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4160"
+    },
+    {
+        "codigo": "416015",
+        "nombre": "Odontología",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4160"
+    },
+    {
+        "codigo": "4165",
+        "nombre": "EDUCACIÓN",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "416505",
+        "nombre": "Pensiones",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4165"
+    },
+    {
+        "codigo": "416510",
+        "nombre": "Matrículas",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4165"
+    },
+    {
+        "codigo": "4170",
+        "nombre": "SERVICIOS COMUNITARIOS Y PERSONALES",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "4175",
+        "nombre": "DEVOLUCIONES EN VENTAS (DB)",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "417505",
+        "nombre": "Devoluciones en ventas",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4175"
+    },
+    {
+        "codigo": "4180",
+        "nombre": "DESCUENTOS EN VENTAS (DB)",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "41"
+    },
+    {
+        "codigo": "418005",
+        "nombre": "Descuentos comerciales",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4180"
+    },
+    {
+        "codigo": "42",
+        "nombre": "NO OPERACIONALES",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "grupo",
+        "parent": "4"
+    },
+    {
+        "codigo": "4205",
+        "nombre": "FINANCIEROS",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "42"
+    },
+    {
+        "codigo": "420505",
+        "nombre": "Intereses",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4205"
+    },
+    {
+        "codigo": "420510",
+        "nombre": "Descuentos comerciales",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4205"
+    },
+    {
+        "codigo": "420515",
+        "nombre": "Corrección monetaria",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4205"
+    },
+    {
+        "codigo": "4210",
+        "nombre": "DIVIDENDOS",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "42"
+    },
+    {
+        "codigo": "4215",
+        "nombre": "INDEMNIZACIONES",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "42"
+    },
+    {
+        "codigo": "4220",
+        "nombre": "ARRENDAMIENTOS",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "42"
+    },
+    {
+        "codigo": "422005",
+        "nombre": "De inmuebles",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4220"
+    },
+    {
+        "codigo": "422010",
+        "nombre": "De muebles",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "subcuenta",
+        "parent": "4220"
+    },
+    {
+        "codigo": "4225",
+        "nombre": "COMISIONES",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "42"
+    },
+    {
+        "codigo": "4230",
+        "nombre": "HONORARIOS",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "42"
+    },
+    {
+        "codigo": "4235",
+        "nombre": "SERVICIOS",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "42"
+    },
+    {
+        "codigo": "4240",
+        "nombre": "UTILIDAD EN VENTA DE INVERSIONES",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "42"
+    },
+    {
+        "codigo": "4245",
+        "nombre": "UTILIDAD EN VENTA DE PROP. PLANTA Y EQUIPO",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "42"
+    },
+    {
+        "codigo": "4250",
+        "nombre": "RECUPERACIONES",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "42"
+    },
+    {
+        "codigo": "4255",
+        "nombre": "INGRESOS DE EJERCICIOS ANTERIORES",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "42"
+    },
+    {
+        "codigo": "4295",
+        "nombre": "DIVERSOS",
+        "tipo": "INGRESO",
+        "naturaleza": "CREDITO",
+        "nivel": "cuenta",
+        "parent": "42"
+    },
+    {
+        "codigo": "5",
+        "nombre": "GASTOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "clase",
+        "parent": null
+    },
+    {
+        "codigo": "51",
+        "nombre": "OPERACIONALES DE ADMINISTRACIÓN",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "5"
+    },
+    {
+        "codigo": "5101",
+        "nombre": "SUELDOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "510105",
+        "nombre": "Sueldos",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5101"
+    },
+    {
+        "codigo": "5102",
+        "nombre": "HORAS EXTRAS Y RECARGOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "510205",
+        "nombre": "Horas extras",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5102"
+    },
+    {
+        "codigo": "5103",
+        "nombre": "COMISIONES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "5104",
+        "nombre": "AUXILIO DE TRANSPORTE",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "510405",
+        "nombre": "Auxilio de transporte",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5104"
+    },
+    {
+        "codigo": "5105",
+        "nombre": "GASTOS DE PERSONAL",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "510505",
+        "nombre": "Jornales",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5105"
+    },
+    {
+        "codigo": "510510",
+        "nombre": "Gastos de representación",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5105"
+    },
+    {
+        "codigo": "5106",
+        "nombre": "CESANTÍAS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "510605",
+        "nombre": "Cesantías",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5106"
+    },
+    {
+        "codigo": "5107",
+        "nombre": "INTERESES SOBRE CESANTÍAS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "5108",
+        "nombre": "PRIMA DE SERVICIOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "5109",
+        "nombre": "VACACIONES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "5110",
+        "nombre": "PENSIONES Y JUBILACIONES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "511005",
+        "nombre": "Aportes pensión",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5110"
+    },
+    {
+        "codigo": "5111",
+        "nombre": "DOTACIÓN Y SUMINISTRO A TRABAJADORES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "511105",
+        "nombre": "Dotación de empleados",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5111"
+    },
+    {
+        "codigo": "5112",
+        "nombre": "GASTOS DE SALUD",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "511205",
+        "nombre": "Aportes salud",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5112"
+    },
+    {
+        "codigo": "5113",
+        "nombre": "APORTES PARAFISCALES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "511305",
+        "nombre": "SENA",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5113"
+    },
+    {
+        "codigo": "511310",
+        "nombre": "ICBF",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5113"
+    },
+    {
+        "codigo": "511315",
+        "nombre": "Cajas de compensación",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5113"
+    },
+    {
+        "codigo": "5114",
+        "nombre": "CAPACITACIÓN AL PERSONAL",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "5115",
+        "nombre": "BONIFICACIONES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "5120",
+        "nombre": "HONORARIOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "512005",
+        "nombre": "Juntas directivas",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5120"
+    },
+    {
+        "codigo": "512010",
+        "nombre": "Revisoría fiscal",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5120"
+    },
+    {
+        "codigo": "512015",
+        "nombre": "Servicios contables",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5120"
+    },
+    {
+        "codigo": "512020",
+        "nombre": "Servicios jurídicos",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5120"
+    },
+    {
+        "codigo": "512025",
+        "nombre": "Asesorías",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5120"
+    },
+    {
+        "codigo": "5125",
+        "nombre": "IMPUESTOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "512505",
+        "nombre": "ICA - Industria y comercio",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5125"
+    },
+    {
+        "codigo": "512510",
+        "nombre": "Predial",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5125"
+    },
+    {
+        "codigo": "512515",
+        "nombre": "Vehículos",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5125"
+    },
+    {
+        "codigo": "512520",
+        "nombre": "Otros impuestos",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5125"
+    },
+    {
+        "codigo": "5130",
+        "nombre": "ARRENDAMIENTOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "513005",
+        "nombre": "Construcciones y edificaciones",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5130"
+    },
+    {
+        "codigo": "513010",
+        "nombre": "Maquinaria y equipo",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5130"
+    },
+    {
+        "codigo": "513015",
+        "nombre": "Equipo de cómputo",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5130"
+    },
+    {
+        "codigo": "5135",
+        "nombre": "CONTRIBUCIONES Y AFILIACIONES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "513505",
+        "nombre": "Contribuciones",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5135"
+    },
+    {
+        "codigo": "513510",
+        "nombre": "Afiliaciones y sostenimiento",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5135"
+    },
+    {
+        "codigo": "5140",
+        "nombre": "SEGUROS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "514005",
+        "nombre": "Manejo",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5140"
+    },
+    {
+        "codigo": "514010",
+        "nombre": "Incendio y terremoto",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5140"
+    },
+    {
+        "codigo": "514015",
+        "nombre": "Equipo",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5140"
+    },
+    {
+        "codigo": "514020",
+        "nombre": "Vida colectivo",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5140"
+    },
+    {
+        "codigo": "5145",
+        "nombre": "SERVICIOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "514505",
+        "nombre": "Aseo y vigilancia",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5145"
+    },
+    {
+        "codigo": "514510",
+        "nombre": "Acueducto y alcantarillado",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5145"
+    },
+    {
+        "codigo": "514515",
+        "nombre": "Energía eléctrica",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5145"
+    },
+    {
+        "codigo": "514520",
+        "nombre": "Teléfono",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5145"
+    },
+    {
+        "codigo": "514525",
+        "nombre": "Correo, portes y telégrafos",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5145"
+    },
+    {
+        "codigo": "514530",
+        "nombre": "Transporte",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5145"
+    },
+    {
+        "codigo": "514535",
+        "nombre": "Gas",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5145"
+    },
+    {
+        "codigo": "514540",
+        "nombre": "Internet y hosting",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5145"
+    },
+    {
+        "codigo": "5150",
+        "nombre": "GASTOS LEGALES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "515005",
+        "nombre": "Notariales",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5150"
+    },
+    {
+        "codigo": "515010",
+        "nombre": "Registro mercantil",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5150"
+    },
+    {
+        "codigo": "515015",
+        "nombre": "Licencias",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5150"
+    },
+    {
+        "codigo": "5155",
+        "nombre": "MANTENIMIENTO Y REPARACIONES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "515505",
+        "nombre": "Construcciones y edificaciones",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5155"
+    },
+    {
+        "codigo": "515510",
+        "nombre": "Maquinaria y equipo",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5155"
+    },
+    {
+        "codigo": "515515",
+        "nombre": "Equipo de oficina",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5155"
+    },
+    {
+        "codigo": "515520",
+        "nombre": "Equipo de cómputo",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5155"
+    },
+    {
+        "codigo": "515525",
+        "nombre": "Equipo de transporte",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5155"
+    },
+    {
+        "codigo": "5160",
+        "nombre": "DEPRECIACIONES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "516005",
+        "nombre": "Construcciones y edificaciones",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5160"
+    },
+    {
+        "codigo": "516010",
+        "nombre": "Maquinaria y equipo",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5160"
+    },
+    {
+        "codigo": "516015",
+        "nombre": "Equipo de oficina",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5160"
+    },
+    {
+        "codigo": "516020",
+        "nombre": "Equipo de cómputo",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5160"
+    },
+    {
+        "codigo": "516025",
+        "nombre": "Equipo de transporte",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5160"
+    },
+    {
+        "codigo": "5165",
+        "nombre": "AMORTIZACIONES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "516505",
+        "nombre": "Intangibles",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5165"
+    },
+    {
+        "codigo": "516510",
+        "nombre": "Diferidos",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5165"
+    },
+    {
+        "codigo": "5170",
+        "nombre": "GASTOS DE VIAJE",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "517005",
+        "nombre": "Fletes",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5170"
+    },
+    {
+        "codigo": "517010",
+        "nombre": "Viáticos y gastos de viaje",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5170"
+    },
+    {
+        "codigo": "5175",
+        "nombre": "PUBLICIDAD Y PROPAGANDA",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "517505",
+        "nombre": "Publicidad",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5175"
+    },
+    {
+        "codigo": "517510",
+        "nombre": "Propaganda",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5175"
+    },
+    {
+        "codigo": "5180",
+        "nombre": "ELEMENTOS DE ASEO Y CAFETERÍA",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "518005",
+        "nombre": "Elementos de aseo",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5180"
+    },
+    {
+        "codigo": "518010",
+        "nombre": "Elementos de cafetería",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5180"
+    },
+    {
+        "codigo": "5185",
+        "nombre": "ÚTILES, PAPELERÍA Y FOTOCOPIAS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "518505",
+        "nombre": "Útiles y papelería",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5185"
+    },
+    {
+        "codigo": "518510",
+        "nombre": "Fotocopias",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5185"
+    },
+    {
+        "codigo": "5190",
+        "nombre": "PROVISIONES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "519005",
+        "nombre": "Provisión cartera",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5190"
+    },
+    {
+        "codigo": "519010",
+        "nombre": "Provisión inventarios",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5190"
+    },
+    {
+        "codigo": "5195",
+        "nombre": "GASTOS DIVERSOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "51"
+    },
+    {
+        "codigo": "519505",
+        "nombre": "Suscripciones",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5195"
+    },
+    {
+        "codigo": "519510",
+        "nombre": "Libros y revistas",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5195"
+    },
+    {
+        "codigo": "519515",
+        "nombre": "Gastos de representación",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5195"
+    },
+    {
+        "codigo": "519520",
+        "nombre": "Parqueadero",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5195"
+    },
+    {
+        "codigo": "519525",
+        "nombre": "Combustibles y lubricantes",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5195"
+    },
+    {
+        "codigo": "52",
+        "nombre": "OPERACIONALES DE VENTAS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "5"
+    },
+    {
+        "codigo": "5201",
+        "nombre": "SUELDOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "52"
+    },
+    {
+        "codigo": "520105",
+        "nombre": "Sueldos vendedores",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5201"
+    },
+    {
+        "codigo": "5203",
+        "nombre": "COMISIONES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "52"
+    },
+    {
+        "codigo": "520305",
+        "nombre": "Comisiones vendedores",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5203"
+    },
+    {
+        "codigo": "5245",
+        "nombre": "SERVICIOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "52"
+    },
+    {
+        "codigo": "524505",
+        "nombre": "Publicidad y mercadeo",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5245"
+    },
+    {
+        "codigo": "5260",
+        "nombre": "DEPRECIACIONES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "52"
+    },
+    {
+        "codigo": "5295",
+        "nombre": "GASTOS DIVERSOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "52"
+    },
+    {
+        "codigo": "529505",
+        "nombre": "Gastos de ventas varios",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5295"
+    },
+    {
+        "codigo": "53",
+        "nombre": "NO OPERACIONALES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "5"
+    },
+    {
+        "codigo": "5305",
+        "nombre": "FINANCIEROS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "53"
+    },
+    {
+        "codigo": "530505",
+        "nombre": "Intereses",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5305"
+    },
+    {
+        "codigo": "530510",
+        "nombre": "Comisiones",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5305"
+    },
+    {
+        "codigo": "530515",
+        "nombre": "Corrección monetaria",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5305"
+    },
+    {
+        "codigo": "530520",
+        "nombre": "Diferencia en cambio",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5305"
+    },
+    {
+        "codigo": "530525",
+        "nombre": "GMF - Gravamen movimientos financieros",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5305"
+    },
+    {
+        "codigo": "5310",
+        "nombre": "PÉRDIDAS EN VENTA Y RETIRO DE INVERSIONES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "53"
+    },
+    {
+        "codigo": "5315",
+        "nombre": "GASTOS EXTRAORDINARIOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "53"
+    },
+    {
+        "codigo": "531505",
+        "nombre": "Multas y sanciones",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5315"
+    },
+    {
+        "codigo": "531510",
+        "nombre": "Pérdidas en retiro de activos",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5315"
+    },
+    {
+        "codigo": "5320",
+        "nombre": "GASTOS DE EJERCICIOS ANTERIORES",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "53"
+    },
+    {
+        "codigo": "5395",
+        "nombre": "GASTOS DIVERSOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "53"
+    },
+    {
+        "codigo": "54",
+        "nombre": "IMPUESTO DE RENTA Y COMPLEMENTARIOS",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "5"
+    },
+    {
+        "codigo": "5405",
+        "nombre": "IMPUESTO RENTA CORRIENTE",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "54"
+    },
+    {
+        "codigo": "540505",
+        "nombre": "Impuesto renta vigencia actual",
+        "tipo": "GASTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "5405"
+    },
+    {
+        "codigo": "6",
+        "nombre": "COSTOS DE VENTAS",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "clase",
+        "parent": null
+    },
+    {
+        "codigo": "61",
+        "nombre": "COSTO DE VENTAS Y PRESTACIÓN DE SERVICIOS",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "6"
+    },
+    {
+        "codigo": "6105",
+        "nombre": "AGRICULTURA, GANADERÍA, CAZA Y SILVICULTURA",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "6110",
+        "nombre": "PESCA",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "6120",
+        "nombre": "EXPLOTACIÓN DE MINAS Y CANTERAS",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "6125",
+        "nombre": "INDUSTRIAS MANUFACTURERAS",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "612505",
+        "nombre": "Costo de producción",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "6125"
+    },
+    {
+        "codigo": "6130",
+        "nombre": "CONSTRUCCIÓN",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "6135",
+        "nombre": "COMERCIO AL POR MAYOR Y AL POR MENOR",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "613505",
+        "nombre": "Costo de mercancías vendidas",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "6135"
+    },
+    {
+        "codigo": "613510",
+        "nombre": "Costo de productos vendidos",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "6135"
+    },
+    {
+        "codigo": "6140",
+        "nombre": "HOTELES Y RESTAURANTES",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "614005",
+        "nombre": "Costo alojamiento",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "6140"
+    },
+    {
+        "codigo": "614010",
+        "nombre": "Costo alimentación",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "6140"
+    },
+    {
+        "codigo": "6145",
+        "nombre": "TRANSPORTE",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "6155",
+        "nombre": "INTERMEDIACIÓN FINANCIERA",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "6160",
+        "nombre": "SERVICIOS SOCIALES Y DE SALUD",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "616005",
+        "nombre": "Costo consultas médicas",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "6160"
+    },
+    {
+        "codigo": "616010",
+        "nombre": "Costo medicamentos",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "6160"
+    },
+    {
+        "codigo": "6165",
+        "nombre": "EDUCACIÓN",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "6170",
+        "nombre": "SERVICIOS COMUNITARIOS Y PERSONALES",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "617005",
+        "nombre": "Costo servicio técnico",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "6170"
+    },
+    {
+        "codigo": "617010",
+        "nombre": "Costo servicios profesionales",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "6170"
+    },
+    {
+        "codigo": "6175",
+        "nombre": "DEVOLUCIONES EN COMPRAS (DB)",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "617505",
+        "nombre": "Devoluciones en compras",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "6175"
+    },
+    {
+        "codigo": "6180",
+        "nombre": "DESCUENTOS EN COMPRAS (DB)",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "61"
+    },
+    {
+        "codigo": "618005",
+        "nombre": "Descuentos comerciales en compras",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "6180"
+    },
+    {
+        "codigo": "7",
+        "nombre": "COSTOS DE PRODUCCIÓN",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "clase",
+        "parent": null
+    },
+    {
+        "codigo": "71",
+        "nombre": "MATERIA PRIMA",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "7"
+    },
+    {
+        "codigo": "7105",
+        "nombre": "MATERIAS PRIMAS",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "71"
+    },
+    {
+        "codigo": "710505",
+        "nombre": "Materias primas directas",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "7105"
+    },
+    {
+        "codigo": "72",
+        "nombre": "MANO DE OBRA DIRECTA",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "7"
+    },
+    {
+        "codigo": "7205",
+        "nombre": "SUELDOS DE PRODUCCIÓN",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "72"
+    },
+    {
+        "codigo": "720505",
+        "nombre": "Sueldos operarios",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "subcuenta",
+        "parent": "7205"
+    },
+    {
+        "codigo": "73",
+        "nombre": "COSTOS INDIRECTOS",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "7"
+    },
+    {
+        "codigo": "7305",
+        "nombre": "MATERIALES INDIRECTOS",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "73"
+    },
+    {
+        "codigo": "7310",
+        "nombre": "MANO DE OBRA INDIRECTA",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "73"
+    },
+    {
+        "codigo": "7315",
+        "nombre": "DEPRECIACIONES DE PRODUCCIÓN",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "73"
+    },
+    {
+        "codigo": "7320",
+        "nombre": "SERVICIOS PÚBLICOS DE PRODUCCIÓN",
+        "tipo": "COSTO",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "73"
+    },
+    {
+        "codigo": "8",
+        "nombre": "CUENTAS DE ORDEN DEUDORAS",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "clase",
+        "parent": null
+    },
+    {
+        "codigo": "81",
+        "nombre": "DERECHOS CONTINGENTES",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "8"
+    },
+    {
+        "codigo": "8105",
+        "nombre": "BIENES Y VALORES ENTREGADOS EN GARANTÍA",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "81"
+    },
+    {
+        "codigo": "83",
+        "nombre": "ACREEDORAS DE CONTROL",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "8"
+    },
+    {
+        "codigo": "8305",
+        "nombre": "ACTIVOS TOTALMENTE DEPRECIADOS",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "83"
+    },
+    {
+        "codigo": "8310",
+        "nombre": "ACTIVOS RETIRADOS DEL SERVICIO",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "83"
+    },
+    {
+        "codigo": "86",
+        "nombre": "ACTIVOS CASTIGADOS",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "8"
+    },
+    {
+        "codigo": "89",
+        "nombre": "OTRAS CUENTAS DE ORDEN DEUDORAS",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "8"
+    },
+    {
+        "codigo": "9",
+        "nombre": "CUENTAS DE ORDEN ACREEDORAS",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "clase",
+        "parent": null
+    },
+    {
+        "codigo": "91",
+        "nombre": "RESPONSABILIDADES CONTINGENTES",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "9"
+    },
+    {
+        "codigo": "9105",
+        "nombre": "GARANTÍAS Y COMPROMISOS",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "91"
+    },
+    {
+        "codigo": "96",
+        "nombre": "ACREEDORAS DE CONTROL",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "9"
+    },
+    {
+        "codigo": "9605",
+        "nombre": "DEPRECIACIÓN ACUMULADA",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "cuenta",
+        "parent": "96"
+    },
+    {
+        "codigo": "99",
+        "nombre": "OTRAS CUENTAS DE ORDEN ACREEDORAS",
+        "tipo": "ORDEN",
+        "naturaleza": "DEBITO",
+        "nivel": "grupo",
+        "parent": "9"
+    }
 ]

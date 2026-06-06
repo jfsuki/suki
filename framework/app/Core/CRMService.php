@@ -25,9 +25,23 @@ final class CRMService
             throw new RuntimeException('Customer name is required.');
         }
 
+        // Guard de idempotencia: evitar duplicar el mismo cliente por retry del LLM.
+        // Busca por email, NIT o teléfono antes de crear.
+        $dedupeKeys = ['email', 'nit', 'telefono', 'celular', 'documento'];
+        foreach ($dedupeKeys as $key) {
+            $val = trim((string) ($data[$key] ?? ''));
+            if ($val === '') {
+                continue;
+            }
+            $existing = $this->repository->findCustomerByField($tenantId, $key, $val);
+            if ($existing !== null) {
+                return array_merge($existing, ['_dedup' => true, '_dedup_field' => $key]);
+            }
+        }
+
         $data['tenant_id'] = $tenantId;
-        $data['status'] = $data['status'] ?? 'LEAD';
-        
+        $data['status']    = $data['status'] ?? 'LEAD';
+
         $id = $this->repository->createCustomer($data);
         return $this->repository->findCustomer($tenantId, $id) ?? [];
     }

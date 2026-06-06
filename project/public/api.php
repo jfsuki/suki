@@ -1970,9 +1970,74 @@ if ($route === 'chat/message') {
     $payload['chat_exec_auth_required'] = true;
 
     setTenantContext($payload, $isAuthenticated);
+
+    // Deduplicación de mensajes: evita que un retry del usuario o del browser
+    // ejecute el mismo comando dos veces en menos de 60 segundos.
+    $clientMsgId = trim((string) ($payload['client_message_id'] ?? $_SERVER['HTTP_X_MESSAGE_ID'] ?? ''));
+    $dedupTenantId = (string) ($payload['auth_tenant_id'] ?? $payload['tenant_id'] ?? 'guest');
+    if ($clientMsgId !== '' && $dedupTenantId !== 'guest') {
+        try {
+            $dedupDb = \App\Core\Database::connection();
+            $driver  = $dedupDb->getAttribute(\PDO::ATTR_DRIVER_NAME);
+            if ($driver === 'mysql') {
+                $dedupDb->exec("CREATE TABLE IF NOT EXISTS chat_message_dedup (
+                    id          INT UNSIGNED NOT NULL AUTO_INCREMENT,
+                    tenant_id   VARCHAR(64) NOT NULL,
+                    message_id  VARCHAR(255) NOT NULL,
+                    response_json MEDIUMTEXT NOT NULL,
+                    created_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    expires_at  DATETIME NOT NULL,
+                    PRIMARY KEY(id),
+                    UNIQUE KEY uq_dedup (tenant_id, message_id),
+                    KEY idx_expires (expires_at)
+                ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            } else {
+                $dedupDb->exec("CREATE TABLE IF NOT EXISTS chat_message_dedup (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    tenant_id TEXT NOT NULL,
+                    message_id TEXT NOT NULL,
+                    response_json TEXT NOT NULL,
+                    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+                    expires_at DATETIME NOT NULL,
+                    UNIQUE(tenant_id, message_id)
+                )");
+            }
+            // Limpiar expirados
+            $dedupDb->prepare("DELETE FROM chat_message_dedup WHERE expires_at < CURRENT_TIMESTAMP")->execute();
+            // Buscar respuesta en caché
+            $cached = $dedupDb->prepare("SELECT response_json FROM chat_message_dedup WHERE tenant_id=:t AND message_id=:m LIMIT 1");
+            $cached->execute([':t' => $dedupTenantId, ':m' => $clientMsgId]);
+            $cachedRow = $cached->fetch(\PDO::FETCH_ASSOC);
+            if ($cachedRow) {
+                $cachedResult = json_decode((string) $cachedRow['response_json'], true);
+                if (is_array($cachedResult)) {
+                    $cachedResult['_dedup_cache'] = true;
+                    respondJson($response, (string) ($cachedResult['status'] ?? 'success'), (string) ($cachedResult['message'] ?? 'OK'), (array) ($cachedResult['data'] ?? []));
+                    return;
+                }
+            }
+        } catch (\Throwable $dedupEx) {
+            error_log('[ChatDedup] Error: ' . $dedupEx->getMessage());
+        }
+    }
+
     try {
         $agent = new \App\Core\ChatAgent();
         $result = $agent->handle($payload);
+
+        // Guardar en caché de dedup si hay client_message_id
+        if ($clientMsgId !== '' && $dedupTenantId !== 'guest') {
+            try {
+                $cachePayload = ['status' => $result['status'] ?? 'success', 'message' => $result['message'] ?? 'OK', 'data' => $result['data'] ?? []];
+                $expiry = date('Y-m-d H:i:s', time() + 60);
+                $ins = $dedupDb->prepare(
+                    $driver === 'mysql'
+                    ? "INSERT IGNORE INTO chat_message_dedup (tenant_id, message_id, response_json, expires_at) VALUES (:t,:m,:r,:e)"
+                    : "INSERT OR IGNORE INTO chat_message_dedup (tenant_id, message_id, response_json, expires_at) VALUES (:t,:m,:r,:e)"
+                );
+                $ins->execute([':t' => $dedupTenantId, ':m' => $clientMsgId, ':r' => json_encode($cachePayload), ':e' => $expiry]);
+            } catch (\Throwable $ignored) {}
+        }
         $status = (string) ($result['status'] ?? 'success');
         $message = (string) ($result['message'] ?? 'OK');
         $data = (array) ($result['data'] ?? []);

@@ -38,6 +38,18 @@ final class CRMRepository
             ->first();
     }
 
+    public function findCustomerByField(string $tenantId, string $field, string $value): ?array
+    {
+        $allowed = ['email', 'nit', 'telefono', 'celular', 'documento', 'nombre'];
+        if (!in_array($field, $allowed, true)) {
+            return null;
+        }
+        return QueryBuilder::table($this->db, self::CUSTOMER_TABLE)
+            ->where('tenant_id', '=', $tenantId)
+            ->where($field, '=', $value)
+            ->first();
+    }
+
     /**
      * @param array<string, mixed> $filters
      * @return array<int, array<string, mixed>>
