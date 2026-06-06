@@ -1737,7 +1737,31 @@ final class FiscalEngineService
             // Si la tabla no existe aún, ignorar y continuar
         }
 
-        // 3. Auto-detectar: si Alanube está configurado → electronic, si no → ticket
-        return AlanubeClient::isConfigured() ? 'electronic' : 'ticket';
+        // 3. Auto-activación: si el tenant completó su config DIAN (resolucion_dian) Y
+        //    Alanube está configurado a nivel sistema → activar FE automáticamente.
+        //    El tenant no necesita setear fiscal_mode manualmente — completar la config
+        //    del agente ES la señal de activación.
+        if (AlanubeClient::isConfigured()) {
+            try {
+                $db   = Database::connection();
+                $stmt = $db->prepare(
+                    'SELECT field_value FROM app_tenant_config
+                     WHERE tenant_id = :tid AND field_key = :fk
+                     AND field_value IS NOT NULL AND field_value != \'\'
+                     LIMIT 1'
+                );
+                $stmt->execute([':tid' => $tenantId, ':fk' => 'resolucion_dian']);
+                $hasResolucion = (string) ($stmt->fetchColumn() ?: '');
+                if ($hasResolucion !== '') {
+                    return 'electronic';
+                }
+            } catch (\Throwable $e) {
+                // Tabla no disponible aún — ignorar
+            }
+        }
+
+        // 4. Fallback final: token presente pero sin config DIAN → ticket
+        //    (evita emitir FE con datos vacíos si el token existe pero el tenant no configuró nada)
+        return 'ticket';
     }
 }
