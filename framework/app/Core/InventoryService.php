@@ -94,6 +94,16 @@ final class InventoryService
         return $this->repository->findProduct($tenantId, $productId) ?? [];
     }
 
+    /**
+     * Registra una salida de inventario por venta.
+     *
+     * Respeta los campos de control del producto:
+     *  - inventariable=false → no descuenta stock (servicio o ítem sin inventario)
+     *  - controla_unidades=false → no descuenta unidades (solo control contable)
+     *  - permite_venta_sin_stock=false → retorna advisory cuando hay déficit
+     *
+     * @return array{product: array, advisory: array|null, stock_after: float}
+     */
     public function registerSale(string $tenantId, string $productId, float $qty, string $ref, string $userId): array
     {
         $product = $this->repository->findProduct($tenantId, $productId);
@@ -101,22 +111,56 @@ final class InventoryService
             throw new RuntimeException('Product not found.');
         }
 
-        if ((float)($product['stock_actual'] ?? 0) < $qty) {
-            // Optional: Block sale if no stock, or just notify.
-            // For now, let's allow negative stock as some businesses operate this way, 
-            // but log a warning if needed.
+        $inventariable    = filter_var($product['inventariable']           ?? true,  FILTER_VALIDATE_BOOLEAN);
+        $controlaUnidades = filter_var($product['controla_unidades']       ?? true,  FILTER_VALIDATE_BOOLEAN);
+        $permiteNegativo  = filter_var($product['permite_venta_sin_stock'] ?? false, FILTER_VALIDATE_BOOLEAN);
+
+        // Servicios e ítems no inventariables: registrar la venta pero NO descontar stock
+        if (!$inventariable || !$controlaUnidades) {
+            return [
+                'product'     => $product,
+                'advisory'    => null,
+                'stock_after' => (float) ($product['stock_actual'] ?? 0),
+                'stock_deducted' => false,
+            ];
+        }
+
+        $stockActual = (float) ($product['stock_actual'] ?? 0);
+        $advisory    = null;
+
+        if ($stockActual < $qty) {
+            $deficit  = $qty - $stockActual;
+            $advisory = [
+                'type'          => $permiteNegativo ? 'warning' : 'advisory',
+                'stock_antes'   => $stockActual,
+                'qty_solicitada'=> $qty,
+                'deficit'       => $deficit,
+                'message'       => $permiteNegativo
+                    ? "⚠ Venta registrada con stock insuficiente. Déficit: {$deficit} unidades."
+                    : "Stock insuficiente (disponible: {$stockActual}, solicitado: {$qty}). Venta procesada. Revisar pendientes.",
+            ];
+
+            error_log("[InventoryAdvisor] tenant={$tenantId} product={$productId} stock={$stockActual} sold={$qty} deficit={$deficit}");
         }
 
         $this->repository->recordMovement([
-            'tenant_id' => $tenantId,
-            'producto_id' => $product['id'],
-            'tipo' => 'SALIDA',
-            'cantidad' => $qty,
+            'tenant_id'          => $tenantId,
+            'producto_id'        => $product['id'],
+            'tipo'               => 'SALIDA',
+            'cantidad'           => $qty,
             'referencia_externa' => $ref,
-            'usuario_id' => $userId
+            'usuario_id'         => $userId,
+            'costo_unitario'     => (float) ($product['costo_unitario'] ?? 0),
         ]);
 
-        return $this->repository->findProduct($tenantId, $productId) ?? [];
+        $updated = $this->repository->findProduct($tenantId, $productId) ?? $product;
+
+        return [
+            'product'        => $updated,
+            'advisory'       => $advisory,
+            'stock_after'    => (float) ($updated['stock_actual'] ?? 0),
+            'stock_deducted' => true,
+        ];
     }
 
     public function registerPurchase(string $tenantId, string $productId, float $qty, string $ref, string $userId): array

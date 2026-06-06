@@ -321,6 +321,23 @@ final class AccountingRepository
 
     public function createJournalEntry(array $header, array $lines): string
     {
+        // Guard de idempotencia: si ya existe un asiento con la misma referencia,
+        // fecha y tenant, retornar su ID en lugar de duplicar.
+        $ref      = (string) ($header['referencia'] ?? '');
+        $fecha    = (string) ($header['fecha']       ?? '');
+        $tenantId = (string) ($header['tenant_id']   ?? '');
+        if ($ref !== '' && $fecha !== '' && $tenantId !== '') {
+            $existing = QueryBuilder::table($this->db, self::JOURNAL_TABLE)
+                ->where('tenant_id',  '=', $tenantId)
+                ->where('referencia', '=', $ref)
+                ->where('fecha',      '=', $fecha)
+                ->limit(1)
+                ->get();
+            if (!empty($existing)) {
+                return (string) ($existing[0]['id'] ?? '');
+            }
+        }
+
         $this->db->beginTransaction();
         try {
             $header['created_at'] = date('Y-m-d H:i:s');
@@ -465,6 +482,7 @@ final class AccountingRepository
                 );
                 CREATE INDEX IF NOT EXISTS idx_journal_tenant     ON {$journalTable}(tenant_id, fecha);
                 CREATE INDEX IF NOT EXISTS idx_journal_electronic ON {$journalTable}(tenant_id, is_electronic, fecha);
+                CREATE UNIQUE INDEX IF NOT EXISTS uq_journal_ref ON {$journalTable}(tenant_id, referencia, fecha);
 
                 CREATE TABLE IF NOT EXISTS {$lineTable} (
                     id         INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -556,7 +574,8 @@ final class AccountingRepository
                     created_at   DATETIME,
                     updated_at   DATETIME,
                     INDEX idx_journal_tenant     (tenant_id, fecha),
-                    INDEX idx_journal_electronic (tenant_id, is_electronic, fecha)
+                    INDEX idx_journal_electronic (tenant_id, is_electronic, fecha),
+                    UNIQUE KEY uq_journal_ref    (tenant_id, referencia, fecha)
                 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 
                 CREATE TABLE IF NOT EXISTS {$lineTable} (

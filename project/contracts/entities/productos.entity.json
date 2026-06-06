@@ -79,7 +79,79 @@
             "label": "Código UNSPSC",
             "required": false,
             "source": "form",
-            "help": "Código de clasificación UNSPSC (ej: 50101501). Requerido para Factura Electrónica DIAN. El contador o el agente puede ayudarle a encontrar el código correcto."
+            "help": "Código de clasificación UNSPSC (ej: 50101501). Requerido para Factura Electrónica DIAN."
+        },
+        {
+            "name": "tipo_item",
+            "type": "string",
+            "label": "Tipo de Ítem",
+            "required": false,
+            "default": "producto_fisico",
+            "source": "form",
+            "enum": ["producto_fisico", "servicio", "producto_fabricado", "materia_prima", "activo"],
+            "help": "Define la naturaleza del ítem. Los servicios no descuentan stock.",
+            "params": {
+                "llm_hint": "Pregunta: '¿Este ítem es un producto físico en bodega, un servicio que prestas, algo que fabricas, o materia prima?'"
+            }
+        },
+        {
+            "name": "inventariable",
+            "type": "boolean",
+            "label": "Lleva control de inventario",
+            "required": false,
+            "default": true,
+            "source": "form",
+            "help": "true = el sistema controla el stock. false = no descuenta inventario (servicios, intangibles).",
+            "params": {
+                "llm_hint": "Pregunta: '¿Este ítem lleva control de inventario en unidades? Para servicios respondería NO.'"
+            }
+        },
+        {
+            "name": "controla_unidades",
+            "type": "boolean",
+            "label": "Control por unidades",
+            "required": false,
+            "default": true,
+            "source": "form",
+            "help": "false = solo se controla el valor contable, no las unidades físicas.",
+            "params": {
+                "llm_hint": "Pregunta: '¿Necesitas controlar cuántas unidades físicas tienes, o solo el valor monetario?'"
+            }
+        },
+        {
+            "name": "permite_venta_sin_stock",
+            "type": "boolean",
+            "label": "Permite venta sin stock disponible",
+            "required": false,
+            "default": false,
+            "source": "form",
+            "help": "false = el agente advierte cuando no hay stock. true = venta libre sin validación.",
+            "params": {
+                "llm_hint": "Pregunta: '¿Quieres que el sistema te avise cuando no haya stock antes de facturar?'"
+            }
+        },
+        {
+            "name": "costo_unitario",
+            "type": "decimal",
+            "label": "Costo Unitario",
+            "required": false,
+            "default": 0,
+            "source": "form",
+            "params": { "precision": 10, "scale": 4 },
+            "help": "Costo de adquisición o producción por unidad. Usado para valoración de inventario."
+        },
+        {
+            "name": "metodo_valuacion",
+            "type": "string",
+            "label": "Método de Valuación",
+            "required": false,
+            "default": "promedio_ponderado",
+            "source": "form",
+            "enum": ["promedio_ponderado", "peps", "ueps", "precio_estandar"],
+            "help": "Método contable para valorar inventario. Colombia NIIF PYME: promedio ponderado o PEPS.",
+            "params": {
+                "llm_hint": "Pregunta: '¿Qué método usa tu contador para valorar el inventario? El más común en Colombia es promedio ponderado.'"
+            }
         }
     ],
     "permissions": {
